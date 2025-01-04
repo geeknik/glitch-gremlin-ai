@@ -10,7 +10,18 @@ use {
         signer::{keypair::Keypair, Signer},
         transaction::Transaction,
     },
+    crate::{
+        instruction::GlitchInstruction,
+        state::ChaosRequest,
+    },
 };
+
+// Program ID for tests
+pub fn id() -> Pubkey {
+    "GremLinXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+        .parse()
+        .unwrap()
+}
 
 pub async fn program_test() -> (BanksClient, Keypair, Hash) {
     let program_id = Pubkey::new_unique();
