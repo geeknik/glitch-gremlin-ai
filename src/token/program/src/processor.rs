@@ -121,7 +121,7 @@ impl Processor {
     }
 
     fn process_finalize_chaos_request(
-        program_id: &Pubkey,
+        _program_id: &Pubkey,
         accounts: &[AccountInfo],
         status: u8,
         result_ref: String,
