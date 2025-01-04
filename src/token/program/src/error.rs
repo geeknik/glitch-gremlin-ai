@@ -23,6 +23,18 @@ pub enum GlitchError {
 
     #[error("Invalid status transition")]
     InvalidStatusTransition,
+
+    #[error("Invalid token account")]
+    InvalidTokenAccount,
+
+    #[error("Invalid escrow account")]
+    InvalidEscrowAccount,
+
+    #[error("Invalid token program")]
+    InvalidTokenProgram,
+
+    #[error("Arithmetic overflow")]
+    Overflow,
 }
 
 impl From<GlitchError> for ProgramError {
