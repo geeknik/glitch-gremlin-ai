@@ -42,15 +42,18 @@ async fn test_initialize_chaos_request() {
     
     // Create chaos request account with proper size including Borsh overhead
     let rent = banks_client.get_rent().await.unwrap();
-    let dummy_request = ChaosRequest {
+    // Use actual test data size for accurate calculation
+    let test_request = ChaosRequest {
         owner: Pubkey::new_unique(),
-        amount: 0,
+        amount: 1000,
         status: 0,
-        params: vec![], // Empty params for base size
+        params: vec![1, 2, 3],
         result_ref: String::new(),
     };
-    let account_size = dummy_request.try_to_vec().unwrap().len();
-    let account_rent = rent.minimum_balance(account_size);
+    let account_size = test_request.try_to_vec().unwrap().len();
+    // Add 10% buffer for safety
+    let account_size_with_buffer = (account_size as f64 * 1.1) as usize;
+    let account_rent = rent.minimum_balance(account_size_with_buffer);
     
     let create_account_ix = system_instruction::create_account(
         &payer.pubkey(),
@@ -111,15 +114,18 @@ async fn test_finalize_chaos_request() {
     
     // Create chaos request account with proper size including Borsh overhead
     let rent = banks_client.get_rent().await.unwrap();
-    let dummy_request = ChaosRequest {
+    // Use actual test data size for accurate calculation
+    let test_request = ChaosRequest {
         owner: Pubkey::new_unique(),
-        amount: 0,
+        amount: 1000,
         status: 0,
-        params: vec![], // Empty params for base size
+        params: vec![1, 2, 3],
         result_ref: String::new(),
     };
-    let account_size = dummy_request.try_to_vec().unwrap().len();
-    let account_rent = rent.minimum_balance(account_size);
+    let account_size = test_request.try_to_vec().unwrap().len();
+    // Add 10% buffer for safety
+    let account_size_with_buffer = (account_size as f64 * 1.1) as usize;
+    let account_rent = rent.minimum_balance(account_size_with_buffer);
     
     let create_account_ix = system_instruction::create_account(
         &payer.pubkey(),
