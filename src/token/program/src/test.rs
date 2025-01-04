@@ -40,9 +40,16 @@ async fn test_initialize_chaos_request() {
     let owner = Keypair::new();
     let chaos_request = Keypair::new();
     
-    // Create chaos request account with proper size
+    // Create chaos request account with proper size including Borsh overhead
     let rent = banks_client.get_rent().await.unwrap();
-    let account_size = std::mem::size_of::<ChaosRequest>();
+    let dummy_request = ChaosRequest {
+        owner: Pubkey::new_unique(),
+        amount: 0,
+        status: 0,
+        params: vec![], // Empty params for base size
+        result_ref: String::new(),
+    };
+    let account_size = dummy_request.try_to_vec().unwrap().len();
     let account_rent = rent.minimum_balance(account_size);
     
     let create_account_ix = system_instruction::create_account(
@@ -102,9 +109,16 @@ async fn test_finalize_chaos_request() {
     let finalizer = Keypair::new();
     let chaos_request = Keypair::new();
     
-    // Create chaos request account with proper size
+    // Create chaos request account with proper size including Borsh overhead
     let rent = banks_client.get_rent().await.unwrap();
-    let account_size = std::mem::size_of::<ChaosRequest>();
+    let dummy_request = ChaosRequest {
+        owner: Pubkey::new_unique(),
+        amount: 0,
+        status: 0,
+        params: vec![], // Empty params for base size
+        result_ref: String::new(),
+    };
+    let account_size = dummy_request.try_to_vec().unwrap().len();
     let account_rent = rent.minimum_balance(account_size);
     
     let create_account_ix = system_instruction::create_account(
