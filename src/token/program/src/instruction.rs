@@ -1,9 +1,8 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::program_error::ProgramError;
 use std::convert::TryInto;
-use std::string::String;
 
-#[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq)]
 #[repr(u8)]
 pub enum GlitchInstruction {
     /// Initialize a new chaos request
@@ -28,7 +27,7 @@ pub enum GlitchInstruction {
         /// Result status code
         status: u8,
         /// Reference to results (e.g. IPFS hash)
-        result_ref: String,
+        result_ref: Vec<u8>, // Changed from String to Vec<u8> for better Borsh compatibility
     },
 }
 
@@ -56,8 +55,7 @@ impl GlitchInstruction {
                     .get(0)
                     .ok_or(ProgramError::InvalidInstructionData)?;
                 
-                let result_ref = String::from_utf8(rest[1..].to_vec())
-                    .map_err(|_| ProgramError::InvalidInstructionData)?;
+                let result_ref = rest[1..].to_vec();
 
                 Self::FinalizeChaosRequest {
                     status: *status,
@@ -96,7 +94,7 @@ mod tests {
     fn test_serialize_finalize_chaos_request() {
         let instruction = GlitchInstruction::FinalizeChaosRequest {
             status: 1,
-            result_ref: "test".to_string(),
+            result_ref: b"test".to_vec(),
         };
         
         let serialized = instruction.try_to_vec().unwrap();
@@ -105,7 +103,7 @@ mod tests {
         match deserialized {
             GlitchInstruction::FinalizeChaosRequest { status, result_ref } => {
                 assert_eq!(status, 1);
-                assert_eq!(result_ref, "test");
+                assert_eq!(result_ref, b"test");
             }
             _ => panic!("Wrong instruction variant"),
         }
