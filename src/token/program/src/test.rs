@@ -139,7 +139,7 @@ async fn test_finalize_chaos_request() {
         id(),
         &GlitchInstruction::FinalizeChaosRequest {
             status,
-            result_ref: result_ref.clone().into_bytes(),
+            result_ref: result_ref.clone(),
         },
         vec![
             AccountMeta::new(chaos_request.pubkey(), false),
@@ -165,5 +165,5 @@ async fn test_finalize_chaos_request() {
     
     let chaos_req = ChaosRequest::try_from_slice(&account.data).unwrap();
     assert_eq!(chaos_req.status, status);
-    assert_eq!(chaos_req.result_ref, String::from_utf8(result_ref).unwrap());
+    assert_eq!(chaos_req.result_ref, result_ref);
 }

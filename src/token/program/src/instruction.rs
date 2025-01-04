@@ -3,6 +3,7 @@ use solana_program::program_error::ProgramError;
 use std::convert::TryInto;
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 pub enum GlitchInstruction {
     /// Initialize a new chaos request
