@@ -1,0 +1,18 @@
+[package]
+name = "glitch-gremlin"
+version = "0.1.0"
+edition = "2021"
+description = "Glitch Gremlin AI - Chaos Engine for Solana dApps"
+license = "MIT"
+
+[features]
+no-entrypoint = []
+
+[dependencies]
+solana-program = "1.17.0"
+borsh = "0.10.3"
+thiserror = "1.0.50"
+spl-token = { version = "4.0.0", features = ["no-entrypoint"] }
+
+[lib]
+crate-type = ["cdylib", "lib"]
