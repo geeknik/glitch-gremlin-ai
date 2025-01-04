@@ -40,17 +40,17 @@ async fn test_initialize_chaos_request() {
     let owner = Keypair::new();
     let chaos_request = Keypair::new();
     
-    // Create chaos request account
+    // Create and initialize chaos request account
     let rent = banks_client.get_rent().await.unwrap();
-    let account_rent = rent.minimum_balance(std::mem::size_of::<ChaosRequest>());
+    let account_size = std::mem::size_of::<ChaosRequest>();
+    let account_rent = rent.minimum_balance(account_size);
     
-    let create_account_ix = system_instruction::create_account(
-        &payer.pubkey(),
-        &chaos_request.pubkey(),
-        account_rent,
-        std::mem::size_of::<ChaosRequest>() as u64,
-        &id(),
-    );
+    // Initialize account with zeroed data of correct size
+    let mut account_data = vec![0; account_size];
+    let mut account = Account::new(account_rent, account_size, &id());
+    account.data = account_data;
+    
+    banks_client.set_account(chaos_request.pubkey(), &account).await.unwrap();
 
     // Initialize chaos request
     let amount = 1000;
@@ -101,17 +101,17 @@ async fn test_finalize_chaos_request() {
     let finalizer = Keypair::new();
     let chaos_request = Keypair::new();
     
-    // First create and initialize the chaos request
+    // Create and initialize chaos request account
     let rent = banks_client.get_rent().await.unwrap();
-    let account_rent = rent.minimum_balance(std::mem::size_of::<ChaosRequest>());
+    let account_size = std::mem::size_of::<ChaosRequest>();
+    let account_rent = rent.minimum_balance(account_size);
     
-    let create_account_ix = system_instruction::create_account(
-        &payer.pubkey(),
-        &chaos_request.pubkey(),
-        account_rent,
-        std::mem::size_of::<ChaosRequest>() as u64,
-        &id(),
-    );
+    // Initialize account with zeroed data of correct size
+    let mut account_data = vec![0; account_size];
+    let mut account = Account::new(account_rent, account_size, &id());
+    account.data = account_data;
+    
+    banks_client.set_account(chaos_request.pubkey(), &account).await.unwrap();
 
     // Initialize with test data
     let instruction_data = GlitchInstruction::InitializeChaosRequest {
