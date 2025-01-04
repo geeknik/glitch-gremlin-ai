@@ -4,6 +4,7 @@ use std::convert::TryInto;
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq)]
 #[repr(u8)]
+#[borsh(use_discriminant = true)]
 pub enum GlitchInstruction {
     /// Initialize a new chaos request
     /// 
