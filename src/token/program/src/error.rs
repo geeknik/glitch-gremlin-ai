@@ -11,6 +11,18 @@ pub enum GlitchError {
     
     #[error("Invalid chaos request")]
     InvalidChaosRequest,
+
+    #[error("Account not initialized")]
+    UninitializedAccount,
+
+    #[error("Invalid account owner")]
+    InvalidAccountOwner,
+
+    #[error("Invalid finalizer")]
+    InvalidFinalizer,
+
+    #[error("Invalid status transition")]
+    InvalidStatusTransition,
 }
 
 impl From<GlitchError> for ProgramError {

@@ -3,8 +3,14 @@ use solana_program::{
     entrypoint,
     entrypoint::ProgramResult,
     pubkey::Pubkey,
-    msg,
 };
+
+pub mod error;
+pub mod instruction;
+pub mod processor;
+pub mod state;
+
+use crate::processor::Processor;
 
 // Declare and export the program's entrypoint
 entrypoint!(process_instruction);
@@ -15,8 +21,7 @@ pub fn process_instruction(
     accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> ProgramResult {
-    msg!("Glitch Gremlin AI Program entrypoint");
-    Ok(())
+    Processor::process(program_id, accounts, instruction_data)
 }
 
 #[cfg(test)]
@@ -25,6 +30,7 @@ mod test {
 
     #[test]
     fn test_sanity() {
-        // Basic sanity test
+        // TODO: Implement comprehensive tests
+        assert!(true);
     }
 }
