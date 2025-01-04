@@ -5,5 +5,20 @@
     "image": "https://arweave.net/[PLACEHOLDER_HASH]",
     "decimals": 9,
     "website": "https://glitchgremlin.ai",
-    "twitter": "@GlitchGremlinAI"
+    "twitter": "@GlitchGremlinAI",
+    "attributes": {
+        "tokenType": "utility",
+        "category": "AI",
+        "platform": "Solana"
+    },
+    "properties": {
+        "files": [
+            {
+                "uri": "logo.png",
+                "type": "image/png"
+            }
+        ],
+        "category": "image",
+        "creators": []
+    }
 }
