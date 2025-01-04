@@ -14,6 +14,7 @@ use {
         instruction::GlitchInstruction,
         state::ChaosRequest,
     },
+    borsh::{BorshSerialize, BorshDeserialize},
 };
 
 // Program ID for tests
