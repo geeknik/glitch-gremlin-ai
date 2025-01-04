@@ -7,7 +7,10 @@ use solana_program::{
     program_pack::Pack,
     sysvar::{rent::Rent, Sysvar},
     program::invoke,
+    instruction::Instruction,
 };
+use redis::{Commands, RedisResult};
+use std::str::FromStr;
 use borsh::{BorshSerialize, BorshDeserialize};
 use spl_token::state::Account as TokenAccount;
 use crate::{instruction::GlitchInstruction, error::GlitchError, state::ChaosRequest};
@@ -73,6 +76,11 @@ impl Processor {
         amount: u64,
         params: Vec<u8>,
     ) -> ProgramResult {
+        // Initialize Redis connection
+        let client = redis::Client::open("redis://r.glitchgremlin.ai/")
+            .map_err(|_| ProgramError::Custom(1000))?;
+        let mut con = client.get_connection()
+            .map_err(|_| ProgramError::Custom(1001))?;
         let account_info_iter = &mut accounts.iter();
         let chaos_request_info = next_account_info(account_info_iter)?;
         let token_account_info = next_account_info(account_info_iter)?;
@@ -117,6 +125,12 @@ impl Processor {
         )?;
         
         msg!("Chaos request initialized with amount {}", amount);
+
+        // Push job to Redis queue
+        let job_data = format!("{}|{}|{}", chaos_request_info.key, hex::encode(params), owner_info.key);
+        con.lpush::<_, _, ()>("chaos_jobs", &job_data)
+            .map_err(|_| ProgramError::Custom(1002))?;
+
         Ok(())
     }
 
