@@ -1,14 +1,8 @@
 use {
     super::*,
-    assert_matches::assert_matches,
-    solana_program::{
-        instruction::{AccountMeta, Instruction},
-        program_pack::Pack,
-    },
     solana_program_test::*,
     solana_sdk::{
-        signature::Signer,
-        transaction::Transaction,
+        hash::Hash,
         signer::keypair::Keypair,
     },
 };
