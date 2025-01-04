@@ -25,12 +25,4 @@ pub fn process_instruction(
 }
 
 #[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_sanity() {
-        // TODO: Implement comprehensive tests
-        assert!(true);
-    }
-}
+mod test;

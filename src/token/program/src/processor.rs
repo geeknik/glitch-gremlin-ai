@@ -54,9 +54,18 @@ impl Processor {
             params,
         );
 
-        // TODO: Implement token transfer logic here
-        // For now just create the request
+        // Verify account ownership
+        if chaos_request_info.owner != program_id {
+            return Err(GlitchError::InvalidAccountOwner.into());
+        }
 
+        // Verify token account ownership
+        if token_account_info.owner != &spl_token::id() {
+            return Err(GlitchError::InvalidAccountOwner.into());
+        }
+
+        // TODO: Add token transfer using spl_token
+        // For demonstration, just create the request
         chaos_request.serialize(&mut *chaos_request_info.data.borrow_mut())?;
         
         Ok(())
