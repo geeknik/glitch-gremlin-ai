@@ -40,15 +40,16 @@ async fn test_initialize_chaos_request() {
     let owner = Keypair::new();
     let chaos_request = Keypair::new();
     
-    // Create chaos request account
+    // Create chaos request account with proper size
     let rent = banks_client.get_rent().await.unwrap();
-    let account_rent = rent.minimum_balance(std::mem::size_of::<ChaosRequest>());
+    let account_size = std::mem::size_of::<ChaosRequest>();
+    let account_rent = rent.minimum_balance(account_size);
     
     let create_account_ix = system_instruction::create_account(
         &payer.pubkey(),
         &chaos_request.pubkey(),
         account_rent,
-        std::mem::size_of::<ChaosRequest>() as u64,
+        account_size as u64,
         &id(),
     );
 
@@ -101,15 +102,16 @@ async fn test_finalize_chaos_request() {
     let finalizer = Keypair::new();
     let chaos_request = Keypair::new();
     
-    // Create chaos request account
+    // Create chaos request account with proper size
     let rent = banks_client.get_rent().await.unwrap();
-    let account_rent = rent.minimum_balance(std::mem::size_of::<ChaosRequest>());
+    let account_size = std::mem::size_of::<ChaosRequest>();
+    let account_rent = rent.minimum_balance(account_size);
     
     let create_account_ix = system_instruction::create_account(
         &payer.pubkey(),
         &chaos_request.pubkey(),
         account_rent,
-        std::mem::size_of::<ChaosRequest>() as u64,
+        account_size as u64,
         &id(),
     );
 
