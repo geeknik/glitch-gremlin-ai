@@ -124,7 +124,7 @@ impl Processor {
         _program_id: &Pubkey,
         accounts: &[AccountInfo],
         status: u8,
-        result_ref: String,
+        result_ref: Vec<u8>,
     ) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
         let chaos_request_info = next_account_info(account_info_iter)?;
