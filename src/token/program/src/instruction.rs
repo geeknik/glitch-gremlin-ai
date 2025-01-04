@@ -1,6 +1,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::program_error::ProgramError;
 use std::convert::TryInto;
+use borsh::io;
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq)]
 #[repr(u8)]
