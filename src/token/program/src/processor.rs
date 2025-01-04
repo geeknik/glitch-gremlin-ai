@@ -138,7 +138,7 @@ impl Processor {
 
         let mut chaos_request = ChaosRequest::try_from_slice(&chaos_request_info.data.borrow())?;
         chaos_request.status = status;
-        chaos_request.result_ref = result_ref;
+        chaos_request.result_ref = String::from_utf8(result_ref).map_err(|_| GlitchError::InvalidChaosRequest)?;
 
         chaos_request.serialize(&mut *chaos_request_info.data.borrow_mut())?;
 
