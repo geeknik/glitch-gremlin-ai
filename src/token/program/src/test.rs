@@ -2,8 +2,8 @@ use {
     super::*,
     solana_program_test::*,
     solana_program::{
-        account_info::Account,
         instruction::{AccountMeta, Instruction},
+        system_instruction,
     },
     solana_sdk::{
         hash::Hash,
