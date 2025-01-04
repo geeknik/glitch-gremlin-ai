@@ -1,8 +1,10 @@
 use borsh::{BorshDeserialize, BorshSerialize, BorshSchema};
 use solana_program::program_error::ProgramError;
 use std::convert::TryInto;
+use std::string::String;
 
 #[derive(BorshSerialize, BorshDeserialize, BorshSchema, Debug, Clone)]
+#[repr(u8)]
 pub enum GlitchInstruction {
     /// Initialize a new chaos request
     /// 
