@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "Glitch Gremlin AI - Chaos Engine for Solana dApps"
 license = "MIT"
+repository = "https://github.com/solana-labs/solana-program-library"
 
 [features]
 no-entrypoint = []
