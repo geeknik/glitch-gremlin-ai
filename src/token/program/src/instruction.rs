@@ -1,5 +1,4 @@
 use borsh::{BorshDeserialize, BorshSerialize, BorshSchema};
-use borsh_derive::{BorshDeserialize, BorshSerialize, BorshSchema};
 use solana_program::program_error::ProgramError;
 use std::convert::TryInto;
 
