@@ -1,9 +1,9 @@
-use borsh::{BorshDeserialize, BorshSerialize, BorshSchema};
+use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::program_error::ProgramError;
 use std::convert::TryInto;
 use std::string::String;
 
-#[derive(BorshSerialize, BorshDeserialize, BorshSchema, Debug, Clone)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
 #[repr(u8)]
 pub enum GlitchInstruction {
     /// Initialize a new chaos request
@@ -66,5 +66,48 @@ impl GlitchInstruction {
             }
             _ => return Err(ProgramError::InvalidInstructionData),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn test_serialize_initialize_chaos_request() {
+        let instruction = GlitchInstruction::InitializeChaosRequest {
+            amount: 1000,
+            params: vec![1, 2, 3],
+        };
+        
+        let serialized = instruction.try_to_vec().unwrap();
+        let deserialized = GlitchInstruction::try_from_slice(&serialized).unwrap();
+        
+        match deserialized {
+            GlitchInstruction::InitializeChaosRequest { amount, params } => {
+                assert_eq!(amount, 1000);
+                assert_eq!(params, vec![1, 2, 3]);
+            }
+            _ => panic!("Wrong instruction variant"),
+        }
+    }
+    
+    #[test]
+    fn test_serialize_finalize_chaos_request() {
+        let instruction = GlitchInstruction::FinalizeChaosRequest {
+            status: 1,
+            result_ref: "test".to_string(),
+        };
+        
+        let serialized = instruction.try_to_vec().unwrap();
+        let deserialized = GlitchInstruction::try_from_slice(&serialized).unwrap();
+        
+        match deserialized {
+            GlitchInstruction::FinalizeChaosRequest { status, result_ref } => {
+                assert_eq!(status, 1);
+                assert_eq!(result_ref, "test");
+            }
+            _ => panic!("Wrong instruction variant"),
+        }
     }
 }
