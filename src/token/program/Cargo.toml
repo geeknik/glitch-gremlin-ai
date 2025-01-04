@@ -14,7 +14,7 @@ solana-sdk = "1.17.0"
 
 [dependencies]
 solana-program = "1.17.0"
-borsh = "0.10.3"
+borsh = { version = "0.10.3", features = ["derive"] }
 thiserror = "1.0.50"
 spl-token = { version = "4.0.0", features = ["no-entrypoint"] }
 arrayref = "0.3.7"
