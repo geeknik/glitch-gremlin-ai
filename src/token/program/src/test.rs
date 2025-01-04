@@ -55,17 +55,21 @@ async fn test_initialize_chaos_request() {
     // Initialize chaos request
     let amount = 1000;
     let params = vec![1, 2, 3];
-    let init_ix = Instruction::new_with_borsh(
-        id(),
-        &GlitchInstruction::InitializeChaosRequest {
-            amount,
-            params: params.clone(),
-        },
-        vec![
+    let instruction_data = GlitchInstruction::InitializeChaosRequest {
+        amount,
+        params: params.clone(),
+    }
+    .try_to_vec()
+    .unwrap();
+
+    let init_ix = Instruction {
+        program_id: id(),
+        accounts: vec![
             AccountMeta::new(chaos_request.pubkey(), false),
             AccountMeta::new(owner.pubkey(), true),
         ],
-    );
+        data: instruction_data,
+    };
 
     let transaction = Transaction::new_signed_with_payer(
         &[create_account_ix, init_ix],
@@ -110,17 +114,21 @@ async fn test_finalize_chaos_request() {
     );
 
     // Initialize with test data
-    let init_ix = Instruction::new_with_borsh(
-        id(),
-        &GlitchInstruction::InitializeChaosRequest {
-            amount: 1000,
-            params: vec![1, 2, 3],
-        },
-        vec![
+    let instruction_data = GlitchInstruction::InitializeChaosRequest {
+        amount: 1000,
+        params: vec![1, 2, 3],
+    }
+    .try_to_vec()
+    .unwrap();
+
+    let init_ix = Instruction {
+        program_id: id(),
+        accounts: vec![
             AccountMeta::new(chaos_request.pubkey(), false),
             AccountMeta::new(finalizer.pubkey(), true),
         ],
-    );
+        data: instruction_data,
+    };
 
     let transaction = Transaction::new_signed_with_payer(
         &[create_account_ix, init_ix],
@@ -135,17 +143,21 @@ async fn test_finalize_chaos_request() {
     let result_ref = String::from("ipfs://QmTest123");
     let status = 2; // completed
 
-    let finalize_ix = Instruction::new_with_borsh(
-        id(),
-        &GlitchInstruction::FinalizeChaosRequest {
-            status,
-            result_ref: result_ref.clone().into_bytes(),
-        },
-        vec![
+    let instruction_data = GlitchInstruction::FinalizeChaosRequest {
+        status,
+        result_ref: result_ref.clone().into_bytes(),
+    }
+    .try_to_vec()
+    .unwrap();
+
+    let finalize_ix = Instruction {
+        program_id: id(),
+        accounts: vec![
             AccountMeta::new(chaos_request.pubkey(), false),
             AccountMeta::new(finalizer.pubkey(), true),
         ],
-    );
+        data: instruction_data,
+    };
 
     let transaction = Transaction::new_signed_with_payer(
         &[finalize_ix],
