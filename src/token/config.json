@@ -1,0 +1,9 @@
+{
+    "name": "Glitch Gremlin AI",
+    "symbol": "GLITCH",
+    "description": "AI-driven chaos engine for stress-testing Solana dApps",
+    "image": "https://arweave.net/[PLACEHOLDER_HASH]",
+    "decimals": 9,
+    "website": "https://glitchgremlin.ai",
+    "twitter": "@GlitchGremlinAI"
+}
