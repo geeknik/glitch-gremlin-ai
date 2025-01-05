@@ -12,16 +12,8 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "composite": true,
-    "allowJs": true,
-    "baseUrl": ".",
-    "paths": {
-      "@glitch-gremlin/sdk": ["../sdk/dist"]
-    }
+    "composite": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"],
-  "references": [
-    { "path": "../sdk" }
-  ]
+  "exclude": ["node_modules", "dist"]
 }
