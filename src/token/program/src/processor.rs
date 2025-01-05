@@ -68,6 +68,18 @@ impl Processor {
                 msg!("Instruction: Finalize Chaos Request");
                 Self::process_finalize_chaos_request(program_id, accounts, status, result_ref)
             }
+            GlitchInstruction::CreateProposal { id, description, target_program, staked_amount, deadline } => {
+                msg!("Instruction: Create Proposal");
+                Self::process_create_proposal(program_id, accounts, id, description, target_program, staked_amount, deadline)
+            }
+            GlitchInstruction::Vote { proposal_id, vote_for, vote_amount } => {
+                msg!("Instruction: Vote");
+                Self::process_vote(program_id, accounts, proposal_id, vote_for, vote_amount)
+            }
+            GlitchInstruction::ExecuteProposal { proposal_id } => {
+                msg!("Instruction: Execute Proposal");
+                Self::process_execute_proposal(program_id, accounts, proposal_id)
+            }
         }
     }
 

@@ -146,4 +146,67 @@ mod tests {
             _ => panic!("Wrong instruction variant"),
         }
     }
+
+    #[tokio::test]
+    async fn test_create_proposal() {
+        let (mut banks_client, payer, recent_blockhash) = program_test().await;
+        let proposer = Keypair::new();
+        let proposal = Keypair::new();
+        let staking_account = Keypair::new();
+        
+        // Create accounts
+        let rent = banks_client.get_rent().await.unwrap();
+        let account_size = std::mem::size_of::<GovernanceProposal>();
+        let account_rent = rent.minimum_balance(account_size);
+        
+        let create_account_ix = system_instruction::create_account(
+            &payer.pubkey(),
+            &proposal.pubkey(),
+            account_rent,
+            account_size as u64,
+            &id(),
+        );
+
+        // Create proposal instruction
+        let instruction_data = GlitchInstruction::CreateProposal {
+            id: 1,
+            description: "Test proposal".to_string(),
+            target_program: Pubkey::new_unique(),
+            staked_amount: 1000,
+            deadline: 1234567890,
+        }
+        .try_to_vec()
+        .unwrap();
+
+        let create_proposal_ix = Instruction {
+            program_id: id(),
+            accounts: vec![
+                AccountMeta::new(proposal.pubkey(), false),
+                AccountMeta::new(staking_account.pubkey(), false),
+                AccountMeta::new(proposer.pubkey(), true),
+            ],
+            data: instruction_data,
+        };
+
+        let transaction = Transaction::new_signed_with_payer(
+            &[create_account_ix, create_proposal_ix],
+            Some(&payer.pubkey()),
+            &[&payer, &proposal, &staking_account, &proposer],
+            recent_blockhash,
+        );
+
+        banks_client.process_transaction(transaction).await.unwrap();
+
+        // Verify proposal state
+        let account = banks_client
+            .get_account(proposal.pubkey())
+            .await
+            .unwrap()
+            .unwrap();
+        
+        let proposal = GovernanceProposal::try_from_slice(&account.data).unwrap();
+        assert_eq!(proposal.id, 1);
+        assert_eq!(proposal.description, "Test proposal");
+        assert_eq!(proposal.staked_amount, 1000);
+    }
 }
