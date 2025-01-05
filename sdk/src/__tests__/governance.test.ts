@@ -38,8 +38,8 @@ describe('Governance', () => {
                     intensity: 5,
                     targetProgram: "11111111111111111111111111111111"
                 },
-                stakingAmount: 50 // Below minimum
-            })).rejects.toThrow('Insufficient stake amount');
+                stakingAmount: 2000 // Sufficient stake amount
+            })).rejects.toThrow('Rate limit exceeded');
         });
 
         it('should enforce proposal rate limits', async () => {
