@@ -67,6 +67,45 @@ impl GlitchInstruction {
     }
 }
 
+/// Governance instructions
+impl GlitchInstruction {
+    pub fn create_proposal(
+        id: u64,
+        description: String,
+        target_program: Pubkey,
+        staked_amount: u64,
+        deadline: i64,
+    ) -> Self {
+        Self::CreateProposal {
+            id,
+            description,
+            target_program,
+            staked_amount,
+            deadline,
+        }
+    }
+
+    pub fn vote(
+        proposal_id: u64,
+        vote_for: bool,
+        vote_amount: u64,
+    ) -> Self {
+        Self::Vote {
+            proposal_id,
+            vote_for,
+            vote_amount,
+        }
+    }
+
+    pub fn execute_proposal(
+        proposal_id: u64,
+    ) -> Self {
+        Self::ExecuteProposal {
+            proposal_id,
+        }
+    }
+}
+
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq)]
 pub enum GovernanceInstruction {
     /// Create a new governance proposal
