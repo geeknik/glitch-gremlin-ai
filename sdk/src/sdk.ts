@@ -5,7 +5,7 @@ import {
     Transaction,
     TransactionInstruction,
 } from '@solana/web3.js';
-import { ChaosRequestParams, ChaosResult, TestType } from './types';
+import { ChaosRequestParams, ChaosResult, TestType, ProposalParams } from './types';
 import { GlitchError, InsufficientFundsError, InvalidProgramError } from './errors';
 
 /**
@@ -39,14 +39,31 @@ export class GlitchSDK {
      * @param config.programId Optional custom program ID
      */
     constructor(config: {
-        cluster: string;
+        cluster?: string;
         wallet: Keypair;
         programId?: string;
     }) {
-        this.connection = new Connection(config.cluster);
+        // Default to testnet
+        this.connection = new Connection(config.cluster || 'https://api.testnet.solana.com');
+        
+        // Use an obfuscated program ID if not specified
         this.programId = new PublicKey(
-            config.programId || 'GremLinXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'
+            config.programId || 'GLt5cQeRgVMqnE9DGJQNNrbAfnRQYWqYVNWnJo7WNLZ9'
         );
+    }
+
+    private lastRequestTime = 0;
+    private readonly MIN_REQUEST_INTERVAL = 2000; // 2 seconds between requests
+
+    private async checkRateLimit() {
+        const now = Date.now();
+        const timeSinceLastRequest = now - this.lastRequestTime;
+        if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
+            await new Promise(resolve => 
+                setTimeout(resolve, this.MIN_REQUEST_INTERVAL - timeSinceLastRequest)
+            );
+        }
+        this.lastRequestTime = now;
     }
 
     async createChaosRequest(params: ChaosRequestParams): Promise<{

@@ -14,7 +14,8 @@ async function runBasicTest() {
     });
 
     // Create a chaos request
-    const request = await sdk.createChaosRequest({
+    await this.checkRateLimit();
+    const request = await this.createChaosRequest({
         targetProgram: "Your program ID here",
         testType: TestType.FUZZ,
         duration: 300, // 5 minutes

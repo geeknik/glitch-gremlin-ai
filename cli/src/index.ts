@@ -100,7 +100,7 @@ program
     }
 
     const sdk = new GlitchSDK({
-        cluster: process.env.SOLANA_CLUSTER || 'devnet',
+        cluster: process.env.SOLANA_CLUSTER || 'https://api.testnet.solana.com',
         wallet: Keypair.fromSecretKey(
             Buffer.from(JSON.parse(readFileSync(keypairPath, 'utf-8')))
         )
