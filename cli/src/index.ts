@@ -20,7 +20,7 @@
 import { readFileSync } from 'fs';
 import { Keypair } from '@solana/web3.js';
 import { Command } from 'commander';
-import { GlitchSDK, TestType } from '@glitch-gremlin/sdk';
+import { GlitchSDK, TestType } from '../../sdk/src';
 import ora from 'ora';
 import chalk from 'chalk';
 
@@ -94,7 +94,12 @@ governance
   .action(async (options) => {
     const spinner = ora('Creating proposal...').start();
     try {
-      const sdk = initSDK();
+      const sdk = new GlitchSDK({
+        cluster: process.env.SOLANA_CLUSTER || 'devnet',
+        wallet: Keypair.fromSecretKey(
+          Buffer.from(JSON.parse(readFileSync(process.env.SOLANA_KEYPAIR_PATH!, 'utf-8')))
+        )
+      });
       const proposal = await sdk.createProposal({
         title: options.title,
         description: options.description,
@@ -122,7 +127,12 @@ governance
   .action(async (options) => {
     const spinner = ora('Submitting vote...').start();
     try {
-      const sdk = initSDK();
+      const sdk = new GlitchSDK({
+        cluster: process.env.SOLANA_CLUSTER || 'devnet',
+        wallet: Keypair.fromSecretKey(
+          Buffer.from(JSON.parse(readFileSync(process.env.SOLANA_KEYPAIR_PATH!, 'utf-8')))
+        )
+      });
       await sdk.vote(options.proposal, options.vote === 'yes');
       spinner.succeed('Vote submitted successfully');
     } catch (error) {
