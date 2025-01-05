@@ -6,7 +6,7 @@ import {
     TransactionInstruction,
 } from '@solana/web3.js';
 import { ChaosRequestParams, ChaosResult, TestType } from './types';
-import { GlitchError, InsufficientFundsError } from './errors';
+import { GlitchError, InsufficientFundsError, InvalidProgramError } from './errors';
 
 export class GlitchSDK {
     private connection: Connection;

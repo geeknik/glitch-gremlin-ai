@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { readFileSync } from 'fs';
+import { Keypair } from '@solana/web3.js';
 import { Command } from 'commander';
 import { GlitchSDK, TestType } from '@glitch-gremlin/sdk';
 import ora from 'ora';
@@ -22,10 +24,17 @@ program
     const spinner = ora('Creating chaos request...').start();
     
     try {
-      const sdk = new GlitchSDK({
+    const keypairPath = process.env.SOLANA_KEYPAIR_PATH;
+    if (!keypairPath) {
+        throw new Error('SOLANA_KEYPAIR_PATH environment variable is not set');
+    }
+
+    const sdk = new GlitchSDK({
         cluster: process.env.SOLANA_CLUSTER || 'devnet',
-        wallet: process.env.SOLANA_KEYPAIR_PATH
-      });
+        wallet: Keypair.fromSecretKey(
+            Buffer.from(JSON.parse(readFileSync(keypairPath, 'utf-8')))
+        )
+    });
 
       const request = await sdk.createChaosRequest({
         targetProgram: options.program,
