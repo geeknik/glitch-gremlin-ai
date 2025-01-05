@@ -34,6 +34,7 @@ async fn run_load_test(
     })
 }
 
+#[allow(dead_code)]
 struct ChaosParams {
     test_type: TestType,
     duration: u64,
@@ -41,6 +42,7 @@ struct ChaosParams {
     // Other parameters
 }
 
+#[allow(dead_code)]
 enum TestType {
     LoadTest,
     FuzzTest,

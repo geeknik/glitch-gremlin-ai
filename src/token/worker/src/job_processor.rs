@@ -88,6 +88,7 @@ async fn finalize_chaos_request(
     Ok(())
 }
 
+#[allow(dead_code)]
 pub struct TestEnvironment {
     pub target_program: Pubkey,
     // Other test environment fields
@@ -103,19 +104,25 @@ mod tests {
     const TEST_PROGRAM_ID: &str = "GremLin1111111111111111111111111111111111111";
 
     #[tokio::test]
-    async fn test_process_chaos_job() {
+    async fn test_process_chaos_job() -> Result<(), Box<dyn std::error::Error>> {
         let rpc_client = RpcClient::new("https://api.testnet.solana.com".to_string());
         let program_id = Pubkey::from_str(TEST_PROGRAM_ID).unwrap();
         
+        // Create and fund payer account
+        let payer = Keypair::new();
+        let sig = rpc_client.request_airdrop(&payer.pubkey(), 1_000_000_000).await?;
+        rpc_client.confirm_transaction(&sig).await?;
+
         // Test job data format: request_id|params|target_program
         let job_data = format!(
             "{}|test_params|{}",
-            Keypair::new().pubkey(),
+            payer.pubkey(),
             Keypair::new().pubkey()
         );
 
         let result = process_chaos_job(&rpc_client, &program_id, &job_data).await;
         assert!(result.is_ok(), "Job processing failed: {:?}", result);
+        Ok(())
     }
 
     #[tokio::test]
