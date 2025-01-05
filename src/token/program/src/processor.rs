@@ -8,6 +8,7 @@ use solana_program::{
     sysvar::{rent::Rent, Sysvar},
     program::invoke,
     instruction::Instruction,
+    clock::Clock,
 };
 use redis::{Commands, RedisResult};
 use std::str::FromStr;
@@ -68,6 +69,153 @@ impl Processor {
                 Self::process_finalize_chaos_request(program_id, accounts, status, result_ref)
             }
         }
+    }
+
+    fn process_create_proposal(
+        program_id: &Pubkey,
+        accounts: &[AccountInfo],
+        id: u64,
+        description: String,
+        target_program: Pubkey,
+        staked_amount: u64,
+        deadline: i64,
+    ) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+        let proposal_info = next_account_info(account_info_iter)?;
+        let staking_info = next_account_info(account_info_iter)?;
+        let proposer_info = next_account_info(account_info_iter)?;
+
+        if !proposer_info.is_signer {
+            return Err(ProgramError::MissingRequiredSignature);
+        }
+
+        // Validate accounts
+        Self::validate_governance_account(proposal_info, program_id)?;
+        Self::validate_token_account(staking_info, proposer_info.key)?;
+
+        // Create and serialize the proposal
+        let proposal = GovernanceProposal::new(
+            id,
+            *proposer_info.key,
+            description,
+            target_program,
+            staked_amount,
+            deadline,
+        );
+        proposal.serialize(&mut *proposal_info.data.borrow_mut())?;
+
+        // Transfer staked tokens
+        let transfer_ix = spl_token::instruction::transfer(
+            staking_info.key,
+            staking_info.key,
+            proposal_info.key,
+            proposer_info.key,
+            &[],
+            staked_amount,
+        )?;
+
+        invoke(
+            &transfer_ix,
+            &[
+                staking_info.clone(),
+                proposal_info.clone(),
+                proposer_info.clone(),
+            ],
+        )?;
+
+        msg!("Proposal created with ID {}", id);
+        Ok(())
+    }
+
+    fn process_vote(
+        program_id: &Pubkey,
+        accounts: &[AccountInfo],
+        proposal_id: u64,
+        vote_for: bool,
+        vote_amount: u64,
+    ) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+        let proposal_info = next_account_info(account_info_iter)?;
+        let staking_info = next_account_info(account_info_iter)?;
+        let voter_info = next_account_info(account_info_iter)?;
+
+        if !voter_info.is_signer {
+            return Err(ProgramError::MissingRequiredSignature);
+        }
+
+        // Validate accounts
+        Self::validate_governance_account(proposal_info, program_id)?;
+        Self::validate_token_account(staking_info, voter_info.key)?;
+
+        let mut proposal = GovernanceProposal::try_from_slice(&proposal_info.data.borrow())?;
+
+        // Check if voting is still open
+        let clock = Clock::get()?;
+        if clock.unix_timestamp > proposal.deadline {
+            return Err(ProgramError::InvalidArgument);
+        }
+
+        // Update vote counts
+        if vote_for {
+            proposal.votes_for += vote_amount;
+        } else {
+            proposal.votes_against += vote_amount;
+        }
+
+        proposal.serialize(&mut *proposal_info.data.borrow_mut())?;
+
+        msg!("Vote recorded for proposal {}", proposal_id);
+        Ok(())
+    }
+
+    fn process_execute_proposal(
+        program_id: &Pubkey,
+        accounts: &[AccountInfo],
+        proposal_id: u64,
+    ) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+        let proposal_info = next_account_info(account_info_iter)?;
+        let executor_info = next_account_info(account_info_iter)?;
+
+        if !executor_info.is_signer {
+            return Err(ProgramError::MissingRequiredSignature);
+        }
+
+        let mut proposal = GovernanceProposal::try_from_slice(&proposal_info.data.borrow())?;
+
+        // Check if proposal is approved
+        if proposal.status != ProposalStatus::Approved {
+            return Err(ProgramError::InvalidArgument);
+        }
+
+        // TODO: Implement actual proposal execution logic
+        // This would include:
+        // 1. Creating chaos request
+        // 2. Transferring funds
+        // 3. Updating proposal status
+
+        proposal.status = ProposalStatus::Executed;
+        proposal.serialize(&mut *proposal_info.data.borrow_mut())?;
+
+        msg!("Proposal {} executed", proposal_id);
+        Ok(())
+    }
+
+    fn validate_governance_account(
+        account_info: &AccountInfo,
+        program_id: &Pubkey,
+    ) -> ProgramResult {
+        if account_info.owner != program_id {
+            return Err(ProgramError::InvalidAccountOwner);
+        }
+
+        // Verify account is rent exempt
+        let rent = Rent::get()?;
+        if !rent.is_exempt(account_info.lamports(), account_info.data_len()) {
+            return Err(ProgramError::AccountNotRentExempt);
+        }
+
+        Ok(())
     }
 
     fn process_initialize_chaos_request(
