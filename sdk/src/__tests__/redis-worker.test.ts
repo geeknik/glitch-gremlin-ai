@@ -1,15 +1,16 @@
 import { RedisQueueWorker } from '../queue/redis-worker';
 import { TestType } from '../types';
-import Redis from 'ioredis-mock';
+import { Redis } from 'ioredis';
+import RedisMock from 'ioredis-mock';
 
 jest.mock('ioredis', () => require('ioredis-mock'));
 
 describe('RedisQueueWorker', () => {
     let worker: RedisQueueWorker;
-    let redis: typeof Redis;
+    let redis: Redis;
 
     beforeEach(() => {
-        redis = new Redis();
+        redis = new RedisMock() as unknown as Redis;
         worker = new RedisQueueWorker(redis);
     });
 
