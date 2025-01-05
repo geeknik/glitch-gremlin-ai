@@ -13,7 +13,12 @@
     "declarationMap": true,
     "sourceMap": true,
     "composite": true,
-    "allowJs": true
+    "allowJs": true,
+    "baseUrl": ".",
+    "paths": {
+      "@glitch-gremlin/sdk": ["../sdk/src"],
+      "@glitch-gremlin/sdk/*": ["../sdk/src/*"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"],
