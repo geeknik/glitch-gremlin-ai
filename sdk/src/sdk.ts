@@ -222,6 +222,29 @@ export class GlitchSDK {
         return await this.connection.sendTransaction(transaction, []);
     }
 
+    async executeProposal(proposalId: string): Promise<string> {
+        const proposal = await this.getProposalStatus(proposalId);
+        
+        if (proposal.status !== 'active') {
+            throw new GlitchError('Proposal not passed', 1009);
+        }
+
+        if (Date.now() < proposal.endTime) {
+            throw new GlitchError('Timelock period not elapsed', 1010);
+        }
+
+        const instruction = new TransactionInstruction({
+            keys: [
+                { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true }
+            ],
+            programId: this.programId,
+            data: Buffer.from([]) // Add instruction data
+        });
+
+        const transaction = new Transaction().add(instruction);
+        return await this.connection.sendTransaction(transaction, [this.wallet]);
+    }
+
     async calculateChaosRequestFee(params: Omit<ChaosRequestParams, 'targetProgram'>): Promise<number> {
         // Base fee calculation based on test type
         let baseFee = 100; // Default base fee
