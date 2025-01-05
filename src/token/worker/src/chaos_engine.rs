@@ -20,8 +20,8 @@ pub struct TestMetrics {
 }
 
 pub async fn run_chaos_test(
-    test_env: &TestEnvironment,
-    params: &str,
+    _test_env: &TestEnvironment,
+    _params: &str,
 ) -> Result<ChaosTestResult, Box<dyn Error>> {
     // Parse parameters
     let params = parse_chaos_params(params)?;
@@ -47,8 +47,8 @@ pub async fn run_chaos_test(
 }
 
 async fn run_load_test(
-    test_env: &TestEnvironment,
-    params: &ChaosParams,
+    _test_env: &TestEnvironment,
+    _params: &ChaosParams,
 ) -> Result<ChaosTestResult, Box<dyn Error>> {
     // TODO: Implement actual load testing
     Ok(ChaosTestResult {
@@ -63,8 +63,8 @@ async fn run_load_test(
 }
 
 async fn run_fuzz_test(
-    test_env: &TestEnvironment,
-    params: &ChaosParams,
+    _test_env: &TestEnvironment,
+    _params: &ChaosParams,
 ) -> Result<ChaosTestResult, Box<dyn Error>> {
     // TODO: Implement fuzz testing
     Ok(ChaosTestResult {
@@ -79,8 +79,8 @@ async fn run_fuzz_test(
 }
 
 async fn run_exploit_test(
-    test_env: &TestEnvironment,
-    params: &ChaosParams,
+    _test_env: &TestEnvironment,
+    _params: &ChaosParams,
 ) -> Result<ChaosTestResult, Box<dyn Error>> {
     // TODO: Implement exploit testing
     Ok(ChaosTestResult {
@@ -107,7 +107,7 @@ enum TestType {
     ExploitTest,
 }
 
-fn parse_chaos_params(params: &str) -> Result<ChaosParams, Box<dyn Error>> {
+fn parse_chaos_params(_params: &str) -> Result<ChaosParams, Box<dyn Error>> {
     // TODO: Implement actual parameter parsing
     Ok(ChaosParams {
         test_type: TestType::LoadTest,
