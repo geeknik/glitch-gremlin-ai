@@ -5,6 +5,7 @@ import {
     Transaction,
     TransactionInstruction,
 } from '@solana/web3.js';
+import { RedisQueueWorker } from './queue/redis-worker';
 import { ChaosRequestParams, ChaosResult, TestType, ProposalParams } from './types';
 import { GlitchError, InsufficientFundsError, InvalidProgramError } from './errors';
 
