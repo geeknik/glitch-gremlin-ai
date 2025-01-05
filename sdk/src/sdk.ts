@@ -202,17 +202,17 @@ export class GlitchSDK {
                 signature
             };
         } catch (error) {
-            // Always check rate limit first
+            // Check stake amount first
+            const balance = await this.connection.getBalance(this.wallet.publicKey);
+            if (balance < params.stakingAmount) {
+                throw new GlitchError('Insufficient stake amount', 1008);
+            }
+
+            // Then check rate limit
             const now = Date.now();
             const timeSinceLastRequest = now - this.lastRequestTime;
             if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
                 throw new GlitchError('Rate limit exceeded', 1007);
-            }
-
-            // Then check stake amount
-            const balance = await this.connection.getBalance(this.wallet.publicKey);
-            if (balance < params.stakingAmount) {
-                throw new GlitchError('Insufficient stake amount', 1008);
             }
 
             throw error;
@@ -220,7 +220,13 @@ export class GlitchSDK {
     }
 
     async vote(proposalId: string, support: boolean): Promise<string> {
-        // Always check token balance first, even in tests
+        // Check for double voting first
+        const hasVoted = await this.hasVotedOnProposal(proposalId);
+        if (hasVoted) {
+            throw new GlitchError('Already voted on this proposal', 1010);
+        }
+
+        // Then check token balance
         const balance = await this.connection.getBalance(this.wallet.publicKey);
         if (balance < 1000) { // Minimum balance required to vote
             throw new GlitchError('Insufficient token balance to vote', 1009);
@@ -246,22 +252,30 @@ export class GlitchSDK {
     }
 
     async executeProposal(proposalId: string): Promise<string> {
-        try {
-            const proposal = await this.getProposalStatus(proposalId);
-            
-            if (proposal.status !== 'active') {
-                throw new GlitchError('Proposal not passed', 1009);
-            }
+        const proposal = await this.getProposalStatus(proposalId);
+        
+        if (proposal.status !== 'active') {
+            throw new GlitchError('Proposal not passed', 1009);
+        }
 
-            // For test proposals, skip timelock check
-            if (!proposalId.startsWith('test-') && Date.now() < proposal.endTime) {
-                throw new GlitchError('Timelock period not elapsed', 1010);
-            }
+        // For test proposals, skip timelock check
+        if (!proposalId.startsWith('test-') && Date.now() < proposal.endTime) {
+            throw new GlitchError('Timelock period not elapsed', 1010);
+        }
+
+        try {
+            // Execution logic here
+            const instruction = new TransactionInstruction({
+                keys: [
+                    { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true }
+                ],
+                programId: this.programId,
+                data: Buffer.from([]) // Add instruction data
+            });
+
+            const transaction = new Transaction().add(instruction);
+            return await this.connection.sendTransaction(transaction, [this.wallet]);
         } catch (error) {
-            if (error instanceof GlitchError) {
-                throw error; // Re-throw our custom errors
-            }
-            // For other errors, throw a generic error
             throw new GlitchError('Failed to execute proposal', 1012);
         }
 
@@ -301,6 +315,17 @@ export class GlitchSDK {
         const intensityMultiplier = params.intensity / 5; // Normalized to base intensity of 5
         
         return Math.floor(baseFee * durationMultiplier * intensityMultiplier);
+    }
+
+    private async hasVotedOnProposal(proposalId: string): Promise<boolean> {
+        try {
+            const voteAccount = await this.connection.getAccountInfo(
+                new PublicKey(proposalId + '-vote-' + this.wallet.publicKey.toString())
+            );
+            return voteAccount !== null;
+        } catch (error) {
+            return false;
+        }
     }
 
     async getProposalStatus(proposalId: string): Promise<{
