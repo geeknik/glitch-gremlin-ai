@@ -12,7 +12,8 @@
     "build": "tsc --project tsconfig.json",
     "test": "jest",
     "lint": "eslint src/**/*.ts",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "postinstall": "npm link"
   },
   "dependencies": {
     "@glitch-gremlin/sdk": "file:../sdk",

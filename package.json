@@ -6,6 +6,7 @@
     "cli"
   ],
   "scripts": {
+    "clean": "npm run clean --workspaces",
     "build": "npm run build --workspace=sdk && npm run build --workspace=cli",
     "test": "npm run test --workspaces",
     "lint": "npm run lint --workspaces"
