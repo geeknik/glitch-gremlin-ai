@@ -6,6 +6,10 @@ authors = ["Glitch Gremlin Team"]
 description = "Shared utilities for Glitch Gremlin"
 license = "MIT"
 
+[lib]
+name = "glitch_shared"
+path = "src/lib.rs"
+
 [dependencies]
 solana-program = "1.18.26"
 solana-program-test = "1.18.26"
