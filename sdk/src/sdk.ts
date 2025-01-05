@@ -28,8 +28,17 @@ export class GlitchSDK {
         waitForCompletion: () => Promise<ChaosResult>;
     }> {
         // Validate parameters
-        if (!params.targetProgram || !params.testType) {
-            throw new Error('Missing required parameters');
+        if (!params.targetProgram) {
+            throw new InvalidProgramError();
+        }
+        if (!params.testType || !Object.values(TestType).includes(params.testType)) {
+            throw new GlitchError('Invalid test type', 1004);
+        }
+        if (params.intensity < 1 || params.intensity > 10) {
+            throw new GlitchError('Intensity must be between 1 and 10', 1005);
+        }
+        if (params.duration < 60 || params.duration > 3600) {
+            throw new GlitchError('Duration must be between 60 and 3600 seconds', 1006);
         }
 
         // Create the chaos request instruction

@@ -15,7 +15,15 @@ npm install @glitch-gremlin/sdk
 ### CLI Installation
 ```bash
 npm install -g @glitch-gremlin/cli
+
+# Configure your Solana environment
+export SOLANA_CLUSTER=devnet  # or mainnet-beta
+export SOLANA_KEYPAIR_PATH=/path/to/your/keypair.json
 ```
+
+The CLI requires these environment variables:
+- `SOLANA_CLUSTER`: The Solana cluster to connect to ('devnet' or 'mainnet-beta')
+- `SOLANA_KEYPAIR_PATH`: Path to your Solana keypair file
 
 ## Basic Usage
 

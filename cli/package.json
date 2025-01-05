@@ -1,0 +1,26 @@
+{
+  "name": "@glitch-gremlin/cli",
+  "version": "0.1.0",
+  "description": "CLI tools for Glitch Gremlin AI chaos testing platform",
+  "main": "dist/index.js",
+  "bin": {
+    "glitch": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "lint": "eslint src/**/*.ts"
+  },
+  "dependencies": {
+    "@glitch-gremlin/sdk": "^0.1.0",
+    "commander": "^11.0.0",
+    "ora": "^5.4.1",
+    "chalk": "^4.1.2"
+  },
+  "devDependencies": {
+    "typescript": "^4.9.0",
+    "jest": "^29.0.0",
+    "@types/jest": "^29.0.0",
+    "eslint": "^8.0.0"
+  }
+}
