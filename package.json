@@ -1,0 +1,13 @@
+{
+  "name": "glitch-gremlin",
+  "private": true,
+  "workspaces": [
+    "sdk",
+    "cli"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace=sdk && npm run build --workspace=cli",
+    "test": "npm run test --workspaces",
+    "lint": "npm run lint --workspaces"
+  }
+}
