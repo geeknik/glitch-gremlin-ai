@@ -15,10 +15,12 @@ describe('Governance', () => {
     afterEach(async () => {
         if (sdk) {
             await sdk['queueWorker'].close();
+            await sdk['connection'].getRecentBlockhash(); // Ensure all pending requests complete
             // Connection doesn't need explicit cleanup
         }
-        // Clear any pending timers
+        // Clear any pending timers and intervals
         jest.clearAllTimers();
+        jest.clearAllMocks();
     });
 
     afterAll(async () => {
