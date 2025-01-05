@@ -64,9 +64,7 @@ export class GlitchSDK {
         const now = Date.now();
         const timeSinceLastRequest = now - this.lastRequestTime;
         if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
-            await new Promise(resolve => 
-                setTimeout(resolve, this.MIN_REQUEST_INTERVAL - timeSinceLastRequest)
-            );
+            throw new GlitchError('Rate limit exceeded', 1007);
         }
         this.lastRequestTime = now;
     }
@@ -180,12 +178,8 @@ export class GlitchSDK {
             throw new Error('Insufficient stake amount');
         }
 
-        // Check rate limit
-        const now = Date.now();
-        const timeSinceLastRequest = now - this.lastRequestTime;
-        if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
-            throw new GlitchError('Rate limit exceeded', 1007);
-        }
+        // Check rate limit for all proposal operations
+        await this.checkRateLimit();
 
         const instruction = new TransactionInstruction({
             keys: [
