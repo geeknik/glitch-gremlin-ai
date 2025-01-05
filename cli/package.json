@@ -9,7 +9,7 @@
   "type": "module",
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "npm run clean && tsc",
+    "build": "tsc",
     "test": "jest",
     "lint": "eslint src/**/*.ts",
     "prepare": "npm run build"
