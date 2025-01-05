@@ -6,6 +6,7 @@
   "bin": {
     "glitch": "./dist/index.js"
   },
+  "private": true,
   "scripts": {
     "build": "tsc",
     "test": "jest",
