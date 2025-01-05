@@ -4,7 +4,7 @@
   "description": "SDK for interacting with Glitch Gremlin AI chaos testing platform",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
-  "types": "dist/index.d.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
