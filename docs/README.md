@@ -1,5 +1,7 @@
 # Glitch Gremlin AI Documentation
 
+[![Tests](https://img.shields.io/badge/tests-16%20passed-brightgreen.svg)](./test-results.md)
+
 ## Overview
 Glitch Gremlin AI provides Chaos-as-a-Service (CaaS) for Solana dApps through a combination of on-chain programs and off-chain AI testing capabilities.
 

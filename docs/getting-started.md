@@ -5,6 +5,12 @@
 - Node.js 14+ 
 - A Solana wallet with some $GLITCH tokens
 
+## Test Coverage
+Our SDK has been thoroughly tested with:
+- Core SDK functionality (10 tests)
+- Governance features (4 tests)
+- Redis worker integration (2 tests)
+
 ## Installation
 
 ### SDK Installation

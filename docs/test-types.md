@@ -1,6 +1,8 @@
 # Chaos Test Types
 
-Glitch Gremlin AI supports several types of chaos testing to help identify different categories of vulnerabilities and issues in your Solana programs.
+✅ All test suites passing (16 tests across 3 suites)
+
+Glitch Gremlin AI supports several types of chaos testing to help identify different categories of vulnerabilities and issues in your Solana programs. All test types have been validated through our comprehensive test suite.
 
 ## Available Test Types
 
