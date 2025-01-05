@@ -113,10 +113,44 @@ mod tests {
         let sig = rpc_client.request_airdrop(&payer.pubkey(), 1_000_000_000).await?;
         rpc_client.confirm_transaction(&sig).await?;
 
+        // Create chaos request account
+        let chaos_request = Keypair::new();
+        let rent = rpc_client.get_minimum_balance_for_rent_exemption(100).await?;
+        
+        let create_account_ix = system_instruction::create_account(
+            &payer.pubkey(),
+            &chaos_request.pubkey(),
+            rent,
+            100,
+            &program_id,
+        );
+
+        // Create escrow account
+        let escrow_account = Keypair::new();
+        let escrow_rent = rpc_client.get_minimum_balance_for_rent_exemption(100).await?;
+        
+        let create_escrow_ix = system_instruction::create_account(
+            &payer.pubkey(),
+            &escrow_account.pubkey(),
+            escrow_rent,
+            100,
+            &program_id,
+        );
+
+        // Send both create account transactions
+        let blockhash = rpc_client.get_latest_blockhash().await?;
+        let transaction = Transaction::new_signed_with_payer(
+            &[create_account_ix, create_escrow_ix],
+            Some(&payer.pubkey()),
+            &[&payer, &chaos_request, &escrow_account],
+            blockhash,
+        );
+        rpc_client.send_and_confirm_transaction(&transaction).await?;
+
         // Test job data format: request_id|params|target_program
         let job_data = format!(
             "{}|test_params|{}",
-            payer.pubkey(),
+            chaos_request.pubkey(),
             Keypair::new().pubkey()
         );
 
