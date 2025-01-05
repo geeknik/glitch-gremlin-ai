@@ -25,6 +25,11 @@ const request = await sdk.createChaosRequest({
 const results = await request.waitForCompletion();
 ```
 
+Check out our [examples directory](../examples) for more sample code:
+- `quick-test.ts`: Simple test using an ephemeral wallet
+- `basic-test.ts`: More detailed test with custom parameters
+- `governance-proposal.ts`: Example of creating a governance proposal
+
 ## Installation
 
 ```bash
