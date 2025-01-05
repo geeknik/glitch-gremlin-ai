@@ -10,6 +10,10 @@ describe('Governance', () => {
             cluster: 'https://api.devnet.solana.com',
             wallet
         });
+
+        // Mock getBalance to return sufficient funds for all tests
+        jest.spyOn(sdk['connection'], 'getBalance')
+            .mockResolvedValue(5000);
     });
 
     afterEach(async () => {
