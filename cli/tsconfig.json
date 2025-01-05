@@ -15,7 +15,6 @@
     "composite": true,
     "allowJs": true,
     "baseUrl": "."
-    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"],
