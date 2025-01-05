@@ -6,10 +6,10 @@
     "cli"
   ],
   "scripts": {
-    "clean": "cd sdk && npm run clean && cd ../cli && npm run clean",
-    "build": "cd sdk && npm run build && cd ../cli && npm run build",
-    "test": "cd sdk && npm test && cd ../cli && npm test",
-    "lint": "cd sdk && npm run lint && cd ../cli && npm run lint"
+    "clean": "npm run clean --workspaces",
+    "build": "tsc --build",
+    "test": "npm run test --workspaces",
+    "lint": "npm run lint --workspaces"
   },
   "devDependencies": {
     "typescript": "^4.9.0"
