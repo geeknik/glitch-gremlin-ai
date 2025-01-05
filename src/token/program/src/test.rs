@@ -49,6 +49,7 @@ async fn test_initialize_chaos_request() {
         status: 0,
         params: vec![1, 2, 3],
         result_ref: String::new(),
+        escrow_account: Pubkey::new_unique(),
     };
     let account_size = test_request.try_to_vec().unwrap().len();
     // Add 10% buffer for safety
@@ -121,6 +122,7 @@ async fn test_finalize_chaos_request() {
         status: 0,
         params: vec![1, 2, 3],
         result_ref: String::new(),
+        escrow_account: Pubkey::new_unique(),
     };
     let account_size = test_request.try_to_vec().unwrap().len();
     // Add 10% buffer for safety
