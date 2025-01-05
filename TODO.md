@@ -29,6 +29,9 @@
   - [ ] Set up monitoring & alerts
   - [x] Load test infrastructure
   - [x] Document deployment process
+  - [ ] Add governance integration tests
+  - [ ] Add token economics tests
+  - [ ] Add rate limiting tests
 
 - [ ] Marketing & Community
   - [ ] Launch landing page

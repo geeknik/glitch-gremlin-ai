@@ -49,4 +49,62 @@ describe('GlitchSDK', () => {
             expect(require('../index').version).toBe('0.1.0');
         });
     });
+
+    describe('governance', () => {
+        it('should create a valid proposal', async () => {
+            const proposal = await sdk.createProposal({
+                title: "Test Proposal",
+                description: "Test Description",
+                targetProgram: "11111111111111111111111111111111",
+                testParams: {
+                    testType: TestType.FUZZ,
+                    duration: 300,
+                    intensity: 5
+                },
+                stakingAmount: 1000
+            });
+
+            expect(proposal.id).toBeDefined();
+            expect(proposal.signature).toBeDefined();
+        });
+
+        it('should validate minimum stake amount', async () => {
+            await expect(sdk.createProposal({
+                title: "Test Proposal",
+                description: "Test Description",
+                targetProgram: "11111111111111111111111111111111",
+                testParams: {
+                    testType: TestType.FUZZ,
+                    duration: 300,
+                    intensity: 5
+                },
+                stakingAmount: 10 // Too low
+            })).rejects.toThrow('Insufficient stake amount');
+        });
+    });
+
+    describe('token economics', () => {
+        it('should calculate correct fees', async () => {
+            const fee = await sdk.calculateChaosRequestFee({
+                testType: TestType.FUZZ,
+                duration: 300,
+                intensity: 5
+            });
+            expect(typeof fee).toBe('number');
+            expect(fee).toBeGreaterThan(0);
+        });
+
+        it('should enforce rate limits', async () => {
+            // Create multiple requests rapidly
+            const promises = Array(5).fill(0).map(() => sdk.createChaosRequest({
+                targetProgram: "11111111111111111111111111111111",
+                testType: TestType.FUZZ,
+                duration: 60,
+                intensity: 1
+            }));
+
+            await expect(Promise.all(promises))
+                .rejects.toThrow('Rate limit exceeded');
+        });
+    });
 });
