@@ -1,6 +1,10 @@
 {
   "name": "glitch-gremlin",
   "private": true,
+  "workspaces": [
+    "sdk",
+    "cli"
+  ],
   "scripts": {
     "clean": "cd sdk && npm run clean && cd ../cli && npm run clean",
     "build": "cd sdk && npm run build && cd ../cli && npm run build",
