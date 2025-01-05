@@ -73,19 +73,24 @@ describe('Governance', () => {
         });
 
         it('should prevent double voting', async () => {
-            // Mock the first vote to succeed
+            // Mock connection methods
+            const mockGetBalance = jest.spyOn(sdk['connection'], 'getBalance')
+                .mockResolvedValue(2000);
+
             const mockSimulateTransaction = jest.spyOn(sdk['connection'], 'simulateTransaction')
-                .mockResolvedValueOnce({
+                .mockResolvedValue({
                     context: { slot: 0 },
                     value: { err: null, logs: [], accounts: null, unitsConsumed: 0, returnData: null }
                 });
 
+            // First vote should succeed
             await sdk.vote('test-proposal-id', true);
 
             // Second vote should fail
             await expect(sdk.vote('test-proposal-id', false))
                 .rejects.toThrow('Already voted on this proposal');
 
+            mockGetBalance.mockRestore();
             mockSimulateTransaction.mockRestore();
         });
     });
