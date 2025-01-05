@@ -12,6 +12,11 @@ describe('GlitchSDK', () => {
         });
     });
 
+    afterAll(async () => {
+        // Cleanup Redis connection from SDK
+        await sdk['queueWorker']['redis'].quit();
+    });
+
     describe('createChaosRequest', () => {
         it('should create a valid chaos request', async () => {
             const request = await sdk.createChaosRequest({

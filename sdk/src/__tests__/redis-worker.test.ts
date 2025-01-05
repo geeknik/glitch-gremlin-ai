@@ -18,10 +18,6 @@ describe('RedisQueueWorker', () => {
         await worker.close();
         await redis.flushall();
         await redis.quit();
-    });
-
-    afterAll(async () => {
-        // Ensure all Redis connections are closed
         await redis.disconnect();
     });
 

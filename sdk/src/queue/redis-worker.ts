@@ -53,5 +53,6 @@ export class RedisQueueWorker {
 
     async close(): Promise<void> {
         await this.redis.quit();
+        await this.redis.disconnect();
     }
 }
