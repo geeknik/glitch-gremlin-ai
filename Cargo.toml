@@ -2,7 +2,8 @@
 resolver = "2"
 members = [
     "src/token/program",
-    "src/token/worker"
+    "src/token/worker",
+    "src/token/shared"
 ]
 
 [workspace.package]

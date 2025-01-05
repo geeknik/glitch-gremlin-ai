@@ -103,6 +103,7 @@ mod tests {
     use solana_client::nonblocking::rpc_client::RpcClient;
     use solana_sdk::signature::Keypair;
     use std::str::FromStr;
+    use glitch_shared::test_utils::{program_test, id};
 
     const TEST_PROGRAM_ID: &str = "GremLin1111111111111111111111111111111111111";
 

@@ -1,0 +1,14 @@
+[package]
+name = "glitch-shared"
+version = "0.1.0"
+edition = "2021"
+authors = ["Glitch Gremlin Team"]
+description = "Shared utilities for Glitch Gremlin"
+license = "MIT"
+
+[dependencies]
+solana-program = "1.18.26"
+solana-program-test = "1.18.26"
+solana-sdk = "1.18.26"
+borsh = "0.10.3"
+tokio = { version = "1.0", features = ["full"] }
