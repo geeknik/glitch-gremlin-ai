@@ -6,7 +6,6 @@
   "bin": {
     "glitch": "./dist/index.js"
   },
-  "private": true,
   "type": "module",
   "scripts": {
     "clean": "rm -rf dist",
