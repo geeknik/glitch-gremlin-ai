@@ -1,5 +1,5 @@
 use borsh::BorshSerialize;
-use solana_client::rpc_client::RpcClient;
+use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
     pubkey::Pubkey,
     instruction::{AccountMeta, Instruction},
@@ -67,7 +67,7 @@ async fn finalize_chaos_request(
 
     // Create and send transaction
     let signer = Keypair::new();
-    let blockhash = rpc_client.get_latest_blockhash()?;
+    let blockhash = rpc_client.get_latest_blockhash().await?;
     
     let transaction = Transaction::new_signed_with_payer(
         &[Instruction {
@@ -83,7 +83,7 @@ async fn finalize_chaos_request(
         blockhash,
     );
 
-    rpc_client.send_and_confirm_transaction(&transaction)?;
+    rpc_client.send_and_confirm_transaction(&transaction).await?;
 
     Ok(())
 }
@@ -96,7 +96,7 @@ pub struct TestEnvironment {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use solana_client::rpc_client::RpcClient;
+    use solana_client::nonblocking::rpc_client::RpcClient;
     use solana_sdk::signature::Keypair;
     use std::str::FromStr;
 
