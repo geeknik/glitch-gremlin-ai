@@ -175,7 +175,14 @@ export class GlitchSDK {
         id: string;
         signature: string;
     }> {
-        // Validate parameters
+        // Check rate limit first
+        const now = Date.now();
+        const timeSinceLastRequest = now - this.lastRequestTime;
+        if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
+            throw new GlitchError('Rate limit exceeded', 1007);
+        }
+
+        // Validate parameters and check stake amount
         if (params.stakingAmount < 100) { // Minimum stake amount
             throw new Error('Insufficient stake amount');
         }
@@ -191,14 +198,6 @@ export class GlitchSDK {
         const transaction = new Transaction().add(instruction);
         
         try {
-            // Check rate limit first
-            const now = Date.now();
-            const timeSinceLastRequest = now - this.lastRequestTime;
-            if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
-                throw new GlitchError('Rate limit exceeded', 1007);
-            }
-
-            // Then check stake amount
             const balance = await this.connection.getBalance(this.wallet.publicKey);
             if (balance < params.stakingAmount) {
                 throw new GlitchError('Insufficient stake amount', 1008);

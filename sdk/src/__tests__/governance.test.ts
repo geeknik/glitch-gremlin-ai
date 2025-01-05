@@ -29,6 +29,12 @@ describe('Governance', () => {
     });
 
     describe('proposal creation', () => {
+        beforeEach(() => {
+            // Mock getBalance to return sufficient funds
+            jest.spyOn(sdk['connection'], 'getBalance')
+                .mockResolvedValue(10000);
+        });
+
         it('should validate minimum stake requirements', async () => {
             await expect(sdk.createProposal({
                 title: "Test Proposal",
