@@ -1,13 +1,12 @@
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::{
     pubkey::Pubkey,
+    instruction::{AccountMeta, Instruction},
     signature::{Keypair, Signer},
     transaction::Transaction,
-    instruction::Instruction,
 };
 use std::error::Error;
 use crate::chaos_engine::{run_chaos_test, ChaosTestResult};
-use crate::instruction::GlitchInstruction;
 
 pub async fn process_chaos_job(
     rpc_client: &RpcClient,
@@ -66,6 +65,8 @@ async fn finalize_chaos_request(
 
     // Create and send transaction
     let signer = Keypair::new();
+    let blockhash = rpc_client.get_latest_blockhash()?;
+    
     let transaction = Transaction::new_signed_with_payer(
         &[Instruction {
             program_id: *program_id,
@@ -77,7 +78,7 @@ async fn finalize_chaos_request(
         }],
         Some(&signer.pubkey()),
         &[&signer],
-        rpc_client.get_latest_blockhash().await?,
+        blockhash,
     );
 
     rpc_client.send_and_confirm_transaction(&transaction)?;
