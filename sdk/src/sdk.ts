@@ -31,6 +31,7 @@ export class GlitchSDK {
     private connection: Connection;
     private programId: PublicKey;
     private wallet: Keypair;
+    private queueWorker: RedisQueueWorker;
     private lastRequestTime = 0;
     private readonly MIN_REQUEST_INTERVAL = 2000; // 2 seconds between requests
 
@@ -46,6 +47,7 @@ export class GlitchSDK {
         wallet: Keypair;
         programId?: string;
     }) {
+        this.queueWorker = new RedisQueueWorker();
         // Default to testnet
         this.connection = new Connection(config.cluster || 'https://api.testnet.solana.com');
         
