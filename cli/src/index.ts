@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
-import { GlitchSDK, TestType } from '@glitch-gremlin/sdk/dist/index.js';
+import { GlitchSDK, TestType } from '@glitch-gremlin/sdk';
 import ora from 'ora';
 import chalk from 'chalk';
 
