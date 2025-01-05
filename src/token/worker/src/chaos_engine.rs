@@ -20,8 +20,8 @@ pub struct TestMetrics {
 }
 
 pub async fn run_chaos_test(
-    _test_env: &TestEnvironment,
-    _params: &str,
+    test_env: &TestEnvironment,
+    params: &str,
 ) -> Result<ChaosTestResult, Box<dyn Error>> {
     // Parse parameters
     let params = parse_chaos_params(params)?;

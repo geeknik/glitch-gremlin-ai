@@ -1,3 +1,4 @@
+use borsh::BorshSerialize;
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::{
     pubkey::Pubkey,
