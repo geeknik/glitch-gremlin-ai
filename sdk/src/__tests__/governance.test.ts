@@ -15,15 +15,15 @@ describe('Governance', () => {
     afterEach(async () => {
         if (sdk) {
             await sdk['queueWorker'].close();
-            await sdk['connection'].disconnect();
+            // Connection doesn't need explicit cleanup
         }
         // Clear any pending timers
         jest.clearAllTimers();
     });
 
     afterAll(async () => {
-        // Ensure all connections are closed
-        await sdk['connection'].disconnect();
+        // No need to explicitly close Connection
+        jest.clearAllMocks();
     });
 
     describe('proposal creation', () => {
