@@ -15,7 +15,7 @@
     "prepare": "npm run build"
   },
   "dependencies": {
-    "@glitch-gremlin/sdk": "file:../sdk",
+    "@glitch-gremlin/sdk": "workspace:*",
     "commander": "^11.0.0",
     "ora": "^5.4.1",
     "chalk": "^4.1.2"
