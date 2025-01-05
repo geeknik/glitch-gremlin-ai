@@ -59,6 +59,10 @@ describe('GlitchSDK', () => {
     describe('governance', () => {
         it('should create a valid proposal', async () => {
             // Mock the connection's simulateTransaction to avoid actual network calls
+            // Mock balance check
+            const mockGetBalance = jest.spyOn(sdk['connection'], 'getBalance')
+                .mockResolvedValue(5000);
+
             const mockSimulateTransaction = jest.spyOn(sdk['connection'], 'simulateTransaction')
                 .mockResolvedValue({
                     context: { slot: 0 },

@@ -175,16 +175,16 @@ export class GlitchSDK {
         id: string;
         signature: string;
     }> {
-        // Check rate limit first
+        // Validate parameters first
+        if (params.stakingAmount < 100) { // Minimum stake amount
+            throw new Error('Insufficient stake amount');
+        }
+
+        // Check rate limit
         const now = Date.now();
         const timeSinceLastRequest = now - this.lastRequestTime;
         if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
             throw new GlitchError('Rate limit exceeded', 1007);
-        }
-
-        // Validate parameters and check stake amount
-        if (params.stakingAmount < 100) { // Minimum stake amount
-            throw new Error('Insufficient stake amount');
         }
 
         const instruction = new TransactionInstruction({
