@@ -12,7 +12,8 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "composite": true
+    "composite": true,
+    "declarationDir": "./dist"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

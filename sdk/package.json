@@ -2,13 +2,15 @@
   "name": "@glitch-gremlin/sdk",
   "version": "0.1.0",
   "description": "SDK for interacting with Glitch Gremlin AI chaos testing platform",
-  "main": "dist/index.js",
-  "module": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "require": "./dist/index.js",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     }
   },
   "type": "module",
