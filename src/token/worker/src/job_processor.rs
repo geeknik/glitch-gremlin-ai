@@ -6,7 +6,15 @@ use solana_sdk::{
 };
 use std::error::Error;
 use crate::chaos_engine::{run_chaos_test, ChaosTestResult};
-use borsh::BorshSerialize;
+use crate::chaos_engine::{run_chaos_test, ChaosTestResult};
+use solana_client::rpc_client::RpcClient;
+use solana_sdk::{
+    pubkey::Pubkey,
+    signature::{Keypair, Signer},
+    transaction::Transaction,
+};
+use std::error::Error;
+use crate::instruction::GlitchInstruction;
 
 pub async fn process_chaos_job(
     rpc_client: &RpcClient,
@@ -72,7 +80,7 @@ async fn finalize_chaos_request(
         rpc_client.get_latest_blockhash().await?,
     );
 
-    rpc_client.send_and_confirm_transaction(&transaction).await?;
+    rpc_client.send_and_confirm_transaction(&transaction)?;
 
     Ok(())
 }
