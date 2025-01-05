@@ -6,5 +6,8 @@
     "build": "cd sdk && npm run build && cd ../cli && npm run build",
     "test": "cd sdk && npm test && cd ../cli && npm test",
     "lint": "cd sdk && npm run lint && cd ../cli && npm run lint"
+  },
+  "devDependencies": {
+    "typescript": "^4.9.0"
   }
 }
