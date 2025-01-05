@@ -1,20 +1,18 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
-    "module": "CommonJS",
-    "moduleResolution": "node",
+    "declaration": true,
+    "declarationMap": false,
+    "emitDeclarationOnly": false,
     "outDir": "./dist",
     "rootDir": "./src",
-    "strict": true,
+    "module": "CommonJS",
+    "target": "ES2020",
+    "moduleResolution": "node",
     "esModuleInterop": true,
-    "skipLibCheck": true,
+    "strict": true,
     "forceConsistentCasingInFileNames": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "composite": true
+    "skipLibCheck": true
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"],
-  "references": []
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
 }
