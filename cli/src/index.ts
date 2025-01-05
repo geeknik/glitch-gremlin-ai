@@ -35,6 +35,12 @@ if (sdkVersion !== REQUIRED_SDK_VERSION) {
   process.exit(1);
 }
 
+// Ensure SDK compatibility
+if (sdkVersion !== CLI_VERSION) {
+  console.error(chalk.red(`Error: SDK version mismatch. Required: ${CLI_VERSION}, Found: ${sdkVersion}`));
+  process.exit(1);
+}
+
 program
   .name('glitch')
   .description('Glitch Gremlin AI CLI tool')

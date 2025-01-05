@@ -1,4 +1,4 @@
-import { GlitchSDK, TestType } from '@glitch-gremlin/sdk';
+import { GlitchSDK, TestType, version as sdkVersion } from '@glitch-gremlin/sdk';
 import { Keypair } from '@solana/web3.js';
 
 async function createGovernanceProposal() {
