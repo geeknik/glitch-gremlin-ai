@@ -15,7 +15,7 @@
     "prepare": "npm run build"
   },
   "dependencies": {
-    "@glitch-gremlin/sdk": "workspace:../sdk",
+    "@glitch-gremlin/sdk": "file:../sdk",
     "@solana/web3.js": "^1.98.0",
     "chalk": "^4.1.2",
     "commander": "^11.0.0",
