@@ -7,12 +7,47 @@ export enum TestType {
     CONCURRENCY = 'CONCURRENCY'
 }
 
+export interface FuzzTestParams {
+    instructionTypes?: string[];
+    seedRange?: [number, number];
+    maxAccountSize?: number;
+}
+
+export interface LoadTestParams {
+    tps: number;
+    rampUp?: boolean;
+    concurrentUsers?: number;
+}
+
+export interface ExploitTestParams {
+    categories: ('reentrancy' | 'arithmetic' | 'access-control')[];
+    maxDepth?: number;
+}
+
 export interface ChaosRequestParams {
     targetProgram: string | PublicKey;
     testType: TestType;
     duration: number;
     intensity: number;
-    params?: Record<string, any>;
+    params?: {
+        fuzz?: FuzzTestParams;
+        load?: LoadTestParams;
+        exploit?: ExploitTestParams;
+    };
+}
+
+export interface GovernanceConfig {
+    minStakeAmount: number;
+    votingPeriod: number;
+    quorum: number;
+}
+
+export interface ProposalParams {
+    title: string;
+    description: string;
+    targetProgram: string | PublicKey;
+    testParams: ChaosRequestParams;
+    stakingAmount: number;
 }
 
 export interface ChaosResult {

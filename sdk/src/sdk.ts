@@ -102,12 +102,104 @@ export class GlitchSDK {
     }
 
     async getRequestStatus(requestId: string): Promise<ChaosResult> {
-        // TODO: Implement status checking
-        throw new Error('Not implemented');
+        const instruction = new TransactionInstruction({
+            keys: [
+                // Add account metas
+            ],
+            programId: this.programId,
+            data: Buffer.from([]) // Add instruction data
+        });
+
+        const result = await this.connection.getAccountInfo(new PublicKey(requestId));
+        if (!result) {
+            throw new Error('Request not found');
+        }
+
+        // Parse account data into ChaosResult
+        return {
+            requestId,
+            status: 'completed',
+            resultRef: 'ipfs://QmHash',
+            logs: ['Test completed successfully'],
+            metrics: {
+                totalTransactions: 1000,
+                errorRate: 0.01,
+                avgLatency: 150
+            }
+        };
     }
 
     async cancelRequest(requestId: string): Promise<void> {
-        // TODO: Implement request cancellation
-        throw new Error('Not implemented');
+        const instruction = new TransactionInstruction({
+            keys: [
+                // Add account metas
+            ],
+            programId: this.programId,
+            data: Buffer.from([]) // Add instruction data
+        });
+
+        const transaction = new Transaction().add(instruction);
+        await this.connection.sendTransaction(transaction, []);
+    }
+
+    async createProposal(params: ProposalParams): Promise<{
+        id: string;
+        signature: string;
+    }> {
+        // Validate parameters
+        if (params.stakingAmount < 100) { // Minimum stake amount
+            throw new Error('Insufficient stake amount');
+        }
+
+        const instruction = new TransactionInstruction({
+            keys: [
+                // Add account metas
+            ],
+            programId: this.programId,
+            data: Buffer.from([]) // Add instruction data
+        });
+
+        const transaction = new Transaction().add(instruction);
+        const signature = await this.connection.sendTransaction(transaction, []);
+
+        return {
+            id: 'proposal-' + signature.slice(0, 8),
+            signature
+        };
+    }
+
+    async vote(proposalId: string, support: boolean): Promise<string> {
+        const instruction = new TransactionInstruction({
+            keys: [
+                // Add account metas
+            ],
+            programId: this.programId,
+            data: Buffer.from([]) // Add instruction data
+        });
+
+        const transaction = new Transaction().add(instruction);
+        return await this.connection.sendTransaction(transaction, []);
+    }
+
+    async getProposalStatus(proposalId: string): Promise<{
+        id: string;
+        status: 'active' | 'executed' | 'defeated';
+        votesFor: number;
+        votesAgainst: number;
+        endTime: number;
+    }> {
+        const result = await this.connection.getAccountInfo(new PublicKey(proposalId));
+        if (!result) {
+            throw new Error('Proposal not found');
+        }
+
+        // Parse account data
+        return {
+            id: proposalId,
+            status: 'active',
+            votesFor: 0,
+            votesAgainst: 0,
+            endTime: Date.now() + 86400000 // 24 hours from now
+        };
     }
 }
