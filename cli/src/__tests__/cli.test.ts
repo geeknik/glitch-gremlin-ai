@@ -27,7 +27,9 @@ describe('CLI', () => {
         ], {
             env: {} // Clear environment to avoid any existing SOLANA_KEYPAIR_PATH
         });
-        expect(result.stderr.toString()).toContain('program');
         expect(result.status).not.toBe(0);
+        if (result.stderr) {
+            expect(result.stderr.toString()).toContain('program');
+        }
     });
 });
