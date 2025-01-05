@@ -40,6 +40,18 @@ export interface GovernanceConfig {
     minStakeAmount: number;
     votingPeriod: number;
     quorum: number;
+    executionDelay: number;
+    minVotingPeriod: number;
+    maxVotingPeriod: number;
+}
+
+export enum ProposalState {
+    Draft = 'draft',
+    Active = 'active',
+    Succeeded = 'succeeded',
+    Defeated = 'defeated',
+    Executed = 'executed',
+    Cancelled = 'cancelled'
 }
 
 export interface ProposalParams {

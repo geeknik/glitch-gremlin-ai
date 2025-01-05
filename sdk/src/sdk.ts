@@ -33,6 +33,7 @@ export class GlitchSDK {
     private programId: PublicKey;
     private wallet: Keypair;
     private queueWorker: RedisQueueWorker;
+    private governanceManager: GovernanceManager;
     private lastRequestTime = 0;
     private readonly MIN_REQUEST_INTERVAL = 2000; // 2 seconds between requests
 
@@ -47,6 +48,7 @@ export class GlitchSDK {
         cluster?: string;
         wallet: Keypair;
         programId?: string;
+        governanceConfig?: GovernanceConfig;
     }) {
         this.queueWorker = new RedisQueueWorker();
         // Default to testnet
@@ -58,6 +60,7 @@ export class GlitchSDK {
         );
 
         this.wallet = config.wallet;
+        this.governanceManager = new GovernanceManager(this.programId, config.governanceConfig);
     }
 
     private async checkRateLimit() {
