@@ -6,7 +6,10 @@ use solana_sdk::{
     signature::{Keypair, Signer},
     transaction::Transaction,
     system_instruction,
+    rent::Rent,
 };
+use solana_program_test::*;
+use solana_sdk::clock::Clock;
 use std::error::Error;
 use crate::chaos_engine::{run_chaos_test, ChaosTestResult};
 use crate::instruction::GlitchInstruction;
@@ -106,18 +109,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_process_chaos_job() -> Result<(), Box<dyn std::error::Error>> {
-        let rpc_client = RpcClient::new("https://api.testnet.solana.com".to_string());
+        // Use local test validator
+        let (mut banks_client, payer, recent_blockhash) = program_test().await;
         let program_id = Pubkey::from_str(TEST_PROGRAM_ID).unwrap();
         
-        // Create and fund payer account
-        let payer = Keypair::new();
-        let sig = rpc_client.request_airdrop(&payer.pubkey(), 1_000_000_000).await?;
-        rpc_client.confirm_transaction(&sig).await?;
-
         // Create chaos request account
         let chaos_request = Keypair::new();
-        let rent = rpc_client.get_minimum_balance_for_rent_exemption(100).await?;
+        let rent = Rent::default().minimum_balance(100);
         
+        // Create chaos request account
         let create_account_ix = system_instruction::create_account(
             &payer.pubkey(),
             &chaos_request.pubkey(),
@@ -128,7 +128,7 @@ mod tests {
 
         // Create escrow account
         let escrow_account = Keypair::new();
-        let escrow_rent = rpc_client.get_minimum_balance_for_rent_exemption(100).await?;
+        let escrow_rent = Rent::default().minimum_balance(100);
         
         let create_escrow_ix = system_instruction::create_account(
             &payer.pubkey(),
@@ -139,14 +139,13 @@ mod tests {
         );
 
         // Send both create account transactions
-        let blockhash = rpc_client.get_latest_blockhash().await?;
         let transaction = Transaction::new_signed_with_payer(
             &[create_account_ix, create_escrow_ix],
             Some(&payer.pubkey()),
             &[&payer, &chaos_request, &escrow_account],
-            blockhash,
+            recent_blockhash,
         );
-        rpc_client.send_and_confirm_transaction(&transaction).await?;
+        banks_client.process_transaction(transaction).await?;
 
         // Test job data format: request_id|params|target_program
         let job_data = format!(
@@ -155,6 +154,8 @@ mod tests {
             Keypair::new().pubkey()
         );
 
+        // Create a new RpcClient for the test
+        let rpc_client = RpcClient::new("http://localhost:8899".to_string());
         let result = process_chaos_job(&rpc_client, &program_id, &job_data).await;
         assert!(result.is_ok(), "Job processing failed: {:?}", result);
         Ok(())
