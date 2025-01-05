@@ -1,0 +1,22 @@
+{
+  "name": "@glitch-gremlin/sdk",
+  "version": "0.1.0",
+  "description": "SDK for interacting with Glitch Gremlin AI chaos testing platform",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "lint": "eslint src/**/*.ts"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.87.0",
+    "@project-serum/anchor": "^0.26.0"
+  },
+  "devDependencies": {
+    "typescript": "^4.9.0",
+    "jest": "^29.0.0",
+    "@types/jest": "^29.0.0",
+    "eslint": "^8.0.0"
+  }
+}
