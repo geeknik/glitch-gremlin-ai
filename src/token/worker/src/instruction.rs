@@ -1,6 +1,5 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use solana_program::program_error::ProgramError;
-use solana_program::pubkey::Pubkey;
+use std::convert::TryInto;
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq)]
 pub enum GlitchInstruction {
