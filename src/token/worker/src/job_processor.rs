@@ -3,17 +3,10 @@ use solana_sdk::{
     pubkey::Pubkey,
     signature::{Keypair, Signer},
     transaction::Transaction,
+    instruction::Instruction,
 };
 use std::error::Error;
 use crate::chaos_engine::{run_chaos_test, ChaosTestResult};
-use crate::chaos_engine::{run_chaos_test, ChaosTestResult};
-use solana_client::rpc_client::RpcClient;
-use solana_sdk::{
-    pubkey::Pubkey,
-    signature::{Keypair, Signer},
-    transaction::Transaction,
-};
-use std::error::Error;
 use crate::instruction::GlitchInstruction;
 
 pub async fn process_chaos_job(
@@ -74,7 +67,14 @@ async fn finalize_chaos_request(
     // Create and send transaction
     let signer = Keypair::new();
     let transaction = Transaction::new_signed_with_payer(
-        &[instruction],
+        &[Instruction {
+            program_id: *program_id,
+            accounts: vec![
+                AccountMeta::new(request_pubkey, false),
+                AccountMeta::new(signer.pubkey(), true),
+            ],
+            data: instruction.try_to_vec()?,
+        }],
         Some(&signer.pubkey()),
         &[&signer],
         rpc_client.get_latest_blockhash().await?,
@@ -85,7 +85,7 @@ async fn finalize_chaos_request(
     Ok(())
 }
 
-struct TestEnvironment {
-    target_program: Pubkey,
+pub struct TestEnvironment {
+    pub target_program: Pubkey,
     // Other test environment fields
 }
