@@ -13,7 +13,9 @@
     "declarationMap": true,
     "sourceMap": true,
     "composite": true,
-    "emitDeclarationOnly": false
+    "emitDeclarationOnly": false,
+    "rootDir": "./src",
+    "outDir": "./dist"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"],
