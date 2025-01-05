@@ -1,5 +1,5 @@
 use redis::Commands;
-use solana_client::rpc_client::RpcClient;
+use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
 use std::{thread, time::Duration};
 use crate::job_processor::process_chaos_job;
@@ -19,7 +19,7 @@ async fn main() {
     let mut con = client.get_connection().expect("Failed to get Redis connection");
 
     // Initialize Solana RPC client
-    let rpc_client = RpcClient::new(RPC_URL);
+    let rpc_client = RpcClient::new(RPC_URL.to_string());
 
     // Get and validate program ID
     let program_id = match PROGRAM_ID.parse::<Pubkey>() {

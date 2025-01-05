@@ -104,7 +104,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_process_chaos_job() {
-        let rpc_client = RpcClient::new("https://api.testnet.solana.com");
+        let rpc_client = RpcClient::new("https://api.testnet.solana.com".to_string());
         let program_id = Pubkey::from_str(TEST_PROGRAM_ID).unwrap();
         
         // Test job data format: request_id|params|target_program
