@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "description": "CLI tools for Glitch Gremlin AI chaos testing platform",
   "main": "dist/index.js",
-  "bin": {
-    "glitch": "./dist/index.js"
-  },
   "type": "module",
+  "bin": {
+    "glitch": "dist/index.js"
+  },
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "tsc",
+    "build": "tsc --project tsconfig.json",
     "test": "jest",
     "lint": "eslint src/**/*.ts",
     "prepare": "npm run build"
