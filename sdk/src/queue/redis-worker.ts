@@ -6,14 +6,21 @@ export class RedisQueueWorker {
     private readonly queueKey = 'glitch:chaos:queue';
     private readonly resultKey = 'glitch:chaos:results';
 
-    constructor() {
-        this.redis = new Redis({
+    constructor(redisClient?: Redis) {
+        this.redis = redisClient || new Redis({
             host: 'r.glitchgremlin.ai',
             port: 6379,
+            connectTimeout: 5000,
+            maxRetriesPerRequest: 3,
             retryStrategy: (times) => {
                 const delay = Math.min(times * 50, 2000);
                 return delay;
-            }
+            },
+            enableOfflineQueue: false
+        });
+
+        this.redis.on('error', (err) => {
+            console.error('Redis connection error:', err);
         });
     }
 

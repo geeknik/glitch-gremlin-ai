@@ -1,15 +1,21 @@
 import { RedisQueueWorker } from '../queue/redis-worker';
 import { TestType } from '../types';
+import Redis from 'ioredis-mock';
+
+jest.mock('ioredis', () => require('ioredis-mock'));
 
 describe('RedisQueueWorker', () => {
     let worker: RedisQueueWorker;
+    let redis: Redis;
 
     beforeEach(() => {
-        worker = new RedisQueueWorker();
+        redis = new Redis();
+        worker = new RedisQueueWorker(redis);
     });
 
     afterEach(async () => {
         await worker.close();
+        await redis.flushall();
     });
 
     it('should enqueue and dequeue requests', async () => {
