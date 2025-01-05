@@ -66,6 +66,24 @@ export class GlitchSDK {
         this.lastRequestTime = now;
     }
 
+    private wallet: Keypair;
+
+    constructor(config: {
+        cluster?: string;
+        wallet: Keypair;
+        programId?: string;
+    }) {
+        // Default to testnet
+        this.connection = new Connection(config.cluster || 'https://api.testnet.solana.com');
+        
+        // Use an obfuscated program ID if not specified
+        this.programId = new PublicKey(
+            config.programId || 'GLt5cQeRgVMqnE9DGJQNNrbAfnRQYWqYVNWnJo7WNLZ9'
+        );
+
+        this.wallet = config.wallet;
+    }
+
     async createChaosRequest(params: ChaosRequestParams): Promise<{
         requestId: string;
         waitForCompletion: () => Promise<ChaosResult>;
@@ -83,6 +101,8 @@ export class GlitchSDK {
         if (params.duration < 60 || params.duration > 3600) {
             throw new GlitchError('Duration must be between 60 and 3600 seconds', 1006);
         }
+
+        await this.checkRateLimit();
 
         // Create the chaos request instruction
         const instruction = new TransactionInstruction({
@@ -177,7 +197,7 @@ export class GlitchSDK {
         });
 
         const transaction = new Transaction().add(instruction);
-        const signature = await this.connection.sendTransaction(transaction, []);
+        const signature = await this.connection.sendTransaction(transaction, [this.wallet]);
 
         return {
             id: 'proposal-' + signature.slice(0, 8),
