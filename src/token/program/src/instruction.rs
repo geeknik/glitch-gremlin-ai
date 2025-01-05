@@ -67,6 +67,44 @@ impl GlitchInstruction {
     }
 }
 
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq)]
+pub enum GovernanceInstruction {
+    /// Create a new governance proposal
+    /// 
+    /// Accounts expected:
+    /// 1. `[writable]` The proposal account
+    /// 2. `[writable]` The staking account
+    /// 3. `[signer]` The proposer
+    CreateProposal {
+        id: u64,
+        description: String,
+        target_program: Pubkey,
+        staked_amount: u64,
+        deadline: i64,
+    },
+
+    /// Vote on a governance proposal
+    /// 
+    /// Accounts expected:
+    /// 1. `[writable]` The proposal account
+    /// 2. `[writable]` The voter's staking account
+    /// 3. `[signer]` The voter
+    Vote {
+        proposal_id: u64,
+        vote_for: bool,
+        vote_amount: u64,
+    },
+
+    /// Execute an approved proposal
+    /// 
+    /// Accounts expected:
+    /// 1. `[writable]` The proposal account
+    /// 2. `[signer]` The executor
+    ExecuteProposal {
+        proposal_id: u64,
+    },
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
