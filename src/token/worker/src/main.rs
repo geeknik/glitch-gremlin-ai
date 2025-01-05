@@ -19,8 +19,15 @@ async fn main() {
     // Initialize Solana RPC client
     let rpc_client = RpcClient::new(RPC_URL);
 
-    // Get program ID
-    let program_id: Pubkey = PROGRAM_ID.parse().expect("Invalid program ID");
+    // Get and validate program ID
+    let program_id = match PROGRAM_ID.parse::<Pubkey>() {
+        Ok(id) => id,
+        Err(e) => {
+            eprintln!("Failed to parse program ID: {}", e);
+            std::process::exit(1);
+        }
+    };
+    println!("Using program ID: {}", program_id);
 
     println!("Glitch Gremlin Worker started");
 
