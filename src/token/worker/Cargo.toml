@@ -9,7 +9,7 @@ license = "MIT"
 [dependencies]
 solana-program = "1.18.26"
 spl-token = { version = "3.2.0" }
-borsh = { version = "0.10", features = ["derive"] }
+borsh = "0.10.3"
 hex = "0.4"
 solana-client = "1.18.26"
 solana-sdk = "1.18.26"
