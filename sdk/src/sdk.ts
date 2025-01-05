@@ -203,6 +203,8 @@ export class GlitchSDK {
             };
         } catch (error) {
             // Check if it's a rate limit error first
+            const now = Date.now();
+            const timeSinceLastRequest = now - this.lastRequestTime;
             if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
                 throw new GlitchError('Rate limit exceeded', 1007);
             }
