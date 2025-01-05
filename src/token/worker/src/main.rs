@@ -8,7 +8,7 @@ mod job_processor;
 
 const REDIS_URL: &str = "redis://r.glitchgremlin.ai/";
 const RPC_URL: &str = "https://api.mainnet-beta.solana.com";
-const PROGRAM_ID: &str = "GremLinXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
+const PROGRAM_ID: &str = "GremLin1111111111111111111111111111111111111";
 
 #[tokio::main]
 async fn main() {
