@@ -1,4 +1,22 @@
 #!/usr/bin/env node
+/**
+ * Glitch Gremlin AI Command Line Interface
+ * 
+ * This CLI tool provides easy access to Glitch Gremlin's chaos testing features.
+ * It requires the following environment variables:
+ * - SOLANA_KEYPAIR_PATH: Path to your Solana keypair file
+ * - SOLANA_CLUSTER: (Optional) Solana cluster to use (defaults to 'devnet')
+ * 
+ * @example
+ * ```bash
+ * # Run a basic fuzz test
+ * glitch test -p <program> -t FUZZ -d 300 -i 5
+ * 
+ * # View test results
+ * glitch test results <test-id>
+ * ```
+ */
+
 import { readFileSync } from 'fs';
 import { Keypair } from '@solana/web3.js';
 import { Command } from 'commander';

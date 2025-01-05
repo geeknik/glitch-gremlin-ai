@@ -8,10 +8,36 @@ import {
 import { ChaosRequestParams, ChaosResult, TestType } from './types';
 import { GlitchError, InsufficientFundsError, InvalidProgramError } from './errors';
 
+/**
+ * GlitchSDK provides the main interface for interacting with the Glitch Gremlin AI platform.
+ * It handles chaos test requests, result monitoring, and governance interactions.
+ * 
+ * @example
+ * ```typescript
+ * const sdk = new GlitchSDK({
+ *   cluster: 'devnet',
+ *   wallet: myKeypair
+ * });
+ * 
+ * const request = await sdk.createChaosRequest({
+ *   targetProgram: "Your program ID",
+ *   testType: TestType.FUZZ,
+ *   duration: 300,
+ *   intensity: 5
+ * });
+ * ```
+ */
 export class GlitchSDK {
     private connection: Connection;
     private programId: PublicKey;
 
+    /**
+     * Creates a new GlitchSDK instance
+     * @param config Configuration options
+     * @param config.cluster Solana cluster URL or name ('devnet', 'mainnet-beta')
+     * @param config.wallet Solana wallet keypair
+     * @param config.programId Optional custom program ID
+     */
     constructor(config: {
         cluster: string;
         wallet: Keypair;
