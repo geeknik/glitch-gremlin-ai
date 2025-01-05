@@ -4,7 +4,7 @@ import { Keypair } from '@solana/web3.js';
 describe('GlitchSDK', () => {
     let sdk: GlitchSDK;
     
-    beforeEach(() => {
+    beforeEach(async () => {
         const wallet = Keypair.generate();
         sdk = new GlitchSDK({
             cluster: 'https://api.devnet.solana.com',
@@ -12,9 +12,10 @@ describe('GlitchSDK', () => {
         });
     });
 
-    afterAll(async () => {
-        // Cleanup Redis connection from SDK
-        await sdk['queueWorker']['redis'].quit();
+    afterEach(async () => {
+        if (sdk) {
+            await sdk['queueWorker'].close();
+        }
     });
 
     describe('createChaosRequest', () => {

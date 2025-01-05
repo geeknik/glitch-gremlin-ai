@@ -16,7 +16,8 @@ export class RedisQueueWorker {
                 const delay = Math.min(times * 50, 2000);
                 return delay;
             },
-            enableOfflineQueue: false
+            enableOfflineQueue: true,
+            lazyConnect: true
         });
 
         this.redis.on('error', (err) => {
