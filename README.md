@@ -13,7 +13,7 @@ $GREMLINAI is more than just a memecoin - it's a tool that provides controlled c
 
 ## Token Details
 
-- Symbol: $GLITCHAI
+- Symbol: $GREMLINAI
 - Decimals: 9
 - Chain: Solana
 - Initial Distribution: 1,000,000,000
