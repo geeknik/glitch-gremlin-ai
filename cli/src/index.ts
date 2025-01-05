@@ -31,6 +31,7 @@ program
   .description('Glitch Gremlin AI CLI tool')
   .version('0.1.0');
 
+// Test command
 program
   .command('test')
   .description('Manage chaos tests')
@@ -41,10 +42,49 @@ program
   .option('--fuzz-seed-range <range>', 'Seed range for fuzz testing (min,max)')
   .option('--load-tps <tps>', 'Transactions per second for load testing')
   .option('--exploit-categories <cats>', 'Exploit categories to test (comma-separated)')
+  .action(async (options) => {
+    const spinner = ora('Creating chaos request...').start();
+    
+    try {
+      const keypairPath = process.env.SOLANA_KEYPAIR_PATH;
+      if (!keypairPath) {
+        throw new Error('SOLANA_KEYPAIR_PATH environment variable is not set');
+      }
 
-program
+      const sdk = new GlitchSDK({
+        cluster: process.env.SOLANA_CLUSTER || 'https://api.testnet.solana.com',
+        wallet: Keypair.fromSecretKey(
+          Buffer.from(JSON.parse(readFileSync(keypairPath, 'utf-8')))
+        )
+      });
+
+      const request = await sdk.createChaosRequest({
+        targetProgram: options.program,
+        testType: options.type as TestType,
+        duration: parseInt(options.duration),
+        intensity: parseInt(options.intensity)
+      });
+
+      spinner.succeed(`Created test request: ${request.requestId}`);
+      
+      spinner.start('Waiting for test completion...');
+      const results = await request.waitForCompletion();
+      
+      spinner.succeed('Test completed!');
+      console.log(chalk.green('\nResults:'));
+      console.log(JSON.stringify(results, null, 2));
+    } catch (error) {
+      spinner.fail(chalk.red(`Error: ${(error as Error).message}`));
+      process.exit(1);
+    }
+  });
+
+// Governance commands
+const governance = program
   .command('governance')
-  .description('Manage governance proposals')
+  .description('Manage governance proposals');
+
+governance
   .command('propose')
   .description('Create a new proposal')
   .requiredOption('-t, --title <title>', 'Proposal title')
@@ -74,7 +114,7 @@ program
     }
   });
 
-program
+governance
   .command('vote')
   .description('Vote on a proposal')
   .requiredOption('-p, --proposal <id>', 'Proposal ID')
@@ -85,42 +125,6 @@ program
       const sdk = initSDK();
       await sdk.vote(options.proposal, options.vote === 'yes');
       spinner.succeed('Vote submitted successfully');
-    } catch (error) {
-      spinner.fail(chalk.red(`Error: ${(error as Error).message}`));
-      process.exit(1);
-    }
-  });
-  .action(async (options) => {
-    const spinner = ora('Creating chaos request...').start();
-    
-    try {
-    const keypairPath = process.env.SOLANA_KEYPAIR_PATH;
-    if (!keypairPath) {
-        throw new Error('SOLANA_KEYPAIR_PATH environment variable is not set');
-    }
-
-    const sdk = new GlitchSDK({
-        cluster: process.env.SOLANA_CLUSTER || 'https://api.testnet.solana.com',
-        wallet: Keypair.fromSecretKey(
-            Buffer.from(JSON.parse(readFileSync(keypairPath, 'utf-8')))
-        )
-    });
-
-      const request = await sdk.createChaosRequest({
-        targetProgram: options.program,
-        testType: options.type as TestType,
-        duration: parseInt(options.duration),
-        intensity: parseInt(options.intensity)
-      });
-
-      spinner.succeed(`Created test request: ${request.requestId}`);
-      
-      spinner.start('Waiting for test completion...');
-      const results = await request.waitForCompletion();
-      
-      spinner.succeed('Test completed!');
-      console.log(chalk.green('\nResults:'));
-      console.log(JSON.stringify(results, null, 2));
     } catch (error) {
       spinner.fail(chalk.red(`Error: ${(error as Error).message}`));
       process.exit(1);
