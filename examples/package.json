@@ -1,12 +1,17 @@
 {
-  "name": "examples",
-  "version": "1.0.0",
-  "main": "index.js",
+  "name": "@glitch-gremlin/examples",
+  "version": "0.1.0",
+  "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "ts-node quick-test.ts"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": ""
+  "dependencies": {
+    "@solana/web3.js": "^1.98.0",
+    "chalk": "^4.1.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^4.9.0",
+    "ts-node": "^10.9.0"
+  }
 }
