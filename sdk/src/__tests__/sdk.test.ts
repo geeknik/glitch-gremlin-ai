@@ -59,7 +59,8 @@ describe('GlitchSDK', () => {
                 testParams: {
                     testType: TestType.FUZZ,
                     duration: 300,
-                    intensity: 5
+                    intensity: 5,
+                    targetProgram: "11111111111111111111111111111111"
                 },
                 stakingAmount: 1000
             });
@@ -76,7 +77,8 @@ describe('GlitchSDK', () => {
                 testParams: {
                     testType: TestType.FUZZ,
                     duration: 300,
-                    intensity: 5
+                    intensity: 5,
+                    targetProgram: "11111111111111111111111111111111"
                 },
                 stakingAmount: 10 // Too low
             })).rejects.toThrow('Insufficient stake amount');

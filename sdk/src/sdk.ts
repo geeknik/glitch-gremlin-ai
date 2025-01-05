@@ -198,6 +198,32 @@ export class GlitchSDK {
         return await this.connection.sendTransaction(transaction, []);
     }
 
+    async calculateChaosRequestFee(params: Omit<ChaosRequestParams, 'targetProgram'>): Promise<number> {
+        // Base fee calculation based on test type
+        let baseFee = 100; // Default base fee
+        
+        switch (params.testType) {
+            case TestType.FUZZ:
+                baseFee = 150;
+                break;
+            case TestType.LOAD:
+                baseFee = 200;
+                break;
+            case TestType.EXPLOIT:
+                baseFee = 300;
+                break;
+            case TestType.CONCURRENCY:
+                baseFee = 250;
+                break;
+        }
+
+        // Adjust fee based on duration and intensity
+        const durationMultiplier = params.duration / 60; // Per minute
+        const intensityMultiplier = params.intensity / 5; // Normalized to base intensity of 5
+        
+        return Math.floor(baseFee * durationMultiplier * intensityMultiplier);
+    }
+
     async getProposalStatus(proposalId: string): Promise<{
         id: string;
         status: 'active' | 'executed' | 'defeated';
