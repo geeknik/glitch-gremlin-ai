@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
-import { GlitchSDK, TestType } from '@glitch-gremlin/sdk';
+import { GlitchSDK, TestType } from '@glitch-gremlin/sdk/dist/index.js';
 import ora from 'ora';
 import chalk from 'chalk';
 
@@ -43,7 +43,7 @@ program
       console.log(chalk.green('\nResults:'));
       console.log(JSON.stringify(results, null, 2));
     } catch (error) {
-      spinner.fail(chalk.red(`Error: ${error.message}`));
+      spinner.fail(chalk.red(`Error: ${(error as Error).message}`));
       process.exit(1);
     }
   });
