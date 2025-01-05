@@ -30,6 +30,9 @@ import { GlitchError, InsufficientFundsError, InvalidProgramError } from './erro
 export class GlitchSDK {
     private connection: Connection;
     private programId: PublicKey;
+    private wallet: Keypair;
+    private lastRequestTime = 0;
+    private readonly MIN_REQUEST_INTERVAL = 2000; // 2 seconds between requests
 
     /**
      * Creates a new GlitchSDK instance
@@ -50,10 +53,9 @@ export class GlitchSDK {
         this.programId = new PublicKey(
             config.programId || 'GLt5cQeRgVMqnE9DGJQNNrbAfnRQYWqYVNWnJo7WNLZ9'
         );
-    }
 
-    private lastRequestTime = 0;
-    private readonly MIN_REQUEST_INTERVAL = 2000; // 2 seconds between requests
+        this.wallet = config.wallet;
+    }
 
     private async checkRateLimit() {
         const now = Date.now();
@@ -64,24 +66,6 @@ export class GlitchSDK {
             );
         }
         this.lastRequestTime = now;
-    }
-
-    private wallet: Keypair;
-
-    constructor(config: {
-        cluster?: string;
-        wallet: Keypair;
-        programId?: string;
-    }) {
-        // Default to testnet
-        this.connection = new Connection(config.cluster || 'https://api.testnet.solana.com');
-        
-        // Use an obfuscated program ID if not specified
-        this.programId = new PublicKey(
-            config.programId || 'GLt5cQeRgVMqnE9DGJQNNrbAfnRQYWqYVNWnJo7WNLZ9'
-        );
-
-        this.wallet = config.wallet;
     }
 
     async createChaosRequest(params: ChaosRequestParams): Promise<{
