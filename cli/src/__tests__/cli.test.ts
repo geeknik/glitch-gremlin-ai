@@ -24,7 +24,10 @@ describe('CLI', () => {
             CLI_PATH,
             'test',
             '--type', 'FUZZ'
-        ]);
-        expect(result.stderr.toString()).toContain('required option');
+        ], {
+            env: {} // Clear environment to avoid any existing SOLANA_KEYPAIR_PATH
+        });
+        expect(result.stderr.toString()).toContain('program');
+        expect(result.status).not.toBe(0);
     });
 });
