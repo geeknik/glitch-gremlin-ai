@@ -1,16 +1,10 @@
-use {
-    solana_program_test::*,
-    solana_program::{
-        instruction::{AccountMeta, Instruction},
-        system_instruction,
-    },
-    solana_sdk::{
-        hash::Hash,
-        signer::{keypair::Keypair, Signer},
-        transaction::Transaction,
-    },
-    borsh::{BorshDeserialize, BorshSerialize},
+use solana_program_test::*;
+use solana_sdk::{
+    pubkey::Pubkey,
+    hash::Hash,
+    signer::keypair::Keypair,
 };
+use solana_program::processor::process_instruction;
 
 // Program ID for tests
 pub fn id() -> Pubkey {
