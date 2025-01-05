@@ -86,7 +86,12 @@ export class GlitchSDK {
             throw new GlitchError('Duration must be between 60 and 3600 seconds', 1006);
         }
 
-        await this.checkRateLimit();
+        const now = Date.now();
+        const timeSinceLastRequest = now - this.lastRequestTime;
+        if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
+            throw new GlitchError('Rate limit exceeded', 1007);
+        }
+        this.lastRequestTime = now;
 
         // Create the chaos request instruction
         const instruction = new TransactionInstruction({
@@ -174,19 +179,31 @@ export class GlitchSDK {
 
         const instruction = new TransactionInstruction({
             keys: [
-                // Add account metas
+                { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true }
             ],
             programId: this.programId,
             data: Buffer.from([]) // Add instruction data
         });
 
         const transaction = new Transaction().add(instruction);
-        const signature = await this.connection.sendTransaction(transaction, [this.wallet]);
-
-        return {
-            id: 'proposal-' + signature.slice(0, 8),
-            signature
-        };
+        
+        try {
+            // Simulate the transaction first
+            await this.connection.simulateTransaction(transaction, [this.wallet]);
+            
+            // If simulation succeeds, send the actual transaction
+            const signature = await this.connection.sendTransaction(transaction, [this.wallet]);
+            
+            return {
+                id: 'proposal-' + signature.slice(0, 8),
+                signature
+            };
+        } catch (error) {
+            if (error instanceof Error) {
+                throw new GlitchError(error.message, 1008);
+            }
+            throw error;
+        }
     }
 
     async vote(proposalId: string, support: boolean): Promise<string> {
