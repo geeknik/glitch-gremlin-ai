@@ -54,7 +54,16 @@ describe('GlitchSDK', () => {
         it('should create a valid proposal', async () => {
             // Mock the connection's simulateTransaction to avoid actual network calls
             const mockSimulateTransaction = jest.spyOn(sdk['connection'], 'simulateTransaction')
-                .mockResolvedValue({ value: { err: null, logs: [] } });
+                .mockResolvedValue({
+                    context: { slot: 0 },
+                    value: { 
+                        err: null,
+                        logs: [],
+                        accounts: null,
+                        unitsConsumed: 0,
+                        returnData: null
+                    }
+                });
 
             // Mock sendTransaction to return a fake signature
             const mockSendTransaction = jest.spyOn(sdk['connection'], 'sendTransaction')
