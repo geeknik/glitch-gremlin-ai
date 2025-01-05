@@ -4,7 +4,7 @@ use solana_sdk::{
     hash::Hash,
     signer::keypair::Keypair,
 };
-use solana_program::processor::process_instruction;
+use glitch_gremlin::process_instruction;
 
 // Program ID for tests
 pub fn id() -> Pubkey {

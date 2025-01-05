@@ -29,6 +29,50 @@ pub enum GlitchInstruction {
         /// Reference to results (e.g. IPFS hash)
         result_ref: Vec<u8>, // Changed from String to Vec<u8> for better Borsh compatibility
     },
+
+    /// Create a governance proposal
+    /// 
+    /// Accounts expected:
+    /// 1. `[writable]` The proposal account
+    /// 2. `[writable]` The staking account
+    /// 3. `[signer]` The proposer
+    CreateProposal {
+        /// Unique proposal ID
+        id: u64,
+        /// Description of the proposal
+        description: String,
+        /// Target program to test
+        target_program: Pubkey,
+        /// Amount of tokens staked
+        staked_amount: u64,
+        /// Voting deadline (Unix timestamp)
+        deadline: i64,
+    },
+
+    /// Vote on a governance proposal
+    /// 
+    /// Accounts expected:
+    /// 1. `[writable]` The proposal account
+    /// 2. `[writable]` The voter's staking account
+    /// 3. `[signer]` The voter
+    Vote {
+        /// Proposal ID to vote on
+        proposal_id: u64,
+        /// Whether voting for or against
+        vote_for: bool,
+        /// Amount of tokens to vote with
+        vote_amount: u64,
+    },
+
+    /// Execute an approved proposal
+    /// 
+    /// Accounts expected:
+    /// 1. `[writable]` The proposal account
+    /// 2. `[signer]` The executor
+    ExecuteProposal {
+        /// Proposal ID to execute
+        proposal_id: u64,
+    },
 }
 
 impl GlitchInstruction {

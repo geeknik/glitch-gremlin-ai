@@ -1,0 +1,91 @@
+# IDE and editor files
+.aider*
+.env
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.iml
+.project
+.classpath
+.settings/
+
+# Rust build artifacts
+target/
+**/target/
+**/*.rs.bk
+debug/
+release/
+*.o
+*.so
+*.dylib
+*.dll
+*.rlib
+*.rmeta
+*.d
+*.bin
+
+# Solana specific
+test-ledger/
+.cargo/
+.spl-token-v2.0/
+.spl-token-v3.0/
+.anchor/
+dist/
+node_modules/
+.solana/
+validator-ledger/
+program-dump/
+test-keypair.json
+*-keypair.json
+*.so
+*.dylib
+*.dll
+
+# Dependency files
+Cargo.lock
+yarn.lock
+package-lock.json
+node_modules/
+bower_components/
+
+# Logs and databases
+*.log
+*.sqlite
+*.db
+dump.rdb
+*.log.*
+
+# OS specific
+.DS_Store
+Thumbs.db
+.directory
+Desktop.ini
+$RECYCLE.BIN/
+
+# Environment files
+.env*
+!.env.example
+*.local
+.env.development
+.env.test
+.env.production
+
+# Test coverage
+coverage/
+.nyc_output/
+lcov.info
+coverage.xml
+*.cover
+htmlcov/
+
+# Build output
+dist/
+build/
+out/
+bin/
+lib/
+target/
+debug/
+release/

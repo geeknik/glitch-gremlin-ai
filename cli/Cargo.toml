@@ -1,0 +1,13 @@
+[package]
+name = "glitch-cli"
+version = "0.1.0"
+edition = "2021"
+authors = ["Glitch Gremlin Team"]
+description = "CLI for Glitch Gremlin AI"
+license = "MIT"
+
+[dependencies]
+glitch-sdk = { path = "../sdk" }
+tokio = { version = "1.0", features = ["full"] }
+clap = { version = "4.0", features = ["derive"] }
+solana-sdk = "1.18.26"
