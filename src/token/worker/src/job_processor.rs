@@ -90,3 +90,41 @@ pub struct TestEnvironment {
     pub target_program: Pubkey,
     // Other test environment fields
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use solana_client::rpc_client::RpcClient;
+    use solana_sdk::signature::Keypair;
+    use std::str::FromStr;
+
+    const TEST_PROGRAM_ID: &str = "GremLin1111111111111111111111111111111111111";
+
+    #[tokio::test]
+    async fn test_process_chaos_job() {
+        let rpc_client = RpcClient::new("https://api.testnet.solana.com");
+        let program_id = Pubkey::from_str(TEST_PROGRAM_ID).unwrap();
+        
+        // Test job data format: request_id|params|target_program
+        let job_data = format!(
+            "{}|test_params|{}",
+            Keypair::new().pubkey(),
+            Keypair::new().pubkey()
+        );
+
+        let result = process_chaos_job(&rpc_client, &program_id, &job_data).await;
+        assert!(result.is_ok(), "Job processing failed: {:?}", result);
+    }
+
+    #[tokio::test]
+    async fn test_invalid_job_format() {
+        let rpc_client = RpcClient::new("https://api.testnet.solana.com");
+        let program_id = Pubkey::from_str(TEST_PROGRAM_ID).unwrap();
+        
+        // Invalid job data - missing parts
+        let job_data = "invalid|format";
+
+        let result = process_chaos_job(&rpc_client, &program_id, job_data).await;
+        assert!(result.is_err(), "Expected error for invalid job format");
+    }
+}
