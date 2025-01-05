@@ -9,7 +9,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "clean": "rm -rf dist",
+    "build": "npm run clean && tsc",
     "test": "jest",
     "lint": "eslint src/**/*.ts",
     "prepare": "npm run build"
