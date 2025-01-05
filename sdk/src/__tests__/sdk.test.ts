@@ -52,6 +52,14 @@ describe('GlitchSDK', () => {
 
     describe('governance', () => {
         it('should create a valid proposal', async () => {
+            // Mock the connection's simulateTransaction to avoid actual network calls
+            const mockSimulateTransaction = jest.spyOn(sdk['connection'], 'simulateTransaction')
+                .mockResolvedValue({ value: { err: null, logs: [] } });
+
+            // Mock sendTransaction to return a fake signature
+            const mockSendTransaction = jest.spyOn(sdk['connection'], 'sendTransaction')
+                .mockResolvedValue('mock-signature');
+
             const proposal = await sdk.createProposal({
                 title: "Test Proposal",
                 description: "Test Description",
@@ -67,6 +75,10 @@ describe('GlitchSDK', () => {
 
             expect(proposal.id).toBeDefined();
             expect(proposal.signature).toBeDefined();
+
+            // Clean up mocks
+            mockSimulateTransaction.mockRestore();
+            mockSendTransaction.mockRestore();
         });
 
         it('should validate minimum stake amount', async () => {
