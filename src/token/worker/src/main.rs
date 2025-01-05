@@ -5,6 +5,7 @@ use std::{thread, time::Duration};
 use crate::job_processor::process_chaos_job;
 
 mod job_processor;
+mod chaos_engine;
 
 const REDIS_URL: &str = "redis://r.glitchgremlin.ai/";
 const RPC_URL: &str = "https://api.mainnet-beta.solana.com";
