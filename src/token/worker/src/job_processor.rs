@@ -5,6 +5,7 @@ use solana_sdk::{
     instruction::{AccountMeta, Instruction},
     signature::{Keypair, Signer},
     transaction::Transaction,
+    system_instruction,
 };
 use std::error::Error;
 use crate::chaos_engine::{run_chaos_test, ChaosTestResult};
