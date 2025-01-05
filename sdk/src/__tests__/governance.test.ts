@@ -11,9 +11,18 @@ describe('Governance', () => {
             wallet
         });
 
-        // Mock getBalance to return sufficient funds for all tests
+        // Mock Solana RPC calls
         jest.spyOn(sdk['connection'], 'getBalance')
-            .mockResolvedValue(5000);
+            .mockResolvedValue(1_000_000_000); // 1 SOL
+
+        jest.spyOn(sdk['connection'], 'simulateTransaction')
+            .mockResolvedValue({
+                context: { slot: 0 },
+                value: { err: null, logs: [], accounts: null, unitsConsumed: 0, returnData: null }
+            });
+
+        jest.spyOn(sdk['connection'], 'sendTransaction')
+            .mockResolvedValue('mock-tx-signature');
     });
 
     afterEach(async () => {
@@ -40,6 +49,10 @@ describe('Governance', () => {
         });
 
         it('should validate minimum stake requirements', async () => {
+            // Mock low balance for this test
+            jest.spyOn(sdk['connection'], 'getBalance')
+                .mockResolvedValueOnce(50); // Not enough SOL
+
             await expect(sdk.createProposal({
                 title: "Test Proposal",
                 description: "Test Description",
@@ -50,8 +63,8 @@ describe('Governance', () => {
                     intensity: 5,
                     targetProgram: "11111111111111111111111111111111"
                 },
-                stakingAmount: 2000 // Sufficient stake amount
-            })).rejects.toThrow('Rate limit exceeded');
+                stakingAmount: 10 // Too low stake amount
+            })).rejects.toThrow('Insufficient stake amount');
         });
 
         it('should enforce proposal rate limits', async () => {
@@ -80,6 +93,17 @@ describe('Governance', () => {
 
     describe('voting', () => {
         it('should require minimum token balance to vote', async () => {
+            // Mock low balance for this test
+            jest.spyOn(sdk['connection'], 'getBalance')
+                .mockResolvedValueOnce(100); // Not enough for voting
+
+            // Mock transaction simulation to succeed
+            jest.spyOn(sdk['connection'], 'simulateTransaction')
+                .mockResolvedValueOnce({
+                    context: { slot: 0 },
+                    value: { err: null, logs: [], accounts: null, unitsConsumed: 0, returnData: null }
+                });
+
             await expect(sdk.vote('test-proposal-id', true))
                 .rejects.toThrow('Insufficient token balance to vote');
         });
