@@ -3,8 +3,8 @@ use solana_sdk::pubkey::Pubkey;
 use std::error::Error;
 
 pub async fn process_chaos_job(
-    rpc_client: &RpcClient,
-    program_id: &Pubkey,
+    _rpc_client: &RpcClient,
+    _program_id: &Pubkey,
     job_data: &str,
 ) -> Result<(), Box<dyn Error>> {
     // Parse job data (TODO: implement proper deserialization)
@@ -14,7 +14,7 @@ pub async fn process_chaos_job(
     }
 
     let request_id = parts[0];
-    let params = parts[1];
+    let _params = parts[1];
     let target_program = parts[2];
 
     println!("Processing chaos request {} for program {}", request_id, target_program);

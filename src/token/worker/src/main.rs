@@ -26,12 +26,18 @@ async fn main() {
 
     loop {
         // Check for new jobs
-        if let Ok(Some(job)) = con.rpop::<_, String>("chaos_jobs", None) {
-            if let Some(job_data) = job {
+        match con.rpop::<_, Option<String>>("chaos_jobs", None) {
+            Ok(Some(job_data)) => {
                 println!("Processing job: {}", job_data);
                 if let Err(e) = process_chaos_job(&rpc_client, &program_id, &job_data).await {
                     eprintln!("Error processing job: {}", e);
                 }
+            }
+            Ok(None) => {
+                // No jobs available
+            }
+            Err(e) => {
+                eprintln!("Error getting job from Redis: {}", e);
             }
         }
 
