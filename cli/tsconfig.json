@@ -16,7 +16,7 @@
     "allowJs": true,
     "baseUrl": ".",
     "paths": {
-      "@glitch-gremlin/sdk": ["../sdk/dist"]
+      "@glitch-gremlin/sdk": ["../sdk/src"]
     }
   },
   "include": ["src/**/*"],
