@@ -6,8 +6,10 @@
     "cli"
   ],
   "scripts": {
-    "clean": "npm run clean --workspaces",
-    "build": "tsc --build",
+    "clean": "rm -rf node_modules package-lock.json sdk/dist cli/dist",
+    "build": "npm run build-sdk && npm run build-cli",
+    "build-sdk": "cd sdk && npm install && npm run build",
+    "build-cli": "cd cli && npm install && npm run build",
     "test": "npm run test --workspaces",
     "lint": "npm run lint --workspaces"
   },
