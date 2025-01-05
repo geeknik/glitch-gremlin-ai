@@ -9,7 +9,6 @@ use solana_sdk::{
     rent::Rent,
 };
 use solana_program_test::*;
-use solana_sdk::clock::Clock;
 use std::error::Error;
 use crate::chaos_engine::{run_chaos_test, ChaosTestResult};
 use crate::instruction::GlitchInstruction;
