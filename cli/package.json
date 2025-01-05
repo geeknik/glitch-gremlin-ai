@@ -3,7 +3,6 @@
   "version": "0.1.0",
   "description": "CLI tools for Glitch Gremlin AI chaos testing platform",
   "main": "dist/index.js",
-  "type": "module",
   "bin": {
     "glitch": "dist/index.js"
   },
