@@ -5,7 +5,8 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "npx tsc",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "echo \"No tests yet\" && exit 0"
   },
   "dependencies": {
     "@solana/web3.js": "^1.87.0",

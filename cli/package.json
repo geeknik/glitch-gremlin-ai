@@ -7,7 +7,8 @@
   },
   "scripts": {
     "build": "npx tsc --project tsconfig.json",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "echo \"No tests yet\" && exit 0"
   },
   "dependencies": {
     "@glitch-gremlin/sdk": "file:../sdk",
