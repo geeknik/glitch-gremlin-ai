@@ -202,6 +202,11 @@ export class GlitchSDK {
                 signature
             };
         } catch (error) {
+            // Check if it's a rate limit error first
+            if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
+                throw new GlitchError('Rate limit exceeded', 1007);
+            }
+            // Otherwise wrap the original error
             if (error instanceof Error) {
                 throw new GlitchError(error.message, 1008);
             }
@@ -219,7 +224,7 @@ export class GlitchSDK {
         });
 
         const transaction = new Transaction().add(instruction);
-        return await this.connection.sendTransaction(transaction, []);
+        return await this.connection.sendTransaction(transaction, [this.wallet]);
     }
 
     async executeProposal(proposalId: string): Promise<string> {

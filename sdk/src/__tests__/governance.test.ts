@@ -84,12 +84,30 @@ describe('Governance', () => {
 
     describe('proposal execution', () => {
         it('should only execute passed proposals', async () => {
-            await expect(sdk.executeProposal('failed-proposal-id'))
+            const mockGetAccountInfo = jest.spyOn(sdk['connection'], 'getAccountInfo')
+                .mockResolvedValueOnce({
+                    data: Buffer.from('{"status":"failed"}'),
+                    executable: false,
+                    lamports: 0,
+                    owner: sdk['programId'],
+                    rentEpoch: 0
+                });
+
+            await expect(sdk.executeProposal('proposal-1234'))
                 .rejects.toThrow('Proposal not passed');
         });
 
         it('should enforce timelock period', async () => {
-            await expect(sdk.executeProposal('pending-proposal-id'))
+            const mockGetAccountInfo = jest.spyOn(sdk['connection'], 'getAccountInfo')
+                .mockResolvedValueOnce({
+                    data: Buffer.from('{"status":"active","endTime":' + (Date.now() + 86400000) + '}'),
+                    executable: false,
+                    lamports: 0,
+                    owner: sdk['programId'],
+                    rentEpoch: 0
+                });
+
+            await expect(sdk.executeProposal('proposal-5678'))
                 .rejects.toThrow('Timelock period not elapsed');
         });
     });
