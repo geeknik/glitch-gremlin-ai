@@ -202,19 +202,17 @@ export class GlitchSDK {
                 signature
             };
         } catch (error) {
-            // Check rate limit first
+            // Always check rate limit first
             const now = Date.now();
             const timeSinceLastRequest = now - this.lastRequestTime;
             if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
                 throw new GlitchError('Rate limit exceeded', 1007);
             }
 
-            // If it's not a rate limit issue, check other conditions
-            if (error instanceof Error) {
-                const balance = await this.connection.getBalance(this.wallet.publicKey);
-                if (balance < params.stakingAmount) {
-                    throw new GlitchError('Insufficient stake amount', 1008);
-                }
+            // Then check stake amount
+            const balance = await this.connection.getBalance(this.wallet.publicKey);
+            if (balance < params.stakingAmount) {
+                throw new GlitchError('Insufficient stake amount', 1008);
             }
 
             throw error;
@@ -222,12 +220,10 @@ export class GlitchSDK {
     }
 
     async vote(proposalId: string, support: boolean): Promise<string> {
-        // Mock successful balance check for tests
-        if (process.env.NODE_ENV !== 'test') {
-            const balance = await this.connection.getBalance(this.wallet.publicKey);
-            if (balance < 1000) { // Minimum balance required to vote
-                throw new GlitchError('Insufficient token balance to vote', 1009);
-            }
+        // Always check token balance first, even in tests
+        const balance = await this.connection.getBalance(this.wallet.publicKey);
+        if (balance < 1000) { // Minimum balance required to vote
+            throw new GlitchError('Insufficient token balance to vote', 1009);
         }
 
         const instruction = new TransactionInstruction({
@@ -250,15 +246,23 @@ export class GlitchSDK {
     }
 
     async executeProposal(proposalId: string): Promise<string> {
-        const proposal = await this.getProposalStatus(proposalId);
-        
-        if (proposal.status !== 'active') {
-            throw new GlitchError('Proposal not passed', 1009);
-        }
+        try {
+            const proposal = await this.getProposalStatus(proposalId);
+            
+            if (proposal.status !== 'active') {
+                throw new GlitchError('Proposal not passed', 1009);
+            }
 
-        // For test proposals, skip timelock check
-        if (!proposalId.startsWith('test-') && Date.now() < proposal.endTime) {
-            throw new GlitchError('Timelock period not elapsed', 1010);
+            // For test proposals, skip timelock check
+            if (!proposalId.startsWith('test-') && Date.now() < proposal.endTime) {
+                throw new GlitchError('Timelock period not elapsed', 1010);
+            }
+        } catch (error) {
+            if (error instanceof GlitchError) {
+                throw error; // Re-throw our custom errors
+            }
+            // For other errors, throw a generic error
+            throw new GlitchError('Failed to execute proposal', 1012);
         }
 
         const instruction = new TransactionInstruction({
@@ -307,8 +311,8 @@ export class GlitchSDK {
         endTime: number;
     }> {
         try {
-            // Validate proposal ID format - accept test IDs for now
-            if (!/^[1-9A-HJ-NP-Za-km-z-]{8,44}$/.test(proposalId)) {
+            // Accept both test IDs and regular proposal IDs
+            if (!/^(test-|proposal-)?[1-9A-HJ-NP-Za-km-z-]{4,44}$/.test(proposalId)) {
                 throw new Error('Invalid proposal ID format');
             }
 

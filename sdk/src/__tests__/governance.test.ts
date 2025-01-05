@@ -15,7 +15,15 @@ describe('Governance', () => {
     afterEach(async () => {
         if (sdk) {
             await sdk['queueWorker'].close();
+            await sdk['connection'].disconnect();
         }
+        // Clear any pending timers
+        jest.clearAllTimers();
+    });
+
+    afterAll(async () => {
+        // Ensure all connections are closed
+        await sdk['connection'].disconnect();
     });
 
     describe('proposal creation', () => {
