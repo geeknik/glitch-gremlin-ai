@@ -120,7 +120,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_invalid_job_format() {
-        let rpc_client = RpcClient::new("https://api.testnet.solana.com");
+        let rpc_client = RpcClient::new("https://api.testnet.solana.com".to_string());
         let program_id = Pubkey::from_str(TEST_PROGRAM_ID).unwrap();
         
         // Invalid job data - missing parts
