@@ -6,10 +6,10 @@ jest.mock('ioredis', () => require('ioredis-mock'));
 
 describe('RedisQueueWorker', () => {
     let worker: RedisQueueWorker;
-    let redis: Redis;
+    let redis: typeof Redis;
 
     beforeEach(() => {
-        redis = new Redis() as Redis;
+        redis = new Redis();
         worker = new RedisQueueWorker(redis);
     });
 
