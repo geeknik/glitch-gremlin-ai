@@ -140,12 +140,13 @@ describe('GovernanceManager', () => {
         describe('failed voting', () => {
             it('should reject voting on inactive proposals', async () => {
                 const proposalAddress = Keypair.generate().publicKey;
-                
+            
                 // Mock for inactive proposal
-                jest.spyOn(governanceManager, 'validateProposal')
+                const validateProposalMock = jest.spyOn(governanceManager, 'validateProposal')
                     .mockRejectedValue(new GlitchError('Proposal voting has ended', 2006));
-                
+            
                 const sendTransactionMock = jest.spyOn(connection, 'sendTransaction');
+                const simulateTransactionMock = jest.spyOn(connection, 'simulateTransaction');
 
                 await expect(
                     governanceManager.castVote(
@@ -156,8 +157,14 @@ describe('GovernanceManager', () => {
                     )
                 ).rejects.toThrow('Proposal voting has ended');
 
-                // Verify transaction was not sent
+                // Verify transaction methods were not called
                 expect(sendTransactionMock).not.toHaveBeenCalled();
+                expect(simulateTransactionMock).not.toHaveBeenCalled();
+
+                // Clean up
+                validateProposalMock.mockRestore();
+                sendTransactionMock.mockRestore();
+                simulateTransactionMock.mockRestore();
             });
         });
     });
