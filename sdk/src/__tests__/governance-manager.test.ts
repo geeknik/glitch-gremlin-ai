@@ -62,27 +62,42 @@ describe('GovernanceManager', () => {
     });
 
     describe('castVote', () => {
-        jest.setTimeout(15000); // Increase timeout for all tests in this block
+        beforeEach(() => {
+            // Reset all mocks before each test
+            jest.clearAllMocks();
+            
+            // Mock current time
+            jest.spyOn(Date, 'now')
+                .mockImplementation(() => 1641024000000); // Fixed timestamp
+        });
         
         it('should create valid vote transaction', async () => {
             const proposalAddress = Keypair.generate().publicKey;
-            
-            // Mock validateProposal
+            const mockProposalData = {
+                title: "Test",
+                description: "Test",
+                proposer: Keypair.generate().publicKey,
+                startTime: Date.now() - 1000,
+                endTime: Date.now() + 1000,
+                executionTime: Date.now() + 86400000,
+                voteWeights: { yes: 0, no: 0, abstain: 0 },
+                votes: [],
+                quorum: 100,
+                executed: false
+            };
+
+            // Mock all async operations
             jest.spyOn(governanceManager, 'validateProposal')
-                .mockResolvedValue({
-                    title: "Test",
-                    description: "Test",
-                    proposer: Keypair.generate().publicKey,
-                    startTime: Date.now() - 1000,
-                    endTime: Date.now() + 1000,
-                    executionTime: Date.now() + 86400000,
-                    voteWeights: { yes: 0, no: 0, abstain: 0 },
-                    votes: [],
-                    quorum: 100,
-                    executed: false
-                });
+                .mockResolvedValueOnce(mockProposalData);
+            
             jest.spyOn(governanceManager, 'getProposalState')
-                .mockResolvedValue(ProposalState.Active);
+                .mockResolvedValueOnce(ProposalState.Active);
+
+            jest.spyOn(connection, 'getAccountInfo')
+                .mockResolvedValueOnce(null);
+
+            jest.spyOn(connection, 'sendTransaction')
+                .mockResolvedValueOnce('mock-signature');
 
             const tx = await governanceManager.castVote(
                 connection,
