@@ -13,12 +13,64 @@ export class GovernanceManager {
     };
 
     private config: GovernanceConfig;
+    private proposalAccountSize: number = 1024; // Size in bytes for proposal accounts
 
     constructor(
         private programId: PublicKey,
         config: Partial<GovernanceConfig> = {}
     ) {
         this.config = { ...this.DEFAULT_CONFIG, ...config };
+    }
+
+    private async createProposalAccount(
+        connection: Connection,
+        payer: Keypair,
+        space: number = this.proposalAccountSize
+    ): Promise<Keypair> {
+        const proposalAccount = Keypair.generate();
+        const rent = await connection.getMinimumBalanceForRentExemption(space);
+        
+        const createAccountIx = SystemProgram.createAccount({
+            fromPubkey: payer.publicKey,
+            newAccountPubkey: proposalAccount.publicKey,
+            lamports: rent,
+            space,
+            programId: this.programId
+        });
+
+        const tx = new Transaction().add(createAccountIx);
+        await connection.sendTransaction(tx, [payer, proposalAccount]);
+        
+        return proposalAccount;
+    }
+
+    private async validateProposal(
+        connection: Connection,
+        proposalAddress: PublicKey
+    ): Promise<ProposalMetadata> {
+        const account = await connection.getAccountInfo(proposalAddress);
+        if (!account) {
+            throw new GlitchError('Proposal not found', 2002);
+        }
+
+        // Deserialize account data into ProposalMetadata
+        const metadata = this.deserializeProposalData(account.data);
+        
+        if (Date.now() < metadata.startTime) {
+            throw new GlitchError('Proposal voting has not started', 2005);
+        }
+        
+        if (Date.now() > metadata.endTime) {
+            throw new GlitchError('Proposal voting has ended', 2006);
+        }
+
+        return metadata;
+    }
+
+    private deserializeProposalData(data: Buffer): ProposalMetadata {
+        // Implement actual deserialization logic here
+        // This is a placeholder implementation
+        return JSON.parse(data.toString());
     }
 
     async createProposalAccount(
@@ -62,15 +114,28 @@ export class GovernanceManager {
     }
 
     async castVote(
-        connection: any,
-        wallet: any,
+        connection: Connection,
+        wallet: Keypair,
         proposalAddress: PublicKey,
-        support: boolean
+        support: boolean,
+        weight?: number
     ): Promise<Transaction> {
-        const state = await this.getProposalState(connection, proposalAddress);
-        if (state !== ProposalState.Active) {
-            throw new GlitchError('Proposal is not active', 2003);
+        const metadata = await this.validateProposal(connection, proposalAddress);
+        
+        // Check if wallet has already voted
+        const hasVoted = metadata.votes.some(v => v.voter.equals(wallet.publicKey));
+        if (hasVoted) {
+            throw new GlitchError('Already voted on this proposal', 2004);
         }
+
+        // Calculate vote weight if not provided
+        const voteWeight = weight || await this.calculateVoteWeight(connection, wallet.publicKey);
+        
+        const voteData = Buffer.from([
+            0x01, // Vote instruction
+            support ? 0x01 : 0x00,
+            ...new Uint8Array(new Float64Array([voteWeight]).buffer)
+        ]);
 
         const voteIx = new TransactionInstruction({
             keys: [
@@ -78,10 +143,31 @@ export class GovernanceManager {
                 { pubkey: proposalAddress, isSigner: false, isWritable: true }
             ],
             programId: this.programId,
-            data: Buffer.from([0x01, support ? 0x01 : 0x00]) // Vote instruction
+            data: voteData
         });
 
         return new Transaction().add(voteIx);
+    }
+
+    private async calculateVoteWeight(
+        connection: Connection,
+        voter: PublicKey
+    ): Promise<number> {
+        // Get token account
+        const tokenAccounts = await connection.getTokenAccountsByOwner(voter, {
+            programId: TOKEN_PROGRAM_ID
+        });
+
+        // Sum up all GLITCH token balances
+        let totalBalance = 0;
+        for (const { account } of tokenAccounts.value) {
+            const data = Buffer.from(account.data);
+            // Parse SPL token account data
+            const amount = Number(data.readBigUInt64LE(64));
+            totalBalance += amount;
+        }
+
+        return totalBalance;
     }
 
     async executeProposal(

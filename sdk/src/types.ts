@@ -53,7 +53,35 @@ export enum ProposalState {
     Succeeded = 'succeeded',
     Defeated = 'defeated',
     Executed = 'executed',
-    Cancelled = 'cancelled'
+    Cancelled = 'cancelled',
+    Queued = 'queued',
+    Expired = 'expired'
+}
+
+export interface VoteWeight {
+    yes: number;
+    no: number;
+    abstain: number;
+}
+
+export interface ProposalVote {
+    voter: PublicKey;
+    vote: boolean;
+    weight: number;
+    timestamp: number;
+}
+
+export interface ProposalMetadata {
+    title: string;
+    description: string;
+    proposer: PublicKey;
+    startTime: number;
+    endTime: number;
+    executionTime: number;
+    voteWeights: VoteWeight;
+    votes: ProposalVote[];
+    quorum: number;
+    executed: boolean;
 }
 
 export interface ProposalParams {
