@@ -140,7 +140,7 @@ describe('GovernanceManager', () => {
 
                     it('should create valid vote transaction', async () => {
                         // Call castVote and await the result
-                        const transaction = await governanceManager.castVote(
+                        const transaction1 = await governanceManager.castVote(
                             connection,
                             wallet,
                             proposalAddress,
@@ -148,7 +148,7 @@ describe('GovernanceManager', () => {
                         );
 
                         // Verify the transaction was created
-                        expect(transaction).toBeDefined();
+                        expect(transaction1).toBeDefined();
                         
                         // Verify validateProposal was called with correct args
                         expect(validateProposalMock).toHaveBeenCalledWith(
