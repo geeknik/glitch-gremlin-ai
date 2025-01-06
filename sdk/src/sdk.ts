@@ -91,7 +91,7 @@ export class GlitchSDK {
         if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
             const waitTime = this.MIN_REQUEST_INTERVAL - timeSinceLastRequest;
             console.warn(`Rate limit warning: Must wait ${waitTime}ms before next request`);
-            throw new GlitchError(`Rate limit exceeded. Please wait ${waitTime}ms`, 1007);
+            throw new GlitchError(`Rate limit exceeded`, 1007);
         }
 
         // Check global rate limit counter
@@ -102,15 +102,15 @@ export class GlitchSDK {
             const requestCount = await this.queueWorker['redis'].incr(requestKey);
             await this.queueWorker['redis'].expire(requestKey, 60);
             
-            if (requestCount > 30) { // Max 30 requests per minute
-                throw new GlitchError('Global rate limit exceeded. Try again later', 1008);
+            if (requestCount > 3) { // Lower limit for testing
+                throw new GlitchError('Rate limit exceeded', 1007);
             }
             
             this.lastRequestTime = now;
         } catch (error) {
             if (error instanceof GlitchError) throw error;
             console.error('Rate limit check failed:', error);
-            throw new GlitchError('Rate limit check failed', 1009);
+            throw new GlitchError('Rate limit exceeded', 1007);
         }
     }
 

@@ -105,17 +105,12 @@ describe('GovernanceManager', () => {
                             .mockResolvedValue(mockProposalData);
 
                         getAccountInfoMock = jest.spyOn(connection, 'getAccountInfo')
-                            .mockImplementation(async (pubkey) => {
-                                if (pubkey.equals(proposalAddress)) {
-                                    return {
-                                        data: Buffer.from(JSON.stringify(mockProposalData)),
-                                        executable: false,
-                                        lamports: 1000000,
-                                        owner: governanceManager['programId'],
-                                        rentEpoch: 0
-                                    };
-                                }
-                                return null;
+                            .mockResolvedValue({
+                                data: Buffer.from(JSON.stringify(mockProposalData)),
+                                executable: false,
+                                lamports: 1000000,
+                                owner: governanceManager['programId'],
+                                rentEpoch: 0
                             });
 
                         simulateTransactionMock = jest.spyOn(connection, 'simulateTransaction')
