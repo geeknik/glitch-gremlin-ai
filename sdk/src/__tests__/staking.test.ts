@@ -62,7 +62,7 @@ describe('Staking', () => {
             // Mock stake info with future unlock time
             jest.spyOn(sdk as any, 'getStakeInfo')
                 .mockResolvedValueOnce({
-                    amount: 1000,
+                    amount: BigInt(1000),
                     lockupPeriod: 86400,
                     startTime: Date.now() / 1000,
                     owner: sdk['wallet'].publicKey

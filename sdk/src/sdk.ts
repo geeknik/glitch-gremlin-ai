@@ -329,7 +329,7 @@ export class GlitchSDK {
         // Parse account data into StakeInfo
         const data = stakeAccount.data;
         return {
-            amount: data.readBigUInt64LE(0),
+            amount: data.readBigInt64LE(0),
             lockupPeriod: data.readBigUInt64LE(8),
             startTime: data.readBigUInt64LE(16),
             owner: new PublicKey(data.slice(24, 56))

@@ -71,6 +71,13 @@ export interface ProposalParams {
     stakingAmount: number;
 }
 
+export interface StakeInfo {
+    amount: bigint;
+    lockupPeriod: number;
+    startTime: number;
+    owner: PublicKey;
+}
+
 export interface ChaosResult {
     requestId: string;
     status: 'completed' | 'failed';
