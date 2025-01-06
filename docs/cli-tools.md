@@ -49,7 +49,7 @@ glitch governance propose \
 #   -t, --title <title>       Proposal title
 #   -d, --description <desc>  Proposal description
 #   -p, --program <address>   Target program address
-#   -s, --stake <amount>      Amount of GLITCH to stake
+#   -s, --stake <amount>      Amount of GREMLINAI to stake
 
 # Vote on a proposal
 glitch governance vote -p <proposal-id> -v yes

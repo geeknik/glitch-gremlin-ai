@@ -25,7 +25,7 @@ async function createGovernanceProposal() {
                 categories: ["reentrancy", "arithmetic"]
             }
         },
-        stakingAmount: 1000 // Amount of GLITCH tokens to stake
+        stakingAmount: 1000 // Amount of GREMLINAI tokens to stake
     });
 
     console.log(`Created proposal: ${proposal.id}`);

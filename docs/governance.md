@@ -4,7 +4,7 @@
 The Glitch Gremlin governance system allows token holders to participate in decision-making through a democratic process. Holders can stake tokens, create proposals, vote, and earn rewards for participation.
 
 ## Staking
-- Minimum stake: 1000 GLITCH
+- Minimum stake: 1000 GREMLINAI
 - Lockup periods: 1 day to 1 year
 - Higher voting power with longer lockups
 - Rewards from protocol fees
