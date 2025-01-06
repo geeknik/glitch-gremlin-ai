@@ -35,6 +35,48 @@ pub enum GlitchError {
 
     #[error("Arithmetic overflow")]
     Overflow,
+
+    // Rate limiting errors
+    #[error("Rate limit exceeded")]
+    RateLimitExceeded,
+    
+    #[error("Invalid rate limit parameters")]
+    InvalidRateLimit,
+
+    // Staking errors
+    #[error("Invalid stake amount")]
+    InvalidStakeAmount,
+    
+    #[error("Stake still locked")]
+    StakeLocked,
+    
+    #[error("Invalid lockup period")]
+    InvalidLockupPeriod,
+    
+    #[error("Stake not found")]
+    StakeNotFound,
+
+    // Advanced governance errors
+    #[error("Invalid proposal parameters")]
+    InvalidProposal,
+    
+    #[error("Insufficient voting power")]
+    InsufficientVotingPower,
+    
+    #[error("Proposal already executed")]
+    ProposalAlreadyExecuted,
+    
+    #[error("Invalid vote weight")]
+    InvalidVoteWeight,
+    
+    #[error("Voting period not started")]
+    VotingNotStarted,
+    
+    #[error("Voting period ended")]
+    VotingEnded,
+    
+    #[error("Quorum not reached")]
+    QuorumNotReached,
 }
 
 impl From<GlitchError> for ProgramError {
