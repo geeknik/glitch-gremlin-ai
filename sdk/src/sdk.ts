@@ -320,7 +320,12 @@ export class GlitchSDK {
         return await this.connection.sendTransaction(transaction, [this.wallet]);
     }
 
-    async getStakeInfo(stakeId: string): Promise<StakeInfo | null> {
+    async getStakeInfo(stakeId: string): Promise<{
+        amount: bigint;
+        lockupPeriod: number;
+        startTime: number;
+        owner: PublicKey;
+    } | null> {
         const stakeAccount = await this.connection.getAccountInfo(new PublicKey(stakeId));
         if (!stakeAccount) {
             return null;

@@ -36,13 +36,6 @@ export interface ChaosRequestParams {
     };
 }
 
-export interface StakeInfo {
-    amount: number;
-    lockupPeriod: number;
-    startTime: number;
-    owner: PublicKey;
-}
-
 export interface GovernanceConfig {
     minVotingPeriod: number;
     maxVotingPeriod: number;
