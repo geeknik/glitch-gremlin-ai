@@ -92,23 +92,29 @@ describe('GovernanceManager', () => {
                 executed: false
             };
 
-            // Set up all mocks with immediate responses
+            // Set up all required mocks
             const mocks = {
                 validateProposal: jest.spyOn(governanceManager, 'validateProposal')
-                    .mockResolvedValue(mockProposalData),
+                    .mockResolvedValueOnce(mockProposalData),
                 getProposalState: jest.spyOn(governanceManager, 'getProposalState')
-                    .mockResolvedValue(ProposalState.Active),
+                    .mockResolvedValueOnce(ProposalState.Active),
                 getAccountInfo: jest.spyOn(connection, 'getAccountInfo')
-                    .mockResolvedValue(null),
+                    .mockResolvedValueOnce({
+                        data: Buffer.from(JSON.stringify(mockProposalData)),
+                        executable: false,
+                        lamports: 1000000,
+                        owner: governanceManager['programId'],
+                        rentEpoch: 0
+                    }),
                 sendTransaction: jest.spyOn(connection, 'sendTransaction')
-                    .mockResolvedValue('mock-signature'),
+                    .mockResolvedValueOnce('mock-signature'),
                 simulateTransaction: jest.spyOn(connection, 'simulateTransaction')
-                    .mockResolvedValue({
+                    .mockResolvedValueOnce({
                         context: { slot: 0 },
                         value: { err: null, logs: [], accounts: null, unitsConsumed: 0, returnData: null }
                     }),
                 confirmTransaction: jest.spyOn(connection, 'confirmTransaction')
-                    .mockResolvedValue({
+                    .mockResolvedValueOnce({
                         context: { slot: 0 },
                         value: { err: null }
                     })
