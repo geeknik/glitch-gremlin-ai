@@ -87,7 +87,7 @@ const results = await request.waitForCompletion();
 - 🔒 Security First: Comprehensive vulnerability scanning and exploit testing
 - 📊 Real-time Monitoring: Detailed metrics and performance analysis
 - 🏛️ Governance: Community-driven testing proposals and protocol improvements
-- 💰 Token Economics: Stake $GLITCH to participate in governance
+- 💰 Token Economics: Stake $GREMLINAI to participate in governance
 
 ## Documentation
 
