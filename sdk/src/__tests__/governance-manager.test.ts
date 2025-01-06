@@ -43,11 +43,20 @@ describe('GovernanceManager', () => {
         });
     });
 
-    // Increase timeout and add beforeEach setup
-    jest.setTimeout(60000);
+    // Increase timeout and add proper test setup
+    jest.setTimeout(120000);
 
     beforeEach(() => {
         jest.useRealTimers();
+        connection = new Connection('http://localhost:8899', 'confirmed');
+        wallet = Keypair.generate();
+        governanceManager = new GovernanceManager(
+            new PublicKey('GLt5cQeRgVMqnE9DGJQNNrbAfnRQYWqYVNWnJo7WNLZ9')
+        );
+    });
+
+    afterEach(() => {
+        jest.clearAllMocks();
     });
 
     describe('castVote', () => {

@@ -161,7 +161,15 @@ describe('Governance', () => {
         it('should enforce timelock period', async () => {
             const mockGetAccountInfo = jest.spyOn(sdk['connection'], 'getAccountInfo')
                 .mockResolvedValueOnce({
-                    data: Buffer.from('{"status":"active","endTime":' + (Date.now() + 86400000) + '}'),
+                    data: Buffer.from(JSON.stringify({
+                        status: 'active',
+                        endTime: Date.now() + 86400000,
+                        voteWeights: {
+                            yes: 100,
+                            no: 50,
+                            abstain: 0
+                        }
+                    })),
                     executable: false,
                     lamports: 0,
                     owner: sdk['programId'],
