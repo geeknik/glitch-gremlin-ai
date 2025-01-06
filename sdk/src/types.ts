@@ -1,5 +1,18 @@
 import { PublicKey } from '@solana/web3.js';
 
+export enum VulnerabilityType {
+    Reentrancy = 'reentrancy',
+    ArithmeticOverflow = 'arithmetic-overflow',
+    AccessControl = 'access-control',
+    RaceCondition = 'race-condition',
+    InstructionInjection = 'instruction-injection',
+    AccountConfusion = 'account-confusion',
+    SignerAuthorization = 'signer-authorization',
+    PdaValidation = 'pda-validation',
+    ClockManipulation = 'clock-manipulation',
+    LamportDrain = 'lamport-drain'
+}
+
 export enum TestType {
     FUZZ = 'FUZZ',
     LOAD = 'LOAD',
