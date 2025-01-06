@@ -37,12 +37,12 @@ export interface ChaosRequestParams {
 }
 
 export interface GovernanceConfig {
-    minStakeAmount: number;
-    votingPeriod: number;
-    quorum: number;
-    executionDelay: number;
-    minVotingPeriod: number;
-    maxVotingPeriod: number;
+    minStakeAmount?: number;
+    votingPeriod?: number;
+    quorum?: number;
+    executionDelay?: number;
+    minVotingPeriod?: number;
+    maxVotingPeriod?: number;
 }
 
 export enum ProposalState {
