@@ -64,52 +64,70 @@ describe('GovernanceManager', () => {
     describe('castVote', () => {
         beforeEach(() => {
             jest.clearAllMocks();
-            jest.spyOn(Date, 'now')
-                .mockImplementation(() => 1641024000000); // Fixed timestamp
+            // Use fake timers
+            jest.useFakeTimers();
+            jest.setSystemTime(1641024000000); // Fixed timestamp
         });
-        
-        // Increase timeout since this test involves multiple async operations
-        jest.setTimeout(10000);
-        
+
+        afterEach(() => {
+            jest.useRealTimers();
+        });
+
         it('should create valid vote transaction', async () => {
-            console.log('Test started: castVote');
-            
-            // Mock current time
-            const now = 1641024000000; // Fixed timestamp
-            jest.spyOn(Date, 'now').mockImplementation(() => now);
+            console.log('[Test] Starting castVote test');
             
             const proposalAddress = Keypair.generate().publicKey;
             const mockProposalData = {
                 title: "Test",
                 description: "Test",
                 proposer: Keypair.generate().publicKey,
-                startTime: now - 1000,
-                endTime: now + 1000,
-                executionTime: now + 86400000,
+                startTime: 1641023000000, // 1000ms before current time
+                endTime: 1641025000000,   // 1000ms after current time
+                executionTime: 1641110400000,
                 voteWeights: { yes: 0, no: 0, abstain: 0 },
                 votes: [],
                 quorum: 100,
                 executed: false
             };
 
-            // Set up all mocks before any calls
+            // Mock all external calls
             const mocks = {
                 validateProposal: jest.spyOn(governanceManager, 'validateProposal')
-                    .mockResolvedValue(mockProposalData),
+                    .mockImplementation(async () => {
+                        console.log('[Mock] validateProposal called');
+                        return mockProposalData;
+                    }),
                 getProposalState: jest.spyOn(governanceManager, 'getProposalState')
-                    .mockResolvedValue(ProposalState.Active),
+                    .mockImplementation(async () => {
+                        console.log('[Mock] getProposalState called');
+                        return ProposalState.Active;
+                    }),
                 getAccountInfo: jest.spyOn(connection, 'getAccountInfo')
-                    .mockResolvedValue(null),
+                    .mockImplementation(async () => {
+                        console.log('[Mock] getAccountInfo called');
+                        return null;
+                    }),
                 sendTransaction: jest.spyOn(connection, 'sendTransaction')
-                    .mockResolvedValue('mock-signature'),
+                    .mockImplementation(async () => {
+                        console.log('[Mock] sendTransaction called');
+                        return 'mock-signature';
+                    }),
                 simulateTransaction: jest.spyOn(connection, 'simulateTransaction')
-                    .mockResolvedValue({
-                        context: { slot: 0 },
-                        value: { err: null, logs: [], accounts: null, unitsConsumed: 0, returnData: null }
+                    .mockImplementation(async () => {
+                        console.log('[Mock] simulateTransaction called');
+                        return {
+                            context: { slot: 0 },
+                            value: { err: null, logs: [], accounts: null, unitsConsumed: 0, returnData: null }
+                        };
+                    }),
+                confirmTransaction: jest.spyOn(connection, 'confirmTransaction')
+                    .mockImplementation(async () => {
+                        console.log('[Mock] confirmTransaction called');
+                        return { value: { err: null } };
                     })
             };
 
-            console.log('About to call castVote...');
+            console.log('[Test] About to call castVote...');
             
             const tx = await governanceManager.castVote(
                 connection,
