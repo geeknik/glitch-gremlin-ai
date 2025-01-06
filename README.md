@@ -36,7 +36,7 @@ This project is in active development. Use at your own risk.
 
 ## Follow Us on X  
 
-Stay updated with the latest news and announcements. Follow us on [X (formerly Twitter)](https://x.com/glitchgremlinai)!
+Stay updated with the latest news and announcements. Follow us on [X ](https://x.com/glitchgremlinai)!
 
 ## License
 
