@@ -101,15 +101,14 @@ export class VulnerabilityDetectionModel {
     }
 
     async save(path: string): Promise<void> {
-        if (!existsSync(path)) {
-            mkdirSync(path, { recursive: true });
+        const dir = path.replace('file://', '');
+        if (!existsSync(dir)) {
+            mkdirSync(dir, { recursive: true });
         }
-        const modelPath = join(path, 'model.json');
-        await this.model.save(`file://${modelPath}`);
+        await this.model.save(path);
     }
 
     async load(path: string): Promise<void> {
-        const modelPath = join(path, 'model.json');
-        this.model = await tf.loadLayersModel(`file://${modelPath}`);
+        this.model = await tf.loadLayersModel(path);
     }
 }

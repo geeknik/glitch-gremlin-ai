@@ -47,9 +47,9 @@ describe('VulnerabilityDetectionModel', () => {
 
     describe('model persistence', () => {
         it('should save and load model', async () => {
-            const tempPath = './test-models/model.json';
-            await model.save('./test-models');
-            await expect(model.load('./test-models')).resolves.not.toThrow();
+            const tempPath = './test-models';
+            await model.save(`file://${tempPath}`);
+            await expect(model.load(`file://${tempPath}/model.json`)).resolves.not.toThrow();
         });
     });
 });
