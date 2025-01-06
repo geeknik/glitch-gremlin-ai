@@ -57,7 +57,7 @@ describe('Rate Limiting', () => {
                 .mockResolvedValue(1);
 
             // Request should fail due to rate limit
-            await expect(async () => sdk.createChaosRequest({
+            await expect(sdk.createChaosRequest({
                 targetProgram: "11111111111111111111111111111111",
                 testType: TestType.FUZZ,
                 duration: 60,
@@ -70,8 +70,10 @@ describe('Rate Limiting', () => {
     });
 
     describe('governance rate limiting', () => {
+        // Increase timeout for governance tests
+        jest.setTimeout(30000);
+        
         it('should limit proposals per day', async () => {
-            jest.setTimeout(30000); // Increase timeout for governance tests
             // Create first proposal
             await sdk.createProposal({
                 title: "Test Proposal",
