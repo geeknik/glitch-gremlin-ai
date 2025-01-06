@@ -112,16 +112,21 @@ export class GovernanceManager {
         support: boolean,
         weight?: number
     ): Promise<Transaction> {
+        console.log('[castVote] Starting with:', { proposalAddress: proposalAddress.toString(), support });
+        
         const metadata = await this.validateProposal(connection, proposalAddress);
+        console.log('[castVote] Proposal validated');
         
         // Check if wallet has already voted
         const hasVoted = metadata.votes.some(v => v.voter.equals(wallet.publicKey));
         if (hasVoted) {
             throw new GlitchError('Already voted on this proposal', 2004);
         }
+        console.log('[castVote] Vote eligibility checked');
 
         // Calculate vote weight if not provided
         const voteWeight = weight || await this.calculateVoteWeight(connection, wallet.publicKey);
+        console.log('[castVote] Vote weight calculated:', voteWeight);
         
         const voteData = Buffer.from([
             0x01, // Vote instruction
@@ -138,7 +143,11 @@ export class GovernanceManager {
             data: voteData
         });
 
-        return new Transaction().add(voteIx);
+        console.log('[castVote] Vote instruction created');
+        const transaction = new Transaction().add(voteIx);
+        console.log('[castVote] Transaction created and returning');
+        
+        return transaction;
     }
 
     private async calculateVoteWeight(
