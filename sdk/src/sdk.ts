@@ -326,19 +326,30 @@ export class GlitchSDK {
         startTime: bigint;
         owner: PublicKey;
     } | null> {
-        const stakeAccount = await this.connection.getAccountInfo(new PublicKey(stakeId));
-        if (!stakeAccount) {
-            return null;
-        }
+        try {
+            const stakeAccount = await this.connection.getAccountInfo(new PublicKey(stakeId));
+            if (!stakeAccount) {
+                throw new GlitchError('Stake not found', 1015);
+            }
 
-        // Parse account data into StakeInfo
-        const data = stakeAccount.data;
-        return {
-            amount: data.readBigInt64LE(0),
-            lockupPeriod: data.readBigUInt64LE(8), // Keep as bigint
-            startTime: data.readBigUInt64LE(16), // Keep as bigint
-            owner: new PublicKey(data.slice(24, 56))
-        };
+            // Parse account data into StakeInfo
+            const data = stakeAccount.data;
+            if (data.length < 56) { // Validate minimum data length
+                throw new GlitchError('Invalid stake account data', 1016);
+            }
+
+            return {
+                amount: data.readBigInt64LE(0),
+                lockupPeriod: data.readBigUInt64LE(8),
+                startTime: data.readBigUInt64LE(16),
+                owner: new PublicKey(data.slice(24, 56))
+            };
+        } catch (error) {
+            if (error instanceof GlitchError) {
+                throw error;
+            }
+            throw new GlitchError('Stake not found', 1015);
+        }
     }
 
     async executeProposal(proposalId: string): Promise<string> {
