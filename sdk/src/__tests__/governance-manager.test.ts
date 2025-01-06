@@ -86,7 +86,7 @@ describe('GovernanceManager', () => {
                         jest.restoreAllMocks();
                         proposalAddress = new PublicKey(Keypair.generate().publicKey);
                         
-                        // Mock active proposal data
+                        // Mock active proposal data with proper structure
                         const mockProposalData = {
                             title: "Test",
                             description: "Test",
@@ -100,16 +100,22 @@ describe('GovernanceManager', () => {
                             executed: false
                         };
 
+                        // Set up mocks in correct order
                         validateProposalMock = jest.spyOn(governanceManager, 'validateProposal')
                             .mockResolvedValue(mockProposalData);
 
                         getAccountInfoMock = jest.spyOn(connection, 'getAccountInfo')
-                            .mockResolvedValue({
-                                data: Buffer.from(JSON.stringify(mockProposalData)),
-                                executable: false,
-                                lamports: 1000000,
-                                owner: governanceManager['programId'],
-                                rentEpoch: 0
+                            .mockImplementation(async (pubkey) => {
+                                if (pubkey.equals(proposalAddress)) {
+                                    return {
+                                        data: Buffer.from(JSON.stringify(mockProposalData)),
+                                        executable: false,
+                                        lamports: 1000000,
+                                        owner: governanceManager['programId'],
+                                        rentEpoch: 0
+                                    };
+                                }
+                                return null;
                             });
 
                         simulateTransactionMock = jest.spyOn(connection, 'simulateTransaction')

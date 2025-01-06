@@ -127,17 +127,76 @@ describe('GlitchSDK', () => {
             expect(fee).toBeGreaterThan(0);
         });
 
-        it('should enforce rate limits', async () => {
-            // Create multiple requests rapidly
-            const promises = Array(5).fill(0).map(() => sdk.createChaosRequest({
-                targetProgram: "11111111111111111111111111111111",
-                testType: TestType.FUZZ,
-                duration: 60,
-                intensity: 1
-            }));
+        describe('rate limiting', () => {
+            beforeEach(() => {
+                jest.useFakeTimers();
+            });
 
-            await expect(Promise.all(promises))
-                .rejects.toThrow('Rate limit exceeded');
+            afterEach(() => {
+                jest.useRealTimers();
+            });
+
+            it('should enforce rate limits for single requests', async () => {
+                // First request should succeed
+                await sdk.createChaosRequest({
+                    targetProgram: "11111111111111111111111111111111",
+                    testType: TestType.FUZZ,
+                    duration: 60,
+                    intensity: 1
+                });
+
+                // Immediate second request should fail
+                await expect(sdk.createChaosRequest({
+                    targetProgram: "11111111111111111111111111111111",
+                    testType: TestType.FUZZ,
+                    duration: 60,
+                    intensity: 1
+                })).rejects.toThrow('Rate limit exceeded');
+
+                // After waiting, request should succeed
+                jest.advanceTimersByTime(2000);
+                await sdk.createChaosRequest({
+                    targetProgram: "11111111111111111111111111111111",
+                    testType: TestType.FUZZ,
+                    duration: 60,
+                    intensity: 1
+                });
+            });
+
+            it('should enforce rate limits for parallel requests', async () => {
+                const promises = Array(5).fill(0).map(() => sdk.createChaosRequest({
+                    targetProgram: "11111111111111111111111111111111",
+                    testType: TestType.FUZZ,
+                    duration: 60,
+                    intensity: 1
+                }));
+
+                await expect(Promise.all(promises))
+                    .rejects.toThrow('Rate limit exceeded');
+            });
+
+            it('should allow requests after cooldown period', async () => {
+                // First request
+                await sdk.createChaosRequest({
+                    targetProgram: "11111111111111111111111111111111",
+                    testType: TestType.FUZZ,
+                    duration: 60,
+                    intensity: 1
+                });
+
+                // Wait for cooldown
+                jest.advanceTimersByTime(2000);
+
+                // Second request should succeed
+                const result = await sdk.createChaosRequest({
+                    targetProgram: "11111111111111111111111111111111",
+                    testType: TestType.FUZZ,
+                    duration: 60,
+                    intensity: 1
+                });
+
+                expect(result.requestId).toBeDefined();
+            });
         });
     });
 });

@@ -87,10 +87,31 @@ export class GlitchSDK {
     private async checkRateLimit() {
         const now = Date.now();
         const timeSinceLastRequest = now - this.lastRequestTime;
+        
         if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
-            throw new GlitchError('Rate limit exceeded', 1007);
+            const waitTime = this.MIN_REQUEST_INTERVAL - timeSinceLastRequest;
+            console.warn(`Rate limit warning: Must wait ${waitTime}ms before next request`);
+            throw new GlitchError(`Rate limit exceeded. Please wait ${waitTime}ms`, 1007);
         }
-        this.lastRequestTime = now;
+
+        // Check global rate limit counter
+        const currentMinute = Math.floor(now / 60000);
+        const requestKey = `requests:${currentMinute}`;
+        
+        try {
+            const requestCount = await this.queueWorker['redis'].incr(requestKey);
+            await this.queueWorker['redis'].expire(requestKey, 60);
+            
+            if (requestCount > 30) { // Max 30 requests per minute
+                throw new GlitchError('Global rate limit exceeded. Try again later', 1008);
+            }
+            
+            this.lastRequestTime = now;
+        } catch (error) {
+            if (error instanceof GlitchError) throw error;
+            console.error('Rate limit check failed:', error);
+            throw new GlitchError('Rate limit check failed', 1009);
+        }
     }
 
     async createChaosRequest(params: ChaosRequestParams): Promise<{
