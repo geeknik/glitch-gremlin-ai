@@ -157,7 +157,7 @@ describe('GovernanceManager', () => {
                         );
                         
                         // Call castVote and await the result
-                        const transaction = await governanceManager.castVote(
+                        const transaction2 = await governanceManager.castVote(
                             connection,
                             wallet,
                             proposalAddress,
