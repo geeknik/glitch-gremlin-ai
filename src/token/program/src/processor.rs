@@ -289,7 +289,7 @@ impl Processor {
     }
 
     fn process_finalize_chaos_request(
-        _program_id: &Pubkey,
+        program_id: &Pubkey,
         accounts: &[AccountInfo],
         status: u8,
         result_ref: Vec<u8>,
