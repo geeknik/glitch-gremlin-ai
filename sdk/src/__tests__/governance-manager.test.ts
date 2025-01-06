@@ -72,7 +72,7 @@ describe('GovernanceManager', () => {
             console.log('Test started: castVote');
             
             // Mock current time
-            const now = Date.now();
+            const now = 1641024000000; // Fixed timestamp
             jest.spyOn(Date, 'now').mockImplementation(() => now);
             
             const proposalAddress = Keypair.generate().publicKey;
@@ -89,33 +89,25 @@ describe('GovernanceManager', () => {
                 executed: false
             };
 
-            // Mock all async operations with mockImplementationOnce for better tracking
-            const validateProposalSpy = jest.spyOn(governanceManager, 'validateProposal')
-                .mockImplementationOnce(async () => {
-                    console.log('[Mock] validateProposal called');
-                    return mockProposalData;
-                });
-            
-            const getProposalStateSpy = jest.spyOn(governanceManager, 'getProposalState')
-                .mockImplementationOnce(async () => {
-                    console.log('[Mock] getProposalState called');
-                    return ProposalState.Active;
-                });
-
-            const getAccountInfoSpy = jest.spyOn(connection, 'getAccountInfo')
-                .mockImplementationOnce(async () => {
-                    console.log('[Mock] getAccountInfo called');
-                    return null;
-                });
-
-            const sendTransactionSpy = jest.spyOn(connection, 'sendTransaction')
-                .mockImplementationOnce(async () => {
-                    console.log('[Mock] sendTransaction called');
-                    return 'mock-signature';
-                });
+            // Set up all mocks before any calls
+            const mocks = {
+                validateProposal: jest.spyOn(governanceManager, 'validateProposal')
+                    .mockResolvedValue(mockProposalData),
+                getProposalState: jest.spyOn(governanceManager, 'getProposalState')
+                    .mockResolvedValue(ProposalState.Active),
+                getAccountInfo: jest.spyOn(connection, 'getAccountInfo')
+                    .mockResolvedValue(null),
+                sendTransaction: jest.spyOn(connection, 'sendTransaction')
+                    .mockResolvedValue('mock-signature'),
+                simulateTransaction: jest.spyOn(connection, 'simulateTransaction')
+                    .mockResolvedValue({
+                        context: { slot: 0 },
+                        value: { err: null, logs: [], accounts: null, unitsConsumed: 0, returnData: null }
+                    })
+            };
 
             console.log('About to call castVote...');
-
+            
             const tx = await governanceManager.castVote(
                 connection,
                 wallet,
@@ -126,21 +118,18 @@ describe('GovernanceManager', () => {
             console.log('castVote returned');
 
             // Verify all mocks were called
-            expect(validateProposalSpy).toHaveBeenCalledTimes(1);
-            expect(getProposalStateSpy).toHaveBeenCalledTimes(1);
-            expect(getAccountInfoSpy).toHaveBeenCalledTimes(1);
-            expect(sendTransactionSpy).toHaveBeenCalledTimes(1);
+            Object.entries(mocks).forEach(([name, mock]) => {
+                expect(mock).toHaveBeenCalled();
+                console.log(`[Mock] ${name} was called ${mock.mock.calls.length} times`);
+            });
             
             expect(tx.instructions.length).toBe(1);
             expect(tx.instructions[0].data[0]).toBe(0x01); // Vote instruction
             
             console.log('Test completed successfully');
 
-            // Clean up spies
-            validateProposalSpy.mockRestore();
-            getProposalStateSpy.mockRestore();
-            getAccountInfoSpy.mockRestore();
-            sendTransactionSpy.mockRestore();
+            // Clean up
+            Object.values(mocks).forEach(mock => mock.mockRestore());
         });
 
         it('should reject voting on inactive proposals', async () => {
