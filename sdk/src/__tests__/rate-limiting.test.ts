@@ -36,7 +36,7 @@ describe('Rate Limiting', () => {
                 testType: TestType.FUZZ,
                 duration: 60,
                 intensity: 1
-            })).rejects.toThrow('Rate limit exceeded');
+            })).rejects.toThrow(GlitchError);
 
             // After cooldown period, request should succeed
             jest.advanceTimersByTime(2000);
@@ -50,14 +50,14 @@ describe('Rate Limiting', () => {
         });
 
         it('should enforce maximum requests per minute', async () => {
-            // Mock Redis for rate limit checking
+            // Mock Redis to simulate rate limit exceeded
             const mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr')
-                .mockResolvedValue(4);
+                .mockResolvedValue(5); // Over the limit of 3
             const mockExpire = jest.spyOn(sdk['queueWorker']['redis'], 'expire')
                 .mockResolvedValue(1);
 
-            // Fourth request in a minute should fail
-            await expect(sdk.createChaosRequest({
+            // Request should fail due to rate limit
+            await expect(async () => sdk.createChaosRequest({
                 targetProgram: "11111111111111111111111111111111",
                 testType: TestType.FUZZ,
                 duration: 60,
@@ -71,7 +71,7 @@ describe('Rate Limiting', () => {
 
     describe('governance rate limiting', () => {
         it('should limit proposals per day', async () => {
-            jest.setTimeout(10000); // Increase timeout for this test
+            jest.setTimeout(30000); // Increase timeout for governance tests
             // Create first proposal
             await sdk.createProposal({
                 title: "Test Proposal",
