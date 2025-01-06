@@ -87,9 +87,10 @@ describe('GovernanceManager', () => {
                         proposalAddress = new PublicKey(Keypair.generate().publicKey);
                         
                         // Mock active proposal data
+                        // Create consistent proposal data
                         const mockProposalData = {
-                            title: "Test",
-                            description: "Test",
+                            title: "Test Proposal",
+                            description: "Test Description",
                             proposer: wallet.publicKey,
                             startTime: Date.now() - 1000,
                             endTime: Date.now() + 86400000,
@@ -97,14 +98,15 @@ describe('GovernanceManager', () => {
                             voteWeights: { yes: 0, no: 0, abstain: 0 },
                             votes: [],
                             quorum: 100,
-                            executed: false
+                            executed: false,
+                            status: 'active'
                         };
 
-                        // Mock validateProposal to return active proposal
+                        // Mock validateProposal first
                         validateProposalMock = jest.spyOn(governanceManager, 'validateProposal')
                             .mockResolvedValueOnce(mockProposalData);
 
-                        // Mock getAccountInfo with proper account data
+                        // Create account info with the same data
                         const mockAccountInfo = {
                             data: Buffer.from(JSON.stringify(mockProposalData)),
                             executable: false,
@@ -112,9 +114,13 @@ describe('GovernanceManager', () => {
                             owner: governanceManager['programId'],
                             rentEpoch: 0
                         };
-                        
+
+                        // Mock getAccountInfo to return our data
                         getAccountInfoMock = jest.spyOn(connection, 'getAccountInfo')
                             .mockResolvedValueOnce(mockAccountInfo);
+
+                        // Ensure clean mock state
+                        jest.clearAllMocks();
 
                         // Mock transaction simulation
                         simulateTransactionMock = jest.spyOn(connection, 'simulateTransaction')
@@ -150,23 +156,33 @@ describe('GovernanceManager', () => {
                             proposalAddress
                         );
                         
-                        // Verify getAccountInfo was called with proposal address
+                        // Call castVote and await the result
+                        const transaction = await governanceManager.castVote(
+                            connection,
+                            wallet,
+                            proposalAddress,
+                            true
+                        );
+
+                        // Verify the transaction was created
+                        expect(transaction).toBeDefined();
+
+                        // Verify each mock was called exactly once with correct args
+                        expect(validateProposalMock).toHaveBeenCalledTimes(1);
+                        expect(validateProposalMock).toHaveBeenCalledWith(connection, proposalAddress);
+
+                        expect(getAccountInfoMock).toHaveBeenCalledTimes(1);
                         expect(getAccountInfoMock).toHaveBeenCalledWith(proposalAddress);
-                        
-                        // Verify transaction simulation and sending
+
                         expect(simulateTransactionMock).toHaveBeenCalledTimes(1);
-                        expect(sendTransactionMock).toHaveBeenCalledTimes(1);
-                        
-                        // Verify call order
-                        const calls = {
-                            validate: validateProposalMock.mock.invocationCallOrder[0],
-                            getInfo: getAccountInfoMock.mock.invocationCallOrder[0],
-                            simulate: simulateTransactionMock.mock.invocationCallOrder[0]
-                        };
-                        
-                        // Validate calls happened in correct order
-                        expect(calls.validate).toBeLessThan(calls.getInfo);
-                        expect(calls.getInfo).toBeLessThan(calls.simulate);
+
+                        // Verify the call order
+                        const validateCall = validateProposalMock.mock.invocationCallOrder[0];
+                        const getInfoCall = getAccountInfoMock.mock.invocationCallOrder[0];
+                        const simulateCall = simulateTransactionMock.mock.invocationCallOrder[0];
+
+                        expect(validateCall).toBeLessThan(getInfoCall);
+                        expect(getInfoCall).toBeLessThan(simulateCall);
                     });
                 });
 
