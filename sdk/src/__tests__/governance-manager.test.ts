@@ -102,16 +102,16 @@ describe('GovernanceManager', () => {
 
                         // Set up mocks in correct order
                         validateProposalMock = jest.spyOn(governanceManager, 'validateProposal')
-                            .mockResolvedValue(mockProposalData);
+                            .mockImplementation(async () => mockProposalData);
 
                         getAccountInfoMock = jest.spyOn(connection, 'getAccountInfo')
-                            .mockResolvedValue({
+                            .mockImplementation(async () => ({
                                 data: Buffer.from(JSON.stringify(mockProposalData)),
                                 executable: false,
                                 lamports: 1000000,
                                 owner: governanceManager['programId'],
                                 rentEpoch: 0
-                            });
+                            }));
 
                         simulateTransactionMock = jest.spyOn(connection, 'simulateTransaction')
                             .mockResolvedValue({
