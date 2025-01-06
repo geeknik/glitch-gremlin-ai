@@ -13,6 +13,7 @@ export class GlitchAIEngine {
     private logger: Logger;
 
     constructor() {
+        this.mlModel = new VulnerabilityDetectionModel();
         this.exploitScanner = new ExploitScanner();
         this.fuzzTester = new FuzzTester();
         this.loadTester = new LoadTester();
