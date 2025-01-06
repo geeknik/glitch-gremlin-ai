@@ -13,7 +13,10 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "allowJs": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "paths": {
+      "@solana/*": ["./node_modules/@solana/*"]
+    }
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"]
