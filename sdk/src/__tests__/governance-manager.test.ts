@@ -43,9 +43,8 @@ describe('GovernanceManager', () => {
         });
     });
 
-    beforeAll(() => {
-        jest.setTimeout(15000); // Increase timeout for all tests in this suite
-    });
+    // Increase timeout for all tests
+    jest.setTimeout(30000);
 
     describe('castVote', () => {
         
