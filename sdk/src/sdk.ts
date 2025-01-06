@@ -45,6 +45,8 @@ export class GlitchSDK {
      * @param config.wallet Solana wallet keypair
      * @param config.programId Optional custom program ID
      */
+    private governanceConfig: GovernanceConfig;
+
     constructor(config: {
         cluster?: string;
         wallet: Keypair;
