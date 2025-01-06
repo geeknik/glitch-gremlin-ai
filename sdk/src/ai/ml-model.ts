@@ -8,6 +8,7 @@ export class VulnerabilityDetectionModel {
     private model: tf.LayersModel;
     
     constructor() {
+        this.model = this.buildModel();
         this.initializeModel();
     }
 
