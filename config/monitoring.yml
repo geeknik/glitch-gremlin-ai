@@ -1,0 +1,26 @@
+# Prometheus monitoring configuration for Glitch Gremlin AI
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'glitch-gremlin'
+    static_configs:
+      - targets: ['localhost:9090']
+    metrics_path: '/metrics'
+    scheme: 'http'
+
+  - job_name: 'ml-engine'
+    static_configs:
+      - targets: ['localhost:9091']
+    metrics_path: '/ml/metrics'
+    scheme: 'http'
+
+alerting:
+  alertmanagers:
+    - static_configs:
+      - targets: ['localhost:9093']
+
+rule_files:
+  - 'alert_rules.yml'

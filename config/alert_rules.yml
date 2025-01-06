@@ -1,0 +1,38 @@
+groups:
+  - name: glitch-alerts
+    rules:
+      - alert: HighErrorRate
+        expr: rate(glitch_errors_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: High error rate detected
+          description: Error rate exceeds 10% over 5 minutes
+
+      - alert: MLModelLowConfidence
+        expr: ml_model_confidence < 0.7
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: ML model confidence below threshold
+          description: Model confidence consistently below 70%
+
+      - alert: QueueBacklog
+        expr: glitch_queue_depth > 100
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Request queue backlog
+          description: More than 100 pending requests
+
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes > 1.5e9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High memory usage
+          description: Memory usage exceeds 1.5GB
