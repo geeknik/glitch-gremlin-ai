@@ -5,6 +5,7 @@ import {
     Transaction,
     TransactionInstruction,
 } from '@solana/web3.js';
+import { TokenEconomics } from './token-economics';
 import { GovernanceConfig, ChaosRequestParams, ChaosResult, TestType, ProposalParams } from './types';
 import { GovernanceManager } from './governance';
 import { RedisQueueWorker } from './queue/redis-worker';
