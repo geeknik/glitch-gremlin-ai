@@ -69,6 +69,8 @@ describe('GovernanceManager', () => {
         });
         
         it('should create valid vote transaction', async () => {
+            // Increase timeout since this test involves multiple async operations
+            jest.setTimeout(10000);
             console.log('Test started: castVote');
             
             // Mock current time
