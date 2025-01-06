@@ -101,21 +101,19 @@ export class VulnerabilityDetectionModel {
     }
 
     async save(path: string): Promise<void> {
-        // Remove file:// prefix to check/create directory
-        const dir = path.replace('file://', '');
+        const dir = path.substring(0, path.lastIndexOf('/'));
         if (!existsSync(dir)) {
             mkdirSync(dir, { recursive: true });
         }
-        // Save using the full path
-        await this.model.save(path);
+        await this.model.save(`file://${path}`);
     }
 
     async load(path: string): Promise<void> {
         try {
-            this.model = await tf.loadLayersModel(path);
+            this.model = await tf.loadLayersModel(`file://${path}/model.json`);
         } catch (error) {
-            if (error instanceof Error && error.message.includes('EISDIR')) {
-                throw new Error('The path to load from must be a file. Loading from a directory is not supported.');
+            if (error instanceof Error) {
+                throw new Error(`Failed to load model: ${error.message}`);
             }
             throw error;
         }
