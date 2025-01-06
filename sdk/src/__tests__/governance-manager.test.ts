@@ -44,7 +44,7 @@ describe('GovernanceManager', () => {
     });
 
     describe('castVote', () => {
-        beforeEach(() => {
+        beforeAll(() => {
             jest.setTimeout(10000);
         });
         

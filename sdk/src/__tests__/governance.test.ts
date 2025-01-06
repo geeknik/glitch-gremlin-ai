@@ -177,7 +177,10 @@ describe('Governance', () => {
                     endTime: Date.now() + 86400000
                 });
 
-            await expect(sdk.executeProposal('proposal-5678'))
+            // Create valid base58 proposal ID
+            const proposalId = new PublicKey(Keypair.generate().publicKey).toString();
+            
+            await expect(sdk.executeProposal(proposalId))
                 .rejects.toThrow('Timelock period not elapsed');
                 
             mockGetProposalStatus.mockRestore();
@@ -211,7 +214,10 @@ describe('Governance', () => {
                     endTime: Date.now() - 86400000
                 });
 
-            await expect(sdk.executeProposal('proposal-9012'))
+            // Create valid base58 proposal ID
+            const proposalId = new PublicKey(Keypair.generate().publicKey).toString();
+            
+            await expect(sdk.executeProposal(proposalId))
                 .rejects.toThrow('Proposal has not reached quorum');
                 
             mockGetProposalStatus.mockRestore();
