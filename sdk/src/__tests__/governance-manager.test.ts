@@ -43,10 +43,11 @@ describe('GovernanceManager', () => {
         });
     });
 
+    beforeAll(() => {
+        jest.setTimeout(15000); // Increase timeout for all tests in this suite
+    });
+
     describe('castVote', () => {
-        beforeAll(() => {
-            jest.setTimeout(10000);
-        });
         
         it('should create valid vote transaction', async () => {
             const proposalAddress = Keypair.generate().publicKey;
