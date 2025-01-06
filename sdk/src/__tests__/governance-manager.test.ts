@@ -43,11 +43,11 @@ describe('GovernanceManager', () => {
         });
     });
 
-    // Increase timeout and add proper test setup
-    jest.setTimeout(120000);
-
     beforeEach(() => {
-        jest.useRealTimers();
+        // Use fake timers
+        jest.useFakeTimers();
+        
+        // Set up test environment
         connection = new Connection('http://localhost:8899', 'confirmed');
         wallet = Keypair.generate();
         governanceManager = new GovernanceManager(
@@ -56,6 +56,7 @@ describe('GovernanceManager', () => {
     });
 
     afterEach(() => {
+        jest.useRealTimers();
         jest.clearAllMocks();
     });
 

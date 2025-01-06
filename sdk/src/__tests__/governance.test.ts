@@ -159,16 +159,21 @@ describe('Governance', () => {
         });
 
         it('should enforce timelock period', async () => {
+            // Mock current time
+            const now = 1641024000000; // Fixed timestamp
+            jest.spyOn(Date, 'now').mockImplementation(() => now);
+
             const mockGetAccountInfo = jest.spyOn(sdk['connection'], 'getAccountInfo')
                 .mockResolvedValueOnce({
                     data: Buffer.from(JSON.stringify({
                         status: 'active',
-                        endTime: Date.now() + 86400000,
+                        endTime: now - 100000, // Set endTime in the past
                         voteWeights: {
                             yes: 100,
                             no: 50,
                             abstain: 0
-                        }
+                        },
+                        quorum: 100 // Set quorum lower than total votes
                     })),
                     executable: false,
                     lamports: 0,
