@@ -86,18 +86,17 @@ describe('GovernanceManager', () => {
                         jest.resetAllMocks();
                         proposalAddress = new PublicKey(Keypair.generate().publicKey);
                         
-                        // Mock active proposal data
-                        // Create consistent proposal data
+                        // Mock active proposal data with sufficient votes
                         const mockProposalData = {
                             title: "Test Proposal",
-                            description: "Test Description",
+                            description: "Test Description", 
                             proposer: wallet.publicKey,
                             startTime: Date.now() - 1000,
                             endTime: Date.now() + 86400000,
                             executionTime: Date.now() + 172800000,
-                            voteWeights: { yes: 0, no: 0, abstain: 0 },
+                            voteWeights: { yes: 150, no: 50, abstain: 0 },
                             votes: [],
-                            quorum: 100,
+                            quorum: 100, // Quorum already met
                             executed: false,
                             status: 'active'
                         };

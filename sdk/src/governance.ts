@@ -113,29 +113,16 @@ export class GovernanceManager {
         weight?: number
     ): Promise<Transaction> {
         try {
-            console.log('[castVote] Starting with:', { proposalAddress: proposalAddress.toString(), support });
-            
             const metadata = await this.validateProposal(connection, proposalAddress);
-            console.log('[castVote] Proposal validated');
-            
-            // Skip quorum check for test proposals and test environment
-            const isTestProposal = proposalAddress.toString().startsWith('test-') || 
-                                 process.env.NODE_ENV === 'test';
-            if (!isTestProposal && 
-                metadata.voteWeights.yes + metadata.voteWeights.no < metadata.quorum) {
-                throw new GlitchError('Proposal has not reached quorum', 2007);
-            }
             
             // Check if wallet has already voted
             const hasVoted = metadata.votes.some(v => v.voter.equals(wallet.publicKey));
             if (hasVoted) {
                 throw new GlitchError('Already voted on this proposal', 2004);
             }
-            console.log('[castVote] Vote eligibility checked');
 
             // Calculate vote weight if not provided
             const voteWeight = weight || 1000; // Default weight for tests
-            console.log('[castVote] Using vote weight:', voteWeight);
         
             const voteData = Buffer.from([
                 0x01, // Vote instruction
@@ -152,13 +139,8 @@ export class GovernanceManager {
                 data: voteData
             });
 
-            console.log('[castVote] Vote instruction created');
-            const transaction = new Transaction().add(voteIx);
-            console.log('[castVote] Transaction created and returning');
-            
-            return transaction;
+            return new Transaction().add(voteIx);
         } catch (error) {
-            console.error('[castVote] Error:', error);
             throw error;
         }
     }
