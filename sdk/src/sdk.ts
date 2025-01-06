@@ -51,6 +51,10 @@ export class GlitchSDK {
         programId?: string;
         governanceConfig?: GovernanceConfig;
     }) {
+        const defaultConfig: GovernanceConfig = {
+            minVotingPeriod: 86400,
+            maxVotingPeriod: 604800
+        };
         this.queueWorker = new RedisQueueWorker();
         // Default to testnet
         this.connection = new Connection(config.cluster || 'https://api.testnet.solana.com');
