@@ -21,8 +21,11 @@ export class GovernanceManager {
         wallet: any,
         params: any
     ): Promise<{ proposalAddress: PublicKey; tx: Transaction }> {
-        if (params.votingPeriod < this.config.minVotingPeriod || 
-            params.votingPeriod > this.config.maxVotingPeriod) {
+        const minPeriod = this.config.minVotingPeriod ?? this.DEFAULT_CONFIG.minVotingPeriod;
+        const maxPeriod = this.config.maxVotingPeriod ?? this.DEFAULT_CONFIG.maxVotingPeriod;
+        
+        if (params.votingPeriod < minPeriod ||
+            params.votingPeriod > maxPeriod) {
             throw new GlitchError('Invalid voting period', 2001);
         }
 
