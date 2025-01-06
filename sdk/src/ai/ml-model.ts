@@ -114,7 +114,7 @@ export class VulnerabilityDetectionModel {
         try {
             this.model = await tf.loadLayersModel(path);
         } catch (error) {
-            if (error.message?.includes('EISDIR')) {
+            if (error instanceof Error && error.message.includes('EISDIR')) {
                 throw new Error('The path to load from must be a file. Loading from a directory is not supported.');
             }
             throw error;
