@@ -1,7 +1,7 @@
 # 🤖 Glitch Gremlin AI ($GREMLINAI)
 # CA: Bx6XZrN7pjbDA5wkiKagbbyHSr1jai45m8peSSmJpump
 
-The AI-driven chaos engine for Solana dApps. Providing Chaos-as-a-Service (CaaS) through a specialized agent: the Glitch Gremlin.
+$GREMLINAI is more than just a memecoin - it's a tool that provides controlled chaos simulations to help developers stress-test their Solana applications. The project combines:
 
 ## Overview
 
