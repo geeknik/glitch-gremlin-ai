@@ -157,9 +157,13 @@ describe('GovernanceManager', () => {
                         expect(simulateTransactionMock).toHaveBeenCalledTimes(1);
                         expect(sendTransactionMock).toHaveBeenCalledTimes(1);
                         
-                        // Verify call order
-                        expect(validateProposalMock).toHaveBeenCalledBefore(getAccountInfoMock);
-                        expect(getAccountInfoMock).toHaveBeenCalledBefore(simulateTransactionMock);
+                        // Verify call order using jest.mock order tracking
+                        const validateProposalCalls = validateProposalMock.mock.invocationCallOrder;
+                        const getAccountInfoCalls = getAccountInfoMock.mock.invocationCallOrder;
+                        const simulateTransactionCalls = simulateTransactionMock.mock.invocationCallOrder;
+                        
+                        expect(validateProposalCalls[0]).toBeLessThan(getAccountInfoCalls[0]);
+                        expect(getAccountInfoCalls[0]).toBeLessThan(simulateTransactionCalls[0]);
                     });
                 });
 
