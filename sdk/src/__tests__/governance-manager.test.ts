@@ -116,10 +116,11 @@ describe('GovernanceManager', () => {
             
             console.log('[Test] Mocks configured');
 
+            let transaction;
             try {
                 console.log('[Test] About to call castVote...');
                 
-                const transaction = await governanceManager.castVote(
+                transaction = await governanceManager.castVote(
                     connection,
                     wallet,
                     proposalAddress,
