@@ -1,5 +1,4 @@
 # 🤖 Glitch Gremlin AI ($GREMLINAI)
-# CA: Bx6XZrN7pjbDA5wkiKagbbyHSr1jai45m8peSSmJpump
 
 $GREMLINAI is more than just a memecoin - it's a tool that provides controlled chaos simulations to help developers stress-test their Solana applications. The project combines:
 
@@ -18,6 +17,7 @@ $GREMLINAI is more than just a memecoin - it's a tool that provides controlled c
 - Decimals: 9
 - Chain: Solana
 - Total Supply: 1,000,000,000
+- CA: Bx6XZrN7pjbDA5wkiKagbbyHSr1jai45m8peSSmJpump
 
 ## Development Status
 
