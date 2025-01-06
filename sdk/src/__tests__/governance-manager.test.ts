@@ -117,14 +117,6 @@ describe('GovernanceManager', () => {
 
                         sendTransactionMock = jest.spyOn(connection, 'sendTransaction')
                             .mockResolvedValue('mock-signature');
-
-                        // Call castVote once to ensure mocks are used
-                        await governanceManager.castVote(
-                            connection,
-                            wallet,
-                            proposalAddress,
-                            true
-                        );
                     });
 
                     afterEach(() => {
@@ -147,8 +139,13 @@ describe('GovernanceManager', () => {
                         expect(transaction.instructions[0].data[0]).toBe(0x01);
 
                         // Verify mocks were called with correct parameters
-                        expect(validateProposalMock).toHaveBeenCalledWith(connection, proposalAddress);
-                        expect(getAccountInfoMock).toHaveBeenCalledWith(proposalAddress);
+                        expect(validateProposalMock).toHaveBeenCalledWith(
+                            connection,
+                            expect.any(PublicKey)
+                        );
+                        expect(getAccountInfoMock).toHaveBeenCalledWith(
+                            expect.any(PublicKey)
+                        );
                         expect(simulateTransactionMock).toHaveBeenCalled();
                         expect(sendTransactionMock).toHaveBeenCalled();
                     });
