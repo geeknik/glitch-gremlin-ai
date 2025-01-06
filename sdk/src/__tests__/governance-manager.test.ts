@@ -93,23 +93,37 @@ describe('GovernanceManager', () => {
                 const validateProposalMock = jest.spyOn(governanceManager, 'validateProposal')
                     .mockResolvedValueOnce(mockProposalData);
 
-                const getAccountInfoMock = jest.spyOn(connection, 'getAccountInfo')
-                    .mockResolvedValueOnce({
-                        data: Buffer.from(JSON.stringify(mockProposalData)),
-                        executable: false,
-                        lamports: 1000000,
-                        owner: governanceManager['programId'],
-                        rentEpoch: 0
-                    });
+                // Mock the account info that validateProposal will fetch
+                const mockAccountInfo = {
+                    data: Buffer.from(JSON.stringify({
+                        title: "Test",
+                        description: "Test",
+                        proposer: wallet.publicKey.toString(),
+                        startTime: Date.now() - 1000,
+                        endTime: Date.now() + 86400000,
+                        executionTime: Date.now() + 172800000,
+                        voteWeights: { yes: 0, no: 0, abstain: 0 },
+                        votes: [],
+                        quorum: 100,
+                        executed: false
+                    })),
+                    executable: false,
+                    lamports: 1000000,
+                    owner: governanceManager['programId'],
+                    rentEpoch: 0
+                };
 
-                const sendTransactionMock = jest.spyOn(connection, 'sendTransaction')
-                    .mockResolvedValueOnce('mock-signature');
+                const getAccountInfoMock = jest.spyOn(connection, 'getAccountInfo')
+                    .mockResolvedValueOnce(mockAccountInfo);
 
                 const simulateTransactionMock = jest.spyOn(connection, 'simulateTransaction')
                     .mockResolvedValueOnce({
                         context: { slot: 0 },
                         value: { err: null, logs: [], accounts: null, unitsConsumed: 0, returnData: null }
                     });
+
+                const sendTransactionMock = jest.spyOn(connection, 'sendTransaction')
+                    .mockResolvedValueOnce('mock-signature');
 
                 const transaction = await governanceManager.castVote(
                     connection,
