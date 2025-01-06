@@ -5,8 +5,15 @@ import * as tf from '@tensorflow/tfjs-node';
 describe('VulnerabilityDetectionModel', () => {
     let model: VulnerabilityDetectionModel;
 
-    beforeEach(() => {
+    beforeEach(async () => {
         model = new VulnerabilityDetectionModel();
+        await (model as any).initializeModel();
+    });
+
+    afterEach(async () => {
+        // Cleanup TensorFlow backend
+        tf.dispose();
+        tf.engine().endScope();
     });
 
     describe('training', () => {
@@ -40,7 +47,7 @@ describe('VulnerabilityDetectionModel', () => {
 
     describe('model persistence', () => {
         it('should save and load model', async () => {
-            const tempPath = '/tmp/model-test';
+            const tempPath = './test-models';
             await model.save(tempPath);
             await expect(model.load(tempPath)).resolves.not.toThrow();
         });

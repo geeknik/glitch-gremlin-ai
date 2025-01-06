@@ -1,11 +1,22 @@
 import * as tf from '@tensorflow/tfjs-node';
 import { VulnerabilityType } from '../types';
+import { mkdirSync, existsSync } from 'fs';
+import { join } from 'path';
 
 export class VulnerabilityDetectionModel {
+    private initialized: boolean = false;
     private model: tf.LayersModel;
     
     constructor() {
-        this.model = this.buildModel();
+        this.initializeModel();
+    }
+
+    private async initializeModel() {
+        if (!this.initialized) {
+            await tf.ready();
+            this.model = this.buildModel();
+            this.initialized = true;
+        }
     }
 
     private buildModel(): tf.LayersModel {
@@ -88,10 +99,15 @@ export class VulnerabilityDetectionModel {
     }
 
     async save(path: string): Promise<void> {
-        await this.model.save(`file://${path}`);
+        if (!existsSync(path)) {
+            mkdirSync(path, { recursive: true });
+        }
+        const modelPath = join(path, 'model.json');
+        await this.model.save(`file://${modelPath}`);
     }
 
     async load(path: string): Promise<void> {
-        this.model = await tf.loadLayersModel(`file://${path}`);
+        const modelPath = join(path, 'model.json');
+        this.model = await tf.loadLayersModel(`file://${modelPath}`);
     }
 }
