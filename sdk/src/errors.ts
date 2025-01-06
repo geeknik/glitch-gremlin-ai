@@ -7,7 +7,7 @@ export class GlitchError extends Error {
 
 export class InsufficientFundsError extends GlitchError {
     constructor() {
-        super('Insufficient $GLITCH tokens for chaos request', 1001);
+        super('Insufficient $GREMLINAI tokens for chaos request', 1001);
     }
 }
 
