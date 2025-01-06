@@ -168,8 +168,19 @@ describe('Governance', () => {
                     rentEpoch: 0
                 });
 
+            const mockGetProposalStatus = jest.spyOn(sdk, 'getProposalStatus')
+                .mockResolvedValueOnce({
+                    id: 'proposal-5678',
+                    status: 'active',
+                    votesFor: 100,
+                    votesAgainst: 50,
+                    endTime: Date.now() + 86400000
+                });
+
             await expect(sdk.executeProposal('proposal-5678'))
                 .rejects.toThrow('Timelock period not elapsed');
+                
+            mockGetProposalStatus.mockRestore();
         });
 
         it('should check quorum requirements', async () => {
@@ -191,8 +202,19 @@ describe('Governance', () => {
                     rentEpoch: 0
                 });
 
+            const mockGetProposalStatus = jest.spyOn(sdk, 'getProposalStatus')
+                .mockResolvedValueOnce({
+                    id: 'proposal-9012',
+                    status: 'active',
+                    votesFor: 100,
+                    votesAgainst: 50,
+                    endTime: Date.now() - 86400000
+                });
+
             await expect(sdk.executeProposal('proposal-9012'))
                 .rejects.toThrow('Proposal has not reached quorum');
+                
+            mockGetProposalStatus.mockRestore();
         });
     });
 });
