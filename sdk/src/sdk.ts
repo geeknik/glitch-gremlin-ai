@@ -4,6 +4,8 @@ import {
     PublicKey,
     Transaction,
     TransactionInstruction,
+    SystemProgram,
+    TOKEN_PROGRAM_ID
 } from '@solana/web3.js';
 import { TokenEconomics } from './token-economics';
 import { GovernanceConfig, ChaosRequestParams, ChaosResult, TestType, ProposalParams } from './types';

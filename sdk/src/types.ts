@@ -84,6 +84,19 @@ export interface ProposalMetadata {
     executed: boolean;
 }
 
+export interface ProposalMetadata {
+    title: string;
+    description: string;
+    proposer: PublicKey;
+    startTime: number;
+    endTime: number;
+    executionTime: number;
+    voteWeights: VoteWeight;
+    votes: ProposalVote[];
+    quorum: number;
+    executed: boolean;
+}
+
 export interface ProposalParams {
     title: string;
     description: string;
