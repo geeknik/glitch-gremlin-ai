@@ -82,8 +82,8 @@ describe('GovernanceManager', () => {
                     let sendTransactionMock: jest.SpyInstance;
                     let proposalAddress: PublicKey;
             
-                    beforeEach(async () => {
-                        proposalAddress = Keypair.generate().publicKey;
+                    beforeEach(() => {
+                        proposalAddress = new PublicKey(Keypair.generate().publicKey);
                         const mockProposalData = {
                             title: "Test",
                             description: "Test",
@@ -152,13 +152,18 @@ describe('GovernanceManager', () => {
                 });
 
                 describe('with ended proposal', () => {
-                    it('should reject voting on ended proposal', async () => {
-                        const endedProposalAddress = Keypair.generate().publicKey;
-                    
-                        // Mock validateProposal to throw ended error
+                    beforeEach(() => {
                         jest.spyOn(governanceManager, 'validateProposal')
-                            .mockRejectedValueOnce(new GlitchError('Proposal voting has ended', 2006));
+                            .mockRejectedValue(new GlitchError('Proposal voting has ended', 2006));
+                    });
 
+                    afterEach(() => {
+                        jest.restoreAllMocks();
+                    });
+
+                    it('should reject voting on ended proposal', async () => {
+                        const endedProposalAddress = new PublicKey(Keypair.generate().publicKey);
+                        
                         await expect(
                             governanceManager.castVote(
                                 connection,
