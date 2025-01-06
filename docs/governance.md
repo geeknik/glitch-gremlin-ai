@@ -51,7 +51,9 @@ await sdk.unstakeTokens(stakeId);
 ## Rate Limits
 - 1 proposal per address per day
 - 2 second cooldown between chaos requests
+- Maximum 3 requests per minute
 - Maximum 10 active proposals at once
+- Cooldown period enforced between votes
 
 ## Rewards
 - Proposal creators: 5% of test fees

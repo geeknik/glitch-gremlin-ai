@@ -184,12 +184,24 @@ Common error codes:
 - 1014: Invalid lockup period
 - 1015: Stake not found
 - 1016: Tokens still locked
+- 1008: Insufficient stake amount
+- 1009: Insufficient voting balance
+- 1010: Already voted
+- 1011: Invalid proposal ID
+- 1012: Execution failed
+- 1013: Proposal not passed
+- 1014: Invalid lockup period
+- 1015: Stake not found
+- 1016: Tokens still locked
 
 ## Rate Limits
 
 - 2 second cooldown between chaos requests
-- Maximum 3 requests per minute
+- Maximum 3 requests per minute per address
 - 1 proposal per address per day
+- Voting cooldown period between votes
+- Maximum 10 active proposals at once
+- Staking lockup period: 1 day to 1 year
 
 ## Best Practices
 
