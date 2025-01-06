@@ -77,7 +77,7 @@ describe('GovernanceManager', () => {
             console.log('[Test] Setting up mocks...');
             
             const proposalAddress = Keypair.generate().publicKey;
-            jest.useFakeTimers('modern');
+            jest.useFakeTimers();
             jest.setSystemTime(1641024000000); // Fixed timestamp
             const mockProposalData = {
                 title: "Test",
@@ -119,7 +119,7 @@ describe('GovernanceManager', () => {
             try {
                 console.log('[Test] About to call castVote...');
                 
-                const tx = await governanceManager.castVote(
+                const transaction = await governanceManager.castVote(
                     connection,
                     wallet,
                     proposalAddress,
@@ -127,9 +127,9 @@ describe('GovernanceManager', () => {
                 );
                 
                 console.log('[Test] castVote returned successfully');
-                expect(tx).toBeDefined();
-                expect(tx.instructions.length).toBe(1);
-                expect(tx.instructions[0].data[0]).toBe(0x01); // Vote instruction
+                expect(transaction).toBeDefined();
+                expect(transaction.instructions.length).toBe(1);
+                expect(transaction.instructions[0].data[0]).toBe(0x01); // Vote instruction
             } catch (error) {
                 console.error('[Test] Error in castVote:', error);
                 throw error;
@@ -141,8 +141,8 @@ describe('GovernanceManager', () => {
                 console.log(`[Mock] ${name} was called ${mock.mock.calls.length} times`);
             });
             
-            expect(tx.instructions.length).toBe(1);
-            expect(tx.instructions[0].data[0]).toBe(0x01); // Vote instruction
+            expect(transaction.instructions.length).toBe(1);
+            expect(transaction.instructions[0].data[0]).toBe(0x01); // Vote instruction
             
             console.log('Test completed successfully');
 
