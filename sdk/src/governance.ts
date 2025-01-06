@@ -12,7 +12,10 @@ export class GovernanceManager {
         maxVotingPeriod: 604800 // 1 week
     };
 
-    constructor(private programId: PublicKey, private config: GovernanceConfig = {}) {
+    constructor(
+        private programId: PublicKey,
+        config: Partial<GovernanceConfig> = {}
+    ) {
         this.config = { ...this.DEFAULT_CONFIG, ...config };
     }
 
