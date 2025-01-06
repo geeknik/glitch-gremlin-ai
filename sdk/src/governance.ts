@@ -44,7 +44,7 @@ export class GovernanceManager {
         return proposalAccount;
     }
 
-    private async validateProposal(
+    public async validateProposal(
         connection: Connection,
         proposalAddress: PublicKey
     ): Promise<ProposalMetadata> {
@@ -79,7 +79,7 @@ export class GovernanceManager {
         return JSON.parse(data.toString());
     }
 
-    async createProposalAccount(
+    public async createProposalAccount(
         connection: any,
         wallet: any,
         params: any
