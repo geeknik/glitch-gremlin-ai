@@ -92,14 +92,14 @@ describe('GovernanceManager', () => {
                 executed: false
             };
 
-            // Set up all required mocks
+            // Set up all required mocks with consistent behavior
             const mocks = {
                 validateProposal: jest.spyOn(governanceManager, 'validateProposal')
-                    .mockResolvedValueOnce(mockProposalData),
+                    .mockResolvedValue(mockProposalData),
                 getProposalState: jest.spyOn(governanceManager, 'getProposalState')
-                    .mockResolvedValueOnce(ProposalState.Active),
+                    .mockResolvedValue(ProposalState.Active),
                 getAccountInfo: jest.spyOn(connection, 'getAccountInfo')
-                    .mockResolvedValueOnce({
+                    .mockResolvedValue({
                         data: Buffer.from(JSON.stringify(mockProposalData)),
                         executable: false,
                         lamports: 1000000,
@@ -107,14 +107,14 @@ describe('GovernanceManager', () => {
                         rentEpoch: 0
                     }),
                 sendTransaction: jest.spyOn(connection, 'sendTransaction')
-                    .mockResolvedValueOnce('mock-signature'),
+                    .mockResolvedValue('mock-signature'),
                 simulateTransaction: jest.spyOn(connection, 'simulateTransaction')
-                    .mockResolvedValueOnce({
+                    .mockResolvedValue({
                         context: { slot: 0 },
                         value: { err: null, logs: [], accounts: null, unitsConsumed: 0, returnData: null }
                     }),
                 confirmTransaction: jest.spyOn(connection, 'confirmTransaction')
-                    .mockResolvedValueOnce({
+                    .mockResolvedValue({
                         context: { slot: 0 },
                         value: { err: null }
                     })
