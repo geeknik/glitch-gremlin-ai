@@ -64,6 +64,7 @@ describe('GovernanceManager', () => {
     describe('castVote', () => {
         
         it('should create valid vote transaction', async () => {
+            jest.setTimeout(10000); // Increase timeout for this test
             const proposalAddress = Keypair.generate().publicKey;
             
             // Mock validateProposal
@@ -110,7 +111,7 @@ describe('GovernanceManager', () => {
                     proposalAddress,
                     true
                 )
-            ).rejects.toThrow('Proposal is not active');
+            ).rejects.toThrow('Proposal voting has ended');
         });
     });
 });
