@@ -16,7 +16,7 @@ $GREMLINAI is more than just a memecoin - it's a tool that provides controlled c
 - Symbol: $GREMLINAI
 - Decimals: 9
 - Chain: Solana
-- Initial Distribution: 1,000,000,000
+- Total Supply: 1,000,000,000
 
 ## Development Status
 
@@ -33,6 +33,10 @@ Documentation and integration guides coming soon.
 ## Security
 
 This project is in active development. Use at your own risk.
+
+## Follow Us on X  
+
+[![Follow on X](https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/X_logo_2023.svg/512px-X_logo_2023.svg.png)](https://x.com/glitchgremlinai)
 
 ## License
 
