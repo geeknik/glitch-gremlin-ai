@@ -43,7 +43,7 @@ export class TokenEconomics {
 
     public static validateStakeAmount(amount: number): void {
         if (amount < this.MIN_STAKE) {
-            throw new GlitchError('Stake amount below minimum required', 3001);
+            throw new GlitchError('Stake amount must be at least 1000', 3001);
         }
         if (amount > this.MAX_STAKE) {
             throw new GlitchError(`Stake amount cannot exceed ${this.MAX_STAKE}`, 3002);
