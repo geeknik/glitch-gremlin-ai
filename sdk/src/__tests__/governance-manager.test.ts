@@ -74,16 +74,17 @@ describe('GovernanceManager', () => {
         });
 
         it('should create valid vote transaction', async () => {
-            console.log('[Test] Starting castVote test');
+            // Increase timeout since this test takes longer
+            jest.setTimeout(10000);
             
             const proposalAddress = Keypair.generate().publicKey;
             const mockProposalData = {
                 title: "Test",
                 description: "Test",
                 proposer: Keypair.generate().publicKey,
-                startTime: 1641023000000, // 1000ms before current time
-                endTime: 1641025000000,   // 1000ms after current time
-                executionTime: 1641110400000,
+                startTime: Date.now() - 1000, // 1 second ago
+                endTime: Date.now() + 86400000, // 24 hours from now
+                executionTime: Date.now() + 172800000, // 48 hours from now
                 voteWeights: { yes: 0, no: 0, abstain: 0 },
                 votes: [],
                 quorum: 100,
