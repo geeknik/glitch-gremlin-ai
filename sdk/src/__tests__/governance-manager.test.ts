@@ -90,27 +90,25 @@ describe('GovernanceManager', () => {
                 };
 
                 // Set up mocks
-                const mocks = {
-                    validateProposal: jest.spyOn(governanceManager, 'validateProposal')
-                        .mockResolvedValue(mockProposalData),
-                    getProposalState: jest.spyOn(governanceManager, 'getProposalState')
-                        .mockResolvedValue(ProposalState.Active),
-                    getAccountInfo: jest.spyOn(connection, 'getAccountInfo')
-                        .mockResolvedValue({
-                            data: Buffer.from(JSON.stringify(mockProposalData)),
-                            executable: false,
-                            lamports: 1000000,
-                            owner: governanceManager['programId'],
-                            rentEpoch: 0
-                        }),
-                    sendTransaction: jest.spyOn(connection, 'sendTransaction')
-                        .mockResolvedValue('mock-signature'),
-                    simulateTransaction: jest.spyOn(connection, 'simulateTransaction')
-                        .mockResolvedValue({
-                            context: { slot: 0 },
-                            value: { err: null, logs: [], accounts: null, unitsConsumed: 0, returnData: null }
-                        })
-                };
+                const validateProposalMock = jest.spyOn(governanceManager, 'validateProposal')
+                    .mockResolvedValue(mockProposalData);
+                const getProposalStateMock = jest.spyOn(governanceManager, 'getProposalState')
+                    .mockResolvedValue(ProposalState.Active);
+                const getAccountInfoMock = jest.spyOn(connection, 'getAccountInfo')
+                    .mockResolvedValue({
+                        data: Buffer.from(JSON.stringify(mockProposalData)),
+                        executable: false,
+                        lamports: 1000000,
+                        owner: governanceManager['programId'],
+                        rentEpoch: 0
+                    });
+                const sendTransactionMock = jest.spyOn(connection, 'sendTransaction')
+                    .mockResolvedValue('mock-signature');
+                const simulateTransactionMock = jest.spyOn(connection, 'simulateTransaction')
+                    .mockResolvedValue({
+                        context: { slot: 0 },
+                        value: { err: null, logs: [], accounts: null, unitsConsumed: 0, returnData: null }
+                    });
 
                 const transaction = await governanceManager.castVote(
                     connection,
@@ -123,13 +121,19 @@ describe('GovernanceManager', () => {
                 expect(transaction.instructions.length).toBe(1);
                 expect(transaction.instructions[0].data[0]).toBe(0x01);
 
-                // Verify mocks were called
-                Object.values(mocks).forEach(mock => {
-                    expect(mock).toHaveBeenCalled();
-                });
+                // Verify each mock was called exactly once
+                expect(validateProposalMock).toHaveBeenCalledTimes(1);
+                expect(getProposalStateMock).toHaveBeenCalledTimes(1);
+                expect(getAccountInfoMock).toHaveBeenCalledTimes(1);
+                expect(sendTransactionMock).toHaveBeenCalledTimes(1);
+                expect(simulateTransactionMock).toHaveBeenCalledTimes(1);
 
                 // Clean up
-                Object.values(mocks).forEach(mock => mock.mockRestore());
+                validateProposalMock.mockRestore();
+                getProposalStateMock.mockRestore();
+                getAccountInfoMock.mockRestore();
+                sendTransactionMock.mockRestore();
+                simulateTransactionMock.mockRestore();
             });
         });
 
