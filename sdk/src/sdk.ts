@@ -59,6 +59,11 @@ export class GlitchSDK {
             quorum: 10,
             executionDelay: 86400
         };
+        
+        this.governanceConfig = {
+            ...defaultConfig,
+            ...config.governanceConfig
+        };
         this.queueWorker = new RedisQueueWorker();
         // Default to testnet
         this.connection = new Connection(config.cluster || 'https://api.testnet.solana.com');
