@@ -1,6 +1,10 @@
 # IDE and editor files
 .aider*
-.env
+.env*
+.env.local
+.env.development
+.env.production
+.env.test
 .vscode/
 .idea/
 *.swp
@@ -39,6 +43,11 @@ validator-ledger/
 program-dump/
 test-keypair.json
 *-keypair.json
+*.key
+wallet.json
+id.json
+*.pem
+.keys/
 *.so
 *.dylib
 *.dll
@@ -56,6 +65,11 @@ bower_components/
 *.db
 dump.rdb
 *.log.*
+.rdb
+*debug.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # OS specific
 .DS_Store
