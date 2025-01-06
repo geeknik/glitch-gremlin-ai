@@ -3,7 +3,7 @@
 ## Prerequisites
 - Solana CLI tools installed
 - Node.js 14+ 
-- A Solana wallet with some $GLITCH tokens
+- A Solana wallet with some $GREMLINAI tokens
 
 ## Test Coverage
 Our SDK has been thoroughly tested with:
