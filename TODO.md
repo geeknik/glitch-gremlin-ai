@@ -31,7 +31,7 @@
   - [ ] Improve mock handling in tests
 
 - [ ] Infrastructure
-  - [ ] Set up monitoring & alerts
+  - [x] Set up monitoring & alerts
   - [ ] Implement proper error handling
   - [ ] Add request validation
   - [ ] Improve logging
