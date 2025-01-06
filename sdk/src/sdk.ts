@@ -375,7 +375,7 @@ export class GlitchSDK {
         if (!proposalId.startsWith('test-')) {
             const executionTime = metadata.endTime + (this.governanceConfig.executionDelay || 86400000);
             if (Date.now() < executionTime) {
-                throw new GlitchError('Timelock period not elapsed', 1010);
+                throw new GlitchError('Timelock period not elapsed', 1012);
             }
         }
 

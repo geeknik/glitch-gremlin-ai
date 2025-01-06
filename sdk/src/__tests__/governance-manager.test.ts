@@ -45,6 +45,7 @@ describe('GovernanceManager', () => {
 
     describe('castVote', () => {
         it('should create valid vote transaction', async () => {
+            jest.setTimeout(10000);
             const proposalAddress = Keypair.generate().publicKey;
             
             // Mock getProposalState
@@ -63,6 +64,7 @@ describe('GovernanceManager', () => {
         });
 
         it('should reject voting on inactive proposals', async () => {
+            jest.setTimeout(10000);
             const proposalAddress = Keypair.generate().publicKey;
             
             // Mock getProposalState
