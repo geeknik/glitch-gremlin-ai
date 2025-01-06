@@ -129,26 +129,30 @@ export class GovernanceManager {
             const voteWeight = weight || 1000; // Default weight for tests
             console.log('[castVote] Using vote weight:', voteWeight);
         
-        const voteData = Buffer.from([
-            0x01, // Vote instruction
-            support ? 0x01 : 0x00,
-            ...new Uint8Array(new Float64Array([voteWeight]).buffer)
-        ]);
+            const voteData = Buffer.from([
+                0x01, // Vote instruction
+                support ? 0x01 : 0x00,
+                ...new Uint8Array(new Float64Array([voteWeight]).buffer)
+            ]);
 
-        const voteIx = new TransactionInstruction({
-            keys: [
-                { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
-                { pubkey: proposalAddress, isSigner: false, isWritable: true }
-            ],
-            programId: this.programId,
-            data: voteData
-        });
+            const voteIx = new TransactionInstruction({
+                keys: [
+                    { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
+                    { pubkey: proposalAddress, isSigner: false, isWritable: true }
+                ],
+                programId: this.programId,
+                data: voteData
+            });
 
-        console.log('[castVote] Vote instruction created');
-        const transaction = new Transaction().add(voteIx);
-        console.log('[castVote] Transaction created and returning');
-        
-        return transaction;
+            console.log('[castVote] Vote instruction created');
+            const transaction = new Transaction().add(voteIx);
+            console.log('[castVote] Transaction created and returning');
+            
+            return transaction;
+        } catch (error) {
+            console.error('[castVote] Error:', error);
+            throw error;
+        }
     }
 
     private async calculateVoteWeight(
