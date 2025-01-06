@@ -165,10 +165,10 @@ describe('GovernanceManager', () => {
                         );
 
                         // Verify the transaction was created
-                        expect(transaction).toBeDefined();
+                        expect(transaction2).toBeDefined();
 
                         // Verify each mock was called exactly once with correct args
-                        expect(validateProposalMock).toHaveBeenCalledTimes(1);
+                        expect(validateProposalMock).toHaveBeenCalledTimes(2);
                         expect(validateProposalMock).toHaveBeenCalledWith(connection, proposalAddress);
 
                         expect(getAccountInfoMock).toHaveBeenCalledTimes(1);
