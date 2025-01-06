@@ -4,9 +4,9 @@ import {
     PublicKey,
     Transaction,
     TransactionInstruction,
-    SystemProgram,
-    TOKEN_PROGRAM_ID
+    SystemProgram
 } from '@solana/web3.js';
+import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { TokenEconomics } from './token-economics';
 import { GovernanceConfig, ChaosRequestParams, ChaosResult, TestType, ProposalParams } from './types';
 import { GovernanceManager } from './governance';
