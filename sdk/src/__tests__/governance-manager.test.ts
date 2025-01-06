@@ -74,31 +74,19 @@ describe('GovernanceManager', () => {
         });
 
         describe('successful voting', () => {
-            it('should create valid vote transaction', async () => {
-                const proposalAddress = Keypair.generate().publicKey;
-                const mockProposalData = {
-                    title: "Test",
-                    description: "Test",
-                    proposer: Keypair.generate().publicKey,
-                    startTime: Date.now() - 1000,
-                    endTime: Date.now() + 86400000,
-                    executionTime: Date.now() + 172800000,
-                    voteWeights: { yes: 0, no: 0, abstain: 0 },
-                    votes: [],
-                    quorum: 100,
-                    executed: false
-                };
-
-                // Set up mocks for successful voting
-                const validateProposalMock = jest.spyOn(governanceManager, 'validateProposal')
-                    .mockResolvedValueOnce(mockProposalData);
-
-                // Mock the account info that validateProposal will fetch
-                const mockAccountInfo = {
-                    data: Buffer.from(JSON.stringify({
+            describe('with active proposal', () => {
+                let validateProposalMock: jest.SpyInstance;
+                let getAccountInfoMock: jest.SpyInstance;
+                let simulateTransactionMock: jest.SpyInstance;
+                let sendTransactionMock: jest.SpyInstance;
+                let proposalAddress: PublicKey;
+            
+                beforeEach(() => {
+                    proposalAddress = Keypair.generate().publicKey;
+                    const mockProposalData = {
                         title: "Test",
                         description: "Test",
-                        proposer: wallet.publicKey.toString(),
+                        proposer: wallet.publicKey,
                         startTime: Date.now() - 1000,
                         endTime: Date.now() + 86400000,
                         executionTime: Date.now() + 172800000,
@@ -106,47 +94,55 @@ describe('GovernanceManager', () => {
                         votes: [],
                         quorum: 100,
                         executed: false
-                    })),
-                    executable: false,
-                    lamports: 1000000,
-                    owner: governanceManager['programId'],
-                    rentEpoch: 0
-                };
+                    };
 
-                const getAccountInfoMock = jest.spyOn(connection, 'getAccountInfo')
-                    .mockResolvedValueOnce(mockAccountInfo);
+                    validateProposalMock = jest.spyOn(governanceManager, 'validateProposal')
+                        .mockResolvedValue(mockProposalData);
 
-                const simulateTransactionMock = jest.spyOn(connection, 'simulateTransaction')
-                    .mockResolvedValueOnce({
-                        context: { slot: 0 },
-                        value: { err: null, logs: [], accounts: null, unitsConsumed: 0, returnData: null }
-                    });
+                    getAccountInfoMock = jest.spyOn(connection, 'getAccountInfo')
+                        .mockResolvedValue({
+                            data: Buffer.from(JSON.stringify(mockProposalData)),
+                            executable: false,
+                            lamports: 1000000,
+                            owner: governanceManager['programId'],
+                            rentEpoch: 0
+                        });
 
-                const sendTransactionMock = jest.spyOn(connection, 'sendTransaction')
-                    .mockResolvedValueOnce('mock-signature');
+                    simulateTransactionMock = jest.spyOn(connection, 'simulateTransaction')
+                        .mockResolvedValue({
+                            context: { slot: 0 },
+                            value: { err: null, logs: [], accounts: null, unitsConsumed: 0, returnData: null }
+                        });
 
-                const transaction = await governanceManager.castVote(
-                    connection,
-                    wallet,
-                    proposalAddress,
-                    true
-                );
+                    sendTransactionMock = jest.spyOn(connection, 'sendTransaction')
+                        .mockResolvedValue('mock-signature');
+                });
 
-                expect(transaction).toBeDefined();
-                expect(transaction.instructions.length).toBe(1);
-                expect(transaction.instructions[0].data[0]).toBe(0x01);
+                afterEach(() => {
+                    validateProposalMock.mockRestore();
+                    getAccountInfoMock.mockRestore();
+                    simulateTransactionMock.mockRestore();
+                    sendTransactionMock.mockRestore();
+                });
 
-                // Verify each mock was called exactly once
-                expect(validateProposalMock).toHaveBeenCalledTimes(1);
-                expect(getAccountInfoMock).toHaveBeenCalledTimes(1);
-                expect(sendTransactionMock).toHaveBeenCalledTimes(1);
-                expect(simulateTransactionMock).toHaveBeenCalledTimes(1);
+                it('should create valid vote transaction', async () => {
+                    const transaction = await governanceManager.castVote(
+                        connection,
+                        wallet,
+                        proposalAddress,
+                        true
+                    );
 
-                // Clean up
-                validateProposalMock.mockRestore();
-                getAccountInfoMock.mockRestore();
-                sendTransactionMock.mockRestore();
-                simulateTransactionMock.mockRestore();
+                    expect(transaction).toBeDefined();
+                    expect(transaction.instructions.length).toBe(1);
+                    expect(transaction.instructions[0].data[0]).toBe(0x01);
+
+                    // Verify each mock was called exactly once
+                    expect(validateProposalMock).toHaveBeenCalledTimes(1);
+                    expect(getAccountInfoMock).toHaveBeenCalledTimes(1);
+                    expect(sendTransactionMock).toHaveBeenCalledTimes(1);
+                    expect(simulateTransactionMock).toHaveBeenCalledTimes(1);
+                });
             });
         });
 
