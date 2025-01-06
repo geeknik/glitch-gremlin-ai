@@ -17,6 +17,8 @@ pub struct ChaosRequest {
     pub escrow_account: Pubkey,
     /// Rate limiting data
     pub rate_limit: RateLimitInfo,
+    /// Rate limiting data
+    pub rate_limit: RateLimitInfo,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
