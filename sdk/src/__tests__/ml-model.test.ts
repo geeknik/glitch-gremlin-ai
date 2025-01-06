@@ -6,14 +6,14 @@ describe('VulnerabilityDetectionModel', () => {
     let model: VulnerabilityDetectionModel;
 
     beforeEach(async () => {
+        await tf.ready();
         model = new VulnerabilityDetectionModel();
-        await (model as any).initializeModel();
     });
 
     afterEach(async () => {
         // Cleanup TensorFlow backend
         tf.dispose();
-        tf.engine().endScope();
+        await tf.setBackend('cpu');
     });
 
     describe('training', () => {
@@ -47,9 +47,9 @@ describe('VulnerabilityDetectionModel', () => {
 
     describe('model persistence', () => {
         it('should save and load model', async () => {
-            const tempPath = './test-models';
-            await model.save(tempPath);
-            await expect(model.load(tempPath)).resolves.not.toThrow();
+            const tempPath = './test-models/model.json';
+            await model.save('./test-models');
+            await expect(model.load('./test-models')).resolves.not.toThrow();
         });
     });
 });

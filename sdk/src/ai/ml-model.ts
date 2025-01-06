@@ -15,6 +15,7 @@ export class VulnerabilityDetectionModel {
     private async initializeModel() {
         if (!this.initialized) {
             await tf.ready();
+            await tf.setBackend('cpu');
             this.model = this.buildModel();
             this.initialized = true;
         }
