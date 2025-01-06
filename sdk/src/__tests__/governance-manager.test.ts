@@ -64,7 +64,6 @@ describe('GovernanceManager', () => {
     describe('castVote', () => {
         
         it('should create valid vote transaction', async () => {
-        }, 10000); // Increase timeout for this test
             const proposalAddress = Keypair.generate().publicKey;
             
             // Mock validateProposal
@@ -93,7 +92,7 @@ describe('GovernanceManager', () => {
             
             expect(tx.instructions.length).toBe(1);
             expect(tx.instructions[0].data[0]).toBe(0x01); // Vote instruction
-        });
+        }, 10000); // Increase timeout for this test
 
         it('should reject voting on inactive proposals', async () => {
             const proposalAddress = Keypair.generate().publicKey;
