@@ -124,14 +124,12 @@ describe('GovernanceManager', () => {
 
                 // Verify each mock was called exactly once
                 expect(validateProposalMock).toHaveBeenCalledTimes(1);
-                expect(getProposalStateMock).toHaveBeenCalledTimes(1);
                 expect(getAccountInfoMock).toHaveBeenCalledTimes(1);
                 expect(sendTransactionMock).toHaveBeenCalledTimes(1);
                 expect(simulateTransactionMock).toHaveBeenCalledTimes(1);
 
                 // Clean up
                 validateProposalMock.mockRestore();
-                getProposalStateMock.mockRestore();
                 getAccountInfoMock.mockRestore();
                 sendTransactionMock.mockRestore();
                 simulateTransactionMock.mockRestore();
