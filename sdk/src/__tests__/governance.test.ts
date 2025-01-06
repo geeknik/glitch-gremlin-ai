@@ -171,5 +171,28 @@ describe('Governance', () => {
             await expect(sdk.executeProposal('proposal-5678'))
                 .rejects.toThrow('Timelock period not elapsed');
         });
+
+        it('should check quorum requirements', async () => {
+            const mockGetAccountInfo = jest.spyOn(sdk['connection'], 'getAccountInfo')
+                .mockResolvedValueOnce({
+                    data: Buffer.from(JSON.stringify({
+                        status: 'active',
+                        voteWeights: {
+                            yes: 100,
+                            no: 50,
+                            abstain: 0
+                        },
+                        quorum: 1000, // Higher than total votes
+                        endTime: Date.now() - 86400000
+                    })),
+                    executable: false,
+                    lamports: 0,
+                    owner: sdk['programId'],
+                    rentEpoch: 0
+                });
+
+            await expect(sdk.executeProposal('proposal-9012'))
+                .rejects.toThrow('Proposal has not reached quorum');
+        });
     });
 });

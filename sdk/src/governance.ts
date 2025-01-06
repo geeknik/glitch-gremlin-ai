@@ -64,6 +64,12 @@ export class GovernanceManager {
             throw new GlitchError('Proposal voting has ended', 2006);
         }
 
+        // Check quorum
+        const totalVotes = metadata.voteWeights.yes + metadata.voteWeights.no + metadata.voteWeights.abstain;
+        if (totalVotes < metadata.quorum) {
+            throw new GlitchError('Proposal has not reached quorum', 2007);
+        }
+
         return metadata;
     }
 

@@ -358,37 +358,46 @@ export class GlitchSDK {
             throw new GlitchError('Proposal not passed', 1009);
         }
 
+        // Check quorum and vote outcome
+        const metadata = await this.governanceManager.validateProposal(
+            this.connection,
+            new PublicKey(proposalId)
+        );
+
+        const passThreshold = metadata.voteWeights.yes > metadata.voteWeights.no;
+        if (!passThreshold) {
+            throw new GlitchError('Proposal did not pass', 1013);
+        }
+
         // For test proposals, skip timelock check
-        if (!proposalId.startsWith('test-') && Date.now() < proposal.endTime) {
-            throw new GlitchError('Timelock period not elapsed', 1010);
+        if (!proposalId.startsWith('test-')) {
+            const executionTime = metadata.endTime + (this.governanceConfig.executionDelay || 86400000);
+            if (Date.now() < executionTime) {
+                throw new GlitchError('Timelock period not elapsed', 1010);
+            }
         }
 
         try {
-            // Execution logic here
+            // Create execution instruction
             const instruction = new TransactionInstruction({
                 keys: [
-                    { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true }
+                    { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+                    { pubkey: new PublicKey(proposalId), isSigner: false, isWritable: true }
                 ],
                 programId: this.programId,
-                data: Buffer.from([]) // Add instruction data
+                data: Buffer.from([0x03]) // Execute instruction
             });
 
             const transaction = new Transaction().add(instruction);
+            
+            // Simulate transaction first
+            await this.connection.simulateTransaction(transaction, [this.wallet]);
+            
+            // If simulation succeeds, send the actual transaction
             return await this.connection.sendTransaction(transaction, [this.wallet]);
         } catch (error) {
             throw new GlitchError('Failed to execute proposal', 1012);
         }
-
-        const instruction = new TransactionInstruction({
-            keys: [
-                { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true }
-            ],
-            programId: this.programId,
-            data: Buffer.from([]) // Add instruction data
-        });
-
-        const transaction = new Transaction().add(instruction);
-        return await this.connection.sendTransaction(transaction, [this.wallet]);
     }
 
     async calculateChaosRequestFee(params: Omit<ChaosRequestParams, 'targetProgram'>): Promise<number> {
