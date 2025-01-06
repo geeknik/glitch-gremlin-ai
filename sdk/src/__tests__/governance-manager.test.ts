@@ -64,7 +64,7 @@ describe('GovernanceManager', () => {
     describe('castVote', () => {
         
         it('should create valid vote transaction', async () => {
-            jest.setTimeout(10000); // Increase timeout for this test
+        }, 10000); // Increase timeout for this test
             const proposalAddress = Keypair.generate().publicKey;
             
             // Mock validateProposal
