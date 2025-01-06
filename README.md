@@ -36,7 +36,7 @@ This project is in active development. Use at your own risk.
 
 ## Follow Us on X  
 
-[![Follow on X](https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/X_logo_2023.svg/512px-X_logo_2023.svg.png)](https://x.com/glitchgremlinai)
+Stay updated with the latest news and announcements. Follow us on [X (formerly Twitter)](https://x.com/glitchgremlinai)!
 
 ## License
 
