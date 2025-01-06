@@ -102,28 +102,30 @@ describe('GovernanceManager', () => {
 
                         // Mock validateProposal to return active proposal
                         validateProposalMock = jest.spyOn(governanceManager, 'validateProposal')
-                            .mockResolvedValue(mockProposalData);
+                            .mockResolvedValueOnce(mockProposalData);
 
                         // Mock getAccountInfo with proper account data
+                        const mockAccountInfo = {
+                            data: Buffer.from(JSON.stringify(mockProposalData)),
+                            executable: false,
+                            lamports: 1000000,
+                            owner: governanceManager['programId'],
+                            rentEpoch: 0
+                        };
+                        
                         getAccountInfoMock = jest.spyOn(connection, 'getAccountInfo')
-                            .mockResolvedValue({
-                                data: Buffer.from(JSON.stringify(mockProposalData)),
-                                executable: false,
-                                lamports: 1000000,
-                                owner: governanceManager['programId'],
-                                rentEpoch: 0
-                            });
+                            .mockResolvedValueOnce(mockAccountInfo);
 
                         // Mock transaction simulation
                         simulateTransactionMock = jest.spyOn(connection, 'simulateTransaction')
-                            .mockResolvedValue({
+                            .mockResolvedValueOnce({
                                 context: { slot: 0 },
                                 value: { err: null, logs: [], accounts: null, unitsConsumed: 0, returnData: null }
                             });
 
                         // Mock transaction sending
                         sendTransactionMock = jest.spyOn(connection, 'sendTransaction')
-                            .mockResolvedValue('mock-signature');
+                            .mockResolvedValueOnce('mock-signature');
                     });
 
                     afterEach(() => {
@@ -149,21 +151,22 @@ describe('GovernanceManager', () => {
                         );
                         
                         // Verify getAccountInfo was called with proposal address
-                        expect(getAccountInfoMock).toHaveBeenCalledWith(
-                            proposalAddress
-                        );
+                        expect(getAccountInfoMock).toHaveBeenCalledWith(proposalAddress);
                         
                         // Verify transaction simulation and sending
                         expect(simulateTransactionMock).toHaveBeenCalledTimes(1);
                         expect(sendTransactionMock).toHaveBeenCalledTimes(1);
                         
-                        // Verify call order using jest.mock order tracking
-                        const validateProposalCalls = validateProposalMock.mock.invocationCallOrder;
-                        const getAccountInfoCalls = getAccountInfoMock.mock.invocationCallOrder;
-                        const simulateTransactionCalls = simulateTransactionMock.mock.invocationCallOrder;
+                        // Verify call order
+                        const calls = {
+                            validate: validateProposalMock.mock.invocationCallOrder[0],
+                            getInfo: getAccountInfoMock.mock.invocationCallOrder[0],
+                            simulate: simulateTransactionMock.mock.invocationCallOrder[0]
+                        };
                         
-                        expect(validateProposalCalls[0]).toBeLessThan(getAccountInfoCalls[0]);
-                        expect(getAccountInfoCalls[0]).toBeLessThan(simulateTransactionCalls[0]);
+                        // Validate calls happened in correct order
+                        expect(calls.validate).toBeLessThan(calls.getInfo);
+                        expect(calls.getInfo).toBeLessThan(calls.simulate);
                     });
                 });
 
