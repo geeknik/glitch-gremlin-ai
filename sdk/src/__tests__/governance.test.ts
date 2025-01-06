@@ -167,13 +167,14 @@ describe('Governance', () => {
                 .mockResolvedValueOnce({
                     data: Buffer.from(JSON.stringify({
                         status: 'active',
-                        endTime: now - 100000, // Set endTime in the past
+                        endTime: now + 86400000, // Set endTime in the future
+                        executionTime: now + 172800000, // Set execution time even further
                         voteWeights: {
                             yes: 100,
                             no: 50,
                             abstain: 0
                         },
-                        quorum: 100 // Set quorum lower than total votes
+                        quorum: 100
                     })),
                     executable: false,
                     lamports: 0,

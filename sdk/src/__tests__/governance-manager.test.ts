@@ -65,7 +65,20 @@ describe('GovernanceManager', () => {
         it('should create valid vote transaction', async () => {
             const proposalAddress = Keypair.generate().publicKey;
             
-            // Mock getProposalState
+            // Mock validateProposal
+            jest.spyOn(governanceManager, 'validateProposal')
+                .mockResolvedValue({
+                    title: "Test",
+                    description: "Test",
+                    proposer: Keypair.generate().publicKey,
+                    startTime: Date.now() - 1000,
+                    endTime: Date.now() + 1000,
+                    executionTime: Date.now() + 86400000,
+                    voteWeights: { yes: 0, no: 0, abstain: 0 },
+                    votes: [],
+                    quorum: 100,
+                    executed: false
+                });
             jest.spyOn(governanceManager, 'getProposalState')
                 .mockResolvedValue(ProposalState.Active);
 
@@ -83,7 +96,9 @@ describe('GovernanceManager', () => {
         it('should reject voting on inactive proposals', async () => {
             const proposalAddress = Keypair.generate().publicKey;
             
-            // Mock getProposalState
+            // Mock validateProposal to throw
+            jest.spyOn(governanceManager, 'validateProposal')
+                .mockRejectedValue(new GlitchError('Proposal voting has ended', 2006));
             jest.spyOn(governanceManager, 'getProposalState')
                 .mockResolvedValue(ProposalState.Executed);
 
