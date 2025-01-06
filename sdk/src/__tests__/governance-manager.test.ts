@@ -123,7 +123,10 @@ describe('GovernanceManager', () => {
                 confirmTransaction: jest.spyOn(connection, 'confirmTransaction')
                     .mockImplementation(async () => {
                         console.log('[Mock] confirmTransaction called');
-                        return { value: { err: null } };
+                        return {
+                            context: { slot: 0 },
+                            value: { err: null }
+                        };
                     })
             };
 
