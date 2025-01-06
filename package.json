@@ -11,6 +11,7 @@
     "build-sdk": "cd sdk && npm install && npm run build",
     "build-cli": "cd cli && npm install && npm run build",
     "test": "npm run test --workspaces --if-present",
+    "test:coverage": "npm run test:coverage --workspaces --if-present",
     "lint": "npm run lint --workspaces"
   },
   "devDependencies": {

@@ -6,7 +6,8 @@
   "scripts": {
     "build": "npx tsc",
     "clean": "rm -rf dist",
-    "test": "jest"
+    "test": "jest",
+    "test:coverage": "jest --coverage --coverageReporters='text-summary' --coverageReporters='lcov'"
   },
   "dependencies": {
     "@project-serum/anchor": "^0.26.0",
