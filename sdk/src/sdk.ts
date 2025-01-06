@@ -328,14 +328,14 @@ export class GlitchSDK {
     } | null> {
         try {
             const stakeAccount = await this.connection.getAccountInfo(new PublicKey(stakeId));
-            if (!stakeAccount) {
+            if (!stakeAccount || !stakeAccount.data) {
                 throw new GlitchError('Stake not found', 1015);
             }
 
             // Parse account data into StakeInfo
             const data = stakeAccount.data;
             if (data.length < 56) { // Validate minimum data length
-                throw new GlitchError('Invalid stake account data', 1016);
+                throw new GlitchError('Stake not found', 1015); // Keep consistent error message
             }
 
             return {
