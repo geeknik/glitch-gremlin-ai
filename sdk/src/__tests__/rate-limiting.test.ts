@@ -54,7 +54,7 @@ describe('Rate Limiting', () => {
             const mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr')
                 .mockResolvedValue(4);
             const mockExpire = jest.spyOn(sdk['queueWorker']['redis'], 'expire')
-                .mockResolvedValue(true);
+                .mockResolvedValue(1);
 
             // Fourth request in a minute should fail
             await expect(sdk.createChaosRequest({
