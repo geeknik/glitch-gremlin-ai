@@ -92,14 +92,14 @@ describe('GovernanceManager', () => {
                 executed: false
             };
 
-            // Set up all required mocks with enough responses for multiple calls
+            // Set up all required mocks
             const mocks = {
                 validateProposal: jest.spyOn(governanceManager, 'validateProposal')
-                    .mockResolvedValue(mockProposalData), // Use mockResolvedValue for consistent behavior
+                    .mockResolvedValueOnce(mockProposalData),
                 getProposalState: jest.spyOn(governanceManager, 'getProposalState')
-                    .mockResolvedValue(ProposalState.Active), // Use mockResolvedValue for consistent behavior
+                    .mockResolvedValueOnce(ProposalState.Active),
                 getAccountInfo: jest.spyOn(connection, 'getAccountInfo')
-                    .mockResolvedValue({
+                    .mockResolvedValueOnce({
                         data: Buffer.from(JSON.stringify(mockProposalData)),
                         executable: false,
                         lamports: 1000000,
@@ -107,14 +107,14 @@ describe('GovernanceManager', () => {
                         rentEpoch: 0
                     }),
                 sendTransaction: jest.spyOn(connection, 'sendTransaction')
-                    .mockResolvedValue('mock-signature'),
+                    .mockResolvedValueOnce('mock-signature'),
                 simulateTransaction: jest.spyOn(connection, 'simulateTransaction')
-                    .mockResolvedValue({
+                    .mockResolvedValueOnce({
                         context: { slot: 0 },
                         value: { err: null, logs: [], accounts: null, unitsConsumed: 0, returnData: null }
                     }),
                 confirmTransaction: jest.spyOn(connection, 'confirmTransaction')
-                    .mockResolvedValue({
+                    .mockResolvedValueOnce({
                         context: { slot: 0 },
                         value: { err: null }
                     })
