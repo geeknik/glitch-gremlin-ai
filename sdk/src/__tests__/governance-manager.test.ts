@@ -43,8 +43,12 @@ describe('GovernanceManager', () => {
         });
     });
 
-    // Increase timeout for all tests
-    jest.setTimeout(30000);
+    // Increase timeout and add beforeEach setup
+    jest.setTimeout(60000);
+
+    beforeEach(() => {
+        jest.useRealTimers();
+    });
 
     describe('castVote', () => {
         

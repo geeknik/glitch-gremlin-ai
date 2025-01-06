@@ -196,8 +196,9 @@ describe('Governance', () => {
                             no: 50,
                             abstain: 0
                         },
-                        quorum: 1000, // Higher than total votes
-                        endTime: Date.now() + 86400000 // Set to future time
+                        quorum: 1000,
+                        endTime: Date.now() + 86400000,
+                        executed: false
                     })),
                     executable: false,
                     lamports: 0,
