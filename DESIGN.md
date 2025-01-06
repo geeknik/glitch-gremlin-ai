@@ -1,13 +1,13 @@
-Below is a more comprehensive and final version of the technical design document for $GLITCH (Glitch Gremlin AI). It expands on the initial outline, clarifying the responsibilities and interactions of each system component so that the development team fully grasps every step of the project.
+Below is a more comprehensive and final version of the technical design document for $GREMLINAI (Glitch Gremlin AI). It expands on the initial outline, clarifying the responsibilities and interactions of each system component so that the development team fully grasps every step of the project.
 
 1. Core Vision and Project Charter
 
-The guiding principle behind $GLITCH is to provide an AI-driven chaos engine that can help developers stress-test and probe their Solana dApps in realistic ways. This is more than just a memecoin: it’s a tool that provides Chaos-as-a-Service (CaaS) via a specialized agent—the Glitch Gremlin—and integrates governance, community engagement, and real-world testing scenarios. While $GLITCH retains a whimsical identity as a “mischievous AI character,” it brings tangible utility to Solana-based applications through controlled chaos simulations.
+The guiding principle behind $GREMLINAI is to provide an AI-driven chaos engine that can help developers stress-test and probe their Solana dApps in realistic ways. This is more than just a memecoin: it’s a tool that provides Chaos-as-a-Service (CaaS) via a specialized agent—the Glitch Gremlin—and integrates governance, community engagement, and real-world testing scenarios. While $GREMLINAI retains a whimsical identity as a “mischievous AI character,” it brings tangible utility to Solana-based applications through controlled chaos simulations.
 
 At a high level, the project aims to:
-	1.	Deliver a secure Solana Program (on-chain) that accepts $GLITCH tokens in exchange for chaos simulations.
+	1.	Deliver a secure Solana Program (on-chain) that accepts $GREMLINAI tokens in exchange for chaos simulations.
 	2.	Implement an off-chain AI engine that processes requests, orchestrates attacks or stress scenarios, and reports back to the blockchain.
-	3.	Integrate with popular Solana wallets so that developers can easily manage their $GLITCH tokens, stake them in governance, or pay for chaos services.
+	3.	Integrate with popular Solana wallets so that developers can easily manage their $GREMLINAI tokens, stake them in governance, or pay for chaos services.
 	4.	Foster a community-driven environment where token holders can vote on “chaos campaigns” for public dApps or protocols.
 
 This extended document will walk through the system’s architecture, data flows, off-chain integrations, and security measures.
@@ -20,12 +20,12 @@ The project architecture relies on a split between on-chain and off-chain compon
 	1.	On-Chain: A Solana program (“GlitchGremlinProgram”) that handles token escrow, records chaos requests, updates request states, and provides governance hooks.
 	2.	Off-Chain: An AI-driven aggregator or service that periodically queries the blockchain for pending chaos requests, performs the requested tasks in a test environment, and writes back the results to the chain.
 
-By offloading the computationally heavy and dynamic AI tasks to an off-chain environment, the system preserves Solana’s throughput and keeps costs predictable. The on-chain program maintains trustless accountability and ensures that $GLITCH tokens are properly managed.
+By offloading the computationally heavy and dynamic AI tasks to an off-chain environment, the system preserves Solana’s throughput and keeps costs predictable. The on-chain program maintains trustless accountability and ensures that $GREMLINAI tokens are properly managed.
 
 2.2 User Interactions
 
 A typical user or developer will interact with three main layers:
-	1.	Wallet Layer: Any Solana-compatible wallet (Phantom, Solflare, Glow, etc.). This layer enables storing $GLITCH tokens, submitting transactions, and signing governance proposals or chaos requests.
+	1.	Wallet Layer: Any Solana-compatible wallet (Phantom, Solflare, Glow, etc.). This layer enables storing $GREMLINAI tokens, submitting transactions, and signing governance proposals or chaos requests.
 	2.	Front-End Interface: A web-based or CLI-based application that triggers chaos requests by sending instructions to the on-chain program. This interface also displays real-time or historical data on completed chaos tests.
 	3.	Off-Chain AI Engine: Accessed indirectly via the GlitchGremlinProgram. Once a user sends a chaos request, the AI engine picks it up and runs the requested tests. The user sees logs and results in the front-end interface or via direct references in the on-chain data.
 
@@ -38,21 +38,21 @@ Decimals: 9 (typical for SPL tokens, but can be configurable)
 Initial Mint: Defined by the project’s governance or leadership at inception.
 Mint Authority: Controlled by a multisig or the same on-chain program to allow for expansions or supply modifications in a transparent manner.
 
-$GLITCH must strictly follow Solana’s SPL token standard so that all major wallets and decentralized exchanges (DEXs) can recognize and trade it. The token’s metadata—name, symbol, URI, image/icon—will be registered via the Metaplex standard to ensure uniform display across user interfaces.
+$GREMLINAI must strictly follow Solana’s SPL token standard so that all major wallets and decentralized exchanges (DEXs) can recognize and trade it. The token’s metadata—name, symbol, URI, image/icon—will be registered via the Metaplex standard to ensure uniform display across user interfaces.
 
 3.2 Token Use Cases
-	1.	Paying for Chaos: Developers must spend $GLITCH to request simulations or attacks on their dApps. The amount paid depends on the complexity or duration of the requested chaos.
-	2.	Governance and Voting: Token holders stake or lock $GLITCH in a governance module to participate in the “Community Chaos Challenges.”
+	1.	Paying for Chaos: Developers must spend $GREMLINAI to request simulations or attacks on their dApps. The amount paid depends on the complexity or duration of the requested chaos.
+	2.	Governance and Voting: Token holders stake or lock $GREMLINAI in a governance module to participate in the “Community Chaos Challenges.”
 	3.	Staking and Rewards: As the system matures, stakers may earn passive rewards from fees generated by the chaos service or from the treasury.
-	4.	Liquidity and Memetic Value: While primarily a utility token, $GLITCH retains an element of memetic appeal, and it can be traded on DEXs for speculative or community-driven reasons.
+	4.	Liquidity and Memetic Value: While primarily a utility token, $GREMLINAI retains an element of memetic appeal, and it can be traded on DEXs for speculative or community-driven reasons.
 
 4. GlitchGremlinProgram (On-Chain)
 
-The GlitchGremlinProgram is written in Rust and deployed on Solana Mainnet. It has multiple entry points (i.e., instructions) that define how users and off-chain services interact with $GLITCH.
+The GlitchGremlinProgram is written in Rust and deployed on Solana Mainnet. It has multiple entry points (i.e., instructions) that define how users and off-chain services interact with $GREMLINAI.
 
 4.1 Program Responsibilities
 	1.	Chaos Request Initialization:
-	•	Checks whether the caller has enough $GLITCH to pay for the requested chaos.
+	•	Checks whether the caller has enough $GREMLINAI to pay for the requested chaos.
 	•	Transfers (or escrows) the required amount from the caller’s wallet into the program’s escrow account.
 	•	Creates a ChaosRequest Account that stores the request parameters and references.
 	2.	Chaos Request Finalization:
@@ -65,18 +65,18 @@ The GlitchGremlinProgram is written in Rust and deployed on Solana Mainnet. It h
 	•	Potentially triggers special events (e.g., distributing rewards to voters or top community participants).
 	4.	Token Management:
 	•	Ensures that the minted tokens are tracked, possibly enforces partial burns or releases from escrow.
-	•	May integrate with a treasury account holding $GLITCH to fund community-driven chaos initiatives.
+	•	May integrate with a treasury account holding $GREMLINAI to fund community-driven chaos initiatives.
 
 4.2 Data Structures and Accounts
 	1.	ChaosRequest Account:
 	•	Request ID: Unique identifier for each chaos request.
 	•	Requestor Pubkey: The user who initiated the request.
-	•	Tokens Escrowed: How many $GLITCH tokens were locked for this request.
+	•	Tokens Escrowed: How many $GREMLINAI tokens were locked for this request.
 	•	Chaos Parameters: A short or hashed reference to the type of chaos requested (exploit scanning, network spamming, malicious input testing, etc.).
 	•	Status: Enum field that indicates Pending, In-Progress, Completed, or Failed.
 	•	Result Reference: Optional link to IPFS/Arweave or an on-chain log for the final chaos test results.
 	2.	Configuration Account:
-	•	Base Fees: The standard cost in $GLITCH for different categories of chaos.
+	•	Base Fees: The standard cost in $GREMLINAI for different categories of chaos.
 	•	Upgrade Authority: The program’s upgrade or admin key, ideally a multisig.
 	•	Rate Limits: Maximum number of chaos requests per block or timespan, if needed.
 	3.	Governance/Proposal Accounts (if integrated into GlitchGremlinProgram or referencing a standard governance program):
@@ -110,7 +110,7 @@ As usage grows, the AI engine should scale horizontally by spinning up additiona
 6. Governance and Community Chaos Challenges
 
 Community Chaos Challenges transform the Glitch Gremlin from a niche developer tool into a more participatory experience:
-	1.	Proposal Creation: A user (or group) stakes a certain amount of $GLITCH to propose a chaos test on a public or private project.
+	1.	Proposal Creation: A user (or group) stakes a certain amount of $GREMLINAI to propose a chaos test on a public or private project.
 	2.	Voting: Other token holders can vote to approve or reject the proposal.
 	3.	Chaos Execution: If approved, the system automatically schedules the test in the off-chain queue, funding it from the project’s treasury or from staked tokens.
 	4.	Rewards: Once the test completes, the system can distribute rewards to participants—like the proposer or top voters—based on the outcome or success of the chaos test.
@@ -119,25 +119,25 @@ The governance itself can either be built into GlitchGremlinProgram or integrate
 
 7. Wallet Integration Details
 
-Solid wallet support is crucial for adoption, especially given the chaotic or experimental nature of $GLITCH. By adhering to SPL token guidelines and standard program invocation flows, any wallet that supports custom program interactions on Solana will work out-of-the-box. Some important specifics:
-	1.	Metadata Registration: Use the Metaplex Token Metadata Program to ensure $GLITCH displays name, symbol, and icon in wallets like Phantom or Solflare.
+Solid wallet support is crucial for adoption, especially given the chaotic or experimental nature of $GREMLINAI. By adhering to SPL token guidelines and standard program invocation flows, any wallet that supports custom program interactions on Solana will work out-of-the-box. Some important specifics:
+	1.	Metadata Registration: Use the Metaplex Token Metadata Program to ensure $GREMLINAI displays name, symbol, and icon in wallets like Phantom or Solflare.
 	2.	Transaction Flow: When a user requests chaos, they sign a transaction that includes:
 	•	A reference to the GlitchGremlinProgram.
-	•	The amount of $GLITCH to be transferred into the escrow.
+	•	The amount of $GREMLINAI to be transferred into the escrow.
 	•	Any additional parameters for the chaos scenario.
 Their wallet will show the usual Solana signature prompts.
 	3.	Security Prompts: For larger transactions or repeated chaos requests, wallet providers may present additional warnings or require multiple confirmations.
 	4.	Governance Actions: Wallets that support governance programs (e.g., Realms integration) can display governance proposals, tally votes, and show final results directly in the interface.
 
 8. Expanded Chaos-as-a-Service (CaaS) Flow
-	1.	Developer or User Initiates Request: Through a front-end UI or CLI tool, they supply chaos parameters—like “simulate malicious transactions over a five-minute window”—and sign a transaction transferring $GLITCH tokens to the program.
+	1.	Developer or User Initiates Request: Through a front-end UI or CLI tool, they supply chaos parameters—like “simulate malicious transactions over a five-minute window”—and sign a transaction transferring $GREMLINAI tokens to the program.
 	2.	On-Chain Request Creation: GlitchGremlinProgram stores this request in a new ChaosRequest Account with status = Pending.
 	3.	Off-Chain Retrieval: The AI engine’s aggregator sees the new request, fetches parameters, and begins to orchestrate the chaos scenario in a sandbox.
 	4.	Simulation Execution: The AI engine bombards the target system with the requested or AI-derived malice: spamming, injection attempts, concurrency edge-case triggers, or any exploit test from the engine’s library.
 	5.	Completion and Reporting: Logs are uploaded to decentralized storage or a recognized aggregator. The AI engine signs a finalize transaction on-chain with references to these logs.
 	6.	On-Chain Finalization: The program updates the request’s status to Completed, unescrows or burns tokens based on the request’s outcome, and potentially triggers reward logic.
 
-This cyclical flow ensures that the chaos process is transparent—each step is either visible on-chain or easily auditable through the logs, letting developers confidently rely on $GLITCH for stress-testing.
+This cyclical flow ensures that the chaos process is transparent—each step is either visible on-chain or easily auditable through the logs, letting developers confidently rely on $GREMLINAI for stress-testing.
 
 9. Security and Abuse Prevention
 
@@ -150,7 +150,7 @@ The paradox of building a “chaos tool” is that it can itself be abused if no
 
 10. Developer Tools and Documentation
 
-To maximize adoption, $GLITCH should offer a rich set of developer tools and documentation:
+To maximize adoption, $GREMLINAI should offer a rich set of developer tools and documentation:
 	1.	SDK or Library: Provide a TypeScript or Go-based client library that wraps key functions of the GlitchGremlinProgram:
 	•	createChaosRequest(params)
 	•	finalizeChaosRequest(id, results)
@@ -161,7 +161,7 @@ To maximize adoption, $GLITCH should offer a rich set of developer tools and doc
 
 11. Roadmap and Milestones
 	1.	Phase 1: Token Launch
-	•	Launch $GLITCH as an SPL token on Solana Mainnet.
+	•	Launch $GREMLINAI as an SPL token on Solana Mainnet.
 	•	Create basic liquidity pools on Raydium, Orca, or other DEXs.
 	•	Register token metadata for wallet display.
 	2.	Phase 2: GlitchGremlinProgram
@@ -184,6 +184,6 @@ To maximize adoption, $GLITCH should offer a rich set of developer tools and doc
 
 12. Conclusion
 
-The Glitch Gremlin AI—powered by $GLITCH—combines the playful nature of a memecoin with an undeniably practical utility: Chaos-as-a-Service for Solana dApps. By seamlessly integrating on-chain governance, an escrow-based token model, and an off-chain AI engine capable of delivering controlled chaos, the platform addresses a real need for security and stress testing. The expanded design outlined here covers the full lifecycle of chaos requests, from creation and execution to finalization and community governance.
+The Glitch Gremlin AI—powered by $GREMLINAI—combines the playful nature of a memecoin with an undeniably practical utility: Chaos-as-a-Service for Solana dApps. By seamlessly integrating on-chain governance, an escrow-based token model, and an off-chain AI engine capable of delivering controlled chaos, the platform addresses a real need for security and stress testing. The expanded design outlined here covers the full lifecycle of chaos requests, from creation and execution to finalization and community governance.
 
-Provided the dev team adheres to these specifications and robust security practices, $GLITCH can become a mainstay in the Solana ecosystem—empowering developers to embrace the chaos while mitigating the very real risks their applications might face in production.
+Provided the dev team adheres to these specifications and robust security practices, $GREMLINAI can become a mainstay in the Solana ecosystem—empowering developers to embrace the chaos while mitigating the very real risks their applications might face in production.
