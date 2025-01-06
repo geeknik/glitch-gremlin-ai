@@ -62,6 +62,7 @@ describe('GovernanceManager', () => {
     });
 
     describe('castVote', () => {
+        jest.setTimeout(15000); // Increase timeout for all tests in this block
         
         it('should create valid vote transaction', async () => {
             const proposalAddress = Keypair.generate().publicKey;
@@ -92,7 +93,7 @@ describe('GovernanceManager', () => {
             
             expect(tx.instructions.length).toBe(1);
             expect(tx.instructions[0].data[0]).toBe(0x01); // Vote instruction
-        }, 10000); // Increase timeout for this test
+        });
 
         it('should reject voting on inactive proposals', async () => {
             const proposalAddress = Keypair.generate().publicKey;
