@@ -41,8 +41,8 @@ export interface GovernanceConfig {
     votingPeriod?: number;
     quorum?: number;
     executionDelay?: number;
-    minVotingPeriod?: number;
-    maxVotingPeriod?: number;
+    minVotingPeriod: number;  // Remove optional
+    maxVotingPeriod: number;  // Remove optional
 }
 
 export enum ProposalState {

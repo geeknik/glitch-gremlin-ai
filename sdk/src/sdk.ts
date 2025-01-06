@@ -49,11 +49,15 @@ export class GlitchSDK {
         cluster?: string;
         wallet: Keypair;
         programId?: string;
-        governanceConfig?: GovernanceConfig;
+        governanceConfig?: Partial<GovernanceConfig>;
     }) {
         const defaultConfig: GovernanceConfig = {
-            minVotingPeriod: 86400,
-            maxVotingPeriod: 604800
+            minVotingPeriod: 86400, // 1 day
+            maxVotingPeriod: 604800, // 1 week
+            minStakeAmount: 1000,
+            votingPeriod: 259200, // 3 days
+            quorum: 10,
+            executionDelay: 86400
         };
         this.queueWorker = new RedisQueueWorker();
         // Default to testnet

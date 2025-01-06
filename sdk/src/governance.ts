@@ -21,8 +21,8 @@ export class GovernanceManager {
         wallet: any,
         params: any
     ): Promise<{ proposalAddress: PublicKey; tx: Transaction }> {
-        const minPeriod = this.config.minVotingPeriod ?? this.DEFAULT_CONFIG.minVotingPeriod;
-        const maxPeriod = this.config.maxVotingPeriod ?? this.DEFAULT_CONFIG.maxVotingPeriod;
+        const minPeriod = this.config.minVotingPeriod;
+        const maxPeriod = this.config.maxVotingPeriod;
         
         if (params.votingPeriod < minPeriod ||
             params.votingPeriod > maxPeriod) {
