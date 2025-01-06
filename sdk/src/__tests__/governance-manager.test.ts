@@ -74,10 +74,11 @@ describe('GovernanceManager', () => {
         });
 
         it('should create valid vote transaction', async () => {
-            // Increase timeout since this test takes longer
-            jest.setTimeout(10000);
+            console.log('[Test] Setting up mocks...');
             
             const proposalAddress = Keypair.generate().publicKey;
+            jest.useFakeTimers('modern');
+            jest.setSystemTime(1641024000000); // Fixed timestamp
             const mockProposalData = {
                 title: "Test",
                 description: "Test",
@@ -91,56 +92,48 @@ describe('GovernanceManager', () => {
                 executed: false
             };
 
-            // Mock all external calls
+            // Set up all mocks with immediate responses
             const mocks = {
                 validateProposal: jest.spyOn(governanceManager, 'validateProposal')
-                    .mockImplementation(async () => {
-                        console.log('[Mock] validateProposal called');
-                        return mockProposalData;
-                    }),
+                    .mockResolvedValue(mockProposalData),
                 getProposalState: jest.spyOn(governanceManager, 'getProposalState')
-                    .mockImplementation(async () => {
-                        console.log('[Mock] getProposalState called');
-                        return ProposalState.Active;
-                    }),
+                    .mockResolvedValue(ProposalState.Active),
                 getAccountInfo: jest.spyOn(connection, 'getAccountInfo')
-                    .mockImplementation(async () => {
-                        console.log('[Mock] getAccountInfo called');
-                        return null;
-                    }),
+                    .mockResolvedValue(null),
                 sendTransaction: jest.spyOn(connection, 'sendTransaction')
-                    .mockImplementation(async () => {
-                        console.log('[Mock] sendTransaction called');
-                        return 'mock-signature';
-                    }),
+                    .mockResolvedValue('mock-signature'),
                 simulateTransaction: jest.spyOn(connection, 'simulateTransaction')
-                    .mockImplementation(async () => {
-                        console.log('[Mock] simulateTransaction called');
-                        return {
-                            context: { slot: 0 },
-                            value: { err: null, logs: [], accounts: null, unitsConsumed: 0, returnData: null }
-                        };
+                    .mockResolvedValue({
+                        context: { slot: 0 },
+                        value: { err: null, logs: [], accounts: null, unitsConsumed: 0, returnData: null }
                     }),
                 confirmTransaction: jest.spyOn(connection, 'confirmTransaction')
-                    .mockImplementation(async () => {
-                        console.log('[Mock] confirmTransaction called');
-                        return {
-                            context: { slot: 0 },
-                            value: { err: null }
-                        };
+                    .mockResolvedValue({
+                        context: { slot: 0 },
+                        value: { err: null }
                     })
             };
+            
+            console.log('[Test] Mocks configured');
 
-            console.log('[Test] About to call castVote...');
-            
-            const tx = await governanceManager.castVote(
-                connection,
-                wallet,
-                proposalAddress,
-                true
-            );
-            
-            console.log('castVote returned');
+            try {
+                console.log('[Test] About to call castVote...');
+                
+                const tx = await governanceManager.castVote(
+                    connection,
+                    wallet,
+                    proposalAddress,
+                    true
+                );
+                
+                console.log('[Test] castVote returned successfully');
+                expect(tx).toBeDefined();
+                expect(tx.instructions.length).toBe(1);
+                expect(tx.instructions[0].data[0]).toBe(0x01); // Vote instruction
+            } catch (error) {
+                console.error('[Test] Error in castVote:', error);
+                throw error;
+            }
 
             // Verify all mocks were called
             Object.entries(mocks).forEach(([name, mock]) => {
