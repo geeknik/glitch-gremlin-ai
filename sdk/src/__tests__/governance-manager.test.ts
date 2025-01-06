@@ -63,15 +63,13 @@ describe('GovernanceManager', () => {
 
     describe('castVote', () => {
         beforeEach(() => {
-            // Reset all mocks before each test
             jest.clearAllMocks();
-            
-            // Mock current time
             jest.spyOn(Date, 'now')
                 .mockImplementation(() => 1641024000000); // Fixed timestamp
         });
         
         it('should create valid vote transaction', async () => {
+            console.log('Test started: castVote');
             const proposalAddress = Keypair.generate().publicKey;
             const mockProposalData = {
                 title: "Test",
@@ -86,18 +84,20 @@ describe('GovernanceManager', () => {
                 executed: false
             };
 
-            // Mock all async operations
+            // Mock all async operations with immediate resolution
             jest.spyOn(governanceManager, 'validateProposal')
-                .mockResolvedValueOnce(mockProposalData);
+                .mockImplementation(() => Promise.resolve(mockProposalData));
             
             jest.spyOn(governanceManager, 'getProposalState')
-                .mockResolvedValueOnce(ProposalState.Active);
+                .mockImplementation(() => Promise.resolve(ProposalState.Active));
 
             jest.spyOn(connection, 'getAccountInfo')
-                .mockResolvedValueOnce(null);
+                .mockImplementation(() => Promise.resolve(null));
 
             jest.spyOn(connection, 'sendTransaction')
-                .mockResolvedValueOnce('mock-signature');
+                .mockImplementation(() => Promise.resolve('mock-signature'));
+
+            console.log('About to call castVote...');
 
             const tx = await governanceManager.castVote(
                 connection,
@@ -106,8 +106,12 @@ describe('GovernanceManager', () => {
                 true
             );
             
+            console.log('castVote returned', tx);
+            
             expect(tx.instructions.length).toBe(1);
             expect(tx.instructions[0].data[0]).toBe(0x01); // Vote instruction
+            
+            console.log('Test completed successfully');
         });
 
         it('should reject voting on inactive proposals', async () => {
