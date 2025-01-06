@@ -74,74 +74,95 @@ describe('GovernanceManager', () => {
         });
 
         describe('successful voting', () => {
-            describe('with active proposal', () => {
-                let validateProposalMock: jest.SpyInstance;
-                let getAccountInfoMock: jest.SpyInstance;
-                let simulateTransactionMock: jest.SpyInstance;
-                let sendTransactionMock: jest.SpyInstance;
-                let proposalAddress: PublicKey;
+            describe('voting scenarios', () => {
+                describe('with active proposal', () => {
+                    let validateProposalMock: jest.SpyInstance;
+                    let getAccountInfoMock: jest.SpyInstance;
+                    let simulateTransactionMock: jest.SpyInstance;
+                    let sendTransactionMock: jest.SpyInstance;
+                    let proposalAddress: PublicKey;
             
-                beforeEach(() => {
-                    proposalAddress = Keypair.generate().publicKey;
-                    const mockProposalData = {
-                        title: "Test",
-                        description: "Test",
-                        proposer: wallet.publicKey,
-                        startTime: Date.now() - 1000,
-                        endTime: Date.now() + 86400000,
-                        executionTime: Date.now() + 172800000,
-                        voteWeights: { yes: 0, no: 0, abstain: 0 },
-                        votes: [],
-                        quorum: 100,
-                        executed: false
-                    };
+                    beforeEach(() => {
+                        proposalAddress = Keypair.generate().publicKey;
+                        const mockProposalData = {
+                            title: "Test",
+                            description: "Test",
+                            proposer: wallet.publicKey,
+                            startTime: Date.now() - 1000,
+                            endTime: Date.now() + 86400000,
+                            executionTime: Date.now() + 172800000,
+                            voteWeights: { yes: 0, no: 0, abstain: 0 },
+                            votes: [],
+                            quorum: 100,
+                            executed: false
+                        };
 
-                    validateProposalMock = jest.spyOn(governanceManager, 'validateProposal')
-                        .mockResolvedValue(mockProposalData);
+                        validateProposalMock = jest.spyOn(governanceManager, 'validateProposal')
+                            .mockResolvedValue(mockProposalData);
 
-                    getAccountInfoMock = jest.spyOn(connection, 'getAccountInfo')
-                        .mockResolvedValue({
-                            data: Buffer.from(JSON.stringify(mockProposalData)),
-                            executable: false,
-                            lamports: 1000000,
-                            owner: governanceManager['programId'],
-                            rentEpoch: 0
-                        });
+                        getAccountInfoMock = jest.spyOn(connection, 'getAccountInfo')
+                            .mockResolvedValue({
+                                data: Buffer.from(JSON.stringify(mockProposalData)),
+                                executable: false,
+                                lamports: 1000000,
+                                owner: governanceManager['programId'],
+                                rentEpoch: 0
+                            });
 
-                    simulateTransactionMock = jest.spyOn(connection, 'simulateTransaction')
-                        .mockResolvedValue({
-                            context: { slot: 0 },
-                            value: { err: null, logs: [], accounts: null, unitsConsumed: 0, returnData: null }
-                        });
+                        simulateTransactionMock = jest.spyOn(connection, 'simulateTransaction')
+                            .mockResolvedValue({
+                                context: { slot: 0 },
+                                value: { err: null, logs: [], accounts: null, unitsConsumed: 0, returnData: null }
+                            });
 
-                    sendTransactionMock = jest.spyOn(connection, 'sendTransaction')
-                        .mockResolvedValue('mock-signature');
+                        sendTransactionMock = jest.spyOn(connection, 'sendTransaction')
+                            .mockResolvedValue('mock-signature');
+                    });
+
+                    afterEach(() => {
+                        validateProposalMock.mockRestore();
+                        getAccountInfoMock.mockRestore();
+                        simulateTransactionMock.mockRestore();
+                        sendTransactionMock.mockRestore();
+                    });
+
+                    it('should create valid vote transaction', async () => {
+                        const transaction = await governanceManager.castVote(
+                            connection,
+                            wallet,
+                            proposalAddress,
+                            true
+                        );
+
+                        expect(transaction).toBeDefined();
+                        expect(transaction.instructions.length).toBe(1);
+                        expect(transaction.instructions[0].data[0]).toBe(0x01);
+
+                        // Verify each mock was called exactly once
+                        expect(validateProposalMock).toHaveBeenCalledTimes(1);
+                        expect(getAccountInfoMock).toHaveBeenCalledTimes(1);
+                        expect(sendTransactionMock).toHaveBeenCalledTimes(1);
+                        expect(simulateTransactionMock).toHaveBeenCalledTimes(1);
+                    });
                 });
 
-                afterEach(() => {
-                    validateProposalMock.mockRestore();
-                    getAccountInfoMock.mockRestore();
-                    simulateTransactionMock.mockRestore();
-                    sendTransactionMock.mockRestore();
-                });
+                describe('with ended proposal', () => {
+                    it('should reject voting on ended proposal', async () => {
+                        const endedProposalAddress = Keypair.generate().publicKey;
+                    
+                        // Mock validateProposal to throw ended error
+                        jest.spyOn(governanceManager, 'validateProposal')
+                            .mockRejectedValueOnce(new GlitchError('Proposal voting has ended', 2006));
 
-                it('should create valid vote transaction', async () => {
-                    const transaction = await governanceManager.castVote(
-                        connection,
-                        wallet,
-                        proposalAddress,
-                        true
-                    );
-
-                    expect(transaction).toBeDefined();
-                    expect(transaction.instructions.length).toBe(1);
-                    expect(transaction.instructions[0].data[0]).toBe(0x01);
-
-                    // Verify each mock was called exactly once
-                    expect(validateProposalMock).toHaveBeenCalledTimes(1);
-                    expect(getAccountInfoMock).toHaveBeenCalledTimes(1);
-                    expect(sendTransactionMock).toHaveBeenCalledTimes(1);
-                    expect(simulateTransactionMock).toHaveBeenCalledTimes(1);
+                        await expect(
+                            governanceManager.castVote(
+                                connection,
+                                wallet,
+                                endedProposalAddress,
+                                true
+                            )
+                        ).rejects.toThrow('Proposal voting has ended');
+                    });
                 });
             });
         });
