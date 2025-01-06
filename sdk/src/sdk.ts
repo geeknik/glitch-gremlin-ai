@@ -322,8 +322,8 @@ export class GlitchSDK {
 
     async getStakeInfo(stakeId: string): Promise<{
         amount: bigint;
-        lockupPeriod: number;
-        startTime: number;
+        lockupPeriod: bigint;
+        startTime: bigint;
         owner: PublicKey;
     } | null> {
         const stakeAccount = await this.connection.getAccountInfo(new PublicKey(stakeId));
