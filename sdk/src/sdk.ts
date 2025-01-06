@@ -335,8 +335,8 @@ export class GlitchSDK {
         const data = stakeAccount.data;
         return {
             amount: data.readBigInt64LE(0),
-            lockupPeriod: data.readBigUInt64LE(8),
-            startTime: data.readBigUInt64LE(16),
+            lockupPeriod: data.readBigUInt64LE(8), // Keep as bigint
+            startTime: data.readBigUInt64LE(16), // Keep as bigint
             owner: new PublicKey(data.slice(24, 56))
         };
     }
