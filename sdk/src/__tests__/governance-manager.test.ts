@@ -70,32 +70,49 @@ describe('GovernanceManager', () => {
         
         it('should create valid vote transaction', async () => {
             console.log('Test started: castVote');
+            
+            // Mock current time
+            const now = Date.now();
+            jest.spyOn(Date, 'now').mockImplementation(() => now);
+            
             const proposalAddress = Keypair.generate().publicKey;
             const mockProposalData = {
                 title: "Test",
                 description: "Test",
                 proposer: Keypair.generate().publicKey,
-                startTime: Date.now() - 1000,
-                endTime: Date.now() + 1000,
-                executionTime: Date.now() + 86400000,
+                startTime: now - 1000,
+                endTime: now + 1000,
+                executionTime: now + 86400000,
                 voteWeights: { yes: 0, no: 0, abstain: 0 },
                 votes: [],
                 quorum: 100,
                 executed: false
             };
 
-            // Mock all async operations with immediate resolution
-            jest.spyOn(governanceManager, 'validateProposal')
-                .mockImplementation(() => Promise.resolve(mockProposalData));
+            // Mock all async operations with mockImplementationOnce for better tracking
+            const validateProposalSpy = jest.spyOn(governanceManager, 'validateProposal')
+                .mockImplementationOnce(async () => {
+                    console.log('[Mock] validateProposal called');
+                    return mockProposalData;
+                });
             
-            jest.spyOn(governanceManager, 'getProposalState')
-                .mockImplementation(() => Promise.resolve(ProposalState.Active));
+            const getProposalStateSpy = jest.spyOn(governanceManager, 'getProposalState')
+                .mockImplementationOnce(async () => {
+                    console.log('[Mock] getProposalState called');
+                    return ProposalState.Active;
+                });
 
-            jest.spyOn(connection, 'getAccountInfo')
-                .mockImplementation(() => Promise.resolve(null));
+            const getAccountInfoSpy = jest.spyOn(connection, 'getAccountInfo')
+                .mockImplementationOnce(async () => {
+                    console.log('[Mock] getAccountInfo called');
+                    return null;
+                });
 
-            jest.spyOn(connection, 'sendTransaction')
-                .mockImplementation(() => Promise.resolve('mock-signature'));
+            const sendTransactionSpy = jest.spyOn(connection, 'sendTransaction')
+                .mockImplementationOnce(async () => {
+                    console.log('[Mock] sendTransaction called');
+                    return 'mock-signature';
+                });
 
             console.log('About to call castVote...');
 
@@ -106,12 +123,24 @@ describe('GovernanceManager', () => {
                 true
             );
             
-            console.log('castVote returned', tx);
+            console.log('castVote returned');
+
+            // Verify all mocks were called
+            expect(validateProposalSpy).toHaveBeenCalledTimes(1);
+            expect(getProposalStateSpy).toHaveBeenCalledTimes(1);
+            expect(getAccountInfoSpy).toHaveBeenCalledTimes(1);
+            expect(sendTransactionSpy).toHaveBeenCalledTimes(1);
             
             expect(tx.instructions.length).toBe(1);
             expect(tx.instructions[0].data[0]).toBe(0x01); // Vote instruction
             
             console.log('Test completed successfully');
+
+            // Clean up spies
+            validateProposalSpy.mockRestore();
+            getProposalStateSpy.mockRestore();
+            getAccountInfoSpy.mockRestore();
+            sendTransactionSpy.mockRestore();
         });
 
         it('should reject voting on inactive proposals', async () => {
