@@ -36,6 +36,13 @@ export interface ChaosRequestParams {
     };
 }
 
+export interface StakeInfo {
+    amount: number;
+    lockupPeriod: number;
+    startTime: number;
+    owner: PublicKey;
+}
+
 export interface GovernanceConfig {
     minVotingPeriod: number;
     maxVotingPeriod: number;
@@ -43,6 +50,8 @@ export interface GovernanceConfig {
     votingPeriod?: number;
     quorum?: number;
     executionDelay?: number;
+    minStakeLockupPeriod?: number;  // Minimum time tokens must be staked
+    maxStakeLockupPeriod?: number;  // Maximum allowed lockup period
 }
 
 export enum ProposalState {

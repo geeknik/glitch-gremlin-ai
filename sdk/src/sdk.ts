@@ -46,6 +46,8 @@ export class GlitchSDK {
      * @param config.programId Optional custom program ID
      */
     private governanceConfig: GovernanceConfig;
+    private readonly MIN_STAKE_LOCKUP = 86400; // 1 day in seconds
+    private readonly MAX_STAKE_LOCKUP = 31536000; // 1 year in seconds
 
     constructor(config: {
         cluster?: string;
@@ -263,6 +265,75 @@ export class GlitchSDK {
             }
             throw error;
         }
+    }
+
+    async stakeTokens(amount: number, lockupPeriod: number): Promise<string> {
+        if (amount < (this.governanceConfig.minStakeAmount || 100)) {
+            throw new GlitchError('Stake amount below minimum required', 1013);
+        }
+
+        if (lockupPeriod < this.MIN_STAKE_LOCKUP || lockupPeriod > this.MAX_STAKE_LOCKUP) {
+            throw new GlitchError('Invalid lockup period', 1014);
+        }
+
+        // Check if user has enough tokens
+        const balance = await this.connection.getBalance(this.wallet.publicKey);
+        if (balance < amount) {
+            throw new InsufficientFundsError();
+        }
+
+        const instruction = new TransactionInstruction({
+            keys: [
+                { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true }
+            ],
+            programId: this.programId,
+            data: Buffer.from([
+                0x03, // Stake instruction
+                ...new Array(8).fill(0).map((_, i) => (amount >> (8 * i)) & 0xff),
+                ...new Array(8).fill(0).map((_, i) => (lockupPeriod >> (8 * i)) & 0xff)
+            ])
+        });
+
+        const transaction = new Transaction().add(instruction);
+        return await this.connection.sendTransaction(transaction, [this.wallet]);
+    }
+
+    async unstakeTokens(stakeId: string): Promise<string> {
+        const stakeInfo = await this.getStakeInfo(stakeId);
+        if (!stakeInfo) {
+            throw new GlitchError('Stake not found', 1015);
+        }
+
+        if (Date.now() / 1000 < stakeInfo.startTime + stakeInfo.lockupPeriod) {
+            throw new GlitchError('Tokens are still locked', 1016);
+        }
+
+        const instruction = new TransactionInstruction({
+            keys: [
+                { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true }
+            ],
+            programId: this.programId,
+            data: Buffer.from([0x04]) // Unstake instruction
+        });
+
+        const transaction = new Transaction().add(instruction);
+        return await this.connection.sendTransaction(transaction, [this.wallet]);
+    }
+
+    async getStakeInfo(stakeId: string): Promise<StakeInfo | null> {
+        const stakeAccount = await this.connection.getAccountInfo(new PublicKey(stakeId));
+        if (!stakeAccount) {
+            return null;
+        }
+
+        // Parse account data into StakeInfo
+        const data = stakeAccount.data;
+        return {
+            amount: data.readBigUInt64LE(0),
+            lockupPeriod: data.readBigUInt64LE(8),
+            startTime: data.readBigUInt64LE(16),
+            owner: new PublicKey(data.slice(24, 56))
+        };
     }
 
     async executeProposal(proposalId: string): Promise<string> {
