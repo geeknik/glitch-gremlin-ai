@@ -22,27 +22,6 @@ export class GovernanceManager {
         this.config = { ...this.DEFAULT_CONFIG, ...config };
     }
 
-    private async createProposalAccount(
-        connection: Connection,
-        payer: Keypair,
-        space: number = this.proposalAccountSize
-    ): Promise<Keypair> {
-        const proposalAccount = Keypair.generate();
-        const rent = await connection.getMinimumBalanceForRentExemption(space);
-        
-        const createAccountIx = SystemProgram.createAccount({
-            fromPubkey: payer.publicKey,
-            newAccountPubkey: proposalAccount.publicKey,
-            lamports: rent,
-            space,
-            programId: this.programId
-        });
-
-        const tx = new Transaction().add(createAccountIx);
-        await connection.sendTransaction(tx, [payer, proposalAccount]);
-        
-        return proposalAccount;
-    }
 
     public async validateProposal(
         connection: Connection,
