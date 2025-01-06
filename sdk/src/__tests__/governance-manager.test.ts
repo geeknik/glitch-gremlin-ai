@@ -89,11 +89,16 @@ describe('GovernanceManager', () => {
                     executed: false
                 };
 
-                // Set up mocks
+                // Set up mocks with explicit ordering
                 const validateProposalMock = jest.spyOn(governanceManager, 'validateProposal')
-                    .mockResolvedValue(mockProposalData);
+                    .mockImplementation(async () => {
+                        await governanceManager.getProposalState(connection, proposalAddress);
+                        return mockProposalData;
+                    });
+                
                 const getProposalStateMock = jest.spyOn(governanceManager, 'getProposalState')
                     .mockResolvedValue(ProposalState.Active);
+                
                 const getAccountInfoMock = jest.spyOn(connection, 'getAccountInfo')
                     .mockResolvedValue({
                         data: Buffer.from(JSON.stringify(mockProposalData)),
@@ -102,8 +107,10 @@ describe('GovernanceManager', () => {
                         owner: governanceManager['programId'],
                         rentEpoch: 0
                     });
+                
                 const sendTransactionMock = jest.spyOn(connection, 'sendTransaction')
                     .mockResolvedValue('mock-signature');
+                
                 const simulateTransactionMock = jest.spyOn(connection, 'simulateTransaction')
                     .mockResolvedValue({
                         context: { slot: 0 },
