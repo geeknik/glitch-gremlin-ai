@@ -31,7 +31,7 @@ describe('TokenEconomics', () => {
     describe('stake validation', () => {
         it('should validate minimum stake', () => {
             expect(() => TokenEconomics.validateStakeAmount(100))
-                .toThrow('Stake amount must be at least 1000');
+                .toThrow('Stake amount below minimum required');
         });
 
         it('should validate maximum stake', () => {
