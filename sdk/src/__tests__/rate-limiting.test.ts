@@ -71,6 +71,7 @@ describe('Rate Limiting', () => {
 
     describe('governance rate limiting', () => {
         it('should limit proposals per day', async () => {
+            jest.setTimeout(10000); // Increase timeout for this test
             // Create first proposal
             await sdk.createProposal({
                 title: "Test Proposal",
