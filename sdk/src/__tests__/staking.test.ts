@@ -54,7 +54,7 @@ describe('Staking', () => {
 
     describe('unstakeTokens', () => {
         it('should validate stake exists', async () => {
-            await expect(sdk.unstakeTokens('nonexistent-stake'))
+            await expect(sdk.unstakeTokens('11111111111111111111111111111111'))
                 .rejects.toThrow('Stake not found');
         });
 
@@ -64,7 +64,7 @@ describe('Staking', () => {
                 .mockResolvedValueOnce({
                     amount: BigInt(1000),
                     lockupPeriod: BigInt(86400),
-                    startTime: BigInt(Date.now() / 1000),
+                    startTime: BigInt(Math.floor(Date.now() / 1000)),
                     owner: sdk['wallet'].publicKey
                 });
 
@@ -78,7 +78,7 @@ describe('Staking', () => {
                 .mockResolvedValueOnce({
                     amount: BigInt(1000),
                     lockupPeriod: BigInt(86400),
-                    startTime: BigInt((Date.now() / 1000) - 90000),
+                    startTime: BigInt(Math.floor(Date.now() / 1000) - 90000),
                     owner: sdk['wallet'].publicKey
                 });
 
