@@ -66,8 +66,8 @@ export interface ProposalParams {
 
 export interface StakeInfo {
     amount: bigint;
-    lockupPeriod: number;
-    startTime: number;
+    lockupPeriod: bigint;
+    startTime: bigint;
     owner: PublicKey;
 }
 

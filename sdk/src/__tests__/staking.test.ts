@@ -63,8 +63,8 @@ describe('Staking', () => {
             jest.spyOn(sdk as any, 'getStakeInfo')
                 .mockResolvedValueOnce({
                     amount: BigInt(1000),
-                    lockupPeriod: 86400,
-                    startTime: Date.now() / 1000,
+                    lockupPeriod: BigInt(86400),
+                    startTime: BigInt(Date.now() / 1000),
                     owner: sdk['wallet'].publicKey
                 });
 
@@ -77,8 +77,8 @@ describe('Staking', () => {
             jest.spyOn(sdk as any, 'getStakeInfo')
                 .mockResolvedValueOnce({
                     amount: BigInt(1000),
-                    lockupPeriod: 86400,
-                    startTime: (Date.now() / 1000) - 90000,
+                    lockupPeriod: BigInt(86400),
+                    startTime: BigInt((Date.now() / 1000) - 90000),
                     owner: sdk['wallet'].publicKey
                 });
 
