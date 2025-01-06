@@ -89,30 +89,24 @@ describe('GovernanceManager', () => {
                     executed: false
                 };
 
-                // Set up mocks with explicit ordering
+                // Set up mocks for successful voting
                 const validateProposalMock = jest.spyOn(governanceManager, 'validateProposal')
-                    .mockImplementation(async () => {
-                        await governanceManager.getProposalState(connection, proposalAddress);
-                        return mockProposalData;
-                    });
-                
-                const getProposalStateMock = jest.spyOn(governanceManager, 'getProposalState')
-                    .mockResolvedValue(ProposalState.Active);
-                
+                    .mockResolvedValueOnce(mockProposalData);
+
                 const getAccountInfoMock = jest.spyOn(connection, 'getAccountInfo')
-                    .mockResolvedValue({
+                    .mockResolvedValueOnce({
                         data: Buffer.from(JSON.stringify(mockProposalData)),
                         executable: false,
                         lamports: 1000000,
                         owner: governanceManager['programId'],
                         rentEpoch: 0
                     });
-                
+
                 const sendTransactionMock = jest.spyOn(connection, 'sendTransaction')
-                    .mockResolvedValue('mock-signature');
-                
+                    .mockResolvedValueOnce('mock-signature');
+
                 const simulateTransactionMock = jest.spyOn(connection, 'simulateTransaction')
-                    .mockResolvedValue({
+                    .mockResolvedValueOnce({
                         context: { slot: 0 },
                         value: { err: null, logs: [], accounts: null, unitsConsumed: 0, returnData: null }
                     });
@@ -150,10 +144,15 @@ describe('GovernanceManager', () => {
             
                 // Mock for inactive proposal
                 const validateProposalMock = jest.spyOn(governanceManager, 'validateProposal')
-                    .mockRejectedValue(new GlitchError('Proposal voting has ended', 2006));
+                    .mockRejectedValueOnce(new GlitchError('Proposal voting has ended', 2006));
             
                 const sendTransactionMock = jest.spyOn(connection, 'sendTransaction');
                 const simulateTransactionMock = jest.spyOn(connection, 'simulateTransaction');
+
+                // Ensure transaction methods are not called for inactive proposal
+                jest.spyOn(connection, 'getAccountInfo').mockImplementation(() => {
+                    throw new Error('Should not fetch account info for inactive proposal');
+                });
 
                 await expect(
                     governanceManager.castVote(
