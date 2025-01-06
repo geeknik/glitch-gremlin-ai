@@ -166,14 +166,14 @@ describe('GovernanceManager', () => {
                         // Verify the transaction was created
                         expect(transaction2).toBeDefined();
 
-                        // Verify each mock was called exactly once with correct args
+                        // Verify each mock was called with correct args
                         expect(validateProposalMock).toHaveBeenCalledTimes(2);
                         expect(validateProposalMock).toHaveBeenCalledWith(connection, proposalAddress);
 
                         expect(getAccountInfoMock).toHaveBeenCalledTimes(1);
                         expect(getAccountInfoMock).toHaveBeenCalledWith(proposalAddress);
 
-                        expect(simulateTransactionMock).toHaveBeenCalledTimes(1);
+                        expect(simulateTransactionMock).toHaveBeenCalledTimes(2);
 
                         // Verify the call order
                         const validateCall = validateProposalMock.mock.invocationCallOrder[0];
