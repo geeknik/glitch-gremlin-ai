@@ -75,6 +75,29 @@ const request = await sdk.createChaosRequest({
 - `duration`: Test duration in seconds
 - `intensity`: Scale of 1-10, affects how aggressive the testing is
 - `params`: Optional test-specific parameters
+- `mlEnabled`: Enable AI-driven vulnerability detection (default: true)
+- `mlConfidenceThreshold`: Minimum confidence score for ML predictions (default: 0.7)
+
+### ML Model Parameters
+The AI engine uses a neural network model to detect potential vulnerabilities:
+
+```typescript
+const request = await sdk.createChaosRequest({
+    targetProgram: "Your program ID",
+    testType: TestType.EXPLOIT,
+    duration: 300,
+    intensity: 7,
+    params: {
+        mlConfig: {
+            confidenceThreshold: 0.8,
+            featureExtraction: {
+                includeStaticAnalysis: true,
+                includeDynamicTraces: true
+            }
+        }
+    }
+});
+```
 
 ### Test-Specific Parameters
 Each test type accepts specific parameters to customize the testing behavior. See the examples above for type-specific parameters.
