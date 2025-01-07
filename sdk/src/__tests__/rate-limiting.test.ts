@@ -14,8 +14,8 @@ describe('Rate Limiting', () => {
             wallet
         });
 
-    let mockIncr: jest.Mock<Promise<number>, [string]>;
-    let mockExpire: jest.Mock<Promise<number>, [string, number]>;
+    let mockIncr: jest.Mock;
+    let mockExpire: jest.Mock;
 
     beforeEach(() => {
         const wallet = Keypair.generate();
@@ -25,8 +25,8 @@ describe('Rate Limiting', () => {
         });
 
         // Initialize mock functions with proper types
-        mockIncr = jest.fn<Promise<number>, [string]>().mockResolvedValue(1);
-        mockExpire = jest.fn<Promise<number>, [string, number]>().mockResolvedValue(1);
+        mockIncr = jest.fn().mockResolvedValue(1);
+        mockExpire = jest.fn().mockResolvedValue(1);
         
         // Assign mocks to redis methods
         // Type assertion needed since we're mocking internal Redis client
