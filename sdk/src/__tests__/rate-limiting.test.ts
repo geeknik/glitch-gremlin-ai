@@ -106,8 +106,8 @@ describe('Rate Limiting', () => {
             const mockExpire = jest.spyOn(sdk['queueWorker']['redis'], 'expire')
                 .mockImplementation(() => Promise.resolve(1));
 
-            // Create first proposal
-            await sdk.createProposal({
+            // First proposal should fail due to rate limit
+            await expect(sdk.createProposal({
                 title: "Test Proposal",
                 description: "Test Description",
                 targetProgram: "11111111111111111111111111111111",
@@ -118,7 +118,7 @@ describe('Rate Limiting', () => {
                     targetProgram: "11111111111111111111111111111111"
                 },
                 stakingAmount: 1000
-            });
+            })).rejects.toThrow('Rate limit exceeded');
 
             // Second proposal should fail due to rate limit
             await expect(sdk.createProposal({
