@@ -22,20 +22,19 @@ import { Keypair, Connection } from '@solana/web3.js';
 import { GlitchSDK, TestType } from '@glitch-gremlin/sdk';
 
 async function main() {
-    try {
-        // Add debug logging for environment
-        console.log('Node version:', process.version);
-        console.log('Platform:', process.platform);
-        console.log('Arch:', process.arch);
-        console.log(chalk.bold.blue('\n🚀 Starting Glitch Gremlin AI Demo\n'));
+    // Add debug logging for environment
+    console.log('Node version:', process.version);
+    console.log('Platform:', process.platform);
+    console.log('Arch:', process.arch);
+    console.log(chalk.bold.blue('\n🚀 Starting Glitch Gremlin AI Demo\n'));
 
-        // 1. Setup
-        console.log(chalk.cyan('1. Setting up environment...'));
-        const wallet = Keypair.generate();
-        const connection = new Connection('https://api.devnet.solana.com', {
-            commitment: 'confirmed',
-            disableRetryOnRateLimit: false
-        });
+    // 1. Setup
+    console.log(chalk.cyan('1. Setting up environment...'));
+    const wallet = Keypair.generate();
+    const connection = new Connection('https://api.devnet.solana.com', {
+        commitment: 'confirmed',
+        disableRetryOnRateLimit: false
+    });
         
         // Verify connection
         try {
