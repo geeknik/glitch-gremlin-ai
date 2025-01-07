@@ -1,3 +1,4 @@
+/** @type {import('ts-jest').JestConfigWithTsJest} */
 export default {
   preset: 'ts-jest',
   testEnvironment: 'node',
@@ -8,7 +9,9 @@ export default {
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
       useESM: true,
+      tsconfig: 'tsconfig.json'
     }]
   },
-  extensionsToTreatAsEsm: ['.ts']
+  extensionsToTreatAsEsm: ['.ts'],
+  setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts']
 };
