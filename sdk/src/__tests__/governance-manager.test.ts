@@ -86,37 +86,55 @@ describe('GovernanceManager', () => {
                         jest.resetAllMocks();
                         proposalAddress = new PublicKey(Keypair.generate().publicKey);
                         
-                        // Mock active proposal data with sufficient votes
-                        const mockProposalData = {
-                            title: "Test Proposal",
-                            description: "Test Description", 
-                            proposer: wallet.publicKey,
-                            startTime: Date.now() - 1000,
-                            endTime: Date.now() + 86400000,
-                            executionTime: Date.now() + 172800000,
-                            voteWeights: { yes: 150, no: 50, abstain: 0 },
-                            votes: [],
-                            quorum: 100, // Quorum already met
-                            executed: false,
-                            status: 'active'
-                        };
-
                         // Mock validateProposal first
                         validateProposalMock = jest.spyOn(governanceManager, 'validateProposal')
-                            .mockResolvedValue(mockProposalData);
+                            .mockImplementation(async () => {
+                                const mockProposalData = {
+                                    title: "Test Proposal",
+                                    description: "Test Description", 
+                                    proposer: wallet.publicKey,
+                                    startTime: Date.now() - 1000,
+                                    endTime: Date.now() + 86400000,
+                                    executionTime: Date.now() + 172800000,
+                                    voteWeights: { yes: 150, no: 50, abstain: 0 },
+                                    votes: [],
+                                    quorum: 100,
+                                    executed: false,
+                                    status: 'active'
+                                };
 
-                        // Create account info with the same data
-                        const mockAccountInfo = {
-                            data: Buffer.from(JSON.stringify(mockProposalData)),
-                            executable: false,
-                            lamports: 1000000,
-                            owner: governanceManager['programId'],
-                            rentEpoch: 0
-                        };
+                                // Get account info as part of validation
+                                const mockAccountInfo = {
+                                    data: Buffer.from(JSON.stringify(mockProposalData)),
+                                    executable: false,
+                                    lamports: 1000000,
+                                    owner: governanceManager['programId'],
+                                    rentEpoch: 0
+                                };
+                                await getAccountInfoMock(proposalAddress);
+                                
+                                return mockProposalData;
+                            });
 
                         // Mock getAccountInfo to return our data
                         getAccountInfoMock = jest.spyOn(connection, 'getAccountInfo')
-                            .mockResolvedValue(mockAccountInfo);
+                            .mockResolvedValue({
+                                data: Buffer.from(JSON.stringify({
+                                    title: "Test Proposal",
+                                    description: "Test Description",
+                                    proposer: wallet.publicKey,
+                                    startTime: Date.now() - 1000,
+                                    endTime: Date.now() + 86400000,
+                                    voteWeights: { yes: 150, no: 50, abstain: 0 },
+                                    votes: [],
+                                    quorum: 100,
+                                    executed: false
+                                })),
+                                executable: false,
+                                lamports: 1000000,
+                                owner: governanceManager['programId'],
+                                rentEpoch: 0
+                            });
 
                         // Mock transaction simulation
                         simulateTransactionMock = jest.spyOn(connection, 'simulateTransaction')
