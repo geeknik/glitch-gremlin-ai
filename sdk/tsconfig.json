@@ -7,7 +7,7 @@
     "rootDir": "./src",
     "module": "CommonJS",
     "target": "ES2019",
-    "moduleResolution": "bundler",
+    "moduleResolution": "NodeNext",
     "esModuleInterop": true,
     "strict": true,
     "forceConsistentCasingInFileNames": true,
