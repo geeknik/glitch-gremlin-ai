@@ -15,8 +15,8 @@ describe('Rate Limiting', () => {
         });
 
         // Initialize mock functions with proper types
-        mockIncr = jest.fn().mockResolvedValue<number>(1);
-        mockExpire = jest.fn().mockResolvedValue<number>(1);
+        mockIncr = jest.fn().mockResolvedValue(1);
+        mockExpire = jest.fn().mockResolvedValue(1);
         
         // Assign mocks to redis methods
         // Type assertion needed since we're mocking internal Redis client
