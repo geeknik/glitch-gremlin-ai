@@ -14,10 +14,10 @@ describe('Rate Limiting', () => {
             wallet
         });
 
-        mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr') as jest.Mock;
-        mockIncr.mockResolvedValue(1 as any);
-        mockExpire = jest.spyOn(sdk['queueWorker']['redis'], 'expire') as jest.Mock;
-        mockExpire.mockResolvedValue(1 as any);
+        mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr') as jest.SpyInstance<Promise<number>>;
+        mockIncr.mockResolvedValue(1);
+        mockExpire = jest.spyOn(sdk['queueWorker']['redis'], 'expire') as jest.SpyInstance<Promise<number>>;
+        mockExpire.mockResolvedValue(1);
         
         jest.useFakeTimers();
     });
@@ -77,7 +77,7 @@ describe('Rate Limiting', () => {
 
         it('should enforce maximum requests per minute', async () => {
             // Mock incr to simulate hitting limit
-            mockIncr.mockResolvedValue(4 as any);
+            mockIncr.mockResolvedValue(4);
 
             // First request should succeed
             await sdk.createChaosRequest({
