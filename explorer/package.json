@@ -3,15 +3,20 @@
   "version": "1.0.0",
   "description": "Blockchain explorer for Glitch Gremlin AI",
   "scripts": {
-    "start": "serve -s .",
-    "build": "echo 'Build process would go here'",
-    "test": "echo 'Tests would go here'"
+    "start": "vite",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest"
   },
   "dependencies": {
     "chart.js": "^3.7.0",
-    "tailwindcss": "^2.2.19"
+    "tailwindcss": "^2.2.19",
+    "vue": "^3.3.0"
   },
   "devDependencies": {
-    "serve": "^13.0.2"
+    "@vitejs/plugin-vue": "^4.5.0",
+    "vite": "^5.0.0",
+    "vitest": "^1.0.0"
   }
 }
