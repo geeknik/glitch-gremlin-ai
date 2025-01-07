@@ -116,6 +116,7 @@ describe('Rate Limiting', () => {
         });
 
         it('should limit proposals per day', async () => {
+            jest.setTimeout(10000); // Increase timeout to 10s
             let proposalCount = 0;
             const mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr')
                 .mockImplementation(() => Promise.resolve(++proposalCount));

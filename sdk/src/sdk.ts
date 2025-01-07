@@ -137,12 +137,21 @@ export class GlitchSDK {
             throw new GlitchError('Duration must be between 60 and 3600 seconds', 1006);
         }
 
+        // Check rate limits using Redis
         const now = Date.now();
-        const timeSinceLastRequest = now - this.lastRequestTime;
-        if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
-            throw new GlitchError('Rate limit exceeded', 1007);
+        const requestKey = `request:${this.wallet.publicKey.toString()}`;
+        
+        // Check cooldown
+        const lastRequest = await this.queueWorker['redis'].get(requestKey);
+        if (lastRequest) {
+            const timeSinceLastRequest = now - parseInt(lastRequest);
+            if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
+                throw new GlitchError('Rate limit exceeded', 1007);
+            }
         }
-        this.lastRequestTime = now;
+        
+        // Update last request time
+        await this.queueWorker['redis'].set(requestKey, now.toString());
 
         // Create the chaos request instruction
         const instruction = new TransactionInstruction({
