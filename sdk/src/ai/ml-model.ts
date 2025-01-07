@@ -147,3 +147,63 @@ export class VulnerabilityDetectionModel {
         }
     }
 }
+import * as tf from '@tensorflow/tfjs-node';
+import { VulnerabilityType } from '../types';
+
+export class VulnerabilityDetectionModel {
+    private model: tf.LayersModel;
+
+    constructor() {
+        this.model = this.buildModel();
+    }
+
+    private buildModel(): tf.LayersModel {
+        const model = tf.sequential();
+        
+        model.add(tf.layers.dense({
+            units: 128,
+            activation: 'relu',
+            inputShape: [20]
+        }));
+        
+        model.add(tf.layers.dropout({ rate: 0.2 }));
+        
+        model.add(tf.layers.dense({
+            units: 32,
+            activation: 'relu'
+        }));
+        
+        model.add(tf.layers.dense({
+            units: Object.keys(VulnerabilityType).length,
+            activation: 'softmax'
+        }));
+
+        model.compile({
+            optimizer: tf.train.adam(),
+            loss: 'categoricalCrossentropy',
+            metrics: ['accuracy']
+        });
+
+        return model;
+    }
+
+    async predict(features: number[]): Promise<{
+        type: VulnerabilityType;
+        confidence: number;
+    }> {
+        const input = tf.tensor2d([features]);
+        const prediction = this.model.predict(input) as tf.Tensor;
+        const probabilities = await prediction.array() as number[][];
+        
+        input.dispose();
+        prediction.dispose();
+
+        const maxIndex = probabilities[0].indexOf(Math.max(...probabilities[0]));
+        const vulnerabilityTypes = Object.values(VulnerabilityType);
+
+        return {
+            type: vulnerabilityTypes[maxIndex],
+            confidence: probabilities[0][maxIndex]
+        };
+    }
+}
