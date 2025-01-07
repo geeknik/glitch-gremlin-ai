@@ -1,4 +1,4 @@
-import IORedis from 'ioredis';
+import Redis from 'ioredis';
 import type { Redis as RedisType } from 'ioredis';
 import type { ChaosRequestParams, ChaosResult } from '../types.js';
 

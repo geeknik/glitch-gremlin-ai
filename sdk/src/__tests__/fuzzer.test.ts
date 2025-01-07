@@ -5,7 +5,7 @@ import { PublicKey } from '@solana/web3.js';
 describe('Fuzzer', () => {
     let fuzzer: Fuzzer;
 
-    beforeEach(() => {
+    beforeEach(async () => {
         fuzzer = new Fuzzer(100); // Use smaller iteration count for tests
     });
 
