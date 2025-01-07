@@ -37,9 +37,13 @@ describe('Rate Limiting', () => {
         });
 
         it('should enforce cooldown between requests', async () => {
-            // Mock Redis methods
+            let requestCount = 0;
+            const mockGet = jest.spyOn(sdk['queueWorker']['redis'], 'get')
+                .mockImplementation(() => Promise.resolve(null));
+            const mockSet = jest.spyOn(sdk['queueWorker']['redis'], 'set')
+                .mockImplementation(() => Promise.resolve('OK'));
             const mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr')
-                .mockImplementation(() => Promise.resolve(1));
+                .mockImplementation(() => Promise.resolve(++requestCount));
             const mockExpire = jest.spyOn(sdk['queueWorker']['redis'], 'expire')
                 .mockImplementation(() => Promise.resolve(1));
 
@@ -52,6 +56,8 @@ describe('Rate Limiting', () => {
             });
 
             // Immediate second request should fail due to cooldown
+            mockGet.mockImplementation(() => Promise.resolve(Date.now().toString()));
+            
             await expect(sdk.createChaosRequest({
                 targetProgram: "11111111111111111111111111111111",
                 testType: TestType.FUZZ,
@@ -61,7 +67,7 @@ describe('Rate Limiting', () => {
 
             // After cooldown period, request should succeed
             jest.advanceTimersByTime(2000);
-            mockIncr.mockImplementation(() => Promise.resolve(2));
+            mockGet.mockImplementation(() => Promise.resolve((Date.now() - 2500).toString()));
 
             await sdk.createChaosRequest({
                 targetProgram: "11111111111111111111111111111111",
@@ -70,8 +76,8 @@ describe('Rate Limiting', () => {
                 intensity: 1
             });
 
-            expect(mockIncr).toHaveBeenCalledTimes(3);
-            expect(mockExpire).toHaveBeenCalledTimes(3);
+            expect(mockIncr).toHaveBeenCalledTimes(2);
+            expect(mockExpire).toHaveBeenCalledTimes(2);
         });
 
         it('should enforce maximum requests per minute', async () => {
