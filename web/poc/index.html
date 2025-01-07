@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>Glitch Gremlin AI POC</title>
+    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.js"></script>
     <script src="dist/index.js"></script>
     <style>
         body {
@@ -19,6 +20,16 @@
             padding: 10px;
             background: #f0f0f0;
             border-radius: 5px;
+            margin: 10px 0;
+        }
+        .wallet-info {
+            margin-bottom: 20px;
+        }
+        .wallet-info span {
+            font-weight: bold;
+        }
+        .token-balance {
+            color: #4CAF50;
         }
     </style>
 </head>
@@ -26,6 +37,12 @@
     <div class="container">
         <h1>Glitch Gremlin AI Proof of Concept</h1>
         
+        <div class="wallet-info">
+            <button id="connectButton">Connect Wallet</button>
+            <div id="walletStatus">Status: Not connected</div>
+            <div>Token Balance: <span id="tokenBalance" class="token-balance">0 GLITCH</span></div>
+        </div>
+
         <div class="form-group">
             <label>Target Program Address:</label>
             <input id="programAddress" type="text" placeholder="Enter program address">
@@ -50,18 +67,64 @@
             <input id="intensity" type="number" placeholder="5">
         </div>
 
-        <button id="submitButton">Submit Chaos Request</button>
+        <button id="submitButton" disabled>Submit Chaos Request</button>
 
         <div class="status" id="status">
-            Status: Ready
+            Status: Connect wallet to begin
         </div>
     </div>
 
     <script>
-        const sdk = new GlitchSDK({
-            cluster: 'https://api.devnet.solana.com',
-            wallet: Keypair.generate()
-        });
+        const GLITCH_TOKEN_MINT = new solanaWeb3.PublicKey("GremLinXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
+        let sdk;
+        let wallet;
+
+        async function connectWallet() {
+            if (!window.solana || !window.solana.isPhantom) {
+                document.getElementById('status').innerText = 'Status: Phantom wallet not detected';
+                return;
+            }
+
+            try {
+                const resp = await window.solana.connect();
+                wallet = resp.publicKey.toString();
+                document.getElementById('walletStatus').innerText = `Status: Connected (${wallet.slice(0,4)}...${wallet.slice(-4)})`;
+                document.getElementById('connectButton').disabled = true;
+                document.getElementById('submitButton').disabled = false;
+                
+                // Initialize SDK with connected wallet
+                sdk = new GlitchSDK({
+                    cluster: 'https://api.devnet.solana.com',
+                    wallet: window.solana
+                });
+
+                // Check token balance
+                await updateTokenBalance();
+            } catch (error) {
+                document.getElementById('status').innerText = `Status: Error - ${error.message}`;
+            }
+        }
+
+        async function updateTokenBalance() {
+            try {
+                const connection = new solanaWeb3.Connection('https://api.devnet.solana.com');
+                const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
+                    new solanaWeb3.PublicKey(wallet),
+                    { mint: GLITCH_TOKEN_MINT }
+                );
+
+                if (tokenAccounts.value.length > 0) {
+                    const balance = tokenAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmount;
+                    document.getElementById('tokenBalance').innerText = `${balance} GLITCH`;
+                } else {
+                    document.getElementById('tokenBalance').innerText = '0 GLITCH';
+                }
+            } catch (error) {
+                console.error('Error fetching token balance:', error);
+            }
+        }
+
+        document.getElementById('connectButton').onclick = connectWallet;
 
         document.getElementById('submitButton').onclick = async () => {
             const programAddress = document.getElementById('programAddress').value;
@@ -79,6 +142,7 @@
                     intensity: intensity
                 });
                 document.getElementById('status').innerText = 'Status: Request submitted successfully!';
+                await updateTokenBalance();
             } catch (error) {
                 document.getElementById('status').innerText = `Status: Error - ${error.message}`;
             }
