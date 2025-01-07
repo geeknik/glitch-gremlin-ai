@@ -40,12 +40,13 @@ async fn run_load_test(
     let results = await_all(tasks).await?;
 
     // Analyze results
-    let success_rate = results.iter().filter(|r| r.success).count() / results.len();
+    let success_count = results.iter().filter(|r| r.success).count();
+    let total_count = results.len();
     
     Ok(ChaosTestResult {
-        status: if success_rate == 1.0 {
+        status: if success_count == total_count {
             TestStatus::Completed
-        } else if success_rate == 0.0 {
+        } else if success_count == 0 {
             TestStatus::Failed
         } else {
             TestStatus::PartialCompletion
@@ -59,7 +60,7 @@ async fn spawn_concurrent_task(
     task_id: u8,
 ) -> Result<ConcurrencyResult, Box<dyn Error>> {
     // Simulate concurrent operation
-    let result = test_env.execute_concurrent_op(task_id).await?;
+    let result = test_env.execute_task(task_id).await?;
     Ok(ConcurrencyResult {
         success: result.is_success(),
         latency: result.latency(),
@@ -71,6 +72,7 @@ use std::future::Future;
 
 async fn await_all(
     tasks: Vec<Future<Result<ConcurrencyResult, Box<dyn Error>>>,
+    _: &TestEnvironment
 ) -> Result<Vec<ConcurrencyResult>, Box<dyn Error>> {
     // Wait for all tasks to complete
     let mut results = Vec::new();
@@ -108,5 +110,8 @@ fn parse_chaos_params(_params: &str) -> Result<ChaosParams, Box<dyn Error>> {
         test_type: TestType::LoadTest,
         duration: 60,
         intensity: 5,
+        concurrency_level: 3,
+        max_latency: 1000,
+        error_threshold: 2
     })
 }
