@@ -22,6 +22,12 @@ describe('Rate Limiting', () => {
 
     describe('request rate limiting', () => {
         it('should enforce cooldown between requests', async () => {
+            // Mock Redis to track request counts
+            const mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr')
+                .mockResolvedValue(1);
+            const mockExpire = jest.spyOn(sdk['queueWorker']['redis'], 'expire')
+                .mockResolvedValue(1);
+
             // First request should succeed
             await sdk.createChaosRequest({
                 targetProgram: "11111111111111111111111111111111",
@@ -30,13 +36,13 @@ describe('Rate Limiting', () => {
                 intensity: 1
             });
 
-            // Immediate second request should fail
+            // Immediate second request should fail due to cooldown
             await expect(sdk.createChaosRequest({
                 targetProgram: "11111111111111111111111111111111",
                 testType: TestType.FUZZ,
                 duration: 60,
                 intensity: 1
-            })).rejects.toThrow(GlitchError);
+            })).rejects.toThrow('Rate limit exceeded');
 
             // After cooldown period, request should succeed
             jest.advanceTimersByTime(2000);
@@ -47,6 +53,9 @@ describe('Rate Limiting', () => {
                 duration: 60,
                 intensity: 1
             });
+
+            expect(mockIncr).toHaveBeenCalled();
+            expect(mockExpire).toHaveBeenCalled();
         });
 
         it('should enforce maximum requests per minute', async () => {
@@ -70,10 +79,11 @@ describe('Rate Limiting', () => {
     });
 
     describe('governance rate limiting', () => {
-        // Increase timeout for governance tests
-        // Increase timeout for this specific test
-        it('should limit proposals per day', async () => {
+        beforeAll(() => {
             jest.setTimeout(60000); // 60 second timeout
+        });
+
+        it('should limit proposals per day', async () => {
             // Create first proposal
             await sdk.createProposal({
                 title: "Test Proposal",
