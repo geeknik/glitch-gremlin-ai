@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
 dotenv.config();
 
 // Global unhandled rejection handler
@@ -30,7 +31,21 @@ async function main() {
 
     // 1. Setup
     console.log(chalk.cyan('1. Setting up environment...'));
-    const wallet = Keypair.generate();
+    // Use persistent demo wallet if it exists, otherwise create it
+    const walletPath = './demo-wallet.json';
+    let wallet: Keypair;
+    
+    if (existsSync(walletPath)) {
+      const keypair = JSON.parse(readFileSync(walletPath, 'utf-8'));
+      wallet = Keypair.fromSecretKey(Uint8Array.from(keypair));
+      console.log(chalk.green('✅ Using existing demo wallet'));
+    } else {
+      wallet = Keypair.generate();
+      writeFileSync(walletPath, JSON.stringify(Array.from(wallet.secretKey)));
+      console.log(chalk.green('✅ Created new demo wallet'));
+    }
+    
+    console.log(chalk.gray('Wallet address:', wallet.publicKey.toString()));
     const connection = new Connection('https://devnet.helius-rpc.com/?api-key=17682982-5929-468d-89cf-a6965d9803cb', {
         commitment: 'confirmed',
         disableRetryOnRateLimit: false
