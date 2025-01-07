@@ -111,7 +111,9 @@ describe('GovernanceManager', () => {
                                     owner: governanceManager['programId'],
                                     rentEpoch: 0
                                 };
-                                await getAccountInfoMock(proposalAddress);
+                                
+                                // Call the mock through connection.getAccountInfo
+                                await connection.getAccountInfo(proposalAddress);
                                 
                                 return mockProposalData;
                             });
