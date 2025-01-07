@@ -27,6 +27,15 @@
 - Max requests per user: 10/min
 - Max tokens escrowed: 1M GLITCH
 - Minimum request duration: 60s
+- Max concurrent tasks: 100
+- Min task latency: 1ms
+- Max task duration: 5min
+
+### 5.2 Monitoring
+- Request success rate tracking
+- Latency percentile monitoring
+- Error rate thresholds
+- Anomaly detection alerts
 
 ### 5.2 Access Control
 - ChaosRequest creation: Any user

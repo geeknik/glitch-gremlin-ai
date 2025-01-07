@@ -3,10 +3,12 @@
 ## 1. Chaos Request Tests
 
 ### 1.1 Valid Requests
-- Minimum token amount request
-- Maximum token amount request
-- Typical request with all parameters
-- Request with optional fields omitted
+- Minimum token amount request (1 token)
+- Maximum token amount request (1M tokens)
+- Typical request with all parameters (100 tokens, 5 min duration)
+- Request with optional fields omitted (no result_ref)
+- Request with maximum concurrency (100 concurrent tasks)
+- Request with minimum latency (1ms target)
 
 ### 1.2 Invalid Requests
 - Insufficient token balance
