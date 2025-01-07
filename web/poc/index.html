@@ -115,9 +115,9 @@
 
                 if (tokenAccounts.value.length > 0) {
                     const balance = tokenAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmount;
-                    document.getElementById('tokenBalance').innerText = `${balance} GLITCH`;
+                    document.getElementById('tokenBalance').innerText = `${balance} $GREMLINAI`;
                 } else {
-                    document.getElementById('tokenBalance').innerText = '0 GLITCH';
+                    document.getElementById('tokenBalance').innerText = '0 $GREMLINAI';
                 }
             } catch (error) {
                 console.error('Error fetching token balance:', error);
