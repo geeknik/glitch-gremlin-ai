@@ -2,11 +2,11 @@ import Redis, { Redis as RedisType } from 'ioredis';
 import type { ChaosRequestParams, ChaosResult } from '../types.js';
 
 export class RedisQueueWorker {
-    private redis: Redis; 
+    private redis: RedisType; 
     private readonly queueKey = 'glitch:chaos:queue';
     private readonly resultKey = 'glitch:chaos:results';
 
-    constructor(redisClient?: Redis) {
+    constructor(redisClient?: RedisType) {
         this.redis = redisClient || new Redis({
             host: 'r.glitchgremlin.ai',
             port: 6379,
