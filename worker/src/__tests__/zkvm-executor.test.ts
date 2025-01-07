@@ -1,6 +1,6 @@
 import { ZkVMExecutor } from '../zkvm/executor';
 import { spawn } from 'child_process';
-import { Logger } from '../utils/logger';
+import { Logger } from '../../utils/logger';
 
 jest.mock('child_process');
 jest.mock('../utils/logger');
