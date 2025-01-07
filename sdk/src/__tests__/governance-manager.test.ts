@@ -138,21 +138,17 @@ describe('GovernanceManager', () => {
                                 rentEpoch: 0
                             });
 
-                        // Mock transaction simulation with proper async behavior
+                        // Mock transaction simulation
                         simulateTransactionMock = jest.spyOn(connection, 'simulateTransaction')
-                            .mockImplementation(async () => {
-                                // Add small delay to simulate network call
-                                await new Promise(resolve => setTimeout(resolve, 10));
-                                return {
-                                    context: { slot: 0 },
-                                    value: { 
-                                        err: null, 
-                                        logs: ['Program log: Vote recorded'], 
-                                        accounts: null, 
-                                        unitsConsumed: 0, 
-                                        returnData: null 
-                                    }
-                                };
+                            .mockResolvedValue({
+                                context: { slot: 0 },
+                                value: { 
+                                    err: null, 
+                                    logs: ['Program log: Vote recorded'], 
+                                    accounts: null, 
+                                    unitsConsumed: 0, 
+                                    returnData: null 
+                                }
                             });
 
                         // Mock transaction sending with proper async behavior
