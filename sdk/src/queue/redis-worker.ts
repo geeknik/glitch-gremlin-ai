@@ -7,7 +7,7 @@ export class RedisQueueWorker {
     private readonly queueKey = 'glitch:chaos:queue';
     private readonly resultKey = 'glitch:chaos:results';
 
-    constructor(redisClient?: Redis) {
+    constructor(redisClient?: RedisType) {
         this.redis = redisClient || new Redis({
             host: 'r.glitchgremlin.ai',
             port: 6379,

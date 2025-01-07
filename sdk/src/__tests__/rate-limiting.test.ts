@@ -7,7 +7,7 @@ describe('Rate Limiting', () => {
     let mockIncr: jest.Mock;
     let mockExpire: jest.Mock;
     
-    beforeEach(() => {
+    beforeEach(async () => {
         const wallet = Keypair.generate();
         sdk = await GlitchSDK.init({
             cluster: 'https://api.devnet.solana.com',

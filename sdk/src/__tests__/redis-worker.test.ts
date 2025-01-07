@@ -5,7 +5,7 @@ import type { Redis as RedisType } from 'ioredis';
 
 describe('RedisQueueWorker', () => {
     let worker: RedisQueueWorker;
-    let redis: IORedis;
+    let redis: RedisType;
 
     beforeEach(() => {
         redis = new Redis({
