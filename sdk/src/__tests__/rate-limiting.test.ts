@@ -101,9 +101,8 @@ describe('Rate Limiting', () => {
             expect(mockIncr).toHaveBeenCalledTimes(2);
             expect(mockExpire).toHaveBeenCalledTimes(2);
         });
-    });
 
-    describe('governance rate limiting', () => {
+        describe('governance rate limiting', () => {
         it('should limit proposals per day', async () => {
             let proposalCount = 0;
             mockIncr.mockImplementation(() => Promise.resolve(++proposalCount));
