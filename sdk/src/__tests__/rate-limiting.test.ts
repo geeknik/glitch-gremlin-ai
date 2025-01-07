@@ -14,12 +14,13 @@ describe('Rate Limiting', () => {
             wallet
         });
 
-        mockIncr = jest.fn<Promise<number>, [string]>().mockResolvedValue(1);
-        mockExpire = jest.fn<Promise<number>, [string, number]>().mockResolvedValue(1);
+        // Create properly typed mock functions
+        const mockIncr = jest.fn().mockResolvedValue(1);
+        const mockExpire = jest.fn().mockResolvedValue(1);
         
-        // Assign mocks directly to redis methods
-        sdk['queueWorker']['redis'].incr = mockIncr;
-        sdk['queueWorker']['redis'].expire = mockExpire;
+        // Type assertion for the redis client methods
+        sdk['queueWorker']['redis'].incr = mockIncr as unknown as (key: string) => Promise<number>;
+        sdk['queueWorker']['redis'].expire = mockExpire as unknown as (key: string, seconds: number) => Promise<number>;
         
         jest.useFakeTimers();
     });
