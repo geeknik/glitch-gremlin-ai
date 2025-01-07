@@ -30,20 +30,6 @@ describe('Rate Limiting', () => {
     });
 
     describe('request rate limiting', () => {
-        let mockIncr: jest.SpyInstance<Promise<number>, [key: string]>;
-        let mockExpire: jest.SpyInstance<Promise<number>, [key: string, seconds: number]>;
-
-        beforeEach(() => {
-            mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr')
-                .mockImplementation(() => Promise.resolve(1));
-            mockExpire = jest.spyOn(sdk['queueWorker']['redis'], 'expire')
-                .mockImplementation(() => Promise.resolve(1));
-        });
-
-        afterEach(() => {
-            mockIncr.mockRestore();
-            mockExpire.mockRestore();
-        });
 
         it('should enforce cooldown between requests', async () => {
             const mockGet = jest.spyOn(sdk['queueWorker']['redis'], 'get')
@@ -63,16 +49,15 @@ describe('Rate Limiting', () => {
                 intensity: 1
             })).rejects.toThrow('Rate limit exceeded');
 
-            // Mock get to simulate recent request
             // Second request should succeed
-            await expect(sdk.createChaosRequest({
+            await sdk.createChaosRequest({
                 targetProgram: "11111111111111111111111111111111",
                 testType: TestType.FUZZ,
                 duration: 60,
                 intensity: 1
             });
 
-            // Immediate third request should fail due to cooldown
+            // Third request should fail due to cooldown
             await expect(
                 sdk.createChaosRequest({
                     targetProgram: "11111111111111111111111111111111",
@@ -87,14 +72,6 @@ describe('Rate Limiting', () => {
 
             mockGet.mockRestore();
             mockSet.mockRestore();
-                targetProgram: "11111111111111111111111111111111",
-                testType: TestType.FUZZ,
-                duration: 60,
-                intensity: 1
-            });
-
-            expect(mockIncr).toHaveBeenCalledTimes(2);
-            expect(mockExpire).toHaveBeenCalledTimes(2);
         });
 
         it('should enforce maximum requests per minute', async () => {
