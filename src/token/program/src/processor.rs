@@ -55,7 +55,7 @@ impl Processor {
         Ok(())
     }
     pub fn process(
-        _program_id: &Pubkey,
+        program_id: &Pubkey,
         accounts: &[AccountInfo],
         instruction_data: &[u8],
     ) -> ProgramResult {
@@ -259,6 +259,11 @@ impl Processor {
             amount,
             params,
             *escrow_account.key,
+            RateLimitInfo {
+                last_request: 0,
+                request_count: 0,
+                window_start: 0,
+            },
         );
         chaos_request.serialize(&mut *chaos_request_info.data.borrow_mut())?;
 
