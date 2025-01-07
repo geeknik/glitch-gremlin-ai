@@ -46,7 +46,13 @@ async function main() {
     }
     
     console.log(chalk.gray('Wallet address:', wallet.publicKey.toString()));
-    const connection = new Connection('https://mainnet.helius-rpc.com/?api-key=', {
+    // Verify Helius API key is set
+    const heliusApiKey = process.env.HELIUS_API_KEY;
+    if (!heliusApiKey) {
+        throw new Error('HELIUS_API_KEY environment variable not set');
+    }
+
+    const connection = new Connection(`https://mainnet.helius-rpc.com/?api-key=${heliusApiKey}`, {
         commitment: 'confirmed',
         disableRetryOnRateLimit: false,
         httpHeaders: {
@@ -84,7 +90,7 @@ async function main() {
             console.log('Initializing SDK with Redis config:', redisConfig);
             
             const sdk = await GlitchSDK.init({
-                cluster: 'https://mainnet.helius-rpc.com/?api-key=',
+                cluster: `https://mainnet.helius-rpc.com/?api-key=${heliusApiKey}`,
                 wallet,
                 redisConfig
             });
@@ -145,7 +151,7 @@ async function main() {
                             ]
                         })));
                         // Use Helius API for airdrop
-                        const airdropResponse = await fetch('https://mainnet.helius-rpc.com/?api-key=', {
+                        const airdropResponse = await fetch(`https://mainnet.helius-rpc.com/?api-key=${heliusApiKey}`, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json'
@@ -251,17 +257,26 @@ async function main() {
                 console.log(chalk.yellow('⚠️ Insufficient balance for governance proposal. Need at least 0.05 SOL.'));
             } else {
                 try {
+                    // Create governance proposal with detailed parameters
                     const proposal = await sdk.createProposal({
-                        title: "Test Proposal",
-                        description: "Test Description",
+                        title: "Community Chaos Campaign",
+                        description: "Stress test the token program with fuzz testing",
                         targetProgram,
                         testParams: {
                             testType: TestType.FUZZ,
                             duration: 300,
                             intensity: 5,
-                            targetProgram
+                            targetProgram,
+                            params: {
+                                fuzz: {
+                                    instructionTypes: ['transfer', 'mint', 'burn'],
+                                    seedRange: [0, 10000],
+                                    maxAccountSize: 1024
+                                }
+                            }
                         },
-                        stakingAmount: Math.min(50_000_000, balance) // Use up to 0.05 SOL or available balance
+                        stakingAmount: Math.min(50_000_000, balance), // Use up to 0.05 SOL or available balance
+                        votingPeriod: 259200 // 3 days
                     });
                     console.log(chalk.green(`✅ Proposal created! ID: ${proposal.id}`));
                 } catch (err) {
