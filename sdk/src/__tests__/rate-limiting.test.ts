@@ -56,19 +56,16 @@ describe('Rate Limiting', () => {
                 .mockImplementation(() => Promise.resolve(1));
 
             // First request should succeed
-            await sdk.createChaosRequest({
+            await expect(sdk.createChaosRequest({
                 targetProgram: "11111111111111111111111111111111",
                 testType: TestType.FUZZ,
                 duration: 60,
                 intensity: 1
             })).rejects.toThrow('Rate limit exceeded');
-            });
 
             // Mock get to simulate recent request
-            mockGet.mockResolvedValue(Date.now().toString());
-
             // Second request should succeed
-            await sdk.createChaosRequest({
+            await expect(sdk.createChaosRequest({
                 targetProgram: "11111111111111111111111111111111",
                 testType: TestType.FUZZ,
                 duration: 60,
