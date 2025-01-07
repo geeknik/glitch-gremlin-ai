@@ -6,21 +6,19 @@ describe('VulnerabilityDetectionModel', () => {
     let model: VulnerabilityDetectionModel;
 
     beforeEach(async () => {
-        await tf.ready();
         model = new VulnerabilityDetectionModel();
+        await model.ensureInitialized();
     });
 
     afterEach(async () => {
-        // Cleanup TensorFlow backend
-        tf.dispose();
-        await tf.setBackend('cpu');
+        await model.cleanup();
     });
 
     describe('training', () => {
         it('should train on sample data', async () => {
             const sampleData = [
                 {
-                    features: [1, 2, 3, 4, 5, 1, 2, 3, 4, 5],
+                    features: new Array(20).fill(0).map((_, i) => i % 10),
                     vulnerabilityType: VulnerabilityType.Reentrancy
                 },
                 {
@@ -35,7 +33,7 @@ describe('VulnerabilityDetectionModel', () => {
 
     describe('prediction', () => {
         it('should make predictions with confidence scores', async () => {
-            const features = [1, 2, 3, 4, 5, 1, 2, 3, 4, 5];
+            const features = new Array(20).fill(0).map((_, i) => i % 10);
             const prediction = await model.predict(features);
 
             expect(prediction).toHaveProperty('type');

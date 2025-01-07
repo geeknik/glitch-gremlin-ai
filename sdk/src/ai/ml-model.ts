@@ -9,10 +9,9 @@ export class VulnerabilityDetectionModel {
     
     constructor() {
         this.model = this.buildModel();
-        this.initializeModel();
     }
 
-    private async initializeModel() {
+    public async ensureInitialized() {
         if (!this.initialized) {
             await tf.ready();
             await tf.setBackend('cpu');
@@ -21,10 +20,9 @@ export class VulnerabilityDetectionModel {
         }
     }
 
-    private async ensureInitialized() {
-        if (!this.initialized) {
-            await this.initializeModel();
-        }
+    public async cleanup() {
+        tf.dispose();
+        this.initialized = false;
     }
 
     private buildModel(): tf.LayersModel {
