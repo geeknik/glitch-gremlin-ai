@@ -1,1 +1,4 @@
-// Jest is already globally available in test files
+import { jest } from '@jest/globals';
+
+// Make jest available globally
+global.jest = jest;
