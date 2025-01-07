@@ -65,12 +65,6 @@ async function main() {
 
             console.log('Initializing SDK with Redis config:', redisConfig);
             
-            // Add Redis error handler
-            sdk['queueWorker']['redis'].on('error', (err: Error) => {
-                console.error('Redis connection error:', err);
-                process.exit(1);
-            });
-            
             const sdk = await GlitchSDK.init({
                 cluster: 'devnet',
                 wallet,
@@ -80,6 +74,12 @@ async function main() {
             if (!sdk) {
                 throw new Error('Failed to initialize SDK');
             }
+            
+            // Add Redis error handler
+            sdk['queueWorker']['redis'].on('error', (err: Error) => {
+                console.error('Redis connection error:', err);
+                process.exit(1);
+            });
             
             // Verify Redis connection
             try {
