@@ -166,13 +166,14 @@ describe('GovernanceManager', () => {
                     });
 
                     it('should create valid vote transaction', async () => {
-                        // Call castVote twice and store results
+                        // Call castVote and await simulation
                         const tx1 = await governanceManager.castVote(
                             connection,
                             wallet,
                             proposalAddress,
                             true
                         );
+                        await connection.simulateTransaction(tx1);
                         
                         const tx2 = await governanceManager.castVote(
                             connection,
@@ -180,10 +181,10 @@ describe('GovernanceManager', () => {
                             proposalAddress,
                             true
                         );
+                        await connection.simulateTransaction(tx2);
 
-                        // Verify transactions were created
-                        expect(tx1).toBeDefined();
-                        expect(tx2).toBeDefined();
+                        // Verify transactions were simulated
+                        expect(simulateTransactionMock).toHaveBeenCalledTimes(2);
 
                         // Verify each mock was called with correct args
                         expect(validateProposalMock).toHaveBeenCalledTimes(2);
