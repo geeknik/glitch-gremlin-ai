@@ -7,10 +7,23 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.js"></script>
+    <script src="https://unpkg.com/@solana/wallet-adapter-wallets@latest/lib/index.iife.js"></script>
+    <script src="https://unpkg.com/@solana/wallet-adapter-base@latest/lib/index.iife.js"></script>
 </head>
 <body class="bg-gray-900 text-gray-100">
     <div class="container mx-auto px-4 py-8">
-        <header class="mb-8 text-center">
+        <header class="mb-8 text-center relative">
+            <!-- Wallet Connection Button -->
+            <div class="absolute top-0 right-0 mt-4 mr-4">
+                <button id="connectWallet" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded">
+                    Connect Wallet
+                </button>
+                <div id="walletInfo" class="hidden mt-2 p-2 bg-gray-800 rounded">
+                    <p class="text-sm">Connected: <span id="walletAddress"></span></p>
+                    <p class="text-sm">Balance: <span id="walletBalance"></span> $GREMLINAI</p>
+                </div>
+            </div>
             <h1 class="text-4xl font-bold mb-2">👹 Glitch Gremlin AI</h1>
             <p class="text-gray-400 text-xl">Embrace The Chaos!</p>
             <p class="mt-4 text-gray-500">The AI Chaos Agent for Solana</p>
@@ -20,6 +33,37 @@
                 Follow us on X
             </a>
         </header>
+
+        <!-- Governance Section -->
+        <section class="mt-8">
+            <h2 class="text-2xl font-semibold mb-4">Governance</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- Active Proposals -->
+                <div class="bg-gray-800/50 p-6 rounded-lg backdrop-blur-sm border border-gray-700/50">
+                    <h3 class="text-xl font-semibold mb-4">Active Proposals</h3>
+                    <div id="activeProposals" class="space-y-4">
+                        <!-- Proposals will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Voting Power -->
+                <div class="bg-gray-800/50 p-6 rounded-lg backdrop-blur-sm border border-gray-700/50">
+                    <h3 class="text-xl font-semibold mb-4">Your Voting Power</h3>
+                    <div class="space-y-4">
+                        <p>Staked: <span id="stakedAmount">0</span> $GREMLINAI</p>
+                        <p>Voting Power: <span id="votingPower">0</span></p>
+                        <div class="flex space-x-4">
+                            <button id="stakeTokens" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+                                Stake Tokens
+                            </button>
+                            <button id="unstakeTokens" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+                                Unstake Tokens
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
             <!-- Search Section -->
@@ -102,6 +146,170 @@
     </div>
 
     <script>
+        // Initialize wallet adapter
+        const wallets = [
+            new SolanaWalletAdapterWallets.PhantomWalletAdapter(),
+            new SolanaWalletAdapterWallets.SolflareWalletAdapter(),
+            new SolanaWalletAdapterWallets.GlowWalletAdapter()
+        ];
+
+        let wallet = null;
+        let connection = null;
+        let publicKey = null;
+
+        // Connect Wallet
+        document.getElementById('connectWallet').addEventListener('click', async () => {
+            try {
+                if (!wallet) {
+                    wallet = wallets.find(w => w.available);
+                    if (!wallet) {
+                        throw new Error('No wallet found');
+                    }
+                    await wallet.connect();
+                    publicKey = wallet.publicKey;
+                    connection = new SolanaWeb3.Connection('https://api.mainnet-beta.solana.com');
+                }
+
+                // Update UI
+                document.getElementById('walletInfo').classList.remove('hidden');
+                document.getElementById('walletAddress').textContent = publicKey.toBase58().slice(0, 6) + '...' + publicKey.toBase58().slice(-4);
+                
+                // Get balance
+                const balance = await connection.getBalance(publicKey);
+                document.getElementById('walletBalance').textContent = (balance / 1e9).toFixed(2);
+
+                // Load governance data
+                loadGovernanceData();
+            } catch (error) {
+                console.error('Wallet connection failed:', error);
+                alert('Wallet connection failed. Please try again.');
+            }
+        });
+
+        // Stake Tokens
+        document.getElementById('stakeTokens').addEventListener('click', async () => {
+            if (!wallet) {
+                alert('Please connect your wallet first');
+                return;
+            }
+
+            const amount = prompt('Enter amount of $GREMLINAI to stake:');
+            if (!amount || isNaN(amount)) {
+                alert('Please enter a valid amount');
+                return;
+            }
+
+            try {
+                // Create stake transaction
+                const transaction = new SolanaWeb3.Transaction().add(
+                    // Add stake instruction
+                );
+
+                // Sign and send transaction
+                const signature = await wallet.sendTransaction(transaction, connection);
+                await connection.confirmTransaction(signature);
+
+                // Update UI
+                loadGovernanceData();
+                alert('Tokens staked successfully!');
+            } catch (error) {
+                console.error('Staking failed:', error);
+                alert('Staking failed. Please try again.');
+            }
+        });
+
+        // Unstake Tokens
+        document.getElementById('unstakeTokens').addEventListener('click', async () => {
+            if (!wallet) {
+                alert('Please connect your wallet first');
+                return;
+            }
+
+            try {
+                // Create unstake transaction
+                const transaction = new SolanaWeb3.Transaction().add(
+                    // Add unstake instruction
+                );
+
+                // Sign and send transaction
+                const signature = await wallet.sendTransaction(transaction, connection);
+                await connection.confirmTransaction(signature);
+
+                // Update UI
+                loadGovernanceData();
+                alert('Tokens unstaked successfully!');
+            } catch (error) {
+                console.error('Unstaking failed:', error);
+                alert('Unstaking failed. Please try again.');
+            }
+        });
+
+        // Load governance data
+        async function loadGovernanceData() {
+            try {
+                // Fetch active proposals
+                const proposals = await fetch('/api/proposals').then(res => res.json());
+                const proposalsContainer = document.getElementById('activeProposals');
+                proposalsContainer.innerHTML = proposals.map(proposal => `
+                    <div class="bg-gray-700 p-4 rounded">
+                        <h4 class="font-semibold">${proposal.title}</h4>
+                        <p class="text-sm text-gray-400">${proposal.description}</p>
+                        <div class="mt-2">
+                            <div class="flex justify-between text-sm">
+                                <span>Yes: ${proposal.votes.yes}</span>
+                                <span>No: ${proposal.votes.no}</span>
+                            </div>
+                            <div class="mt-1 h-2 bg-gray-600 rounded-full">
+                                <div class="h-full bg-green-500 rounded-full" 
+                                     style="width: ${(proposal.votes.yes / (proposal.votes.yes + proposal.votes.no)) * 100}%"></div>
+                            </div>
+                        </div>
+                        <button onclick="voteOnProposal('${proposal.id}', true)" 
+                                class="mt-2 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-2 rounded">
+                            Vote Yes
+                        </button>
+                        <button onclick="voteOnProposal('${proposal.id}', false)" 
+                                class="mt-1 w-full bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-2 rounded">
+                            Vote No
+                        </button>
+                    </div>
+                `).join('');
+
+                // Fetch staking info
+                const stakingInfo = await fetch('/api/staking').then(res => res.json());
+                document.getElementById('stakedAmount').textContent = stakingInfo.staked;
+                document.getElementById('votingPower').textContent = stakingInfo.votingPower;
+            } catch (error) {
+                console.error('Failed to load governance data:', error);
+            }
+        }
+
+        // Vote on proposal
+        async function voteOnProposal(proposalId, vote) {
+            if (!wallet) {
+                alert('Please connect your wallet first');
+                return;
+            }
+
+            try {
+                // Create vote transaction
+                const transaction = new SolanaWeb3.Transaction().add(
+                    // Add vote instruction
+                );
+
+                // Sign and send transaction
+                const signature = await wallet.sendTransaction(transaction, connection);
+                await connection.confirmTransaction(signature);
+
+                // Update UI
+                loadGovernanceData();
+                alert('Vote recorded successfully!');
+            } catch (error) {
+                console.error('Voting failed:', error);
+                alert('Voting failed. Please try again.');
+            }
+        }
+
         // Mock data - replace with actual API calls
         const mockData = {
             totalRequests: 1234,
