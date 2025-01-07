@@ -1,7 +1,7 @@
-import * as tf from '@tensorflow/tfjs-node.js';
-import { VulnerabilityType } from '../types.js';
-import { mkdirSync, existsSync } from 'fs.js';
-import { join } from 'path.js';
+import * as tf from '@tensorflow/tfjs-node';
+import { VulnerabilityType } from '../types';
+import { mkdirSync, existsSync } from 'fs';
+import { join } from 'path';
 
 export class VulnerabilityDetectionModel {
     private initialized: boolean = false;
