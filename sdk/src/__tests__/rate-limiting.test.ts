@@ -77,7 +77,7 @@ describe('Rate Limiting', () => {
 
         it('should enforce maximum requests per minute', async () => {
             // Mock incr to simulate hitting limit
-            mockIncr.mockResolvedValue(4);
+            mockIncr.mockResolvedValue(4 as any);
 
             // First request should succeed
             await sdk.createChaosRequest({
