@@ -14,9 +14,9 @@ describe('Rate Limiting', () => {
             wallet
         });
 
-        mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr') as jest.SpyInstance<Promise<number>, [string]>;
+        mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr') as jest.MockedFunction<typeof sdk['queueWorker']['redis']['incr']>;
         mockIncr.mockResolvedValue(1);
-        mockExpire = jest.spyOn(sdk['queueWorker']['redis'], 'expire') as jest.SpyInstance<Promise<number>, [string, number]>;
+        mockExpire = jest.spyOn(sdk['queueWorker']['redis'], 'expire') as jest.MockedFunction<typeof sdk['queueWorker']['redis']['expire']>;
         mockExpire.mockResolvedValue(1);
         
         jest.useFakeTimers();
