@@ -134,7 +134,7 @@ describe('GlitchSDK', () => {
         });
 
         describe('rate limiting', () => {
-            beforeEach(() => {
+            beforeEach(async () => {
                 jest.useFakeTimers();
             });
 

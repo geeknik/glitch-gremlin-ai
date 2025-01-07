@@ -115,9 +115,12 @@ export class GlitchSDK {
         if (this.initialized) return;
         
         // Initialize Redis worker with provided config or defaults
-        this.queueWorker = new RedisQueueWorker(redisConfig ? {
-            ...redisConfig
-        } : undefined);
+        this.queueWorker = new RedisQueueWorker(redisConfig ? 
+            new IORedis({
+                host: redisConfig.host,
+                port: redisConfig.port
+            }) 
+        : undefined);
         
         // Verify connection
         await this.connection.getVersion();
