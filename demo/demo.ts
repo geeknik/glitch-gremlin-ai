@@ -46,7 +46,7 @@ async function main() {
     }
     
     console.log(chalk.gray('Wallet address:', wallet.publicKey.toString()));
-    const connection = new Connection('https://devnet.helius-rpc.com/?api-key=17682982-5929-468d-89cf-a6965d9803cb', {
+    const connection = new Connection('https://mainnet.helius-rpc.com/?api-key=17682982-5929-468d-89cf-a6965d9803cb', {
         commitment: 'confirmed',
         disableRetryOnRateLimit: false,
         httpHeaders: {
@@ -84,7 +84,7 @@ async function main() {
             console.log('Initializing SDK with Redis config:', redisConfig);
             
             const sdk = await GlitchSDK.init({
-                cluster: 'https://devnet.helius-rpc.com/?api-key=17682982-5929-468d-89cf-a6965d9803cb',
+                cluster: 'https://mainnet.helius-rpc.com/?api-key=17682982-5929-468d-89cf-a6965d9803cb',
                 wallet,
                 redisConfig
             });
@@ -145,7 +145,7 @@ async function main() {
                             ]
                         })));
                         // Use Helius API for airdrop
-                        const airdropResponse = await fetch('https://devnet.helius-rpc.com/?api-key=17682982-5929-468d-89cf-a6965d9803cb', {
+                        const airdropResponse = await fetch('https://mainnet.helius-rpc.com/?api-key=17682982-5929-468d-89cf-a6965d9803cb', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
