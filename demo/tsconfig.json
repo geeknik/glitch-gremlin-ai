@@ -14,11 +14,13 @@
     "paths": {
       "@glitch-gremlin/sdk": ["../sdk/src/index.ts"]
     },
-    "types": ["node"]
+    "types": ["node"],
+    "resolveJsonModule": true
   },
   "ts-node": {
     "esm": true,
-    "experimentalSpecifierResolution": "node"
+    "experimentalSpecifierResolution": "node",
+    "transpileOnly": true
   },
   "include": ["**/*.ts"],
   "exclude": ["node_modules"]

@@ -13,8 +13,10 @@
   },
   "ts-node": {
     "esm": true,
-    "experimentalSpecifierResolution": "node"
+    "experimentalSpecifierResolution": "node",
+    "transpileOnly": true
   },
+  "type": "module",
   "scripts": {
     "demo": "ts-node --esm demo.ts"
   }
