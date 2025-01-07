@@ -96,6 +96,9 @@ describe('Rate Limiting', () => {
             // Mock Redis rate limit check
             const mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr')
                 .mockImplementation(() => Promise.resolve(5)); // Over daily limit
+            const mockExpire = jest.spyOn(sdk['queueWorker']['redis'], 'expire')
+                .mockImplementation(() => Promise.resolve(1));
+
             // Create first proposal
             await sdk.createProposal({
                 title: "Test Proposal",
@@ -109,12 +112,6 @@ describe('Rate Limiting', () => {
                 },
                 stakingAmount: 1000
             });
-
-            // Mock Redis to simulate rate limit exceeded
-            const mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr')
-                .mockResolvedValue(5); // Over the limit of 3
-            const mockExpire = jest.spyOn(sdk['queueWorker']['redis'], 'expire')
-                .mockResolvedValue(1);
 
             // Second proposal should fail due to rate limit
             await expect(sdk.createProposal({
