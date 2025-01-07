@@ -14,9 +14,9 @@ describe('Rate Limiting', () => {
             wallet
         });
 
-        // Initialize mock functions with proper types
-        mockIncr = jest.fn<Promise<number>, []>().mockResolvedValue(1);
-        mockExpire = jest.fn<Promise<number>, []>().mockResolvedValue(1);
+        // Initialize mock functions
+        mockIncr = jest.fn().mockResolvedValue(1);
+        mockExpire = jest.fn().mockResolvedValue(1);
         
         // Assign mocks to redis methods
         // Type assertion needed since we're mocking internal Redis client
