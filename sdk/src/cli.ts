@@ -13,4 +13,11 @@ program
     // Add chaos request creation logic
   });
 
+program
+  .command('version')
+  .description('Print version')
+  .action(() => {
+    console.log(pkg.version);
+  });
+
 program.parse(process.argv);
