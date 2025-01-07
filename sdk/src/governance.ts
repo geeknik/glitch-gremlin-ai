@@ -4,10 +4,10 @@ import {
     PublicKey, 
     Transaction, 
     TransactionInstruction 
-} from '@solana/web3.js';
-import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
-import { GlitchError } from './errors';
-import { ProposalState, GovernanceConfig, ProposalMetadata } from './types';
+} from '@solana/web3.js.js';
+import { TOKEN_PROGRAM_ID } from '@solana/spl-token.js';
+import { GlitchError } from './errors.js';
+import { ProposalState, GovernanceConfig, ProposalMetadata } from './types.js';
 
 export class GovernanceManager {
     private readonly DEFAULT_CONFIG: GovernanceConfig = {

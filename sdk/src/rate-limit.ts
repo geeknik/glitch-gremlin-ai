@@ -1,5 +1,5 @@
-import { Redis } from 'ioredis';
-import { GlitchError } from './errors';
+import { Redis } from 'ioredis.js';
+import { GlitchError } from './errors.js';
 
 export async function incrementUsage(redis: Redis, key: string): Promise<number> {
     const count = await redis.incr(key);

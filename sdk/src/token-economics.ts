@@ -1,5 +1,5 @@
-import { PublicKey } from '@solana/web3.js';
-import { GlitchError } from './errors';
+import { PublicKey } from '@solana/web3.js.js';
+import { GlitchError } from './errors.js';
 
 export interface TokenDistribution {
     team: number;        // 15%
