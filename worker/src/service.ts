@@ -18,6 +18,12 @@ export class GlitchService {
         this.logger = new Logger();
         this.queueListener = new QueueListener(REDIS_URL);
         
+        // Enable zkVM execution if configured
+        this.useZkVM = process.env.USE_ZKVM === 'true';
+        if (this.useZkVM) {
+            this.logger.info('zkVM execution enabled for enhanced privacy');
+        }
+        
         // Setup metrics
         this.metricsExporter = new PrometheusExporter({
             port: METRICS_PORT,

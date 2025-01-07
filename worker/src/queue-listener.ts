@@ -1,6 +1,7 @@
 import { Redis } from 'ioredis';
 import { GlitchAIEngine } from './ai/engine';
 import { Logger } from './utils/logger';
+import { ZkVMExecutor } from './zkvm/executor';
 
 export class QueueListener {
     private redis: Redis;
@@ -8,10 +9,17 @@ export class QueueListener {
     private logger: Logger;
     private isRunning: boolean = false;
 
-    constructor(redisUrl: string = 'redis://localhost:6379') {
+    private zkVMExecutor?: ZkVMExecutor;
+
+    constructor(redisUrl: string = 'redis://localhost:6379', useZkVM: boolean = false) {
         this.redis = new Redis(redisUrl);
         this.aiEngine = new GlitchAIEngine();
         this.logger = new Logger();
+        
+        if (useZkVM) {
+            this.zkVMExecutor = new ZkVMExecutor();
+            this.logger.info('zkVM execution enabled');
+        }
     }
 
     async start() {
@@ -29,12 +37,28 @@ export class QueueListener {
                     
                     this.logger.info(`Processing test request ${request.id}`);
                     
-                    // Execute test through AI engine
-                    const testResult = await this.aiEngine.executeChaosTest(
-                        request.programId,
-                        request.testType,
-                        request.params
-                    );
+                    let testResult;
+                    if (this.zkVMExecutor) {
+                        // Execute in zkVM for enhanced privacy
+                        const zkResult = await this.zkVMExecutor.executeTest(
+                            request.programId,
+                            {
+                                type: request.testType,
+                                params: request.params
+                            }
+                        );
+                        testResult = {
+                            ...zkResult.results,
+                            proof: zkResult.proof
+                        };
+                    } else {
+                        // Standard execution
+                        testResult = await this.aiEngine.executeChaosTest(
+                            request.programId,
+                            request.testType,
+                            request.params
+                        );
+                    }
 
                     // Store result
                     await this.redis.hset('test:results', request.id, JSON.stringify(testResult));
