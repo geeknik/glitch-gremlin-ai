@@ -37,10 +37,6 @@ describe('Rate Limiting', () => {
                 .mockImplementation(() => Promise.resolve(null));
             const mockSet = jest.spyOn(sdk['queueWorker']['redis'], 'set')
                 .mockImplementation(() => Promise.resolve('OK'));
-            mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr')
-                .mockImplementation(() => Promise.resolve(1));
-            mockExpire = jest.spyOn(sdk['queueWorker']['redis'], 'expire')
-                .mockImplementation(() => Promise.resolve(1));
 
             // First request should succeed
             await expect(sdk.createChaosRequest({
