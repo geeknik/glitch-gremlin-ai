@@ -18,6 +18,8 @@
   },
   "type": "module",
   "scripts": {
-    "demo": "ts-node --esm demo.ts"
+    "build": "tsc",
+    "start": "node dist/demo.js",
+    "demo": "npm run build && npm run start"
   }
 }

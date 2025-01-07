@@ -1,43 +1,25 @@
-#!/usr/bin/env node
-import { register } from 'node:module';
-import { pathToFileURL } from 'node:url';
+import dotenv from 'dotenv';
+dotenv.config();
 
-// Register ts-node/esm using the new recommended approach
-register('ts-node/esm', pathToFileURL('./'));
-
-// Enhanced error handling
-const handleError = (err: unknown) => {
-    if (err instanceof Error) {
-        console.error('❌ Error:', err.message);
-        console.error('Stack:', err.stack);
-    } else {
-        console.error('❌ Unknown error:', JSON.stringify(err, null, 2));
+// Global unhandled rejection handler
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ [GLOBAL] Unhandled Rejection at Promise:', promise);
+  if (reason instanceof Error) {
+    console.error('Reason (Error):', reason.message);
+    console.error(reason.stack);
+  } else {
+    console.error('Reason (non-Error):', reason);
+    try {
+      console.error('JSON:', JSON.stringify(reason, null, 2));
+    } catch (jsonErr) {
+      console.error('Could not JSON.stringify the reason:', jsonErr);
     }
-    process.exit(1);
-};
+  }
+});
 
-process.on('unhandledRejection', handleError);
-process.on('uncaughtException', handleError);
-
-// Load environment variables
-import { config } from 'dotenv';
-import { fileURLToPath } from 'url';
-import path from 'path';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const result = config({ path: path.join(__dirname, '.env') });
-
-if (result.error) {
-    console.error('❌ Error loading .env file:', result.error);
-    process.exit(1);
-}
-
-console.log('✅ .env file loaded successfully.');
-
-// Import dependencies after setting up error handlers
-import { GlitchSDK, TestType } from '../sdk/src/index.js';
-import { Keypair, Connection } from '@solana/web3.js';
 import chalk from 'chalk';
+import { Keypair, Connection } from '@solana/web3.js';
+import { GlitchSDK, TestType } from '@glitch-gremlin/sdk';
 
 async function main() {
     try {
