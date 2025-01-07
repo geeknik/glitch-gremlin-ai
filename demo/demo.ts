@@ -103,6 +103,13 @@ async function main() {
             // 2. Wallet Connection
             console.log(chalk.cyan('\n2. Connecting wallet...'));
             try {
+                // Airdrop 1 SOL to test wallet
+                const airdropSignature = await connection.requestAirdrop(
+                    wallet.publicKey,
+                    1_000_000_000 // 1 SOL
+                );
+                await connection.confirmTransaction(airdropSignature);
+                
                 const balance = await connection.getBalance(wallet.publicKey);
                 console.log(chalk.green(`✅ Wallet connected! Balance: ${balance} lamports`));
             } catch (err) {

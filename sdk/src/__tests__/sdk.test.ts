@@ -95,7 +95,7 @@ describe('GlitchSDK', () => {
                     intensity: 5,
                     targetProgram: "11111111111111111111111111111111"
                 },
-                stakingAmount: 1000
+                stakingAmount: 100_000_000 // 0.1 SOL
             });
 
             expect(proposal.id).toBeDefined();
