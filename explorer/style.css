@@ -1,0 +1,27 @@
+/* Custom styles for the explorer */
+body {
+    font-family: 'Inter', sans-serif;
+}
+
+.container {
+    max-width: 1200px;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.fade-in {
+    animation: fadeIn 0.3s ease-in;
+}
+
+/* Responsive table */
+@media (max-width: 768px) {
+    table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+}

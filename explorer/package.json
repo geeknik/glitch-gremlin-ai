@@ -1,0 +1,17 @@
+{
+  "name": "glitch-gremlin-explorer",
+  "version": "1.0.0",
+  "description": "Blockchain explorer for Glitch Gremlin AI",
+  "scripts": {
+    "start": "serve -s .",
+    "build": "echo 'Build process would go here'",
+    "test": "echo 'Tests would go here'"
+  },
+  "dependencies": {
+    "chart.js": "^3.7.0",
+    "tailwindcss": "^2.2.19"
+  },
+  "devDependencies": {
+    "serve": "^13.0.2"
+  }
+}

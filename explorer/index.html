@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Glitch Gremlin AI Explorer</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-900 text-white">
+    <div class="container mx-auto px-4 py-8">
+        <header class="mb-8">
+            <h1 class="text-4xl font-bold mb-2">Glitch Gremlin AI Explorer</h1>
+            <p class="text-gray-400">Monitor Chaos Requests and Governance Proposals</p>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Search Section -->
+            <section class="bg-gray-800 p-6 rounded-lg">
+                <h2 class="text-2xl font-semibold mb-4">Search</h2>
+                <div class="space-y-4">
+                    <input type="text" id="searchInput" placeholder="Enter Request ID or Address" 
+                           class="w-full p-2 rounded bg-gray-700 text-white">
+                    <button onclick="searchRequest()" 
+                            class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                        Search
+                    </button>
+                </div>
+            </section>
+
+            <!-- Stats Section -->
+            <section class="bg-gray-800 p-6 rounded-lg">
+                <h2 class="text-2xl font-semibold mb-4">Network Stats</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-gray-700 p-3 rounded">
+                        <p class="text-gray-400">Total Requests</p>
+                        <p id="totalRequests" class="text-2xl">-</p>
+                    </div>
+                    <div class="bg-gray-700 p-3 rounded">
+                        <p class="text-gray-400">Active Requests</p>
+                        <p id="activeRequests" class="text-2xl">-</p>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Request Details Section -->
+        <section id="requestDetails" class="mt-8 hidden">
+            <h2 class="text-2xl font-semibold mb-4">Request Details</h2>
+            <div class="bg-gray-800 p-6 rounded-lg">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-gray-400">Request ID:</p>
+                        <p id="requestId" class="text-lg">-</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-400">Status:</p>
+                        <p id="requestStatus" class="text-lg">-</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-400">Test Type:</p>
+                        <p id="testType" class="text-lg">-</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-400">Duration:</p>
+                        <p id="duration" class="text-lg">-</p>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <canvas id="metricsChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Recent Requests Section -->
+        <section class="mt-8">
+            <h2 class="text-2xl font-semibold mb-4">Recent Chaos Requests</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full bg-gray-800 rounded-lg">
+                    <thead>
+                        <tr>
+                            <th class="px-6 py-3 text-left">Request ID</th>
+                            <th class="px-6 py-3 text-left">Status</th>
+                            <th class="px-6 py-3 text-left">Test Type</th>
+                            <th class="px-6 py-3 text-left">Duration</th>
+                            <th class="px-6 py-3 text-left">Intensity</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recentRequests" class="divide-y divide-gray-700">
+                        <!-- Rows will be populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        // Mock data - replace with actual API calls
+        const mockData = {
+            totalRequests: 1234,
+            activeRequests: 42,
+            recentRequests: [
+                {
+                    id: 'req_12345',
+                    status: 'Completed',
+                    testType: 'FUZZ',
+                    duration: '300s',
+                    intensity: 5
+                },
+                {
+                    id: 'req_12346',
+                    status: 'In Progress',
+                    testType: 'LOAD',
+                    duration: '600s',
+                    intensity: 7
+                }
+            ]
+        };
+
+        // Initialize stats
+        document.getElementById('totalRequests').textContent = mockData.totalRequests;
+        document.getElementById('activeRequests').textContent = mockData.activeRequests;
+
+        // Populate recent requests
+        const recentRequestsTable = document.getElementById('recentRequests');
+        mockData.recentRequests.forEach(request => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td class="px-6 py-4">${request.id}</td>
+                <td class="px-6 py-4">${request.status}</td>
+                <td class="px-6 py-4">${request.testType}</td>
+                <td class="px-6 py-4">${request.duration}</td>
+                <td class="px-6 py-4">${request.intensity}</td>
+            `;
+            recentRequestsTable.appendChild(row);
+        });
+
+        function searchRequest() {
+            const searchInput = document.getElementById('searchInput').value;
+            if (searchInput) {
+                // Show details section
+                document.getElementById('requestDetails').classList.remove('hidden');
+                
+                // Populate mock details
+                document.getElementById('requestId').textContent = 'req_12345';
+                document.getElementById('requestStatus').textContent = 'Completed';
+                document.getElementById('testType').textContent = 'FUZZ';
+                document.getElementById('duration').textContent = '300s';
+
+                // Initialize chart
+                const ctx = document.getElementById('metricsChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Transactions', 'Errors', 'Latency'],
+                        datasets: [{
+                            label: 'Metrics',
+                            data: [1000, 10, 150],
+                            backgroundColor: [
+                                'rgba(59, 130, 246, 0.5)',
+                                'rgba(239, 68, 68, 0.5)',
+                                'rgba(16, 185, 129, 0.5)'
+                            ],
+                            borderColor: [
+                                'rgb(59, 130, 246)',
+                                'rgb(239, 68, 68)',
+                                'rgb(16, 185, 129)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    </script>
+</body>
+</html>
