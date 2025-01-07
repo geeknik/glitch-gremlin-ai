@@ -5,6 +5,9 @@ export interface RedisClient {
     expire(key: string, seconds: number): Promise<number>;
     get(key: string): Promise<string | null>;
     set(key: string, value: string): Promise<'OK'>;
+    flushall(): Promise<'OK'>;
+    quit(): Promise<'OK'>;
+    disconnect(): Promise<void>;
 }
 
 export enum VulnerabilityType {
