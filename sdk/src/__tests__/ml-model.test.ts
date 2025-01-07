@@ -2,7 +2,7 @@ import { VulnerabilityDetectionModel } from '../ai/ml-model';
 import { VulnerabilityType } from '../types';
 import * as tf from '@tensorflow/tfjs-node';
 
-describe('VulnerabilityDetectionModel', () => {
+describe('VulnerabilityDetectionModel Tests', () => {
     let model: VulnerabilityDetectionModel;
 
     beforeAll(async () => {
