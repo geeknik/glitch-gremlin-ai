@@ -14,12 +14,12 @@ describe('Rate Limiting', () => {
             wallet
         });
 
-    let mockIncr: jest.Mock<Promise<number>, [string]>;
-    let mockExpire: jest.Mock<Promise<number>, [string, number]>;
+    let mockIncr: jest.Mock;
+    let mockExpire: jest.Mock;
 
-        // Initialize mock functions with explicit types
-        mockIncr = jest.fn<Promise<number>, [string]>().mockResolvedValue(1);
-        mockExpire = jest.fn<Promise<number>, [string, number]>().mockResolvedValue(1);
+        // Initialize mock functions
+        mockIncr = jest.fn().mockResolvedValue(1);
+        mockExpire = jest.fn().mockResolvedValue(1);
         
         // Assign mocks to redis methods
         sdk['queueWorker']['redis'].incr = mockIncr;
