@@ -47,10 +47,19 @@ The GlitchGremlinProgram is a Solana program that provides Chaos-as-a-Service (C
 - Minimum request duration
 
 ## 4. Error Handling
-- InsufficientFundsError (1001)
-- InvalidProgramError (1002)
-- RequestTimeoutError (1003)
-- InvalidInstructionError (1004)
+
+### 4.1 Error Codes
+- InsufficientFundsError (1001): Caller lacks required tokens
+- InvalidProgramError (1002): Target program address invalid
+- RequestTimeoutError (1003): Chaos request exceeded duration
+- InvalidInstructionError (1004): Malformed instruction data
+- UnauthorizedAccessError (1005): Invalid signer or authority
+- RateLimitExceededError (1006): Request threshold exceeded
+
+### 4.2 Error Recovery
+- Failed requests refund tokens
+- Partial completions refund proportionally
+- Invalid states trigger pause and audit
 
 ## 5. State Transitions
 - ChaosRequest:
