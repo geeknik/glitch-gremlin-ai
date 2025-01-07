@@ -38,8 +38,25 @@ describe('VulnerabilityDetectionModel', () => {
 
             expect(prediction).toHaveProperty('type');
             expect(prediction).toHaveProperty('confidence');
+            expect(prediction).toHaveProperty('details');
             expect(prediction.confidence).toBeGreaterThanOrEqual(0);
             expect(prediction.confidence).toBeLessThanOrEqual(1);
+        });
+
+        it('should detect high-risk patterns', async () => {
+            const features = new Array(20).fill(0);
+            features[0] = 0.9; // High transaction volume
+            features[1] = 0.8; // High error rate
+            
+            const prediction = await model.predict(features);
+            expect(prediction.confidence).toBeGreaterThan(0.7);
+            expect(prediction.details).toContain('High transaction volume');
+        });
+
+        it('should handle edge cases', async () => {
+            const features = new Array(20).fill(1); // All high values
+            const prediction = await model.predict(features);
+            expect(prediction.confidence).toBeGreaterThan(0.8);
         });
     });
 
