@@ -102,24 +102,39 @@ async function main() {
 
             // 2. Wallet Connection
             console.log(chalk.cyan('\n2. Connecting wallet...'));
-            try {
-                // Airdrop 1 SOL to test wallet
-                const airdropSignature = await connection.requestAirdrop(
-                    wallet.publicKey,
-                    1_000_000_000 // 1 SOL
-                );
-                await connection.confirmTransaction(airdropSignature);
+            let balance = await connection.getBalance(wallet.publicKey);
+            
+            // Only airdrop if balance is less than 0.1 SOL
+            if (balance < 100_000_000) {
+                const maxRetries = 3;
+                let retryCount = 0;
+                let airdropSuccess = false;
                 
-                const balance = await connection.getBalance(wallet.publicKey);
-                console.log(chalk.green(`✅ Wallet connected! Balance: ${balance} lamports`));
-            } catch (err) {
-                console.error(chalk.red('❌ Failed to connect wallet:'));
-                if (err instanceof Error) {
-                    console.error(chalk.red(err.message));
-                    console.error(chalk.gray('Stack:'), err.stack);
+                while (retryCount < maxRetries && !airdropSuccess) {
+                    try {
+                        console.log(chalk.gray(`Attempting airdrop (${retryCount + 1}/${maxRetries})...`));
+                        const airdropSignature = await connection.requestAirdrop(
+                            wallet.publicKey,
+                            1_000_000_000 // 1 SOL
+                        );
+                        await connection.confirmTransaction(airdropSignature);
+                        airdropSuccess = true;
+                    } catch (err) {
+                        retryCount++;
+                        if (retryCount === maxRetries) {
+                            console.warn(chalk.yellow('⚠️ Airdrop failed after multiple attempts. Using existing balance.'));
+                        } else {
+                            // Wait 2 seconds before retrying
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+                        }
+                    }
                 }
-                throw err;
+                
+                // Get updated balance
+                balance = await connection.getBalance(wallet.publicKey);
             }
+            
+            console.log(chalk.green(`✅ Wallet connected! Balance: ${balance} lamports`));
 
             // 3. Create Chaos Request
             console.log(chalk.cyan('\n3. Creating chaos request...'));
@@ -172,7 +187,7 @@ async function main() {
                         intensity: 5,
                         targetProgram
                     },
-                    stakingAmount: 1000
+                    stakingAmount: Math.min(100_000_000, balance) // Use up to 0.1 SOL or available balance
                 });
                 console.log(chalk.green(`✅ Proposal created! ID: ${proposal.id}`));
             } catch (err) {
