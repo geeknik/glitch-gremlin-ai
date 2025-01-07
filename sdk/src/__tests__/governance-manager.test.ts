@@ -187,8 +187,11 @@ describe('GovernanceManager', () => {
                         expect(validateProposalMock).toHaveBeenCalledTimes(2);
                         expect(validateProposalMock).toHaveBeenCalledWith(connection, proposalAddress);
 
-                        expect(getAccountInfoMock).toHaveBeenCalledTimes(1);
+                        expect(getAccountInfoMock).toHaveBeenCalledTimes(2);
                         expect(getAccountInfoMock).toHaveBeenCalledWith(proposalAddress);
+                        expect(getAccountInfoMock.mock.calls.every(call => 
+                            call[0].equals(proposalAddress)
+                        )).toBe(true);
 
                         expect(simulateTransactionMock).toHaveBeenCalledTimes(2);
 
