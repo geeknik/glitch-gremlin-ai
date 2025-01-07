@@ -138,17 +138,19 @@ describe('GovernanceManager', () => {
                                 rentEpoch: 0
                             });
 
-                        // Mock transaction simulation with simpler implementation
+                        // Mock transaction simulation and ensure it's called
                         simulateTransactionMock = jest.spyOn(connection, 'simulateTransaction')
-                            .mockResolvedValue({
-                                context: { slot: 0 },
-                                value: { 
-                                    err: null, 
-                                    logs: ['Program log: Vote recorded'], 
-                                    accounts: null, 
-                                    unitsConsumed: 0, 
-                                    returnData: null 
-                                }
+                            .mockImplementation(async () => {
+                                return {
+                                    context: { slot: 0 },
+                                    value: { 
+                                        err: null, 
+                                        logs: ['Program log: Vote recorded'], 
+                                        accounts: null, 
+                                        unitsConsumed: 0, 
+                                        returnData: null 
+                                    }
+                                };
                             });
 
                         // Mock transaction sending with proper async behavior
@@ -164,20 +166,24 @@ describe('GovernanceManager', () => {
                     });
 
                     it('should create valid vote transaction', async () => {
-                        // Call castVote twice and await both results
-                        await governanceManager.castVote(
+                        // Call castVote twice and store results
+                        const tx1 = await governanceManager.castVote(
                             connection,
                             wallet,
                             proposalAddress,
                             true
                         );
                         
-                        await governanceManager.castVote(
+                        const tx2 = await governanceManager.castVote(
                             connection,
                             wallet,
                             proposalAddress,
                             true
                         );
+
+                        // Verify transactions were created
+                        expect(tx1).toBeDefined();
+                        expect(tx2).toBeDefined();
 
                         // Verify each mock was called with correct args
                         expect(validateProposalMock).toHaveBeenCalledTimes(2);
