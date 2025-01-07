@@ -148,8 +148,7 @@ async function main() {
                         const airdropResponse = await fetch('https://mainnet.helius-rpc.com/?api-key=17682982-5929-468d-89cf-a6965d9803cb', {
                             method: 'POST',
                             headers: {
-                                'Content-Type': 'application/json',
-                                'Accept': 'application/json'
+                                'Content-Type': 'application/json'
                             },
                             body: JSON.stringify({
                                 jsonrpc: '2.0',
@@ -157,10 +156,7 @@ async function main() {
                                 method: 'requestAirdrop',
                                 params: [
                                     wallet.publicKey.toString(),
-                                    airdropAmount,
-                                    {
-                                        commitment: 'confirmed'
-                                    }
+                                    airdropAmount
                                 ]
                             })
                         });
