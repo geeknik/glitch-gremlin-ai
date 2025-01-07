@@ -48,7 +48,10 @@ async function main() {
     console.log(chalk.gray('Wallet address:', wallet.publicKey.toString()));
     const connection = new Connection('https://devnet.helius-rpc.com/?api-key=17682982-5929-468d-89cf-a6965d9803cb', {
         commitment: 'confirmed',
-        disableRetryOnRateLimit: false
+        disableRetryOnRateLimit: false,
+        httpHeaders: {
+            'Content-Type': 'application/json'
+        }
     });
         
         // Verify connection
@@ -124,16 +127,38 @@ async function main() {
                 const maxRetries = 5; // Increased retry count
                 let retryCount = 0;
                 let airdropSuccess = false;
-                let airdropAmount = 100_000_000; // Start with 0.1 SOL
+                let airdropAmount = 500_000_000; // Start with 0.5 SOL
                 
                 while (retryCount < maxRetries && !airdropSuccess) {
                     try {
                         console.log(chalk.gray(`Attempting airdrop of ${airdropAmount} lamports (${retryCount + 1}/${maxRetries})...`));
-                        const airdropSignature = await connection.requestAirdrop(
-                            wallet.publicKey,
-                            airdropAmount
-                        );
-                        await connection.confirmTransaction(airdropSignature, 'confirmed');
+                        // Use Helius API for airdrop
+                        const airdropResponse = await fetch('https://devnet.helius-rpc.com/?api-key=17682982-5929-468d-89cf-a6965d9803cb', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                jsonrpc: '2.0',
+                                id: 1,
+                                method: 'requestAirdrop',
+                                params: [wallet.publicKey.toString(), airdropAmount]
+                            })
+                        });
+
+                        const airdropData = await airdropResponse.json();
+                        if (!airdropData.result) {
+                            throw new Error('Airdrop failed: ' + JSON.stringify(airdropData));
+                        }
+
+                        // Wait for confirmation
+                        const signature = airdropData.result;
+                        const latestBlockhash = await connection.getLatestBlockhash();
+                        await connection.confirmTransaction({
+                            signature,
+                            blockhash: latestBlockhash.blockhash,
+                            lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
+                        }, 'confirmed');
                         airdropSuccess = true;
                     } catch (err) {
                         retryCount++;
