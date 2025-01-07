@@ -1,16 +1,18 @@
 import { RedisQueueWorker } from '../queue/redis-worker.js';
 import { TestType } from '../types.js';
-import { Redis } from 'ioredis.js';
-// Remove this line since we're using the real Redis client
-
-jest.mock('ioredis', () => require('ioredis-mock'));
+import Redis from 'ioredis';
+import { RedisQueueWorker } from '../queue/redis-worker.js';
 
 describe('RedisQueueWorker', () => {
     let worker: RedisQueueWorker;
     let redis: Redis;
 
     beforeEach(() => {
-        redis = new RedisMock() as unknown as Redis;
+        redis = new Redis({
+            host: 'localhost',
+            port: 6379,
+            lazyConnect: true
+        });
         worker = new RedisQueueWorker(redis);
     });
 

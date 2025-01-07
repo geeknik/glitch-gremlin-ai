@@ -1,4 +1,4 @@
-import { PublicKey } from '@solana/web3.js.js';
+import { PublicKey } from '@solana/web3.js';
 
 export interface RedisClient {
     incr(key: string): Promise<number>;

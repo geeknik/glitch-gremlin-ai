@@ -7,7 +7,7 @@ describe('Staking', () => {
     
     beforeEach(async () => {
         const wallet = Keypair.generate();
-        sdk = new GlitchSDK({
+        sdk = await GlitchSDK.init({
             cluster: 'https://api.devnet.solana.com',
             wallet,
             governanceConfig: {

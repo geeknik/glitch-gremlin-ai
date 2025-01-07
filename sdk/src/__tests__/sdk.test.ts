@@ -6,7 +6,7 @@ describe('GlitchSDK', () => {
     
     beforeEach(async () => {
         const wallet = Keypair.generate();
-        sdk = new GlitchSDK({
+        sdk = await GlitchSDK.init({
             cluster: 'https://api.devnet.solana.com',
             wallet
         });
@@ -57,7 +57,7 @@ describe('GlitchSDK', () => {
 
     describe('version compatibility', () => {
         it('should export correct version', async () => {
-            const { version } = await import('../index');
+            const { version } = await import('../index.js');
             expect(version).toBe('0.1.0');
         });
     });

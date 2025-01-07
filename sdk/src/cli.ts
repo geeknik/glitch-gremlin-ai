@@ -1,6 +1,6 @@
-import { GlitchSDK } from './sdk.js.js';
-import { Command } from 'commander.js';
-import { readPackageJson } from './utils.js.js';
+import { GlitchSDK } from './sdk.js';
+import { Command } from 'commander';
+import { readPackageJson } from './utils.js';
 
 const program = new Command();
 
@@ -13,7 +13,7 @@ program
   .action(async () => {
     const sdk = await GlitchSDK.init({
         cluster: 'devnet',
-        wallet: Keypair.generate()
+        wallet: new Keypair()
     });
     // Add chaos request creation logic
   });

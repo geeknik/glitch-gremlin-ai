@@ -12,7 +12,7 @@ export class RedisQueueWorker {
             port: 6379,
             connectTimeout: 5000,
             maxRetriesPerRequest: 3,
-            retryStrategy: (times) => {
+            retryStrategy: (times: number) => {
                 const delay = Math.min(times * 50, 2000);
                 return delay;
             },
@@ -20,7 +20,7 @@ export class RedisQueueWorker {
             lazyConnect: true
         });
 
-        this.redis.on('error', (err) => {
+        this.redis.on('error', (err: Error) => {
             console.error('Redis connection error:', err);
         });
     }
