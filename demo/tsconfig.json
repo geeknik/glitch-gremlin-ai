@@ -22,6 +22,6 @@
     "experimentalSpecifierResolution": "node",
     "transpileOnly": true
   },
-  "include": ["demo.ts"],
-  "exclude": ["node_modules"]
+  "include": ["demo.ts", "../sdk/src/**/*"],
+  "exclude": ["node_modules", "../sdk/node_modules"]
 }
