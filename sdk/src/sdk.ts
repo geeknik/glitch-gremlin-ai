@@ -52,11 +52,18 @@ export class GlitchSDK {
     private readonly MIN_STAKE_LOCKUP = 86400; // 1 day in seconds
     private readonly MAX_STAKE_LOCKUP = 31536000; // 1 year in seconds
 
-    constructor(config: {
+    private static instance: GlitchSDK;
+    private initialized = false;
+
+    private constructor(config: {
         cluster?: string;
         wallet: Keypair;
         programId?: string;
         governanceConfig?: Partial<GovernanceConfig>;
+        redisConfig?: {
+            host: string;
+            port: number;
+        };
     }) {
         const defaultConfig: GovernanceConfig = {
             minVotingPeriod: 86400, // 1 day
@@ -71,7 +78,7 @@ export class GlitchSDK {
             ...defaultConfig,
             ...config.governanceConfig
         };
-        this.queueWorker = new RedisQueueWorker();
+        
         // Default to testnet
         this.connection = new Connection(config.cluster || 'https://api.testnet.solana.com');
         
@@ -82,6 +89,41 @@ export class GlitchSDK {
 
         this.wallet = config.wallet;
         this.governanceManager = new GovernanceManager(this.programId, config.governanceConfig);
+    }
+
+    public static async init(config: {
+        cluster?: string;
+        wallet: Keypair;
+        programId?: string;
+        governanceConfig?: Partial<GovernanceConfig>;
+        redisConfig?: {
+            host: string;
+            port: number;
+        };
+    }): Promise<GlitchSDK> {
+        if (!GlitchSDK.instance) {
+            GlitchSDK.instance = new GlitchSDK(config);
+            await GlitchSDK.instance.initialize(config.redisConfig);
+        }
+        return GlitchSDK.instance;
+    }
+
+    private async initialize(redisConfig?: {
+        host: string;
+        port: number;
+    }): Promise<void> {
+        if (this.initialized) return;
+        
+        // Initialize Redis worker with provided config or defaults
+        this.queueWorker = new RedisQueueWorker(redisConfig ? {
+            host: redisConfig.host,
+            port: redisConfig.port
+        } : undefined);
+        
+        // Verify connection
+        await this.connection.getVersion();
+        
+        this.initialized = true;
     }
 
     private async checkRateLimit() {

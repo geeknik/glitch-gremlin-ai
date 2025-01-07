@@ -68,6 +68,9 @@ async function main() {
 }
 
 main().catch(err => {
-    console.error(chalk.red('Demo failed:'), err);
+    console.error(chalk.red('\n❌ Demo failed:'));
+    console.error(chalk.red(err instanceof Error ? err.message : 'Unknown error'));
+    console.error(chalk.gray('\nStack trace:'));
+    console.error(chalk.gray(err instanceof Error ? err.stack : 'No stack trace available'));
     process.exit(1);
 });
