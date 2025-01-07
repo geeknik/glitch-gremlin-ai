@@ -81,12 +81,15 @@ describe('Governance', () => {
                 stakingAmount: 1000
             };
 
-            // Create multiple proposals rapidly
-            const promises = Array(3).fill(0).map(() => 
-                sdk.createProposal(validProposal)
-            );
+            // First proposal should succeed
+            await sdk.createProposal(validProposal);
 
-            await expect(Promise.all(promises))
+            // Second proposal should fail due to rate limit
+            await expect(sdk.createProposal(validProposal))
+                .rejects.toThrow('Rate limit exceeded');
+
+            // Third proposal should also fail
+            await expect(sdk.createProposal(validProposal))
                 .rejects.toThrow('Rate limit exceeded');
         });
     });
