@@ -58,10 +58,18 @@ async function main() {
                 port: parseInt(process.env.REDIS_PORT || '6379'),
                 connectTimeout: 5000,
                 retryStrategy: (times: number) => Math.min(times * 50, 2000),
-                maxRetriesPerRequest: 3
+                maxRetriesPerRequest: 3,
+                enableOfflineQueue: true,
+                lazyConnect: true
             };
 
             console.log('Initializing SDK with Redis config:', redisConfig);
+            
+            // Add Redis error handler
+            sdk['queueWorker']['redis'].on('error', (err: Error) => {
+                console.error('Redis connection error:', err);
+                process.exit(1);
+            });
             
             const sdk = await GlitchSDK.init({
                 cluster: 'devnet',
