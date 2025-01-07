@@ -42,7 +42,7 @@ describe('Governance', () => {
     });
 
     describe('proposal creation', () => {
-        beforeEach(() => {
+        beforeEach(async () => {
             // Mock getBalance to return sufficient funds
             jest.spyOn(sdk['connection'], 'getBalance')
                 .mockResolvedValue(10000);

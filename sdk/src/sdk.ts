@@ -7,6 +7,7 @@ import {
     SystemProgram
 } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import Redis from 'ioredis';
 import { TokenEconomics } from './token-economics.js';
 import { GovernanceConfig, ChaosRequestParams, ChaosResult, TestType, ProposalParams } from './types.js';
 import { GovernanceManager } from './governance.js';
@@ -116,7 +117,7 @@ export class GlitchSDK {
         
         // Initialize Redis worker with provided config or defaults
         this.queueWorker = new RedisQueueWorker(redisConfig ? 
-            new IORedis({
+            new Redis({
                 host: redisConfig.host,
                 port: redisConfig.port
             }) 
