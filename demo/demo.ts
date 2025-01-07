@@ -1,6 +1,23 @@
 import dotenv from 'dotenv';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
-dotenv.config();
+import path from 'path';
+
+// Load environment variables from .env file
+const envPath = path.join(__dirname, '.env');
+if (!existsSync(envPath)) {
+  console.error(chalk.red('❌ .env file not found! Please create one with HELIUS_API_KEY'));
+  process.exit(1);
+}
+dotenv.config({ path: envPath });
+
+// Verify required environment variables
+const requiredEnvVars = ['HELIUS_API_KEY'];
+for (const envVar of requiredEnvVars) {
+  if (!process.env[envVar]) {
+    console.error(chalk.red(`❌ Missing required environment variable: ${envVar}`));
+    process.exit(1);
+  }
+}
 
 // Global unhandled rejection handler
 process.on('unhandledRejection', (reason, promise) => {
@@ -241,7 +258,14 @@ async function main() {
                 const results = await request.waitForCompletion();
                 console.log(chalk.green('✅ Chaos test completed!'));
                 console.log(chalk.green('Results:'));
-                console.log(results);
+                console.log(chalk.gray('Status:'), results.status);
+                console.log(chalk.gray('Result Reference:'), results.resultRef);
+                console.log(chalk.gray('Metrics:'));
+                console.log(chalk.gray('  Total Transactions:'), results.metrics?.totalTransactions);
+                console.log(chalk.gray('  Error Rate:'), results.metrics?.errorRate);
+                console.log(chalk.gray('  Average Latency:'), results.metrics?.avgLatency);
+                console.log(chalk.gray('Logs:'));
+                results.logs.forEach((log, i) => console.log(chalk.gray(`  ${i + 1}. ${log}`)));
             } catch (err) {
                 console.error(chalk.red('❌ Failed to monitor request:'));
                 if (err instanceof Error) {
@@ -296,17 +320,29 @@ async function main() {
             } else {
                 try {
                     // Create proposal
+                    // Create governance proposal with detailed parameters
                     const proposal = await sdk.createProposal({
-                        title: "Test Proposal",
-                        description: "Test Description",
+                        title: "Community Chaos Campaign",
+                        description: "Stress test the token program with fuzz testing",
                         targetProgram,
                         testParams: {
                             testType: TestType.FUZZ,
                             duration: 300,
                             intensity: 5,
-                            targetProgram
+                            targetProgram,
+                            params: {
+                                fuzz: {
+                                    instructionTypes: ['transfer', 'mint', 'burn'],
+                                    seedRange: [0, 10000],
+                                    maxAccountSize: 1024,
+                                    maxTransactions: 1000,
+                                    errorThreshold: 0.1,
+                                    maxLatency: 1000 // 1 second
+                                }
+                            }
                         },
-                        stakingAmount: Math.min(50_000_000, balance) // Use up to 0.05 SOL or available balance
+                        stakingAmount: Math.min(50_000_000, balance), // Use up to 0.05 SOL or available balance
+                        votingPeriod: 259200 // 3 days
                     });
                     console.log(chalk.green(`✅ Proposal created! ID: ${proposal.id}`));
 
