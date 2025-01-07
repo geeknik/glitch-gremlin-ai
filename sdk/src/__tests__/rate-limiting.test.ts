@@ -98,9 +98,15 @@ describe('Rate Limiting', () => {
                 stakingAmount: 1000
             });
 
-            // Second proposal same day should fail
+            // Mock Redis to simulate rate limit exceeded
+            const mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr')
+                .mockResolvedValue(5); // Over the limit of 3
+            const mockExpire = jest.spyOn(sdk['queueWorker']['redis'], 'expire')
+                .mockResolvedValue(1);
+
+            // Second proposal should fail due to rate limit
             await expect(sdk.createProposal({
-                title: "Test Proposal 2",
+                title: "Test Proposal 2", 
                 description: "Test Description",
                 targetProgram: "11111111111111111111111111111111",
                 testParams: {
@@ -111,6 +117,9 @@ describe('Rate Limiting', () => {
                 },
                 stakingAmount: 1000
             })).rejects.toThrow('Rate limit exceeded');
+
+            expect(mockIncr).toHaveBeenCalled();
+            expect(mockExpire).toHaveBeenCalled();
 
             // After 24 hours, should succeed
             jest.advanceTimersByTime(24 * 60 * 60 * 1000);
