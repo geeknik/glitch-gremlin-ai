@@ -1,13 +1,13 @@
 import { RedisQueueWorker } from '../queue/redis-worker.js';
 import { TestType } from '../types.js';
-import Redis, { Redis as RedisType } from 'ioredis';
+import IORedis, { Redis as RedisType } from 'ioredis';
 
 describe('RedisQueueWorker', () => {
     let worker: RedisQueueWorker;
     let redis: RedisType;
 
     beforeEach(() => {
-        redis = new Redis({
+        redis = new IORedis({
             host: 'localhost',
             port: 6379,
             lazyConnect: true

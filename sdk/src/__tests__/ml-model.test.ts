@@ -10,7 +10,7 @@ describe('VulnerabilityDetectionModel Tests', () => {
         await tf.setBackend('cpu');
     });
 
-    beforeEach(() => {
+    beforeEach(async () => {
         model = new VulnerabilityDetectionModel();
     });
 
