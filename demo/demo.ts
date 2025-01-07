@@ -50,7 +50,7 @@ async function main() {
             cluster: 'devnet',
             wallet,
             redisConfig: {
-                host: process.env.REDIS_HOST || 'localhost',
+                host: process.env.REDIS_HOST || 'r.glitchgremlin.ai',
                 port: parseInt(process.env.REDIS_PORT || '6379'),
             }
         });
