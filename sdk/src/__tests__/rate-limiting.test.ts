@@ -4,8 +4,8 @@ import { jest } from '@jest/globals';
 
 describe('Rate Limiting', () => {
     let sdk: GlitchSDK;
-    let mockIncr: jest.MockInstance<Promise<number>, [string]>;
-    let mockExpire: jest.MockInstance<Promise<number>, [string, number]>;
+    let mockIncr: jest.Mock<Promise<number>, [string]>;
+    let mockExpire: jest.Mock<Promise<number>, [string, number]>;
     
     beforeEach(() => {
         const wallet = Keypair.generate();
