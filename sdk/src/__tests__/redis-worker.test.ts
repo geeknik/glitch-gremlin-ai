@@ -1,10 +1,10 @@
 import { RedisQueueWorker } from '../queue/redis-worker.js';
 import { TestType } from '../types.js';
-import Redis from 'ioredis';
+import Redis, { Redis as RedisType } from 'ioredis';
 
 describe('RedisQueueWorker', () => {
     let worker: RedisQueueWorker;
-    let redis: Redis;
+    let redis: RedisType;
 
     beforeEach(() => {
         redis = new Redis({

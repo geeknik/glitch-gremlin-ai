@@ -1,4 +1,5 @@
 import { GlitchSDK } from './sdk.js';
+import { Keypair } from '@solana/web3.js';
 import { Command } from 'commander';
 import { readPackageJson } from './utils.js';
 
