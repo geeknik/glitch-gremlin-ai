@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Glitch Gremlin AI POC</title>
+    <script src="dist/index.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Glitch Gremlin AI Proof of Concept</h1>
+        
+        <div class="form-group">
+            <label>Target Program Address:</label>
+            <input id="programAddress" type="text" placeholder="Enter program address">
+        </div>
+
+        <div class="form-group">
+            <label>Test Type:</label>
+            <select id="testType">
+                <option value="FUZZ">Fuzz Test</option>
+                <option value="LOAD">Load Test</option>
+                <option value="EXPLOIT">Exploit Test</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Duration (seconds):</label>
+            <input id="duration" type="number" placeholder="60">
+        </div>
+
+        <div class="form-group">
+            <label>Intensity (1-10):</label>
+            <input id="intensity" type="number" placeholder="5">
+        </div>
+
+        <button id="submitButton">Submit Chaos Request</button>
+
+        <div class="status" id="status">
+            Status: Ready
+        </div>
+    </div>
+
+    <script>
+        const sdk = new GlitchSDK({
+            cluster: 'https://api.devnet.solana.com',
+            wallet: Keypair.generate()
+        });
+
+        document.getElementById('submitButton').onclick = async () => {
+            const programAddress = document.getElementById('programAddress').value;
+            const testType = document.getElementById('testType').value;
+            const duration = document.getElementById('duration').value;
+            const intensity = document.getElementById('intensity').value;
+
+            document.getElementById('status').innerText = 'Status: Submitting request...';
+
+            try {
+                await sdk.createChaosRequest({
+                    targetProgram: programAddress,
+                    testType: testType,
+                    duration: duration,
+                    intensity: intensity
+                });
+                document.getElementById('status').innerText = 'Status: Request submitted successfully!';
+            } catch (error) {
+                document.getElementById('status').innerText = `Status: Error - ${error.message}`;
+            }
+        };
+    </script>
+</body>
+</html>
