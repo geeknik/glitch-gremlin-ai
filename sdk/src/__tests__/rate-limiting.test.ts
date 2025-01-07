@@ -4,8 +4,8 @@ import { jest } from '@jest/globals';
 
 describe('Rate Limiting', () => {
     let sdk: GlitchSDK;
-    let mockIncr: jest.SpyInstance;
-    let mockExpire: jest.SpyInstance;
+    let mockIncr: jest.SpyInstance<Promise<number>, [key: string]>;
+    let mockExpire: jest.SpyInstance<Promise<number>, [key: string, seconds: number]>;
     
     beforeEach(() => {
         const wallet = Keypair.generate();
@@ -30,8 +30,8 @@ describe('Rate Limiting', () => {
     });
 
     describe('request rate limiting', () => {
-        let mockIncr: jest.SpyInstance;
-        let mockExpire: jest.SpyInstance;
+        let mockIncr: jest.SpyInstance<Promise<number>, [key: string]>;
+        let mockExpire: jest.SpyInstance<Promise<number>, [key: string, seconds: number]>;
 
         beforeEach(() => {
             mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr')
