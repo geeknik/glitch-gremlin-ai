@@ -1,22 +1,31 @@
 #!/usr/bin/env node
-// Load environment variables at the very top
+// Add global error handlers first
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+    process.exit(1);
+});
+
+process.on('uncaughtException', (err) => {
+    console.error('❌ Uncaught Exception:', err);
+    process.exit(1);
+});
+
+// Load environment variables
 import { config } from 'dotenv';
 import { fileURLToPath } from 'url';
 import path from 'path';
 
-// Get the directory name of the current module
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-// Load .env from the demo directory
 const result = config({ path: path.join(__dirname, '.env') });
 
 if (result.error) {
     console.error('❌ Error loading .env file:', result.error);
     process.exit(1);
-} else {
-    console.log('✅ .env file loaded successfully.');
 }
 
+console.log('✅ .env file loaded successfully.');
+
+// Import dependencies after setting up error handlers
 import { GlitchSDK, TestType } from '../sdk/src/index.js';
 import { Keypair, Connection } from '@solana/web3.js';
 import chalk from 'chalk';
@@ -46,22 +55,51 @@ async function main() {
 
         // Initialize SDK with proper configuration
         console.log(chalk.cyan('\nInitializing SDK...'));
-        const sdk = await GlitchSDK.init({
-            cluster: 'devnet',
-            wallet,
-            redisConfig: {
-                host: process.env.REDIS_HOST || 'r.glitchgremlin.ai',
-                port: parseInt(process.env.REDIS_PORT || '6379'),
+        try {
+            const sdk = await GlitchSDK.init({
+                cluster: 'devnet',
+                wallet,
+                redisConfig: {
+                    host: process.env.REDIS_HOST || 'r.glitchgremlin.ai',
+                    port: parseInt(process.env.REDIS_PORT || '6379'),
+                    connectTimeout: 5000, // 5 second timeout
+                    retryStrategy: (times) => {
+                        const delay = Math.min(times * 50, 2000);
+                        return delay;
+                    }
+                }
+            });
+
+            if (!sdk) {
+                throw new Error('Failed to initialize SDK');
             }
-        });
+            
+            // Verify Redis connection
+            try {
+                await sdk['queueWorker']['redis'].ping();
+                console.log(chalk.green('✅ Redis connection verified!'));
+            } catch (redisErr) {
+                console.error(chalk.red('❌ Failed to connect to Redis:'));
+                throw redisErr;
+            }
 
-        // Verify SDK initialization
-        if (!sdk) {
-            throw new Error('Failed to initialize SDK');
+            console.log(chalk.green('✅ SDK initialized successfully!'));
+            return sdk;
+        } catch (initErr) {
+            console.error(chalk.red('❌ SDK initialization failed:'));
+            if (initErr instanceof Error) {
+                console.error(chalk.red(initErr.message));
+                if (initErr.stack) {
+                    console.error(chalk.gray('\nStack trace:'));
+                    console.error(chalk.gray(initErr.stack));
+                }
+            } else {
+                console.error(chalk.red('Unknown error:', initErr));
+            }
+            process.exit(1);
         }
-        console.log(chalk.green('✅ SDK initialized successfully!'));
 
-    console.log('✅ SDK initialized successfully.');
+    const sdk = await initializeSDK(wallet);
 
     // 2. Wallet Connection
     console.log(chalk.cyan('\n2. Connecting wallet...'));
