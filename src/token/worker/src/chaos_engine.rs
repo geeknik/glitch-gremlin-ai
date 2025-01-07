@@ -67,6 +67,8 @@ async fn spawn_concurrent_task(
     })
 }
 
+use std::future::Future;
+
 async fn await_all(
     tasks: Vec<Future<Result<ConcurrencyResult, Box<dyn Error>>>,
 ) -> Result<Vec<ConcurrencyResult>, Box<dyn Error>> {
