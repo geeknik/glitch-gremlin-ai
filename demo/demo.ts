@@ -3,7 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'fs';
 import path from 'path';
 
 // Load environment variables from .env file
-const envPath = path.join(__dirname, '.env');
+const envPath = path.join(path.dirname(new URL(import.meta.url).pathname), '.env');
 if (!existsSync(envPath)) {
   console.error(chalk.red('❌ .env file not found! Please create one with HELIUS_API_KEY'));
   process.exit(1);
@@ -49,7 +49,7 @@ async function main() {
     // 1. Setup
     console.log(chalk.cyan('1. Setting up environment...'));
     // Use persistent demo wallet if it exists, otherwise create it
-    const walletPath = './demo-wallet.json';
+    const walletPath = path.join(path.dirname(new URL(import.meta.url).pathname), 'demo-wallet.json');
     let wallet: Keypair;
     
     if (existsSync(walletPath)) {
