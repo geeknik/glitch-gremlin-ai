@@ -10,7 +10,7 @@ async function main() {
     const wallet = Keypair.generate();
     const connection = new Connection('https://api.devnet.solana.com');
     
-    // Initialize SDK with direct Redis config
+    // Initialize SDK with proper async initialization
     const sdk = await GlitchSDK.init({
         cluster: 'devnet',
         wallet,
