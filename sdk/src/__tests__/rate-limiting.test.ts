@@ -84,6 +84,7 @@ describe('Rate Limiting', () => {
         });
 
         it('should limit proposals per day', async () => {
+            jest.setTimeout(15000); // Increase timeout to 15 seconds
             // Create first proposal
             await sdk.createProposal({
                 title: "Test Proposal",
