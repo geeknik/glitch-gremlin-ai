@@ -13,7 +13,7 @@
     "test": "npm run test --workspaces --if-present",
     "test:coverage": "npm run test:coverage --workspaces --if-present",
     "lint": "npm run lint --workspaces",
-    "demo": "ts-node demo/demo.ts"
+    "demo": "NODE_PATH=./sdk/src ts-node demo/demo.ts"
   },
   "type": "commonjs",
   "devDependencies": {

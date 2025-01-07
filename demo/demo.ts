@@ -1,4 +1,4 @@
-import { GlitchSDK, TestType } from '@glitch-gremlin/sdk';
+import { GlitchSDK, TestType } from '../sdk/src/index';
 import { Keypair, Connection } from '@solana/web3.js';
 import chalk from 'chalk';
 
