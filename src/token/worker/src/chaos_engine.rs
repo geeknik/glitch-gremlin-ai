@@ -9,6 +9,8 @@ pub struct ChaosTestResult {
 #[derive(Debug)]
 pub enum TestStatus {
     Completed,
+    Failed,
+    PartialCompletion,
 }
 
 pub async fn run_chaos_test(
@@ -25,21 +27,70 @@ pub async fn run_chaos_test(
 }
 
 async fn run_load_test(
-    _test_env: &TestEnvironment,
-    _params: &ChaosParams,
+    test_env: &TestEnvironment,
+    params: &ChaosParams,
 ) -> Result<ChaosTestResult, Box<dyn Error>> {
+    // Simulate concurrent load
+    let mut tasks = Vec::new();
+    for i in 0..params.intensity {
+        tasks.push(spawn_concurrent_task(test_env, i));
+    }
+
+    // Wait for all tasks to complete
+    let results = await_all(tasks).await?;
+
+    // Analyze results
+    let success_rate = results.iter().filter(|r| r.success).count() / results.len();
+    
     Ok(ChaosTestResult {
-        status: TestStatus::Completed,
-        logs: "Load test completed".to_string(),
+        status: if success_rate == 1.0 {
+            TestStatus::Completed
+        } else if success_rate == 0.0 {
+            TestStatus::Failed
+        } else {
+            TestStatus::PartialCompletion
+        },
+        logs: format!("Concurrency test completed with {}% success rate", success_rate * 100).to_string(),
     })
 }
 
-#[allow(dead_code)]
+async fn spawn_concurrent_task(
+    test_env: &TestEnvironment,
+    task_id: u8,
+) -> Result<ConcurrencyResult, Box<dyn Error>> {
+    // Simulate concurrent operation
+    let result = test_env.execute_concurrent_op(task_id).await?;
+    Ok(ConcurrencyResult {
+        success: result.is_success(),
+        latency: result.latency(),
+        errors: result.errors(),
+    })
+}
+
+async fn await_all(
+    tasks: Vec<Future<Result<ConcurrencyResult, Box<dyn Error>>>,
+) -> Result<Vec<ConcurrencyResult>, Box<dyn Error>> {
+    // Wait for all tasks to complete
+    let mut results = Vec::new();
+    for task in tasks {
+        results.push(task.await?);
+    }
+    Ok(results)
+}
+
+struct ConcurrencyResult {
+    success: bool,
+    latency: u64,
+    errors: Vec<String>,
+}
+
 struct ChaosParams {
     test_type: TestType,
     duration: u64,
     intensity: u8,
-    // Other parameters
+    concurrency_level: u8,
+    max_latency: u64,
+    error_threshold: u8,
 }
 
 #[allow(dead_code)]
