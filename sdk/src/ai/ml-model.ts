@@ -24,10 +24,11 @@ export class VulnerabilityDetectionModel {
     private buildModel(): tf.LayersModel {
         const model = tf.sequential();
         
+        // Enhanced model architecture for vulnerability detection
         model.add(tf.layers.dense({
-            units: 64,
+            units: 128,
             activation: 'relu',
-            inputShape: [10]
+            inputShape: [20] // Expanded feature set
         }));
         
         model.add(tf.layers.dropout({ rate: 0.2 }));
@@ -78,7 +79,10 @@ export class VulnerabilityDetectionModel {
     async predict(features: number[]): Promise<{
         type: VulnerabilityType;
         confidence: number;
+        details?: string;
     }> {
+        await this.ensureInitialized();
+        
         const input = tf.tensor2d([features]);
         const prediction = this.model.predict(input) as tf.Tensor;
         const probabilities = await prediction.array() as number[][];
@@ -88,11 +92,29 @@ export class VulnerabilityDetectionModel {
 
         const maxIndex = probabilities[0].indexOf(Math.max(...probabilities[0]));
         const vulnerabilityTypes = Object.values(VulnerabilityType);
+        const confidence = probabilities[0][maxIndex];
+
+        // Enhanced prediction logic with detailed analysis
+        const details = this.analyzePrediction(features, confidence);
 
         return {
             type: vulnerabilityTypes[maxIndex],
-            confidence: probabilities[0][maxIndex]
+            confidence,
+            details
         };
+    }
+
+    private analyzePrediction(features: number[], confidence: number): string {
+        const patterns = [];
+        
+        // Analyze feature patterns
+        if (features[0] > 0.8) patterns.push('High transaction volume');
+        if (features[1] > 0.7) patterns.push('Unusual error rate');
+        if (features[2] > 0.9) patterns.push('Memory access pattern anomaly');
+        
+        return patterns.length > 0 
+            ? `Detected patterns: ${patterns.join(', ')}` 
+            : 'No specific patterns detected';
     }
 
     private oneHotEncode(type: VulnerabilityType): number[] {
