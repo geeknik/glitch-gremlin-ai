@@ -11,7 +11,10 @@ program
   .command('create-chaos-request')
   .description('Create a chaos request')
   .action(async () => {
-    const sdk = new GlitchSDK();
+    const sdk = await GlitchSDK.init({
+        cluster: 'devnet',
+        wallet: Keypair.generate()
+    });
     // Add chaos request creation logic
   });
 
