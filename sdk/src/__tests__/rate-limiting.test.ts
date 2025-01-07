@@ -14,10 +14,12 @@ describe('Rate Limiting', () => {
             wallet
         });
 
-        mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr') as jest.Mock;
-        mockIncr.mockResolvedValue(1);
-        mockExpire = jest.spyOn(sdk['queueWorker']['redis'], 'expire') as jest.Mock;
-        mockExpire.mockResolvedValue(1);
+        mockIncr = jest.fn<Promise<number>, [string]>().mockResolvedValue(1);
+        mockExpire = jest.fn<Promise<number>, [string, number]>().mockResolvedValue(1);
+        
+        // Assign mocks directly to redis methods
+        sdk['queueWorker']['redis'].incr = mockIncr;
+        sdk['queueWorker']['redis'].expire = mockExpire;
         
         jest.useFakeTimers();
     });
