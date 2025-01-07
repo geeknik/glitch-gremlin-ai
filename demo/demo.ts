@@ -1,12 +1,19 @@
 #!/usr/bin/env node
 // Add global error handlers first
 process.on('unhandledRejection', (reason, promise) => {
-    console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+    console.error('❌ Unhandled Rejection at:', promise);
+    if (reason instanceof Error) {
+        console.error('Reason:', reason.message);
+        console.error('Stack:', reason.stack);
+    } else {
+        console.error('Reason (object):', JSON.stringify(reason, null, 2));
+    }
     process.exit(1);
 });
 
 process.on('uncaughtException', (err) => {
-    console.error('❌ Uncaught Exception:', err);
+    console.error('❌ Uncaught Exception:', err.message);
+    console.error('Stack:', err.stack);
     process.exit(1);
 });
 
@@ -93,33 +100,62 @@ async function main() {
 
             console.log(chalk.green('✅ SDK initialized successfully!'));
 
+            // 2. Wallet Connection
+            console.log(chalk.cyan('\n2. Connecting wallet...'));
             try {
-                // 2. Wallet Connection
-                console.log(chalk.cyan('\n2. Connecting wallet...'));
                 const balance = await connection.getBalance(wallet.publicKey);
                 console.log(chalk.green(`✅ Wallet connected! Balance: ${balance} lamports`));
+            } catch (err) {
+                console.error(chalk.red('❌ Failed to connect wallet:'));
+                if (err instanceof Error) {
+                    console.error(chalk.red(err.message));
+                    console.error(chalk.gray('Stack:'), err.stack);
+                }
+                throw err;
+            }
 
-                // 3. Create Chaos Request
-                console.log(chalk.cyan('\n3. Creating chaos request...'));
-                const targetProgram = '11111111111111111111111111111111'; // Example program
-                const request = await sdk.createChaosRequest({
+            // 3. Create Chaos Request
+            console.log(chalk.cyan('\n3. Creating chaos request...'));
+            const targetProgram = '11111111111111111111111111111111'; // Example program
+            let request;
+            try {
+                request = await sdk.createChaosRequest({
                     targetProgram,
                     testType: TestType.FUZZ,
                     duration: 300, // 5 minutes
                     intensity: 5
                 });
                 console.log(chalk.green(`✅ Chaos request created! ID: ${request.requestId}`));
+            } catch (err) {
+                console.error(chalk.red('❌ Failed to create chaos request:'));
+                if (err instanceof Error) {
+                    console.error(chalk.red(err.message));
+                    console.error(chalk.gray('Stack:'), err.stack);
+                }
+                throw err;
+            }
 
-                // 4. Monitor Request
-                console.log(chalk.cyan('\n4. Monitoring request status...'));
+            // 4. Monitor Request
+            console.log(chalk.cyan('\n4. Monitoring request status...'));
+            try {
                 const results = await request.waitForCompletion();
                 console.log(chalk.green('✅ Chaos test completed!'));
                 console.log(chalk.green('Results:'));
                 console.log(results);
+            } catch (err) {
+                console.error(chalk.red('❌ Failed to monitor request:'));
+                if (err instanceof Error) {
+                    console.error(chalk.red(err.message));
+                    console.error(chalk.gray('Stack:'), err.stack);
+                }
+                throw err;
+            }
 
-                // 5. Governance Demo
-                console.log(chalk.cyan('\n5. Creating governance proposal...'));
-                const proposal = await sdk.createProposal({
+            // 5. Governance Demo
+            console.log(chalk.cyan('\n5. Creating governance proposal...'));
+            let proposal;
+            try {
+                proposal = await sdk.createProposal({
                     title: "Test Proposal",
                     description: "Test Description",
                     targetProgram,
@@ -132,24 +168,30 @@ async function main() {
                     stakingAmount: 1000
                 });
                 console.log(chalk.green(`✅ Proposal created! ID: ${proposal.id}`));
-
-                // 6. Voting
-                console.log(chalk.cyan('\n6. Voting on proposal...'));
-                await sdk.vote(proposal.id, true);
-                console.log(chalk.green('✅ Vote recorded!'));
-
-                console.log(chalk.bold.blue('\n🎉 Demo complete!'));
             } catch (err) {
-                console.error(chalk.red('\n❌ Error during demo execution:'));
+                console.error(chalk.red('❌ Failed to create proposal:'));
                 if (err instanceof Error) {
                     console.error(chalk.red(err.message));
-                    console.error(chalk.gray('\nStack trace:'));
-                    console.error(chalk.gray(err.stack));
-                } else {
-                    console.error(chalk.red('Unknown error:', err));
+                    console.error(chalk.gray('Stack:'), err.stack);
                 }
-                process.exit(1);
+                throw err;
             }
+
+            // 6. Voting
+            console.log(chalk.cyan('\n6. Voting on proposal...'));
+            try {
+                await sdk.vote(proposal.id, true);
+                console.log(chalk.green('✅ Vote recorded!'));
+            } catch (err) {
+                console.error(chalk.red('❌ Failed to vote:'));
+                if (err instanceof Error) {
+                    console.error(chalk.red(err.message));
+                    console.error(chalk.gray('Stack:'), err.stack);
+                }
+                throw err;
+            }
+
+            console.log(chalk.bold.blue('\n🎉 Demo complete!'));
         } catch (initErr) {
             console.error(chalk.red('❌ SDK initialization failed:'));
             if (initErr instanceof Error) {
