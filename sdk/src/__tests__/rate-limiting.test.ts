@@ -61,6 +61,7 @@ describe('Rate Limiting', () => {
                 testType: TestType.FUZZ,
                 duration: 60,
                 intensity: 1
+            })).rejects.toThrow('Rate limit exceeded');
             });
 
             // Mock get to simulate recent request
