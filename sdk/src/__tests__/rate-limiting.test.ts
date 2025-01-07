@@ -37,8 +37,11 @@ describe('Rate Limiting', () => {
         });
 
         it('should enforce cooldown between requests', async () => {
-            // Mock lastRequestTime to simulate recent request
-            sdk['lastRequestTime'] = Date.now();
+            // Mock Redis methods
+            const mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr')
+                .mockImplementation(() => Promise.resolve(1));
+            const mockExpire = jest.spyOn(sdk['queueWorker']['redis'], 'expire')
+                .mockImplementation(() => Promise.resolve(1));
 
             // First request should succeed
             await sdk.createChaosRequest({
@@ -58,6 +61,7 @@ describe('Rate Limiting', () => {
 
             // After cooldown period, request should succeed
             jest.advanceTimersByTime(2000);
+            mockIncr.mockImplementation(() => Promise.resolve(2));
 
             await sdk.createChaosRequest({
                 targetProgram: "11111111111111111111111111111111",
@@ -66,13 +70,16 @@ describe('Rate Limiting', () => {
                 intensity: 1
             });
 
-            expect(mockIncr).toHaveBeenCalled();
-            expect(mockExpire).toHaveBeenCalled();
+            expect(mockIncr).toHaveBeenCalledTimes(3);
+            expect(mockExpire).toHaveBeenCalledTimes(3);
         });
 
         it('should enforce maximum requests per minute', async () => {
             // Mock Redis to simulate rate limit exceeded
-            mockIncr.mockImplementation(() => Promise.resolve(5)); // Over the limit of 3
+            const mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr')
+                .mockImplementation(() => Promise.resolve(4)); // Over the limit of 3
+            const mockExpire = jest.spyOn(sdk['queueWorker']['redis'], 'expire')
+                .mockImplementation(() => Promise.resolve(1));
 
             // Request should fail due to rate limit
             await expect(sdk.createChaosRequest({
@@ -82,8 +89,8 @@ describe('Rate Limiting', () => {
                 intensity: 1
             })).rejects.toThrow('Rate limit exceeded');
 
-            expect(mockIncr).toHaveBeenCalled();
-            expect(mockExpire).toHaveBeenCalled();
+            expect(mockIncr).toHaveBeenCalledTimes(1);
+            expect(mockExpire).toHaveBeenCalledTimes(1);
         });
     });
 
