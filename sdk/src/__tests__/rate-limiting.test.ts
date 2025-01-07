@@ -15,9 +15,9 @@ describe('Rate Limiting', () => {
         });
 
         mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr') as jest.Mock;
-        mockIncr.mockResolvedValue(1);
+        mockIncr.mockResolvedValue(1 as any);
         mockExpire = jest.spyOn(sdk['queueWorker']['redis'], 'expire') as jest.Mock;
-        mockExpire.mockResolvedValue(1);
+        mockExpire.mockResolvedValue(1 as any);
         
         jest.useFakeTimers();
     });
