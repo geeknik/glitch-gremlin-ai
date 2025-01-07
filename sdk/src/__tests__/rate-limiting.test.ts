@@ -1,10 +1,11 @@
-import { GlitchSDK, TestType, GlitchError } from '../index';
+import { GlitchSDK, TestType } from '../index';
 import { Keypair } from '@solana/web3.js';
+import { jest } from '@jest/globals';
 
 describe('Rate Limiting', () => {
-    jest.setTimeout(15000); // Increase timeout for all rate limiting tests
-    
     let sdk: GlitchSDK;
+    let mockIncr: jest.SpyInstance;
+    let mockExpire: jest.SpyInstance;
     
     beforeEach(() => {
         const wallet = Keypair.generate();
@@ -12,12 +13,18 @@ describe('Rate Limiting', () => {
             cluster: 'https://api.devnet.solana.com',
             wallet
         });
+
+        mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr')
+            .mockResolvedValue(1);
+        mockExpire = jest.spyOn(sdk['queueWorker']['redis'], 'expire')
+            .mockResolvedValue(1);
         
-        // Reset timer mocks before each test
         jest.useFakeTimers();
     });
 
     afterEach(() => {
+        mockIncr.mockRestore();
+        mockExpire.mockRestore();
         jest.useRealTimers();
         jest.clearAllMocks();
     });
@@ -48,17 +55,6 @@ describe('Rate Limiting', () => {
             mockExpire = jest.spyOn(sdk['queueWorker']['redis'], 'expire')
                 .mockImplementation(() => Promise.resolve(1));
 
-            // Make first request
-            await sdk.createChaosRequest({
-                targetProgram: "11111111111111111111111111111111",
-                testType: TestType.FUZZ,
-                duration: 60,
-                intensity: 1
-            });
-
-            // Mock get to simulate recent request
-            mockGet.mockImplementation(() => Promise.resolve(Date.now().toString()));
-
             // First request should succeed
             await sdk.createChaosRequest({
                 targetProgram: "11111111111111111111111111111111",
@@ -67,21 +63,32 @@ describe('Rate Limiting', () => {
                 intensity: 1
             });
 
-            // Immediate second request should fail due to cooldown
-            mockGet.mockImplementation(() => Promise.resolve(Date.now().toString()));
-            
-            await expect(sdk.createChaosRequest({
+            // Mock get to simulate recent request
+            mockGet.mockResolvedValue(Date.now().toString());
+
+            // Second request should succeed
+            await sdk.createChaosRequest({
                 targetProgram: "11111111111111111111111111111111",
                 testType: TestType.FUZZ,
                 duration: 60,
                 intensity: 1
-            })).rejects.toThrow('Rate limit exceeded');
+            });
 
-            // After cooldown period, request should succeed
-            jest.advanceTimersByTime(2000);
-            mockGet.mockImplementation(() => Promise.resolve((Date.now() - 2500).toString()));
+            // Immediate third request should fail due to cooldown
+            await expect(
+                sdk.createChaosRequest({
+                    targetProgram: "11111111111111111111111111111111",
+                    testType: TestType.FUZZ,
+                    duration: 60,
+                    intensity: 1
+                })
+            ).rejects.toThrow('Rate limit exceeded');
 
-            await sdk.createChaosRequest({
+            expect(mockIncr).toHaveBeenCalledTimes(2);
+            expect(mockExpire).toHaveBeenCalledTimes(2);
+
+            mockGet.mockRestore();
+            mockSet.mockRestore();
                 targetProgram: "11111111111111111111111111111111",
                 testType: TestType.FUZZ,
                 duration: 60,
@@ -93,10 +100,8 @@ describe('Rate Limiting', () => {
         });
 
         it('should enforce maximum requests per minute', async () => {
-            const mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr')
-                .mockImplementation(() => Promise.resolve(1));
-            const mockExpire = jest.spyOn(sdk['queueWorker']['redis'], 'expire')
-                .mockImplementation(() => Promise.resolve(1));
+            // Mock incr to simulate hitting limit
+            mockIncr.mockResolvedValue(4);
 
             // First request should succeed
             await sdk.createChaosRequest({
@@ -106,27 +111,15 @@ describe('Rate Limiting', () => {
                 intensity: 1
             });
 
-            // Mock incr to simulate hitting limit
-            mockIncr.mockImplementation(() => Promise.resolve(4));
-
-            // Fourth request should fail
-                await sdk.createChaosRequest({
+            // Request that hits the limit should fail
+            await expect(
+                sdk.createChaosRequest({
                     targetProgram: "11111111111111111111111111111111",
                     testType: TestType.FUZZ,
                     duration: 60,
                     intensity: 1
-                });
-            }
-
-            // Fourth request should fail
-            await expect(async () => {
-                await sdk.createChaosRequest({
-                    targetProgram: "11111111111111111111111111111111",
-                    testType: TestType.FUZZ,
-                    duration: 60,
-                    intensity: 1
-                });
-            }).rejects.toThrow('Rate limit exceeded');
+                })
+            ).rejects.toThrow('Rate limit exceeded');
 
             expect(mockIncr).toHaveBeenCalledTimes(2);
             expect(mockExpire).toHaveBeenCalledTimes(2);
