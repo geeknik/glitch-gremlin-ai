@@ -31,7 +31,7 @@ describe('VulnerabilityDetectionModel', () => {
         });
     });
 
-    describe('predictions', () => {
+    describe('prediction', () => {
         it('should make predictions with confidence scores', async () => {
             const features = new Array(20).fill(0).map((_, i) => i % 10);
             const prediction = await model.predict(features);
