@@ -16,7 +16,6 @@ pub struct ChaosRequest {
     /// Escrow account for tokens
     pub escrow_account: Pubkey,
     /// Rate limiting data
-    pub rate_limit: RateLimitInfo,
     /// Rate limiting data
     pub rate_limit: RateLimitInfo,
 }
