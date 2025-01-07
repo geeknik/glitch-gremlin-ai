@@ -29,7 +29,8 @@ describe('Rate Limiting', () => {
         jest.clearAllMocks();
     });
 
-    describe('request rate limiting', () => {
+    describe('rate limiting', () => {
+        describe('request limits', () => {
 
         it('should enforce cooldown between requests', async () => {
             const mockGet = jest.spyOn(sdk['queueWorker']['redis'], 'get')
@@ -69,6 +70,8 @@ describe('Rate Limiting', () => {
 
             expect(mockIncr).toHaveBeenCalledTimes(2);
             expect(mockExpire).toHaveBeenCalledTimes(2);
+            expect(mockGet).toHaveBeenCalled();
+            expect(mockSet).toHaveBeenCalled();
 
             mockGet.mockRestore();
             mockSet.mockRestore();
