@@ -44,7 +44,10 @@ async function main() {
         // 1. Setup
         console.log(chalk.cyan('1. Setting up environment...'));
         const wallet = Keypair.generate();
-        const connection = new Connection('https://api.devnet.solana.com');
+        const connection = new Connection('https://api.devnet.solana.com', {
+            commitment: 'confirmed',
+            disableRetryOnRateLimit: false
+        });
         
         // Verify connection
         try {
@@ -73,8 +76,21 @@ async function main() {
                     retryStrategy: (times) => {
                         const delay = Math.min(times * 50, 2000);
                         return delay;
-                    }
+                    },
+                    maxRetriesPerRequest: 3
                 }
+            }).catch(err => {
+                console.error(chalk.red('❌ SDK initialization failed:'));
+                if (err instanceof Error) {
+                    console.error(chalk.red(err.message));
+                    if (err.stack) {
+                        console.error(chalk.gray('\nStack trace:'));
+                        console.error(chalk.gray(err.stack));
+                    }
+                } else {
+                    console.error(chalk.red('Unknown error:', err));
+                }
+                process.exit(1);
             });
 
             if (!sdk) {
@@ -202,6 +218,11 @@ async function main() {
                 }
             } else {
                 console.error(chalk.red('Unknown error:', initErr));
+                try {
+                    console.error(chalk.red('Error details:', JSON.stringify(initErr, null, 2)));
+                } catch (e) {
+                    console.error(chalk.red('Could not stringify error:', e));
+                }
             }
             process.exit(1);
         }
