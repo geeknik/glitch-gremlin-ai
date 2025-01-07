@@ -1,6 +1,8 @@
-import { GlitchSDK } from './sdk';
-import { program } from 'commander';
-import { readPackageJson } from './utils';
+import { GlitchSDK } from './sdk.js';
+import { Command } from 'commander';
+import { readPackageJson } from './utils.js';
+
+const program = new Command();
 
 const pkg = readPackageJson();
 

@@ -1,8 +1,8 @@
-import Redis from 'ioredis';
-import { ChaosRequestParams, ChaosResult } from '../types';
+import { Redis } from 'ioredis';
+import type { ChaosRequestParams, ChaosResult } from '../types.js';
 
 export class RedisQueueWorker {
-    private redis: Redis;
+    private redis: Redis; 
     private readonly queueKey = 'glitch:chaos:queue';
     private readonly resultKey = 'glitch:chaos:results';
 
