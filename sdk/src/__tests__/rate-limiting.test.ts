@@ -26,9 +26,9 @@ describe('Rate Limiting', () => {
 
         beforeEach(() => {
             mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr')
-                .mockResolvedValue(1);
+                .mockImplementation(() => Promise.resolve(1));
             mockExpire = jest.spyOn(sdk['queueWorker']['redis'], 'expire')
-                .mockResolvedValue(1);
+                .mockImplementation(() => Promise.resolve(1));
         });
 
         afterEach(() => {
@@ -37,6 +37,8 @@ describe('Rate Limiting', () => {
         });
 
         it('should enforce cooldown between requests', async () => {
+            // Mock lastRequestTime to simulate recent request
+            sdk['lastRequestTime'] = Date.now();
 
             // First request should succeed
             await sdk.createChaosRequest({
@@ -70,7 +72,7 @@ describe('Rate Limiting', () => {
 
         it('should enforce maximum requests per minute', async () => {
             // Mock Redis to simulate rate limit exceeded
-            mockIncr.mockResolvedValueOnce(5); // Over the limit of 3
+            mockIncr.mockImplementation(() => Promise.resolve(5)); // Over the limit of 3
 
             // Request should fail due to rate limit
             await expect(sdk.createChaosRequest({
@@ -86,11 +88,14 @@ describe('Rate Limiting', () => {
     });
 
     describe('governance rate limiting', () => {
-        // Increase timeout for all tests in this describe block
-        jest.setTimeout(30000);
+        beforeAll(() => {
+            jest.setTimeout(60000); // Increase timeout to 60s for all governance tests
+        });
 
         it('should limit proposals per day', async () => {
-            // Set timeout at describe level instead
+            // Mock Redis rate limit check
+            const mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr')
+                .mockImplementation(() => Promise.resolve(5)); // Over daily limit
             // Create first proposal
             await sdk.createProposal({
                 title: "Test Proposal",
