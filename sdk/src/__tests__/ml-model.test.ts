@@ -5,13 +5,23 @@ import * as tf from '@tensorflow/tfjs-node';
 describe('VulnerabilityDetectionModel', () => {
     let model: VulnerabilityDetectionModel;
 
-    beforeEach(async () => {
+    beforeAll(async () => {
+        await tf.ready();
+        await tf.setBackend('cpu');
+    });
+
+    beforeEach(() => {
         model = new VulnerabilityDetectionModel();
-        await model.ensureInitialized();
     });
 
     afterEach(async () => {
         await model.cleanup();
+        // Clear all tensors between tests
+        tf.disposeVariables();
+    });
+
+    afterAll(async () => {
+        await tf.dispose();
     });
 
     describe('training', () => {
