@@ -103,28 +103,13 @@ describe('Rate Limiting', () => {
         });
 
         describe('governance rate limiting', () => {
-        it('should limit proposals per day', async () => {
-            let proposalCount = 0;
-            mockIncr.mockImplementation(() => Promise.resolve(++proposalCount));
+            it('should limit proposals per day', async () => {
+                let proposalCount = 0;
+                mockIncr.mockImplementation(() => Promise.resolve(++proposalCount));
 
-            // First proposal should succeed
-            await sdk.createProposal({
-                title: "Test Proposal",
-                description: "Test Description",
-                targetProgram: "11111111111111111111111111111111",
-                testParams: {
-                    testType: TestType.FUZZ,
-                    duration: 300,
-                    intensity: 5,
-                    targetProgram: "11111111111111111111111111111111"
-                },
-                stakingAmount: 1000
-            });
-
-            // Second proposal should fail due to daily limit
-            await expect(
-                sdk.createProposal({
-                    title: "Test Proposal 2",
+                // First proposal should succeed
+                await sdk.createProposal({
+                    title: "Test Proposal",
                     description: "Test Description",
                     targetProgram: "11111111111111111111111111111111",
                     testParams: {
@@ -134,30 +119,46 @@ describe('Rate Limiting', () => {
                         targetProgram: "11111111111111111111111111111111"
                     },
                     stakingAmount: 1000
-                })
-            ).rejects.toThrow('Rate limit exceeded');
+                });
 
-            expect(mockIncr).toHaveBeenCalledTimes(2);
-            expect(mockExpire).toHaveBeenCalledTimes(2);
+                // Second proposal should fail due to daily limit
+                await expect(
+                    sdk.createProposal({
+                        title: "Test Proposal 2",
+                        description: "Test Description",
+                        targetProgram: "11111111111111111111111111111111",
+                        testParams: {
+                            testType: TestType.FUZZ,
+                            duration: 300,
+                            intensity: 5,
+                            targetProgram: "11111111111111111111111111111111"
+                        },
+                        stakingAmount: 1000
+                    })
+                ).rejects.toThrow('Rate limit exceeded');
 
-            // After 24 hours, should succeed
-            jest.advanceTimersByTime(24 * 60 * 60 * 1000);
-            proposalCount = 0; // Reset counter after time advance
-            
-            await sdk.createProposal({
-                title: "Test Proposal 3",
-                description: "Test Description",
-                targetProgram: "11111111111111111111111111111111",
-                testParams: {
-                    testType: TestType.FUZZ,
-                    duration: 300,
-                    intensity: 5,
-                    targetProgram: "11111111111111111111111111111111"
-                },
-                stakingAmount: 1000
+                expect(mockIncr).toHaveBeenCalledTimes(2);
+                expect(mockExpire).toHaveBeenCalledTimes(2);
+
+                // After 24 hours, should succeed
+                jest.advanceTimersByTime(24 * 60 * 60 * 1000);
+                proposalCount = 0; // Reset counter after time advance
+                
+                await sdk.createProposal({
+                    title: "Test Proposal 3",
+                    description: "Test Description",
+                    targetProgram: "11111111111111111111111111111111",
+                    testParams: {
+                        testType: TestType.FUZZ,
+                        duration: 300,
+                        intensity: 5,
+                        targetProgram: "11111111111111111111111111111111"
+                    },
+                    stakingAmount: 1000
+                });
+
+                expect(mockIncr).toHaveBeenCalledTimes(3);
+                expect(mockExpire).toHaveBeenCalledTimes(3);
             });
-
-            expect(mockIncr).toHaveBeenCalledTimes(3);
-            expect(mockExpire).toHaveBeenCalledTimes(3);
         });
 });
