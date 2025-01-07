@@ -207,16 +207,18 @@ async function main() {
 }
 
 // Wrap the main function in a try-catch block
-try {
-    await main();
-} catch (err) {
-    console.error(chalk.red('\n❌ Demo failed:'));
-    if (err instanceof Error) {
-        console.error(chalk.red(err.message));
-        console.error(chalk.gray('\nStack trace:'));
-        console.error(chalk.gray(err.stack));
-    } else {
-        console.error(chalk.red('Unknown error:', err));
+(async () => {
+    try {
+        await main();
+    } catch (err) {
+        console.error(chalk.red('\n❌ Demo failed:'));
+        if (err instanceof Error) {
+            console.error(chalk.red(err.message));
+            console.error(chalk.gray('\nStack trace:'));
+            console.error(chalk.gray(err.stack));
+        } else {
+            console.error(chalk.red('Unknown error:', err));
+        }
+        process.exit(1);
     }
-    process.exit(1);
-}
+})();
