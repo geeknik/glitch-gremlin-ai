@@ -1,17 +1,28 @@
 import { GlitchSDK, TestType } from '@glitch-gremlin/sdk';
 import { Keypair, Connection } from '@solana/web3.js';
 import chalk from 'chalk';
+import { config } from 'dotenv';
 
 async function main() {
+    // Load environment variables
+    config();
+    
     console.log(chalk.bold.blue('\n🚀 Starting Glitch Gremlin AI Demo\n'));
 
     // 1. Setup
     console.log(chalk.cyan('1. Setting up environment...'));
     const wallet = Keypair.generate();
     const connection = new Connection('https://api.devnet.solana.com');
-    const sdk = new GlitchSDK({
+    
+    // Initialize SDK with proper configuration
+    const sdk = await GlitchSDK.init({
         cluster: 'devnet',
-        wallet
+        wallet,
+        redisConfig: {
+            host: process.env.REDIS_HOST || 'localhost',
+            port: parseInt(process.env.REDIS_PORT || '6379'),
+            password: process.env.REDIS_PASSWORD
+        }
     });
 
     // 2. Wallet Connection
