@@ -4,5 +4,9 @@
     "@glitch-gremlin/sdk": "file:../sdk",
     "@solana/web3.js": "^1.98.0",
     "chalk": "^5.4.1"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
   }
 }
