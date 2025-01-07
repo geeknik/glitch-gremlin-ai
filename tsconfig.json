@@ -8,7 +8,7 @@
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
-      "@glitch-gremlin/sdk": ["./sdk/src/index.js"]
+      "@glitch-gremlin/sdk": ["./sdk/src/index.ts"]
     }
   },
   "references": [
