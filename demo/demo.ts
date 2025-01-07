@@ -182,28 +182,31 @@ async function main() {
 
             // 5. Governance Demo
             console.log(chalk.cyan('\n5. Creating governance proposal...'));
-            let proposal;
-            try {
-                proposal = await sdk.createProposal({
-                    title: "Test Proposal",
-                    description: "Test Description",
-                    targetProgram,
-                    testParams: {
-                        testType: TestType.FUZZ,
-                        duration: 300,
-                        intensity: 5,
-                        targetProgram
-                    },
-                    stakingAmount: Math.min(50_000_000, balance) // Use up to 0.05 SOL or available balance
-                });
-                console.log(chalk.green(`✅ Proposal created! ID: ${proposal.id}`));
-            } catch (err) {
-                console.error(chalk.red('❌ Failed to create proposal:'));
-                if (err instanceof Error) {
-                    console.error(chalk.red(err.message));
-                    console.error(chalk.gray('Stack:'), err.stack);
+            if (balance < 50_000_000) { // Need at least 0.05 SOL
+                console.log(chalk.yellow('⚠️ Insufficient balance for governance proposal. Need at least 0.05 SOL.'));
+            } else {
+                try {
+                    const proposal = await sdk.createProposal({
+                        title: "Test Proposal",
+                        description: "Test Description",
+                        targetProgram,
+                        testParams: {
+                            testType: TestType.FUZZ,
+                            duration: 300,
+                            intensity: 5,
+                            targetProgram
+                        },
+                        stakingAmount: Math.min(50_000_000, balance) // Use up to 0.05 SOL or available balance
+                    });
+                    console.log(chalk.green(`✅ Proposal created! ID: ${proposal.id}`));
+                } catch (err) {
+                    console.error(chalk.red('❌ Failed to create proposal:'));
+                    if (err instanceof Error) {
+                        console.error(chalk.red(err.message));
+                        console.error(chalk.gray('Stack:'), err.stack);
+                    }
+                    throw err;
                 }
-                throw err;
             }
 
             // 6. Voting
