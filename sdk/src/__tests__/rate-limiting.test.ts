@@ -42,11 +42,6 @@ describe('Rate Limiting', () => {
                 .mockImplementation(() => Promise.resolve(null));
             const mockSet = jest.spyOn(sdk['queueWorker']['redis'], 'set')
                 .mockImplementation(() => Promise.resolve('OK'));
-            // Mock Redis methods
-            const mockGet = jest.spyOn(sdk['queueWorker']['redis'], 'get')
-                .mockImplementation(() => Promise.resolve(null));
-            const mockSet = jest.spyOn(sdk['queueWorker']['redis'], 'set')
-                .mockImplementation(() => Promise.resolve('OK'));
             const mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr')
                 .mockImplementation(() => Promise.resolve(1));
             const mockExpire = jest.spyOn(sdk['queueWorker']['redis'], 'expire')
