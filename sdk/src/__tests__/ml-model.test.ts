@@ -22,7 +22,7 @@ describe('VulnerabilityDetectionModel', () => {
                     vulnerabilityType: VulnerabilityType.Reentrancy
                 },
                 {
-                    features: [5, 4, 3, 2, 1, 5, 4, 3, 2, 1],
+                    features: new Array(20).fill(0).map((_, i) => (i + 1) % 10),
                     vulnerabilityType: VulnerabilityType.ArithmeticOverflow
                 }
             ];
