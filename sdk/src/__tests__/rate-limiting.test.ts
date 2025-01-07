@@ -14,15 +14,9 @@ describe('Rate Limiting', () => {
             wallet
         });
 
-    let mockIncr: jest.Mock;
-    let mockExpire: jest.Mock;
-
-    beforeEach(() => {
-        const wallet = Keypair.generate();
-        sdk = new GlitchSDK({
-            cluster: 'https://api.devnet.solana.com',
-            wallet
-        });
+        // Initialize mock functions with proper types
+        mockIncr = jest.fn().mockResolvedValue(1);
+        mockExpire = jest.fn().mockResolvedValue(1);
 
         // Initialize mock functions with proper types
         mockIncr = jest.fn().mockResolvedValue(1);
@@ -45,7 +39,6 @@ describe('Rate Limiting', () => {
 
     describe('rate limiting', () => {
         describe('request limits', () => {
-            // Add missing closing brace for describe block
         });
     });
 
