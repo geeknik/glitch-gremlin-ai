@@ -63,8 +63,10 @@ export class VulnerabilityDetectionModel {
             batchSize: 32,
             validationSplit: 0.2,
             callbacks: {
-                onEpochEnd: (epoch: number, logs: { loss: number }) => {
-                    console.log(`Epoch ${epoch}: loss = ${logs.loss.toFixed(4)}`);
+                onEpochEnd: (epoch: number, logs?: tf.Logs) => {
+                    if (logs?.loss) {
+                        console.log(`Epoch ${epoch}: loss = ${logs.loss.toFixed(4)}`);
+                    }
                 }
             }
         });
