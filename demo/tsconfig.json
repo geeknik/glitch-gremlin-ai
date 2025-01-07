@@ -1,23 +1,6 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": {
-    "module": "ESNext",
-    "moduleResolution": "NodeNext",
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "baseUrl": ".",
-    "paths": {
-      "@glitch-gremlin/sdk": ["../sdk/src/index.ts"]
-    }
-  },
-  "ts-node": {
-    "esm": true,
-    "experimentalSpecifierResolution": "node"
-  }
-}
-{
-  "compilerOptions": {
     "target": "ES2020",
     "module": "ESNext",
     "moduleResolution": "NodeNext",
@@ -31,6 +14,10 @@
     "paths": {
       "@glitch-gremlin/sdk": ["../sdk/src/index.ts"]
     }
+  },
+  "ts-node": {
+    "esm": true,
+    "experimentalSpecifierResolution": "node"
   },
   "include": ["**/*.ts"],
   "exclude": ["node_modules"]
