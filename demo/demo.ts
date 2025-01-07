@@ -106,32 +106,39 @@ async function main() {
             
             // Only airdrop if balance is less than 0.1 SOL
             if (balance < 100_000_000) {
-                const maxRetries = 3;
+                const maxRetries = 5; // Increased retry count
                 let retryCount = 0;
                 let airdropSuccess = false;
+                let airdropAmount = 100_000_000; // Start with 0.1 SOL
                 
                 while (retryCount < maxRetries && !airdropSuccess) {
                     try {
-                        console.log(chalk.gray(`Attempting airdrop (${retryCount + 1}/${maxRetries})...`));
+                        console.log(chalk.gray(`Attempting airdrop of ${airdropAmount} lamports (${retryCount + 1}/${maxRetries})...`));
                         const airdropSignature = await connection.requestAirdrop(
                             wallet.publicKey,
-                            1_000_000_000 // 1 SOL
+                            airdropAmount
                         );
-                        await connection.confirmTransaction(airdropSignature);
+                        await connection.confirmTransaction(airdropSignature, 'confirmed');
                         airdropSuccess = true;
                     } catch (err) {
                         retryCount++;
                         if (retryCount === maxRetries) {
                             console.warn(chalk.yellow('⚠️ Airdrop failed after multiple attempts. Using existing balance.'));
                         } else {
-                            // Wait 2 seconds before retrying
-                            await new Promise(resolve => setTimeout(resolve, 2000));
+                            // Reduce airdrop amount and increase wait time
+                            airdropAmount = Math.floor(airdropAmount / 2);
+                            const waitTime = Math.min(2000 * (retryCount + 1), 10000); // Max 10s wait
+                            console.warn(chalk.yellow(`⚠️ Airdrop failed, retrying with ${airdropAmount} lamports in ${waitTime}ms...`));
+                            await new Promise(resolve => setTimeout(resolve, waitTime));
                         }
                     }
                 }
                 
                 // Get updated balance
                 balance = await connection.getBalance(wallet.publicKey);
+                console.log(chalk.green(`✅ Wallet connected! Balance: ${balance} lamports`));
+            } else {
+                console.log(chalk.green(`✅ Wallet connected! Balance: ${balance} lamports`));
             }
             
             console.log(chalk.green(`✅ Wallet connected! Balance: ${balance} lamports`));
@@ -187,7 +194,7 @@ async function main() {
                         intensity: 5,
                         targetProgram
                     },
-                    stakingAmount: Math.min(100_000_000, balance) // Use up to 0.1 SOL or available balance
+                    stakingAmount: Math.min(50_000_000, balance) // Use up to 0.05 SOL or available balance
                 });
                 console.log(chalk.green(`✅ Proposal created! ID: ${proposal.id}`));
             } catch (err) {
