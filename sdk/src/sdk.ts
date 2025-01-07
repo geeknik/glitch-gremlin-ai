@@ -80,8 +80,12 @@ export class GlitchSDK {
             ...config.governanceConfig
         };
         
-        // Default to testnet
-        this.connection = new Connection(config.cluster || 'https://api.testnet.solana.com');
+        // Validate and set cluster URL
+        const clusterUrl = config.cluster || 'https://api.testnet.solana.com';
+        if (!clusterUrl.startsWith('http')) {
+            throw new Error('Cluster URL must start with http:// or https://');
+        }
+        this.connection = new Connection(clusterUrl);
         
         // Use an obfuscated program ID if not specified
         this.programId = new PublicKey(

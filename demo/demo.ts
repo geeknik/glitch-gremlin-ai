@@ -66,7 +66,7 @@ async function main() {
             console.log('Initializing SDK with Redis config:', redisConfig);
             
             const sdk = await GlitchSDK.init({
-                cluster: 'devnet',
+                cluster: 'https://api.devnet.solana.com',
                 wallet,
                 redisConfig
             });
