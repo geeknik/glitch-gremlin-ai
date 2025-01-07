@@ -13,7 +13,7 @@
     "test": "npm run test --workspaces --if-present",
     "test:coverage": "npm run test:coverage --workspaces --if-present",
     "lint": "npm run lint --workspaces",
-    "demo": "NODE_OPTIONS='--loader ts-node/esm' NODE_PATH=./sdk/src ts-node --esm demo/demo.ts"
+    "demo": "cd demo && npm install && NODE_OPTIONS='--loader ts-node/esm' ts-node --esm demo.ts"
   },
   "type": "commonjs",
   "devDependencies": {
