@@ -1,6 +1,6 @@
-import { RedisQueueWorker } from '../queue/redis-worker';
-import { TestType } from '../types';
-import { Redis } from 'ioredis';
+import { RedisQueueWorker } from '../queue/redis-worker.js';
+import { TestType } from '../types.js';
+import { Redis } from 'ioredis.js';
 // Remove this line since we're using the real Redis client
 
 jest.mock('ioredis', () => require('ioredis-mock'));

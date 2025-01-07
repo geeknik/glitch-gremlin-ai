@@ -5,13 +5,13 @@ import {
     Transaction,
     TransactionInstruction,
     SystemProgram
-} from '@solana/web3.js';
-import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
-import { TokenEconomics } from './token-economics';
-import { GovernanceConfig, ChaosRequestParams, ChaosResult, TestType, ProposalParams } from './types';
-import { GovernanceManager } from './governance';
-import { RedisQueueWorker } from './queue/redis-worker';
-import { GlitchError, InsufficientFundsError, InvalidProgramError } from './errors';
+} from '@solana/web3.js.js';
+import { TOKEN_PROGRAM_ID } from '@solana/spl-token.js';
+import { TokenEconomics } from './token-economics.js';
+import { GovernanceConfig, ChaosRequestParams, ChaosResult, TestType, ProposalParams } from './types.js';
+import { GovernanceManager } from './governance.js';
+import { RedisQueueWorker } from './queue/redis-worker.js';
+import { GlitchError, InsufficientFundsError, InvalidProgramError } from './errors.js';
 
 /**
  * GlitchSDK provides the main interface for interacting with the Glitch Gremlin AI platform.

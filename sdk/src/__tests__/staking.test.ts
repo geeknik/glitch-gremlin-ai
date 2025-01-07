@@ -1,6 +1,6 @@
-import { GlitchSDK } from '../sdk';
-import { Keypair } from '@solana/web3.js';
-import { GlitchError, InsufficientFundsError } from '../errors';
+import { GlitchSDK } from '../sdk.js';
+import { Keypair } from '@solana/web3.js.js';
+import { GlitchError, InsufficientFundsError } from '../errors.js';
 
 describe('Staking', () => {
     let sdk: GlitchSDK;

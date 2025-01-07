@@ -1,5 +1,5 @@
-import { GlitchSDK, TestType } from '../index';
-import { Keypair } from '@solana/web3.js';
+import { GlitchSDK, TestType } from '../index.js';
+import { Keypair } from '@solana/web3.js.js';
 
 describe('GlitchSDK', () => {
     let sdk: GlitchSDK;
