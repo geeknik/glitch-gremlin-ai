@@ -140,14 +140,14 @@ describe('GovernanceManager', () => {
 
                         // Mock transaction simulation
                         simulateTransactionMock = jest.spyOn(connection, 'simulateTransaction')
-                            .mockResolvedValue({
+                            .mockImplementation(async () => ({
                                 context: { slot: 0 },
                                 value: { err: null, logs: [], accounts: null, unitsConsumed: 0, returnData: null }
-                            });
+                            }));
 
                         // Mock transaction sending
                         sendTransactionMock = jest.spyOn(connection, 'sendTransaction')
-                            .mockResolvedValue('mock-signature');
+                            .mockImplementation(async () => 'mock-signature');
                     });
 
                     afterEach(() => {
