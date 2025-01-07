@@ -206,7 +206,7 @@ async function main() {
 
 }
 
-// Wrap the main function in a try-catch block
+// Main execution
 (async () => {
     try {
         await main();
