@@ -45,3 +45,32 @@ npx ts-node demo.ts
    - Create test proposal
    - Cast vote
    - View proposal status
+<<<<<<< HEAD
+=======
+
+## Recording Tips
+
+- Use a terminal with good contrast for recording
+- Highlight key interactions with chalk colors
+- Pause between steps to explain functionality
+- Show console output for each operation
+</source>
+</source>
+
+Let's also add a demo script to package.json:
+
+package.json
+<source>json
+<<<<<<< SEARCH
+  "scripts": {
+    "clean": "rm -rf node_modules package-lock.json sdk/dist cli/dist",
+    "build": "npm run build-sdk && npm run build-cli",
+    "build-sdk": "cd sdk && npm install && npm run build",
+    "build-cli": "cd cli && npm install && npm run build",
+    "test": "npm run test --workspaces --if-present",
+    "test:coverage": "npm run test:coverage --workspaces --if-present",
+    "lint": "npm run lint --workspaces",
+    "demo": "NODE_OPTIONS='--loader ts-node/esm' ts-node --esm demo.ts",
+    "dev": "cd explorer && npm run dev"
+  },
+>>>>>>> c23ee6a (feat: Add dev script to start explorer UI development server)
