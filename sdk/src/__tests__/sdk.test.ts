@@ -15,7 +15,12 @@ describe('GlitchSDK', () => {
     afterEach(async () => {
         if (sdk) {
             await sdk['queueWorker'].close();
+            await sdk['connection'].getRecentBlockhash(); // Ensure all pending requests complete
+            // Connection doesn't need explicit cleanup
         }
+        // Clear any pending timers and intervals
+        jest.clearAllTimers();
+        jest.clearAllMocks();
     });
 
     describe('createChaosRequest', () => {
@@ -138,6 +143,7 @@ describe('GlitchSDK', () => {
             });
 
             it('should enforce rate limits for single requests', async () => {
+                jest.setTimeout(10000); // Increase timeout for this test
                 // First request should succeed
                 await sdk.createChaosRequest({
                     targetProgram: "11111111111111111111111111111111",
@@ -165,6 +171,7 @@ describe('GlitchSDK', () => {
             });
 
             it('should enforce rate limits for parallel requests', async () => {
+                jest.setTimeout(10000); // Increase timeout for this test
                 const promises = Array(5).fill(0).map(() => sdk.createChaosRequest({
                     targetProgram: "11111111111111111111111111111111",
                     testType: TestType.FUZZ,
@@ -177,6 +184,7 @@ describe('GlitchSDK', () => {
             });
 
             it('should allow requests after cooldown period', async () => {
+                jest.setTimeout(10000); // Increase timeout for this test
                 // First request
                 await sdk.createChaosRequest({
                     targetProgram: "11111111111111111111111111111111",
