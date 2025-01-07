@@ -21,6 +21,12 @@ export class VulnerabilityDetectionModel {
         }
     }
 
+    private async ensureInitialized() {
+        if (!this.initialized) {
+            await this.initializeModel();
+        }
+    }
+
     private buildModel(): tf.LayersModel {
         const model = tf.sequential();
         

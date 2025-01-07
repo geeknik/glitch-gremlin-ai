@@ -51,8 +51,9 @@ describe('GlitchSDK', () => {
     });
 
     describe('version compatibility', () => {
-        it('should export correct version', () => {
-            expect(require('../index').version).toBe('0.1.0');
+        it('should export correct version', async () => {
+            const { version } = await import('../index');
+            expect(version).toBe('0.1.0');
         });
     });
 

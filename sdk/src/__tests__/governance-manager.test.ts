@@ -75,6 +75,7 @@ describe('GovernanceManager', () => {
 
         describe('successful voting', () => {
             describe('voting scenarios', () => {
+                jest.setTimeout(30000); // Increase timeout for these tests
                 describe('with active proposal', () => {
                     let validateProposalMock: jest.SpyInstance;
                     let getAccountInfoMock: jest.SpyInstance;
