@@ -1,3 +1,14 @@
+// Load environment variables at the very top
+import { config } from 'dotenv';
+const result = config();
+
+if (result.error) {
+    console.error('❌ Error loading .env file:', result.error);
+    process.exit(1);
+} else {
+    console.log('✅ .env file loaded successfully.');
+}
+
 import { GlitchSDK, TestType } from '@glitch-gremlin/sdk';
 import { Keypair, Connection } from '@solana/web3.js';
 import chalk from 'chalk';
@@ -10,15 +21,22 @@ async function main() {
     const wallet = Keypair.generate();
     const connection = new Connection('https://api.devnet.solana.com');
     
-    // Initialize SDK with proper async initialization
+    // Log loaded environment variables for debugging
+    console.log('REDIS_HOST:', process.env.REDIS_HOST);
+    console.log('REDIS_PORT:', process.env.REDIS_PORT);
+
+    // Initialize SDK with proper configuration
     const sdk = await GlitchSDK.init({
         cluster: 'devnet',
         wallet,
         redisConfig: {
-            host: 'r.glitchgremlin.ai',
-            port: 6379
+            host: process.env.REDIS_HOST || 'localhost',
+            port: parseInt(process.env.REDIS_PORT || '6379'),
+            // No password needed
         }
     });
+
+    console.log('✅ SDK initialized successfully.');
 
     // 2. Wallet Connection
     console.log(chalk.cyan('\n2. Connecting wallet...'));
