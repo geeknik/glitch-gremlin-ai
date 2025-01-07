@@ -1,21 +1,23 @@
 #!/usr/bin/env node
-// Add global error handlers first
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('❌ Unhandled Rejection at:', promise);
-    if (reason instanceof Error) {
-        console.error('Reason:', reason.message);
-        console.error('Stack:', reason.stack);
+import { register } from 'node:module';
+import { pathToFileURL } from 'node:url';
+
+// Register ts-node/esm using the new recommended approach
+register('ts-node/esm', pathToFileURL('./'));
+
+// Enhanced error handling
+const handleError = (err: unknown) => {
+    if (err instanceof Error) {
+        console.error('❌ Error:', err.message);
+        console.error('Stack:', err.stack);
     } else {
-        console.error('Reason (object):', JSON.stringify(reason, null, 2));
+        console.error('❌ Unknown error:', JSON.stringify(err, null, 2));
     }
     process.exit(1);
-});
+};
 
-process.on('uncaughtException', (err) => {
-    console.error('❌ Uncaught Exception:', err.message);
-    console.error('Stack:', err.stack);
-    process.exit(1);
-});
+process.on('unhandledRejection', handleError);
+process.on('uncaughtException', handleError);
 
 // Load environment variables
 import { config } from 'dotenv';
@@ -39,6 +41,10 @@ import chalk from 'chalk';
 
 async function main() {
     try {
+        // Add debug logging for environment
+        console.log('Node version:', process.version);
+        console.log('Platform:', process.platform);
+        console.log('Arch:', process.arch);
         console.log(chalk.bold.blue('\n🚀 Starting Glitch Gremlin AI Demo\n'));
 
         // 1. Setup
@@ -66,31 +72,20 @@ async function main() {
         // Initialize SDK with proper configuration
         console.log(chalk.cyan('\nInitializing SDK...'));
         try {
+            const redisConfig = {
+                host: process.env.REDIS_HOST || 'r.glitchgremlin.ai',
+                port: parseInt(process.env.REDIS_PORT || '6379'),
+                connectTimeout: 5000,
+                retryStrategy: (times: number) => Math.min(times * 50, 2000),
+                maxRetriesPerRequest: 3
+            };
+
+            console.log('Initializing SDK with Redis config:', redisConfig);
+            
             const sdk = await GlitchSDK.init({
                 cluster: 'devnet',
                 wallet,
-                redisConfig: {
-                    host: process.env.REDIS_HOST || 'r.glitchgremlin.ai',
-                    port: parseInt(process.env.REDIS_PORT || '6379'),
-                    connectTimeout: 5000, // 5 second timeout
-                    retryStrategy: (times) => {
-                        const delay = Math.min(times * 50, 2000);
-                        return delay;
-                    },
-                    maxRetriesPerRequest: 3
-                }
-            }).catch(err => {
-                console.error(chalk.red('❌ SDK initialization failed:'));
-                if (err instanceof Error) {
-                    console.error(chalk.red(err.message));
-                    if (err.stack) {
-                        console.error(chalk.gray('\nStack trace:'));
-                        console.error(chalk.gray(err.stack));
-                    }
-                } else {
-                    console.error(chalk.red('Unknown error:', err));
-                }
-                process.exit(1);
+                redisConfig
             });
 
             if (!sdk) {
