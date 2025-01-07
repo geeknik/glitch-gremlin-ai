@@ -1,5 +1,12 @@
 import { PublicKey } from '@solana/web3.js';
 
+export interface RedisClient {
+    incr(key: string): Promise<number>;
+    expire(key: string, seconds: number): Promise<number>;
+    get(key: string): Promise<string | null>;
+    set(key: string, value: string): Promise<'OK'>;
+}
+
 export enum VulnerabilityType {
     Reentrancy = 'reentrancy',
     ArithmeticOverflow = 'arithmetic-overflow',
