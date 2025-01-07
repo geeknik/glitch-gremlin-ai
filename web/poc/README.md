@@ -10,7 +10,7 @@ This is a simple web-based interface to demonstrate the core functionality of th
 ## Setup
 1. Install dependencies:
 ```bash
-npm install @glitch-gremlin/sdk
+npm install @gremlinai/sdk
 ```
 
 2. Build the SDK:
