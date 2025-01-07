@@ -37,7 +37,7 @@ async fn run_load_test(
     }
 
     // Wait for all tasks to complete
-    let results = await_all(tasks).await?;
+    let results = await_all(tasks, &test_env).await?;
 
     // Analyze results
     let success_count = results.iter().filter(|r| r.success).count();
@@ -62,22 +62,17 @@ async fn spawn_concurrent_task(
 ) -> Result<ConcurrencyResult, Box<dyn Error>> {
     // Simulate concurrent operation
     // TODO: Implement actual task execution
-    let result = ConcurrencyResult {
+    Ok(ConcurrencyResult {
         success: true,
         latency: 100,
         errors: Vec::new(),
-    };
-    Ok(ConcurrencyResult {
-        success: result.is_success(),
-        latency: result.latency(),
-        errors: result.errors(),
     })
 }
 
 
 async fn await_all(
     tasks: Vec<Box<dyn Future<Result<ConcurrencyResult, Box<dyn Error>>>>,
-    test_env: &TestEnvironment
+    _test_env: &TestEnvironment
 ) -> Result<Vec<ConcurrencyResult>, Box<dyn Error>> {
     // Wait for all tasks to complete
     let mut results = Vec::new();

@@ -5,10 +5,7 @@ use solana_sdk::{
     instruction::{AccountMeta, Instruction},
     signature::{Keypair, Signer},
     transaction::Transaction,
-    system_instruction,
-    rent::Rent,
 };
-use solana_program_test::*;
 use std::error::Error;
 use crate::chaos_engine::{run_chaos_test, ChaosTestResult};
 use crate::instruction::GlitchInstruction;
