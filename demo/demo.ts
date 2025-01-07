@@ -132,23 +132,52 @@ async function main() {
                 while (retryCount < maxRetries && !airdropSuccess) {
                     try {
                         console.log(chalk.gray(`Attempting airdrop of ${airdropAmount} lamports (${retryCount + 1}/${maxRetries})...`));
+                        console.log(chalk.gray('Request payload:', JSON.stringify({
+                            jsonrpc: '2.0',
+                            id: 1,
+                            method: 'requestAirdrop',
+                            params: [
+                                wallet.publicKey.toString(),
+                                airdropAmount,
+                                {
+                                    commitment: 'confirmed'
+                                }
+                            ]
+                        })));
                         // Use Helius API for airdrop
                         const airdropResponse = await fetch('https://devnet.helius-rpc.com/?api-key=17682982-5929-468d-89cf-a6965d9803cb', {
                             method: 'POST',
                             headers: {
-                                'Content-Type': 'application/json'
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json'
                             },
                             body: JSON.stringify({
                                 jsonrpc: '2.0',
                                 id: 1,
                                 method: 'requestAirdrop',
-                                params: [wallet.publicKey.toString(), airdropAmount]
+                                params: [
+                                    wallet.publicKey.toString(),
+                                    airdropAmount,
+                                    {
+                                        commitment: 'confirmed'
+                                    }
+                                ]
                             })
                         });
 
+                        if (!airdropResponse.ok) {
+                            const errorText = await airdropResponse.text();
+                            throw new Error(`Helius API error: ${errorText}`);
+                        }
+
                         const airdropData = await airdropResponse.json();
+            
+                        if (airdropData.error) {
+                            throw new Error(`Helius error: ${airdropData.error.message}`);
+                        }
+            
                         if (!airdropData.result) {
-                            throw new Error('Airdrop failed: ' + JSON.stringify(airdropData));
+                            throw new Error('Airdrop failed: No transaction signature returned');
                         }
 
                         // Wait for confirmation
