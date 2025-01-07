@@ -39,10 +39,7 @@ describe('Rate Limiting', () => {
 
     describe('rate limiting', () => {
         describe('request limits', () => {
-        });
-    });
-
-        it('should enforce cooldown between requests', async () => {
+            it('should enforce cooldown between requests', async () => {
             const mockGet = jest.spyOn(sdk['queueWorker']['redis'], 'get')
                 .mockImplementation(() => Promise.resolve(null));
             const mockSet = jest.spyOn(sdk['queueWorker']['redis'], 'set')
