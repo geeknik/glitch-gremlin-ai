@@ -47,6 +47,7 @@ describe('Rate Limiting', () => {
         describe('request limits', () => {
             // Add missing closing brace for describe block
         });
+    });
 
         it('should enforce cooldown between requests', async () => {
             const mockGet = jest.spyOn(sdk['queueWorker']['redis'], 'get')
