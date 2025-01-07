@@ -1,5 +1,5 @@
-import { GlitchSDK, TestType } from '../index';
-import { Keypair, PublicKey } from '@solana/web3.js';
+import { GlitchSDK, TestType } from '../index.js';
+import { Keypair, PublicKey } from '@solana/web3.js.js';
 
 describe('Governance', () => {
     let sdk: GlitchSDK;

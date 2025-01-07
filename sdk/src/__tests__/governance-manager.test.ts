@@ -1,7 +1,7 @@
-import { GovernanceManager } from '../governance';
-import { Keypair, Connection, PublicKey } from '@solana/web3.js';
-import { ProposalState } from '../types';
-import { GlitchError } from '../errors';
+import { GovernanceManager } from '../governance.js';
+import { Keypair, Connection, PublicKey } from '@solana/web3.js.js';
+import { ProposalState } from '../types.js';
+import { GlitchError } from '../errors.js';
 
 describe('GovernanceManager', () => {
     let governanceManager: GovernanceManager;
