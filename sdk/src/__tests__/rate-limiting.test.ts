@@ -75,13 +75,23 @@ describe('Rate Limiting', () => {
         });
 
         it('should enforce maximum requests per minute', async () => {
-            // Mock Redis to simulate rate limit exceeded
+            let requestCount = 0;
             const mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr')
-                .mockImplementation(() => Promise.resolve(4)); // Over the limit of 3
+                .mockImplementation(() => Promise.resolve(++requestCount));
             const mockExpire = jest.spyOn(sdk['queueWorker']['redis'], 'expire')
                 .mockImplementation(() => Promise.resolve(1));
 
-            // Request should fail due to rate limit
+            // First 3 requests should succeed
+            for (let i = 0; i < 3; i++) {
+                await sdk.createChaosRequest({
+                    targetProgram: "11111111111111111111111111111111",
+                    testType: TestType.FUZZ,
+                    duration: 60,
+                    intensity: 1
+                });
+            }
+
+            // Fourth request should fail
             await expect(sdk.createChaosRequest({
                 targetProgram: "11111111111111111111111111111111",
                 testType: TestType.FUZZ,
@@ -89,8 +99,8 @@ describe('Rate Limiting', () => {
                 intensity: 1
             })).rejects.toThrow('Rate limit exceeded');
 
-            expect(mockIncr).toHaveBeenCalledTimes(1);
-            expect(mockExpire).toHaveBeenCalledTimes(1);
+            expect(mockIncr).toHaveBeenCalledTimes(4);
+            expect(mockExpire).toHaveBeenCalledTimes(3);
         });
     });
 
@@ -100,14 +110,14 @@ describe('Rate Limiting', () => {
         });
 
         it('should limit proposals per day', async () => {
-            // Mock Redis rate limit check
+            let proposalCount = 0;
             const mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr')
-                .mockImplementation(() => Promise.resolve(5)); // Over daily limit
+                .mockImplementation(() => Promise.resolve(++proposalCount));
             const mockExpire = jest.spyOn(sdk['queueWorker']['redis'], 'expire')
                 .mockImplementation(() => Promise.resolve(1));
 
-            // First proposal should fail due to rate limit
-            await expect(sdk.createProposal({
+            // First proposal should succeed
+            await sdk.createProposal({
                 title: "Test Proposal",
                 description: "Test Description",
                 targetProgram: "11111111111111111111111111111111",
@@ -118,11 +128,11 @@ describe('Rate Limiting', () => {
                     targetProgram: "11111111111111111111111111111111"
                 },
                 stakingAmount: 1000
-            })).rejects.toThrow('Rate limit exceeded');
+            });
 
-            // Second proposal should fail due to rate limit
+            // Second proposal should fail due to daily limit
             await expect(sdk.createProposal({
-                title: "Test Proposal 2", 
+                title: "Test Proposal 2",
                 description: "Test Description",
                 targetProgram: "11111111111111111111111111111111",
                 testParams: {
@@ -134,12 +144,13 @@ describe('Rate Limiting', () => {
                 stakingAmount: 1000
             })).rejects.toThrow('Rate limit exceeded');
 
-            expect(mockIncr).toHaveBeenCalled();
-            expect(mockExpire).toHaveBeenCalled();
+            expect(mockIncr).toHaveBeenCalledTimes(2);
+            expect(mockExpire).toHaveBeenCalledTimes(1);
 
             // After 24 hours, should succeed
             jest.advanceTimersByTime(24 * 60 * 60 * 1000);
-
+            proposalCount = 0; // Reset counter after time advance
+            
             await sdk.createProposal({
                 title: "Test Proposal 3",
                 description: "Test Description",
@@ -152,6 +163,9 @@ describe('Rate Limiting', () => {
                 },
                 stakingAmount: 1000
             });
+
+            expect(mockIncr).toHaveBeenCalledTimes(3);
+            expect(mockExpire).toHaveBeenCalledTimes(2);
         });
     });
 });
