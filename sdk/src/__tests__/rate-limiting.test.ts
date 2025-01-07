@@ -166,4 +166,6 @@ describe('Rate Limiting', () => {
             expect(mockExpire).toHaveBeenCalledTimes(3);
         });
     });
+        });
+    });
 });
