@@ -71,7 +71,7 @@ async fn spawn_concurrent_task(
 use std::future::Future;
 
 async fn await_all(
-    tasks: Vec<Future<Result<ConcurrencyResult, Box<dyn Error>>>,
+    tasks: Vec<Box<dyn Future<Result<ConcurrencyResult, Box<dyn Error>>>>,
     _: &TestEnvironment
 ) -> Result<Vec<ConcurrencyResult>, Box<dyn Error>> {
     // Wait for all tasks to complete
