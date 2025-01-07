@@ -1,5 +1,5 @@
-import { RedisQueueWorker } from '../queue/redis-worker';
-import { TestType } from '../types';
+import { RedisQueueWorker } from '../queue/redis-worker.js';
+import { TestType } from '../types.js';
 import Redis from 'ioredis';
 
 describe('RedisQueueWorker', () => {

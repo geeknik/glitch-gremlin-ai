@@ -1,5 +1,5 @@
 import { GovernanceManager } from '../governance.js';
-import { Keypair, Connection, PublicKey } from '@solana/web3.js.js';
+import { Keypair, Connection, PublicKey } from '@solana/web3.js';
 import { ProposalState } from '../types.js';
 import { GlitchError } from '../errors.js';
 

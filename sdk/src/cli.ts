@@ -13,7 +13,7 @@ program
   .action(async () => {
     const sdk = await GlitchSDK.init({
         cluster: 'devnet',
-        wallet: new Keypair()
+        wallet: Keypair.generate()
     });
     // Add chaos request creation logic
   });

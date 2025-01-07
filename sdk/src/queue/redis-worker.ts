@@ -1,5 +1,5 @@
-import { Redis } from 'ioredis.js';
-import type { ChaosRequestParams, ChaosResult } from '../types.js.js';
+import Redis from 'ioredis';
+import type { ChaosRequestParams, ChaosResult } from '../types.js';
 
 export class RedisQueueWorker {
     private redis: Redis; 

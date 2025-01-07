@@ -1,6 +1,6 @@
 import { Fuzzer } from '../ai/fuzzer.js';
 import { VulnerabilityType } from '../types.js';
-import { PublicKey } from '@solana/web3.js.js';
+import { PublicKey } from '@solana/web3.js';
 
 describe('Fuzzer', () => {
     let fuzzer: Fuzzer;

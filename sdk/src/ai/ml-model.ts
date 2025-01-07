@@ -1,5 +1,5 @@
 import * as tf from '@tensorflow/tfjs-node';
-import { VulnerabilityType } from '../types';
+import { VulnerabilityType } from '../types.js';
 import { mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
 

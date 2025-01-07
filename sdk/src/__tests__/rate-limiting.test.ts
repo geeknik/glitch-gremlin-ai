@@ -1,6 +1,6 @@
 import { GlitchSDK, TestType } from '../index.js';
-import { Keypair } from '@solana/web3.js.js';
-import { jest } from '@jest/globals.js';
+import { Keypair } from '@solana/web3.js';
+import { jest } from '@jest/globals';
 
 describe('Rate Limiting', () => {
     let sdk: GlitchSDK;
