@@ -103,7 +103,7 @@ describe('GovernanceManager', () => {
 
                         // Mock validateProposal first
                         validateProposalMock = jest.spyOn(governanceManager, 'validateProposal')
-                            .mockResolvedValueOnce(mockProposalData);
+                            .mockResolvedValue(mockProposalData);
 
                         // Create account info with the same data
                         const mockAccountInfo = {
@@ -116,21 +116,18 @@ describe('GovernanceManager', () => {
 
                         // Mock getAccountInfo to return our data
                         getAccountInfoMock = jest.spyOn(connection, 'getAccountInfo')
-                            .mockResolvedValueOnce(mockAccountInfo);
-
-                        // Ensure clean mock state
-                        jest.clearAllMocks();
+                            .mockResolvedValue(mockAccountInfo);
 
                         // Mock transaction simulation
                         simulateTransactionMock = jest.spyOn(connection, 'simulateTransaction')
-                            .mockResolvedValueOnce({
+                            .mockResolvedValue({
                                 context: { slot: 0 },
                                 value: { err: null, logs: [], accounts: null, unitsConsumed: 0, returnData: null }
                             });
 
                         // Mock transaction sending
                         sendTransactionMock = jest.spyOn(connection, 'sendTransaction')
-                            .mockResolvedValueOnce('mock-signature');
+                            .mockResolvedValue('mock-signature');
                     });
 
                     afterEach(() => {
