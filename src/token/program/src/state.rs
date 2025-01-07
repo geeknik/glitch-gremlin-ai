@@ -93,7 +93,7 @@ pub struct VoteRecord {
 }
 
 impl ChaosRequest {
-    pub fn new(owner: Pubkey, amount: u64, params: Vec<u8>, escrow_account: Pubkey) -> Self {
+    pub fn new(owner: Pubkey, amount: u64, params: Vec<u8>, escrow_account: Pubkey, rate_limit: RateLimitInfo) -> Self {
         Self {
             owner,
             amount,
@@ -101,6 +101,7 @@ impl ChaosRequest {
             params,
             result_ref: String::new(),
             escrow_account,
+            rate_limit,
         }
     }
 }
