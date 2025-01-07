@@ -87,7 +87,7 @@ impl Processor {
     }
 
     fn process_create_proposal(
-        _program_id: &Pubkey,
+        program_id: &Pubkey,
         accounts: &[AccountInfo],
         id: u64,
         description: String,
