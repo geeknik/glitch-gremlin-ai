@@ -1,6 +1,14 @@
+#!/usr/bin/env node
 // Load environment variables at the very top
 import { config } from 'dotenv';
-const result = config();
+import { fileURLToPath } from 'url';
+import path from 'path';
+
+// Get the directory name of the current module
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Load .env from the demo directory
+const result = config({ path: path.join(__dirname, '.env') });
 
 if (result.error) {
     console.error('❌ Error loading .env file:', result.error);
@@ -9,7 +17,7 @@ if (result.error) {
     console.log('✅ .env file loaded successfully.');
 }
 
-import { GlitchSDK, TestType } from '@glitch-gremlin/sdk';
+import { GlitchSDK, TestType } from '../sdk/src/index.js';
 import { Keypair, Connection } from '@solana/web3.js';
 import chalk from 'chalk';
 

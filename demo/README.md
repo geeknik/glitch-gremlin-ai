@@ -67,5 +67,6 @@ package.json
     "build-cli": "cd cli && npm install && npm run build",
     "test": "npm run test --workspaces --if-present",
     "test:coverage": "npm run test:coverage --workspaces --if-present",
-    "lint": "npm run lint --workspaces"
+    "lint": "npm run lint --workspaces",
+    "demo": "NODE_OPTIONS='--loader ts-node/esm' ts-node --esm demo.ts"
   },
