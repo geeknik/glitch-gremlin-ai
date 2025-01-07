@@ -1,4 +1,4 @@
-import { PublicKey } from '@solana/web3.js.js';
+import { PublicKey } from '@solana/web3.js';
 import { VulnerabilityType } from '../types.js';
 
 export class Fuzzer {

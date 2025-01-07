@@ -1,4 +1,4 @@
-import { Redis } from 'ioredis.js';
+import { Redis } from 'ioredis';
 import { GlitchError } from './errors.js';
 
 export async function incrementUsage(redis: Redis, key: string): Promise<number> {
