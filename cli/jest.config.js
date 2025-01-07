@@ -5,6 +5,7 @@ module.exports = {
   testMatch: ['**/__tests__/**/*.test.ts'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    '^@glitch-gremlin/sdk$': '<rootDir>/../sdk/dist'
   },
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
