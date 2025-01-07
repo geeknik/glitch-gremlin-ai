@@ -13,7 +13,8 @@
     "rootDir": ".",
     "baseUrl": ".",
     "paths": {
-      "@glitch-gremlin/sdk": ["../sdk/dist/index.js"]
+      "@glitch-gremlin/sdk": ["../sdk/dist/index.js"],
+      "@glitch-gremlin/sdk/*": ["../sdk/dist/types/*"]
     },
     "types": ["node"],
     "resolveJsonModule": true
