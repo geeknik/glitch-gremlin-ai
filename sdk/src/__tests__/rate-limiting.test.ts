@@ -160,5 +160,4 @@ describe('Rate Limiting', () => {
             expect(mockIncr).toHaveBeenCalledTimes(3);
             expect(mockExpire).toHaveBeenCalledTimes(3);
         });
-    });
 });
