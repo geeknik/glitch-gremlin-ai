@@ -8,7 +8,8 @@
     "build": "npx tsc",
     "clean": "rm -rf dist",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest",
-    "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage --coverageReporters='text-summary' --coverageReporters='lcov'"
+    "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage --coverageReporters='text-summary' --coverageReporters='lcov' --coverageThreshold='{\"global\":{\"branches\":80,\"functions\":80,\"lines\":80,\"statements\":80}}'",
+    "test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --watch"
   },
   "dependencies": {
     "@project-serum/anchor": "^0.26.0",

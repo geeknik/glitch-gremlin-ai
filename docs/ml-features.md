@@ -19,11 +19,17 @@ Glitch Gremlin uses machine learning to enhance its vulnerability detection capa
 
 ## Model Architecture
 
-The vulnerability detection model uses a neural network with:
-- Dense input layer (64 units)
-- Dropout layer (0.2)
-- Dense hidden layer (32 units)
-- Softmax output layer
+The vulnerability detection model uses a deep neural network with:
+- Input layer: Dense (128 units, ReLU activation) for processing 20 program features
+- Regularization: Dropout layer (0.2) to prevent overfitting
+- Hidden layer: Dense (32 units, ReLU activation) for pattern recognition
+- Output layer: Dense with softmax activation for multi-class vulnerability prediction
+
+Key features:
+- Input features include transaction patterns, memory access, error rates
+- Confidence scoring for each prediction
+- Pattern analysis for detailed vulnerability insights
+- Model persistence with save/load capabilities
 
 ## Usage
 
