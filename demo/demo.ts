@@ -209,18 +209,39 @@ async function main() {
                 }
             }
 
-            // 6. Voting
-            console.log(chalk.cyan('\n6. Voting on proposal...'));
-            try {
-                await sdk.vote(proposal.id, true);
-                console.log(chalk.green('✅ Vote recorded!'));
-            } catch (err) {
-                console.error(chalk.red('❌ Failed to vote:'));
-                if (err instanceof Error) {
-                    console.error(chalk.red(err.message));
-                    console.error(chalk.gray('Stack:'), err.stack);
+            // 6. Governance Demo
+            console.log(chalk.cyan('\n6. Governance Demo...'));
+            if (balance < 50_000_000) { // Need at least 0.05 SOL
+                console.log(chalk.yellow('⚠️ Insufficient balance for governance demo. Need at least 0.05 SOL.'));
+            } else {
+                try {
+                    // Create proposal
+                    const proposal = await sdk.createProposal({
+                        title: "Test Proposal",
+                        description: "Test Description",
+                        targetProgram,
+                        testParams: {
+                            testType: TestType.FUZZ,
+                            duration: 300,
+                            intensity: 5,
+                            targetProgram
+                        },
+                        stakingAmount: Math.min(50_000_000, balance) // Use up to 0.05 SOL or available balance
+                    });
+                    console.log(chalk.green(`✅ Proposal created! ID: ${proposal.id}`));
+
+                    // Voting
+                    console.log(chalk.cyan('\n6.1 Voting on proposal...'));
+                    await sdk.vote(proposal.id, true);
+                    console.log(chalk.green('✅ Vote recorded!'));
+                } catch (err) {
+                    console.error(chalk.red('❌ Governance demo failed:'));
+                    if (err instanceof Error) {
+                        console.error(chalk.red(err.message));
+                        console.error(chalk.gray('Stack:'), err.stack);
+                    }
+                    throw err;
                 }
-                throw err;
             }
 
             console.log(chalk.bold.blue('\n🎉 Demo complete!'));
