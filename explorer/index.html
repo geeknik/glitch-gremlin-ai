@@ -8,7 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 </head>
-<body class="bg-gray-950 text-white">
+<body class="bg-gray-900 text-gray-100">
     <div class="container mx-auto px-4 py-8">
         <header class="mb-8 text-center">
             <h1 class="text-4xl font-bold mb-2">👹 Glitch Gremlin AI</h1>
@@ -23,7 +23,7 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
             <!-- Search Section -->
-            <section class="bg-gray-800 p-6 rounded-lg">
+            <section class="bg-gray-800/50 p-6 rounded-lg backdrop-blur-sm border border-gray-700/50">
                 <h2 class="text-2xl font-semibold mb-4">Search</h2>
                 <div class="space-y-4">
                     <input type="text" id="searchInput" placeholder="Enter Request ID or Address" 
@@ -39,7 +39,7 @@
             <section class="bg-gray-800 p-6 rounded-lg">
                 <h2 class="text-2xl font-semibold mb-4">Network Stats</h2>
                 <div class="grid grid-cols-2 gap-4">
-                    <div class="bg-gray-700 p-3 rounded">
+                    <div class="bg-gray-800/50 p-3 rounded-lg border border-gray-700/50">
                         <p class="text-gray-400">Total Requests</p>
                         <p id="totalRequests" class="text-2xl">-</p>
                     </div>
@@ -54,7 +54,7 @@
         <!-- Request Details Section -->
         <section id="requestDetails" class="mt-8 hidden">
             <h2 class="text-2xl font-semibold mb-4">Request Details</h2>
-            <div class="bg-gray-800 p-6 rounded-lg">
+            <div class="bg-gray-800/50 p-6 rounded-lg backdrop-blur-sm border border-gray-700/50">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <p class="text-gray-400">Request ID:</p>
@@ -83,7 +83,7 @@
         <section class="mt-8">
             <h2 class="text-2xl font-semibold mb-4">Recent Chaos Requests</h2>
             <div class="overflow-x-auto">
-                <table class="min-w-full bg-gray-800 rounded-lg">
+                <table class="min-w-full bg-gray-800/50 rounded-lg backdrop-blur-sm border border-gray-700/50">
                     <thead>
                         <tr>
                             <th class="px-6 py-3 text-left">Request ID</th>
