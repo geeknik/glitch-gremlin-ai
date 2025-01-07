@@ -21,12 +21,22 @@ describe('Rate Limiting', () => {
     });
 
     describe('request rate limiting', () => {
+        let mockIncr: jest.SpyInstance;
+        let mockExpire: jest.SpyInstance;
+
+        beforeEach(() => {
+            mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr')
+                .mockResolvedValue(1);
+            mockExpire = jest.spyOn(sdk['queueWorker']['redis'], 'expire')
+                .mockResolvedValue(1);
+        });
+
+        afterEach(() => {
+            mockIncr.mockRestore();
+            mockExpire.mockRestore();
+        });
+
         it('should enforce cooldown between requests', async () => {
-            // Mock Redis to track request counts
-            const mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr')
-                .mockResolvedValue(1);
-            const mockExpire = jest.spyOn(sdk['queueWorker']['redis'], 'expire')
-                .mockResolvedValue(1);
 
             // First request should succeed
             await sdk.createChaosRequest({
@@ -60,10 +70,7 @@ describe('Rate Limiting', () => {
 
         it('should enforce maximum requests per minute', async () => {
             // Mock Redis to simulate rate limit exceeded
-            const mockIncr = jest.spyOn(sdk['queueWorker']['redis'], 'incr')
-                .mockResolvedValue(5); // Over the limit of 3
-            const mockExpire = jest.spyOn(sdk['queueWorker']['redis'], 'expire')
-                .mockResolvedValue(1);
+            mockIncr.mockResolvedValueOnce(5); // Over the limit of 3
 
             // Request should fail due to rate limit
             await expect(sdk.createChaosRequest({
@@ -79,12 +86,11 @@ describe('Rate Limiting', () => {
     });
 
     describe('governance rate limiting', () => {
-        beforeAll(() => {
-            jest.setTimeout(60000); // 60 second timeout
-        });
+        // Increase timeout for all tests in this describe block
+        jest.setTimeout(30000);
 
         it('should limit proposals per day', async () => {
-            jest.setTimeout(15000); // Increase timeout to 15 seconds
+            // Set timeout at describe level instead
             // Create first proposal
             await sdk.createProposal({
                 title: "Test Proposal",
