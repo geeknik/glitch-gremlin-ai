@@ -42,6 +42,14 @@ describe('Rate Limiting', () => {
                 .mockImplementation(() => Promise.resolve('OK'));
 
             // First request should succeed
+            await sdk.createChaosRequest({
+                targetProgram: "11111111111111111111111111111111", 
+                testType: TestType.FUZZ,
+                duration: 60,
+                intensity: 1
+            });
+
+            // Immediate second request should fail
             await expect(sdk.createChaosRequest({
                 targetProgram: "11111111111111111111111111111111",
                 testType: TestType.FUZZ,
@@ -88,6 +96,17 @@ describe('Rate Limiting', () => {
                 intensity: 1
             });
 
+            // Mock incr to simulate hitting limit
+            mockIncr.mockImplementation(async () => 4);
+
+            // First request should succeed
+            await sdk.createChaosRequest({
+                targetProgram: "11111111111111111111111111111111",
+                testType: TestType.FUZZ,
+                duration: 60,
+                intensity: 1
+            });
+
             // Request that hits the limit should fail
             await expect(
                 sdk.createChaosRequest({
@@ -104,8 +123,57 @@ describe('Rate Limiting', () => {
 
         describe('governance rate limiting', () => {
             it('should limit proposals per day', async () => {
+                jest.setTimeout(30000); // Increase timeout for this test
+                
                 let proposalCount = 0;
-                mockIncr.mockImplementation(() => Promise.resolve(++proposalCount));
+                mockIncr.mockImplementation(async () => ++proposalCount);
+
+                // First proposal should succeed
+                await sdk.createProposal({
+                    title: "Test Proposal",
+                    description: "Test Description",
+                    targetProgram: "11111111111111111111111111111111",
+                    testParams: {
+                        testType: TestType.FUZZ,
+                        duration: 300,
+                        intensity: 5,
+                        targetProgram: "11111111111111111111111111111111"
+                    },
+                    stakingAmount: 1000
+                });
+
+                // Second proposal should fail due to daily limit
+                await expect(
+                    sdk.createProposal({
+                        title: "Test Proposal 2",
+                        description: "Test Description",
+                        targetProgram: "11111111111111111111111111111111",
+                        testParams: {
+                            testType: TestType.FUZZ,
+                            duration: 300,
+                            intensity: 5,
+                            targetProgram: "11111111111111111111111111111111"
+                        },
+                        stakingAmount: 1000
+                    })
+                ).rejects.toThrow('Rate limit exceeded');
+
+                // After 24 hours, should succeed
+                jest.advanceTimersByTime(24 * 60 * 60 * 1000);
+                proposalCount = 0; // Reset counter after time advance
+                
+                await sdk.createProposal({
+                    title: "Test Proposal 3",
+                    description: "Test Description",
+                    targetProgram: "11111111111111111111111111111111",
+                    testParams: {
+                        testType: TestType.FUZZ,
+                        duration: 300,
+                        intensity: 5,
+                        targetProgram: "11111111111111111111111111111111"
+                    },
+                    stakingAmount: 1000
+                });
 
                 // First proposal should succeed
                 await sdk.createProposal({
