@@ -65,6 +65,7 @@ export class GlitchSDK {
             host: string;
             port: number;
         };
+        heliusApiKey?: string;
     }) {
         const defaultConfig: GovernanceConfig = {
             minVotingPeriod: 86400, // 1 day
@@ -81,11 +82,19 @@ export class GlitchSDK {
         };
         
         // Validate and set cluster URL
-        const clusterUrl = config.cluster || 'https://api.testnet.solana.com';
-        if (!clusterUrl.startsWith('http')) {
-            throw new Error('Cluster URL must start with http:// or https://');
+        const heliusApiKey = config.heliusApiKey || process.env.HELIUS_API_KEY;
+        if (!heliusApiKey) {
+            throw new Error('Helius API key is required');
         }
-        this.connection = new Connection(clusterUrl);
+        
+        const clusterUrl = config.cluster || `https://mainnet.helius-rpc.com/?api-key=${heliusApiKey}`;
+        this.connection = new Connection(clusterUrl, {
+            commitment: 'confirmed',
+            disableRetryOnRateLimit: false,
+            httpHeaders: {
+                'Content-Type': 'application/json'
+            }
+        });
         
         // Use an obfuscated program ID if not specified
         this.programId = new PublicKey(
@@ -280,6 +289,15 @@ export class GlitchSDK {
     async createProposal(params: ProposalParams): Promise<{
         id: string;
         signature: string;
+        title: string;
+        description: string;
+        status: string;
+        votes: {
+            yes: number;
+            no: number;
+            abstain: number;
+        };
+        endTime: number;
     }> {
         // Validate parameters first
         if (params.stakingAmount < 100) { // Minimum stake amount
@@ -437,7 +455,11 @@ export class GlitchSDK {
         }
     }
 
-    async executeProposal(proposalId: string): Promise<string> {
+    async executeProposal(proposalId: string): Promise<{
+        signature: string;
+        executedAt: number;
+        results?: ChaosResult;
+    }> {
         const proposal = await this.getProposalStatus(proposalId);
         
         if (proposal.status !== 'active') {
@@ -508,10 +530,21 @@ export class GlitchSDK {
 
     async getProposalStatus(proposalId: string): Promise<{
         id: string;
-        status: 'active' | 'executed' | 'defeated';
-        votesFor: number;
-        votesAgainst: number;
+        status: 'draft' | 'active' | 'succeeded' | 'defeated' | 'executed' | 'cancelled' | 'queued' | 'expired';
+        title: string;
+        description: string;
+        proposer: string;
+        votes: {
+            yes: number;
+            no: number;
+            abstain: number;
+        };
+        startTime: number;
         endTime: number;
+        executionTime?: number;
+        quorum: number;
+        stakedAmount: number;
+        testParams: ChaosRequestParams;
     }> {
         try {
             // For testing, return mock data based on proposal ID

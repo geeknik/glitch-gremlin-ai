@@ -1,7 +1,21 @@
 export class GlitchError extends Error {
-    constructor(message: string, public code: number) {
+    constructor(message: string, public code: number, public details?: any) {
         super(message);
         this.name = 'GlitchError';
+        
+        // Capture stack trace
+        if (Error.captureStackTrace) {
+            Error.captureStackTrace(this, GlitchError);
+        }
+    }
+    
+    toJSON() {
+        return {
+            code: this.code,
+            message: this.message,
+            details: this.details,
+            stack: this.stack
+        };
     }
 }
 
