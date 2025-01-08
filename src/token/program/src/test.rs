@@ -24,6 +24,16 @@ pub fn id() -> Pubkey {
         .unwrap()
 }
 
+pub async fn program_test() -> (BanksClient, Keypair, Hash) {
+    let program_id = Pubkey::new_unique();
+    let program_test = ProgramTest::new(
+        "glitch_gremlin",
+        program_id,
+        processor!(process_instruction),
+    );
+    program_test.start().await
+}
+
 pub struct TestContext {
     pub banks_client: BanksClient,
     pub payer: Keypair,
@@ -48,7 +58,7 @@ impl TestContext {
         }
     }
 
-    pub async fn create_chaos_request_account(&self) -> (Keypair, u64) {
+    pub async fn create_chaos_request_account(&mut self) -> (Keypair, u64) {
         let rent = self.banks_client.get_rent().await.unwrap();
         let chaos_request = Keypair::new();
         
@@ -92,7 +102,7 @@ impl TestContext {
 
 #[tokio::test]
 async fn test_initialize_chaos_request() {
-    let ctx = TestContext::new().await;
+    let mut ctx = TestContext::new().await;
     let owner = Keypair::new();
     let (chaos_request, _) = ctx.create_chaos_request_account().await;
 

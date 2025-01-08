@@ -186,10 +186,15 @@ impl Processor {
     }
 
     fn process_execute_proposal(
-        _program_id: &Pubkey,
+        program_id: &Pubkey,
         accounts: &[AccountInfo],
         proposal_id: u64,
     ) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+        let proposal_info = next_account_info(account_info_iter)?;
+        
+        // Validate proposal account
+        Self::validate_governance_account(proposal_info, program_id)?;
         let account_info_iter = &mut accounts.iter();
         let proposal_info = next_account_info(account_info_iter)?;
         let executor_info = next_account_info(account_info_iter)?;
