@@ -184,7 +184,7 @@ impl Processor {
     }
 
     fn process_execute_proposal(
-        _program_id: &Pubkey,
+        program_id: &Pubkey,
         accounts: &[AccountInfo], 
         proposal_id: u64,
     ) -> ProgramResult {
@@ -239,7 +239,7 @@ impl Processor {
     }
 
     fn process_initialize_chaos_request(
-        program_id: &Pubkey,
+        _program_id: &Pubkey,
         accounts: &[AccountInfo],
         amount: u64,
         params: Vec<u8>,

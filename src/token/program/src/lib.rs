@@ -3,7 +3,10 @@ use solana_program::{
     entrypoint,
     entrypoint::ProgramResult,
     pubkey::Pubkey,
+    declare_id,
 };
+
+declare_id!("GremLinXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
 
 pub mod error;
 pub mod instruction;

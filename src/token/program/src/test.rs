@@ -18,11 +18,11 @@ use {
     borsh::{BorshDeserialize, BorshSerialize},
 };
 
+use crate::id;
+
 // Program ID for tests
 pub fn id() -> Pubkey {
-    "GremLinXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-        .parse()
-        .unwrap()
+    id()
 }
 
 pub async fn program_test() -> (BanksClient, Keypair, Hash) {
