@@ -6,17 +6,20 @@ export default defineConfig({
   server: {
     port: 5173,
     open: true,
-    strictPort: true
+    strictPort: true,
+    hmr: {
+      overlay: false
+    }
   },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    assetsInclude: ['**/*.js']
+    assetsInclude: ['**/*.js', '**/*.html']
   },
   optimizeDeps: {
     include: [
       '@solana/web3.js',
-      '@solana/wallet-adapter-wallets',
+      '@solana/wallet-adapter-wallets', 
       '@solana/wallet-adapter-base'
     ]
   }
