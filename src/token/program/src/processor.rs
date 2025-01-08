@@ -43,7 +43,7 @@ impl Processor {
         chaos_request_info: &AccountInfo,
         _program_id: &Pubkey,
     ) -> ProgramResult {
-        if chaos_request_info.owner != program_id {
+        if chaos_request_info.owner != _program_id {
             return Err(GlitchError::InvalidAccountOwner.into());
         }
 
