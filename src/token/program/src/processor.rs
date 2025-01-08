@@ -41,7 +41,7 @@ impl Processor {
 
     fn validate_chaos_request(
         chaos_request_info: &AccountInfo,
-        program_id: &Pubkey,
+        _program_id: &Pubkey,
     ) -> ProgramResult {
         if chaos_request_info.owner != program_id {
             return Err(GlitchError::InvalidAccountOwner.into());
