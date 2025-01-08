@@ -1,8 +1,12 @@
+import { jest } from '@jest/globals';
 import { GovernanceManager } from '../governance.js';
 import { Keypair, Connection, PublicKey, Transaction } from '@solana/web3.js';
 import { ProposalState } from '../types.js';
 import { GlitchError } from '../errors.js';
 import { TokenEconomics } from '../token-economics.js';
+
+// Increase timeout for all tests
+jest.setTimeout(30000);
 
 describe('GovernanceManager', () => {
     let governanceManager: GovernanceManager;

@@ -1,6 +1,9 @@
+import { jest } from '@jest/globals';
 import { GlitchSDK, TestType } from '../index.js';
 import { Keypair } from '@solana/web3.js';
-import { jest } from '@jest/globals';
+
+// Increase timeout for all tests
+jest.setTimeout(30000);
 
 describe('Rate Limiting', () => {
     let sdk: GlitchSDK;

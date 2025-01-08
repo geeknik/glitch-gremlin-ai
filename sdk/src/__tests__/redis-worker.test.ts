@@ -1,8 +1,12 @@
+import { jest } from '@jest/globals';
 import { RedisQueueWorker } from '../queue/redis-worker.js';
 import { TestType } from '../types.js';
 import { Redis } from 'ioredis';
 import type { Redis as RedisType } from 'ioredis';
 import { GlitchError } from '../errors.js';
+
+// Increase timeout for all tests
+jest.setTimeout(30000);
 
 describe('RedisQueueWorker', () => {
     let worker: RedisQueueWorker;

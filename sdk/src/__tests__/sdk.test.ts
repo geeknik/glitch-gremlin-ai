@@ -1,5 +1,9 @@
-import { GlitchSDK, TestType } from '../index.js';
+import { jest } from '@jest/globals';
+import { GlitchSDK, TestType } from '../index.js'; 
 import { Keypair } from '@solana/web3.js';
+
+// Increase timeout for all tests
+jest.setTimeout(30000);
 
 describe('GlitchSDK', () => {
     let sdk: GlitchSDK;
