@@ -8,9 +8,11 @@ export default {
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
       tsconfig: 'tsconfig.json',
-      isolatedModules: true // Faster tests by skipping type checking
+      useESM: true,
+      isolatedModules: true
     }]
   },
+  extensionsToTreatAsEsm: ['.ts'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   collectCoverage: true,
   coverageDirectory: 'coverage',
@@ -24,8 +26,11 @@ export default {
     }
   },
   setupFilesAfterEnv: ['./jest.setup.ts'],
-  testTimeout: 10000, // Global timeout for all tests
-  verbose: true, // Show detailed test output
-  detectOpenHandles: true, // Detect async operations that weren't stopped
-  forceExit: true // Force exit after tests complete
+  testTimeout: 10000,
+  verbose: true,
+  detectOpenHandles: true,
+  forceExit: true,
+  transformIgnorePatterns: [
+    'node_modules/(?!(?:@solana|ioredis)/)' // Transform these modules
+  ]
 };

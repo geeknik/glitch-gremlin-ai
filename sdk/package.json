@@ -21,7 +21,7 @@
     "prebuild": "node -e \"require('dotenv').config()\"",
     "build": "tsc -p .",
     "clean": "rm -rf dist",
-    "test": "jest"
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest"
   },
   "dependencies": {
     "@solana/web3.js": "^1.98.0",
