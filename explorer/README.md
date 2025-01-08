@@ -46,10 +46,6 @@ The explorer will be available at http://localhost:3000
 npm run build
 ```
 
-## API Integration
-
-The explorer integrates with the Glitch Gremlin AI API to fetch real-time data. See the [API Documentation](https://api.glitchgremlin.ai/docs) for more details.
-
 ## Contributing
 
 Contributions are welcome! Please follow the [contribution guidelines](CONTRIBUTING.md).
