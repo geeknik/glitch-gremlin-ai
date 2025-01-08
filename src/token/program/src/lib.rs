@@ -6,7 +6,7 @@ use solana_program::{
     declare_id,
 };
 
-declare_id!("GremLin111111111111111111111111111111111111111111");
+declare_id!(include!("../../config/program_ids.json"));
 
 pub mod error;
 pub mod instruction;
