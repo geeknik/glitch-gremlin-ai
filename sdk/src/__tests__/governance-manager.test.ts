@@ -1,7 +1,8 @@
 import { GovernanceManager } from '../governance.js';
-import { Keypair, Connection, PublicKey } from '@solana/web3.js';
+import { Keypair, Connection, PublicKey, Transaction } from '@solana/web3.js';
 import { ProposalState } from '../types.js';
 import { GlitchError } from '../errors.js';
+import { TokenEconomics } from '../token-economics.js';
 
 describe('GovernanceManager', () => {
     let governanceManager: GovernanceManager;
@@ -16,37 +17,161 @@ describe('GovernanceManager', () => {
         );
     });
 
-    describe('createProposalAccount', () => {
-        it('should create a proposal with valid parameters', async () => {
+    describe('proposal lifecycle', () => {
+        it('should create, vote on, and execute a proposal', async () => {
+            // Create proposal
             const { proposalAddress, tx } = await governanceManager.createProposalAccount(
                 connection,
                 wallet,
                 {
                     votingPeriod: 259200,
-                    description: 'Test proposal'
+                    description: 'Test proposal',
+                    title: 'Test Title'
                 }
             );
             expect(proposalAddress).toBeDefined();
             expect(tx.instructions.length).toBe(1);
+
+            // Cast vote
+            const voteTx = await governanceManager.castVote(
+                connection,
+                wallet,
+                proposalAddress,
+                true
+            );
+            expect(voteTx.instructions.length).toBe(1);
+
+            // Execute proposal
+            const executeTx = await governanceManager.executeProposal(
+                connection,
+                wallet,
+                proposalAddress
+            );
+            expect(executeTx.instructions.length).toBe(1);
         });
 
-        it('should reject invalid voting periods', async () => {
+        it('should reject proposals with invalid parameters', async () => {
             await expect(
                 governanceManager.createProposalAccount(
                     connection,
                     wallet,
                     {
                         votingPeriod: 3600, // Too short
-                        description: 'Test proposal'
+                        description: 'Test proposal',
+                        title: ''
                     }
                 )
-            ).rejects.toThrow('Invalid voting period');
+            ).rejects.toThrow('Invalid proposal parameters');
         });
     });
 
-    beforeEach(() => {
-        // Use fake timers
-        jest.useFakeTimers();
+    describe('voting', () => {
+        it('should validate voting power', async () => {
+            const proposalAddress = new PublicKey(Keypair.generate().publicKey);
+            
+            // Mock insufficient voting power
+            jest.spyOn(TokenEconomics, 'calculateVotingPower')
+                .mockReturnValue(0);
+
+            await expect(
+                governanceManager.castVote(
+                    connection,
+                    wallet,
+                    proposalAddress,
+                    true
+                )
+            ).rejects.toThrow('Insufficient voting power');
+        });
+
+        it('should prevent double voting', async () => {
+            const proposalAddress = new PublicKey(Keypair.generate().publicKey);
+            
+            // Mock hasVoted to return true
+            jest.spyOn(governanceManager as any, 'hasVoted')
+                .mockResolvedValue(true);
+
+            await expect(
+                governanceManager.castVote(
+                    connection,
+                    wallet,
+                    proposalAddress,
+                    true
+                )
+            ).rejects.toThrow('Already voted');
+        });
+    });
+
+    describe('proposal execution', () => {
+        it('should validate quorum requirements', async () => {
+            const proposalAddress = new PublicKey(Keypair.generate().publicKey);
+            
+            // Mock insufficient votes
+            jest.spyOn(governanceManager as any, 'getVoteCount')
+                .mockResolvedValue({ yes: 10, no: 5, abstain: 0 });
+
+            await expect(
+                governanceManager.executeProposal(
+                    connection,
+                    wallet,
+                    proposalAddress
+                )
+            ).rejects.toThrow('Quorum not reached');
+        });
+
+        it('should enforce timelock period', async () => {
+            const proposalAddress = new PublicKey(Keypair.generate().publicKey);
+            
+            // Mock proposal with future execution time
+            jest.spyOn(governanceManager as any, 'getProposalState')
+                .mockResolvedValue({
+                    executionTime: Date.now() + 86400000 // 1 day in future
+                });
+
+            await expect(
+                governanceManager.executeProposal(
+                    connection,
+                    wallet,
+                    proposalAddress
+                )
+            ).rejects.toThrow('Timelock period not elapsed');
+        });
+    });
+
+    describe('error handling', () => {
+        it('should handle connection errors', async () => {
+            // Mock connection failure
+            jest.spyOn(connection, 'sendTransaction')
+                .mockRejectedValue(new Error('Connection failed'));
+
+            await expect(
+                governanceManager.createProposalAccount(
+                    connection,
+                    wallet,
+                    {
+                        votingPeriod: 259200,
+                        description: 'Test proposal',
+                        title: 'Test Title'
+                    }
+                )
+            ).rejects.toThrow('Connection failed');
+        });
+
+        it('should handle invalid proposal state', async () => {
+            const proposalAddress = new PublicKey(Keypair.generate().publicKey);
+            
+            // Mock invalid state
+            jest.spyOn(governanceManager as any, 'getProposalState')
+                .mockResolvedValue(null);
+
+            await expect(
+                governanceManager.executeProposal(
+                    connection,
+                    wallet,
+                    proposalAddress
+                )
+            ).rejects.toThrow('Invalid proposal state');
+        });
+    });
         
         // Set up test environment
         connection = new Connection('http://localhost:8899', 'confirmed');
