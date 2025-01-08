@@ -6,7 +6,7 @@ import { GlitchError } from '../errors.js';
 import { TokenEconomics } from '../token-economics.js';
 
 // Increase timeout for all tests
-jest.setTimeout(30000);
+jest.setTimeout(60000); // Increased to 60 seconds for network operations
 
 describe('GovernanceManager', () => {
     let governanceManager: GovernanceManager;
@@ -177,13 +177,6 @@ describe('GovernanceManager', () => {
         });
     });
         
-        // Set up test environment
-        connection = new Connection('http://localhost:8899', 'confirmed');
-        wallet = Keypair.generate();
-        governanceManager = new GovernanceManager(
-            new PublicKey('GLt5cQeRgVMqnE9DGJQNNrbAfnRQYWqYVNWnJo7WNLZ9')
-        );
-    });
 
     afterEach(() => {
         jest.useRealTimers();

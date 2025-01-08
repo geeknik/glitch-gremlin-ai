@@ -17,7 +17,9 @@ describe('RedisQueueWorker', () => {
             host: 'localhost',
             port: 6379,
             lazyConnect: true,
-            maxRetriesPerRequest: 0 // Disable retries for testing
+            maxRetriesPerRequest: 3, // Allow retries
+            retryStrategy: (times) => Math.min(times * 50, 2000),
+            connectTimeout: 5000
         });
         worker = new RedisQueueWorker(redis);
     });

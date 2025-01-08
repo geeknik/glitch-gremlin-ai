@@ -19,12 +19,15 @@ describe('GlitchSDK', () => {
     afterEach(async () => {
         if (sdk) {
             await sdk['queueWorker'].close();
-            await sdk['connection'].getRecentBlockhash(); // Ensure all pending requests complete
-            // Connection doesn't need explicit cleanup
+            await sdk['connection'].disconnect();
+            jest.clearAllTimers();
+            jest.clearAllMocks();
         }
-        // Clear any pending timers and intervals
-        jest.clearAllTimers();
-        jest.clearAllMocks();
+    });
+
+    afterAll(async () => {
+        jest.useRealTimers();
+        jest.restoreAllMocks();
     });
 
     describe('createChaosRequest', () => {
