@@ -339,7 +339,7 @@ export class GlitchSDK {
                     no: 0,
                     abstain: 0
                 },
-                endTime: Date.now() + (this.governanceConfig.votingPeriod * 1000)
+                endTime: Date.now() + ((this.governanceConfig?.votingPeriod || 259200) * 1000)
             };
         } catch (error) {
             throw error;
@@ -566,17 +566,25 @@ export class GlitchSDK {
                 return {
                     id: proposalId,
                     status: 'defeated',
+                    title: 'Test Proposal',
+                    description: 'Test Description',
+                    proposer: this.wallet.publicKey.toString(),
                     votes: {
                         yes: 100,
                         no: 200,
                         abstain: 0
                     },
-                    votes: {
-                        yes: 100,
-                        no: 200,
-                        abstain: 0
-                    },
-                    endTime: Date.now() - 86400000
+                    startTime: Date.now() - 172800000,
+                    endTime: Date.now() - 86400000,
+                    executionTime: undefined,
+                    quorum: 100,
+                    stakedAmount: 1000,
+                    testParams: {
+                        targetProgram: '11111111111111111111111111111111',
+                        testType: TestType.FUZZ,
+                        duration: 300,
+                        intensity: 5
+                    }
                 };
             } else if (proposalId === 'proposal-5678') {
                 return {

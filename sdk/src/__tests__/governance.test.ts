@@ -194,7 +194,11 @@ describe('Governance', () => {
                         no: 50,
                         abstain: 0
                     },
-                    votesAgainst: 50,
+                    votes: {
+                        yes: 100,
+                        no: 50,
+                        abstain: 0
+                    },
                     endTime: Date.now() + 86400000
                 });
 
@@ -231,7 +235,11 @@ describe('Governance', () => {
                 .mockResolvedValueOnce({
                     id: 'proposal-9012',
                     status: 'active',
-                    votesFor: 100,
+                    votes: {
+                        yes: 100,
+                        no: 50,
+                        abstain: 0
+                    },
                     votesAgainst: 50,
                     endTime: Date.now() - 86400000
                 });

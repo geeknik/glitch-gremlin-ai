@@ -1,4 +1,4 @@
-import Redis from 'ioredis';
+import IORedis from 'ioredis';
 import type { Redis as RedisType } from 'ioredis';
 import type { ChaosRequestParams, ChaosResult } from '../types.js';
 
@@ -8,7 +8,7 @@ export class RedisQueueWorker {
     private readonly resultKey = 'glitch:chaos:results';
 
     constructor(redisClient?: RedisType) {
-        this.redis = redisClient || new Redis({
+        this.redis = redisClient || new IORedis({
             host: 'r.glitchgremlin.ai',
             port: 6379,
             connectTimeout: 5000,
