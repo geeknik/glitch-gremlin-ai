@@ -2,7 +2,15 @@ import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [
+    vue({
+      template: {
+        compilerOptions: {
+          isCustomElement: (tag) => tag.startsWith('solana-')
+        }
+      }
+    })
+  ],
   server: {
     port: 5173,
     open: true,
@@ -20,7 +28,8 @@ export default defineConfig({
     include: [
       '@solana/web3.js',
       '@solana/wallet-adapter-wallets', 
-      '@solana/wallet-adapter-base'
+      '@solana/wallet-adapter-base',
+      'vue'
     ]
   }
 });
