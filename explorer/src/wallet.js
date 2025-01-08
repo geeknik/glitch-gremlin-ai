@@ -14,11 +14,13 @@ export async function initWallet(wallets, connection) {
     if (connectButton) {
         connectButton.addEventListener('click', async () => {
             try {
-                const wallet = wallets.find(w => w.available);
-                if (!wallet) {
-                    throw new Error('No wallet found');
+                const availableWallets = wallets.filter(w => w.available);
+                if (availableWallets.length === 0) {
+                    throw new Error('No wallet found. Please install a supported wallet like Phantom.');
                 }
                 
+                // Use the first available wallet
+                const wallet = availableWallets[0];
                 await wallet.connect();
                 const publicKey = wallet.publicKey;
                 
@@ -34,8 +36,13 @@ export async function initWallet(wallets, connection) {
                 loadGovernanceData();
             } catch (error) {
                 console.error('Wallet connection failed:', error);
-                alert('Wallet connection failed. Please try again.');
+                alert(`Wallet connection failed: ${error.message}`);
             }
         });
     }
+}
+
+function loadGovernanceData() {
+    // Placeholder for governance data loading
+    console.log('Loading governance data...');
 }
