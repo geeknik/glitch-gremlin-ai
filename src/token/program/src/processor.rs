@@ -107,7 +107,7 @@ impl Processor {
         }
 
         // Validate accounts
-        Self::validate_governance_account(proposal_info, program_id)?;
+        Self::validate_governance_account(proposal_info, &program_id)?;
         Self::validate_token_account(staking_info, proposer_info.key)?;
 
         // Create and serialize the proposal
