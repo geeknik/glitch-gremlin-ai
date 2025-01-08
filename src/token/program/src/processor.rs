@@ -96,7 +96,7 @@ impl Processor {
         deadline: i64,
     ) -> ProgramResult {
         // Use program_id parameter instead of id() function
-        let program_id = program_id.clone();
+        let program_id = *program_id;
         let account_info_iter = &mut accounts.iter();
         let proposal_info = next_account_info(account_info_iter)?;
         let staking_info = next_account_info(account_info_iter)?;
