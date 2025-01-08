@@ -33,3 +33,21 @@
     "typescript": "^5.3.3"
   }
 }
+{
+  "name": "@glitch-gremlin/sdk",
+  "version": "0.1.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.98.0",
+    "@solana/spl-token": "^0.4.9"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vitest": "^1.0.0"
+  }
+}
