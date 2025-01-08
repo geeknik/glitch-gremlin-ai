@@ -10,6 +10,16 @@
     <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.js"></script>
     <script src="https://unpkg.com/@solana/wallet-adapter-wallets@latest/lib/index.iife.js"></script>
     <script src="https://unpkg.com/@solana/wallet-adapter-base@latest/lib/index.iife.js"></script>
+    <script>
+        // Initialize wallet adapters after scripts are loaded
+        const { PhantomWalletAdapter, SolflareWalletAdapter, GlowWalletAdapter } = window.SolanaWalletAdapterWallets;
+        
+        const wallets = [
+            new PhantomWalletAdapter(),
+            new SolflareWalletAdapter(), 
+            new GlowWalletAdapter()
+        ];
+    </script>
 </head>
 <body class="bg-gray-900 text-gray-100">
     <div class="container mx-auto px-4 py-8">
