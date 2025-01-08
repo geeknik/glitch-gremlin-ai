@@ -71,8 +71,8 @@ async fn spawn_concurrent_task(
 
 
 async fn await_all(
-    tasks: Vec<Box<dyn Future<Result<ConcurrencyResult, Box<dyn Error>>>>,
-    _test_env: &TestEnvironment
+    tasks: Vec<Box<dyn Future<Output = Result<ConcurrencyResult, Box<dyn Error>>>>>,
+    _test_env: &TestEnvironment,
 ) -> Result<Vec<ConcurrencyResult>, Box<dyn Error>> {
     // Wait for all tasks to complete
     let mut results = Vec::new();
