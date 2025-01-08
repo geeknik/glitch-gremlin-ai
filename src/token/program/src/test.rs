@@ -14,7 +14,6 @@ use {
     crate::{
         instruction::GlitchInstruction,
         state::{ChaosRequest, RateLimitInfo},
-        governance::GovernanceProposal,
     },
     borsh::{BorshDeserialize, BorshSerialize},
 };

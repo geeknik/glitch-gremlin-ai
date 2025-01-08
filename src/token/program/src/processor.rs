@@ -87,7 +87,7 @@ impl Processor {
     }
 
     fn process_create_proposal(
-        _program_id: &Pubkey,
+        program_id: &Pubkey,
         accounts: &[AccountInfo],
         id: u64,
         description: String,
@@ -105,7 +105,7 @@ impl Processor {
         }
 
         // Validate accounts
-        Self::validate_governance_account(proposal_info, &program_id)?;
+        Self::validate_governance_account(proposal_info, program_id)?;
         Self::validate_token_account(staking_info, proposer_info.key)?;
 
         // Create and serialize the proposal
