@@ -30,10 +30,10 @@ pub async fn run_chaos_test(
     Ok(result)
 }
 
-async fn run_load_test(
-    test_env: &TestEnvironment,
-    params: &ChaosParams,
-) -> Result<ChaosTestResult, Box<dyn Error + '_>> {
+async fn run_load_test<'a>(
+    _test_env: &'a TestEnvironment,
+    _params: &'a ChaosParams,
+) -> Result<ChaosTestResult, Box<dyn Error + 'a>> {
     let mut tasks: Vec<Pin<Box<dyn Future<Output = Result<ConcurrencyResult, Box<dyn Error>>> + Send + 'static>>> = Vec::new();
     
     // Simulate concurrent load
@@ -62,8 +62,8 @@ async fn run_load_test(
 }
 
 async fn spawn_concurrent_task(
-    test_env: &TestEnvironment,
-    task_id: u8,
+    _test_env: &TestEnvironment,
+    _task_id: u8,
 ) -> Result<ConcurrencyResult, Box<dyn Error>> {
     // Simulate concurrent operation
     // TODO: Implement actual task execution
