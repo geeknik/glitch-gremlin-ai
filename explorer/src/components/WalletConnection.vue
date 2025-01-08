@@ -39,11 +39,21 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
-import { useWallet } from '@solana/wallet-adapter-vue';
+import { ref, computed, onMounted } from 'vue';
+import { useWallet, WalletAdapterNetwork } from '@solana/wallet-adapter-vue';
+import { 
+  PhantomWalletAdapter,
+  BraveWalletAdapter
+} from '@solana/wallet-adapter-wallets';
 import { GlitchSDK } from '@glitch-gremlin/sdk';
 
-const { connected, publicKey, connect, disconnect } = useWallet();
+// Initialize wallet adapters
+const wallets = [
+  new PhantomWalletAdapter(),
+  new BraveWalletAdapter()
+];
+
+const { connected, publicKey, connect, disconnect, wallet } = useWallet();
 const gremlinBalance = ref(0);
 const votingPower = ref(0);
 const stakedBalance = ref(0);
@@ -55,24 +65,42 @@ const shortAddress = computed(() => {
   return `${addr.slice(0, 4)}...${addr.slice(-4)}`;
 });
 
+const isConnected = computed(() => connected.value && publicKey.value);
+
 const connectWallet = async () => {
   try {
+    if (!wallet.value) {
+      throw new Error('No wallet selected');
+    }
+    
     await connect();
     await initializeSDK();
     await fetchWalletData();
   } catch (error) {
     console.error('Wallet connection failed:', error);
+    alert(`Wallet connection failed: ${error.message}`);
   }
 };
 
 const disconnectWallet = async () => {
-  await disconnect();
-  if (sdkInstance) {
-    await sdkInstance['queueWorker'].close();
+  try {
+    await disconnect();
+    if (sdkInstance) {
+      await sdkInstance['queueWorker'].close();
+    }
+    gremlinBalance.value = 0;
+    votingPower.value = 0;
+    stakedBalance.value = 0;
+  } catch (error) {
+    console.error('Failed to disconnect wallet:', error);
   }
 };
 
 const initializeSDK = async () => {
+  if (!publicKey.value) {
+    throw new Error('No public key available');
+  }
+  
   sdkInstance = await GlitchSDK.init({
     cluster: 'https://api.mainnet-beta.solana.com',
     wallet: publicKey.value
@@ -81,6 +109,10 @@ const initializeSDK = async () => {
 
 const fetchWalletData = async () => {
   try {
+    if (!sdkInstance || !publicKey.value) {
+      return;
+    }
+
     // Fetch token balance
     const balance = await sdkInstance.connection.getBalance(publicKey.value);
     gremlinBalance.value = balance / 1e9; // Convert lamports to SOL
@@ -99,6 +131,14 @@ const fetchWalletData = async () => {
 // Watch for wallet changes
 watch(publicKey, async (newKey) => {
   if (newKey) {
+    await fetchWalletData();
+  }
+});
+
+// Initialize on mount
+onMounted(async () => {
+  if (isConnected.value) {
+    await initializeSDK();
     await fetchWalletData();
   }
 });
