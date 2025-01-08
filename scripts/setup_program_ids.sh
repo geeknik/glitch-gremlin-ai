@@ -7,20 +7,20 @@ mkdir -p program-keys config
 echo "Generating program IDs with glitch:1 prefix..."
 echo "This may take a few minutes..."
 
-# Generate main program ID
-MAIN_PROGRAM=$(solana-keygen grind --starts-with ggai:1glitch --num-threads 4)
+# Generate main program ID (starts with ggai, ends with glitch)
+MAIN_PROGRAM=$(solana-keygen grind --starts-with ggai:1 --ends-with glitch:1 --num-threads 4)
 echo "Main program ID: $MAIN_PROGRAM"
 
-# Generate governance program ID
-GOVERNANCE_PROGRAM=$(solana-keygen grind --starts-with ggai:1gov --num-threads 4)
+# Generate governance program ID (starts with ggai, ends with gov)
+GOVERNANCE_PROGRAM=$(solana-keygen grind --starts-with ggai:1 --ends-with gov:1 --num-threads 4)
 echo "Governance program ID: $GOVERNANCE_PROGRAM"
 
-# Generate token program ID
-TOKEN_PROGRAM=$(solana-keygen grind --starts-with ggai:1token --num-threads 4)
+# Generate token program ID (starts with ggai, ends with token)
+TOKEN_PROGRAM=$(solana-keygen grind --starts-with ggai:1 --ends-with token:1 --num-threads 4)
 echo "Token program ID: $TOKEN_PROGRAM"
 
-# Generate worker program ID
-WORKER_PROGRAM=$(solana-keygen grind --starts-with ggai:1worker --num-threads 4)
+# Generate worker program ID (starts with ggai, ends with worker)
+WORKER_PROGRAM=$(solana-keygen grind --starts-with ggai:1 --ends-with worker:1 --num-threads 4)
 echo "Worker program ID: $WORKER_PROGRAM"
 
 # Create program IDs config
