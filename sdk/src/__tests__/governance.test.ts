@@ -189,7 +189,11 @@ describe('Governance', () => {
                 .mockResolvedValueOnce({
                     id: 'proposal-5678',
                     status: 'active',
-                    votesFor: 100,
+                    votes: {
+                        yes: 100,
+                        no: 50,
+                        abstain: 0
+                    },
                     votesAgainst: 50,
                     endTime: Date.now() + 86400000
                 });

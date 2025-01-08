@@ -339,7 +339,7 @@ export class GlitchSDK {
                     no: 0,
                     abstain: 0
                 },
-                endTime: Date.now() + (params.votingPeriod || 259200000)
+                endTime: Date.now() + (this.governanceConfig.votingPeriod * 1000)
             };
         } catch (error) {
             throw error;
@@ -373,21 +373,7 @@ export class GlitchSDK {
         try {
             const transaction = new Transaction().add(instruction);
             const signature = await this.connection.sendTransaction(transaction, [this.wallet]);
-            return {
-                signature,
-                executedAt: Date.now(),
-                results: {
-                    requestId: proposalId,
-                    status: 'completed',
-                    resultRef: 'ipfs://QmHash',
-                    logs: ['Proposal executed successfully'],
-                    metrics: {
-                        totalTransactions: 1000,
-                        errorRate: 0.01,
-                        avgLatency: 150
-                    }
-                }
-            };
+            return signature;
         } catch (error) {
             if (error instanceof Error && error.message.includes('already voted')) {
                 throw new GlitchError('Already voted on this proposal', 1010);
@@ -526,7 +512,11 @@ export class GlitchSDK {
             await this.connection.simulateTransaction(transaction, [this.wallet]);
             
             // If simulation succeeds, send the actual transaction
-            return await this.connection.sendTransaction(transaction, [this.wallet]);
+            const signature = await this.connection.sendTransaction(transaction, [this.wallet]);
+            return {
+                signature,
+                executedAt: Date.now()
+            };
         } catch (error) {
             throw new GlitchError('Failed to execute proposal', 1012);
         }
@@ -581,14 +571,22 @@ export class GlitchSDK {
                         no: 200,
                         abstain: 0
                     },
-                    votesAgainst: 200,
+                    votes: {
+                        yes: 100,
+                        no: 200,
+                        abstain: 0
+                    },
                     endTime: Date.now() - 86400000
                 };
             } else if (proposalId === 'proposal-5678') {
                 return {
                     id: proposalId,
                     status: 'active',
-                    votesFor: 100,
+                    votes: {
+                        yes: 100,
+                        no: 50,
+                        abstain: 0
+                    },
                     votesAgainst: 50,
                     endTime: Date.now() + 86400000
                 };
