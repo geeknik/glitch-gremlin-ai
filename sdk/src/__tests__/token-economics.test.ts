@@ -1,5 +1,5 @@
-import { TokenEconomics } from '../token-economics';
-import { GlitchError } from '../errors';
+import { TokenEconomics } from '../token-economics.js';
+import { GlitchError } from '../errors.js';
 
 describe('TokenEconomics', () => {
     describe('fee calculation', () => {
