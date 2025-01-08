@@ -4,6 +4,7 @@ use {
     solana_program::{
         instruction::{AccountMeta, Instruction},
         system_instruction,
+        pubkey::Pubkey,
     },
     solana_sdk::{
         hash::Hash,
@@ -13,6 +14,7 @@ use {
     crate::{
         instruction::GlitchInstruction,
         state::{ChaosRequest, RateLimitInfo},
+        governance::GovernanceProposal,
     },
     borsh::{BorshDeserialize, BorshSerialize},
 };
@@ -151,7 +153,7 @@ async fn test_initialize_chaos_request() {
 
 #[tokio::test]
 async fn test_initialize_chaos_request_invalid_owner() {
-    let ctx = TestContext::new().await;
+    let mut ctx = TestContext::new().await;
     let (chaos_request, _) = ctx.create_chaos_request_account().await;
 
     // Try to initialize with invalid owner (not a signer)

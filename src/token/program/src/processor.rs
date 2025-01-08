@@ -87,7 +87,7 @@ impl Processor {
     }
 
     fn process_create_proposal(
-        program_id: &Pubkey,
+        _program_id: &Pubkey,
         accounts: &[AccountInfo],
         id: u64,
         description: String,
@@ -95,8 +95,6 @@ impl Processor {
         staked_amount: u64,
         deadline: i64,
     ) -> ProgramResult {
-        // Use program_id parameter instead of id() function
-        let program_id = *program_id;
         let account_info_iter = &mut accounts.iter();
         let proposal_info = next_account_info(account_info_iter)?;
         let staking_info = next_account_info(account_info_iter)?;
