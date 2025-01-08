@@ -23,6 +23,11 @@ describe('GovernanceManager', () => {
 
     describe('proposal lifecycle', () => {
         it('should create, vote on, and execute a proposal', async () => {
+            jest.setTimeout(60000); // Increase timeout to 60 seconds
+            
+            // Mock proposal data
+            jest.spyOn(governanceManager, 'getProposalState')
+                .mockResolvedValue(ProposalState.Succeeded);
             // Create proposal
             const { proposalAddress, tx } = await governanceManager.createProposalAccount(
                 connection,

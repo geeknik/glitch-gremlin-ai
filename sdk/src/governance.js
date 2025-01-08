@@ -46,6 +46,9 @@ export class GovernanceManager {
     async createProposalAccount(connection, wallet, params) {
         const minPeriod = this.config.minVotingPeriod;
         const maxPeriod = this.config.maxVotingPeriod;
+        if (!params.title || !params.description) {
+            throw new GlitchError('Invalid proposal parameters', 2001);
+        }
         if (params.votingPeriod < minPeriod ||
             params.votingPeriod > maxPeriod) {
             throw new GlitchError('Invalid voting period', 2001);
@@ -67,8 +70,24 @@ export class GovernanceManager {
         if (!account) {
             throw new GlitchError('Proposal not found', 2002);
         }
-        // TODO: Deserialize account data
-        return ProposalState.Active;
+        const metadata = this.deserializeProposalData(account.data);
+        return metadata.status;
+    }
+
+    async hasVoted(connection, voter, proposalAddress) {
+        const voteAccount = await connection.getAccountInfo(
+            new PublicKey(proposalAddress + '-vote-' + voter.toString())
+        );
+        return voteAccount !== null;
+    }
+
+    async getVoteCount(connection, proposalAddress) {
+        const account = await connection.getAccountInfo(proposalAddress);
+        if (!account) {
+            throw new GlitchError('Proposal not found', 2002);
+        }
+        const metadata = this.deserializeProposalData(account.data);
+        return metadata.voteWeights;
     }
     async castVote(connection, wallet, proposalAddress, support, weight) {
         try {

@@ -39,6 +39,14 @@ export class TokenEconomics {
     static getInitialDistribution() {
         return this.DEFAULT_DISTRIBUTION;
     }
+    static calculateVotingPower(stakeAmount, lockupDuration) {
+        // Base voting power is 1:1 with staked amount
+        // Longer lockups get a multiplier up to 3x
+        const maxLockup = 365 * 24 * 60 * 60; // 1 year
+        const multiplier = 1 + (2 * (lockupDuration / maxLockup));
+        return Math.floor(stakeAmount * Math.min(multiplier, 3));
+    }
+
     static calculateRewards(stakeAmount, lockupDuration) {
         // Base APY of 5%, increasing with lockup duration
         const baseAPY = 0.05;
