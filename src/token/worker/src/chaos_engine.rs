@@ -80,9 +80,6 @@ async fn await_all(
     let mut results = Vec::new();
     for task in tasks {
         results.push(task.await?);
-    }
-    }
-
     Ok(results)
 }
 struct ConcurrencyResult {
