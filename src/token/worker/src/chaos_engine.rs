@@ -17,10 +17,10 @@ pub enum TestStatus {
     PartialCompletion,
 }
 
-pub async fn run_chaos_test<'a>(
-    test_env: &'a TestEnvironment,
-    params: &'a str,
-) -> Result<ChaosTestResult, Box<dyn Error + 'a>> {
+pub async fn run_chaos_test(
+    test_env: &TestEnvironment,
+    params: &str,
+) -> Result<ChaosTestResult, Box<dyn Error + Send + Sync>> {
     // Parse parameters
     let params = parse_chaos_params(params)?;
 
@@ -30,10 +30,10 @@ pub async fn run_chaos_test<'a>(
     Ok(result)
 }
 
-async fn run_load_test<'a>(
-    test_env: &'a TestEnvironment,
-    params: &'a ChaosParams,
-) -> Result<ChaosTestResult, Box<dyn Error + 'a>> {
+async fn run_load_test(
+    test_env: &TestEnvironment,
+    params: &ChaosParams,
+) -> Result<ChaosTestResult, Box<dyn Error + Send + Sync>> {
     let mut tasks: Vec<Pin<Box<dyn Future<Output = Result<ConcurrencyResult, Box<dyn Error>>> + Send + 'static>>> = Vec::new();
     
     // Simulate concurrent load

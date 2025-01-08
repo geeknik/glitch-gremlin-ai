@@ -184,8 +184,8 @@ impl Processor {
     }
 
     fn process_execute_proposal(
-        program_id: &Pubkey,
-        accounts: &[AccountInfo],
+        _program_id: &Pubkey,
+        accounts: &[AccountInfo], 
         proposal_id: u64,
     ) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();

@@ -16,7 +16,7 @@ pub async fn process_chaos_job(
     rpc_client: &RpcClient,
     program_id: &Pubkey,
     job_data: &str,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     // Parse job data
     let parts: Vec<&str> = job_data.split('|').collect();
     if parts.len() < 3 {
@@ -41,16 +41,23 @@ pub async fn process_chaos_job(
     Ok(())
 }
 
-async fn setup_test_environment(target_program: &Pubkey) -> Result<TestEnvironment, Box<dyn Error>> {
-    // TODO: Implement actual test environment setup
-    // This would include:
-    // - Forking the target program's state
-    // - Setting up accounts
-    // - Initializing test parameters
+async fn setup_test_environment(target_program: &Pubkey) -> Result<TestEnvironment, Box<dyn Error + Send + Sync>> {
+    // Initialize test environment with default values
     Ok(TestEnvironment {
         target_program: *target_program,
-        // Other test environment fields
+        test_accounts: Vec::new(),
+        test_parameters: TestParameters::default(),
+        start_time: std::time::Instant::now(),
     })
+}
+
+#[derive(Default)]
+struct TestParameters {
+    duration: u64,
+    intensity: u8,
+    concurrency_level: u8,
+    max_latency: u64,
+    error_threshold: u8,
 }
 
 async fn finalize_chaos_request(
