@@ -9,7 +9,7 @@ use solana_sdk::{
     sysvar::rent::Rent,
 };
 use std::error::Error;
-use crate::chaos_engine::{run_chaos_test, ChaosTestResult};
+use super::chaos_engine::{run_chaos_test, ChaosTestResult};
 use crate::instruction::GlitchInstruction;
 
 pub async fn process_chaos_job(
@@ -102,7 +102,7 @@ mod tests {
     use solana_client::nonblocking::rpc_client::RpcClient;
     use solana_sdk::signature::Keypair;
     use std::str::FromStr;
-    use glitch_shared::test_utils::{program_test, id};
+    use glitch_shared::test_utils::program_test;
 
     const TEST_PROGRAM_ID: &str = "GremLin1111111111111111111111111111111111111";
 

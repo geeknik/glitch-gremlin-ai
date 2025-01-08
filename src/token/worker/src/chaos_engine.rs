@@ -84,6 +84,7 @@ async fn await_all(
     }
 
     Ok(results)
+}
 struct ConcurrencyResult {
     success: bool,
     latency: u64,

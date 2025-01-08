@@ -1,16 +1,8 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{
     program_error::ProgramError,
-    pubkey::Pubkey,
-    instruction::{AccountMeta, Instruction},
-    system_instruction
+    pubkey::Pubkey
 };
-use solana_sdk::{
-    signer::keypair::Keypair,
-    transaction::Transaction,
-    signature::Signer
-};
-use crate::governance::GovernanceProposal;
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq)]
 pub enum GlitchInstruction {
     /// Initialize a new chaos request
