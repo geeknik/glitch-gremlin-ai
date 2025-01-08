@@ -2,11 +2,14 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{
     program_error::ProgramError,
     pubkey::Pubkey,
+    instruction::{AccountMeta, Instruction},
+    system_instruction,
 };
-use crate::{
-    state::GovernanceProposal,
-    test::{program_test, id},
+use solana_sdk::{
+    signer::{keypair::Keypair, Signer},
+    transaction::Transaction,
 };
+use crate::state::GovernanceProposal;
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq)]
 pub enum GlitchInstruction {
@@ -295,6 +298,6 @@ mod tests {
         let proposal = GovernanceProposal::try_from_slice(&account.data).unwrap();
         assert_eq!(proposal.id, 1);
         assert_eq!(proposal.description, "Test proposal");
-        assert_eq!(proposal.stake_amount, 1000);
+        assert_eq!(proposal.staked_amount, 1000);
     }
 }
