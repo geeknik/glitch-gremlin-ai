@@ -6,7 +6,7 @@ use solana_program::{
     declare_id,
 };
 
-declare_id!("GremLinXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
+declare_id!("GremLin111111111111111111111111111111111111111111");
 
 pub mod error;
 pub mod instruction;

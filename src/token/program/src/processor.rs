@@ -239,7 +239,7 @@ impl Processor {
     }
 
     fn process_initialize_chaos_request(
-        _program_id: &Pubkey,
+        program_id: &Pubkey,
         accounts: &[AccountInfo],
         amount: u64,
         params: Vec<u8>,
