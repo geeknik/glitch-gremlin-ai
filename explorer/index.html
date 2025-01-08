@@ -10,15 +10,25 @@
     <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.js"></script>
     <script src="https://unpkg.com/@solana/wallet-adapter-wallets@latest/lib/index.iife.js"></script>
     <script src="https://unpkg.com/@solana/wallet-adapter-base@latest/lib/index.iife.js"></script>
-    <script>
-        // Initialize wallet adapters after scripts are loaded
-        const { PhantomWalletAdapter, SolflareWalletAdapter, GlowWalletAdapter } = window.SolanaWalletAdapterWallets;
-        
-        const wallets = [
-            new PhantomWalletAdapter(),
-            new SolflareWalletAdapter(), 
-            new GlowWalletAdapter()
-        ];
+    <script type="module">
+        // Wait for all scripts to load
+        window.addEventListener('load', async () => {
+            try {
+                // Dynamically import wallet adapters
+                const { PhantomWalletAdapter, SolflareWalletAdapter, GlowWalletAdapter } = await import('@solana/wallet-adapter-wallets');
+                
+                // Initialize wallets
+                window.wallets = [
+                    new PhantomWalletAdapter(),
+                    new SolflareWalletAdapter(),
+                    new GlowWalletAdapter()
+                ];
+                
+                console.log('Wallets initialized successfully');
+            } catch (error) {
+                console.error('Failed to initialize wallets:', error);
+            }
+        });
     </script>
 </head>
 <body class="bg-gray-900 text-gray-100">
@@ -157,11 +167,8 @@
 
     <script>
         // Initialize wallet adapter
-        const wallets = [
-            new SolanaWalletAdapterWallets.PhantomWalletAdapter(),
-            new SolanaWalletAdapterWallets.SolflareWalletAdapter(),
-            new SolanaWalletAdapterWallets.GlowWalletAdapter()
-        ];
+        // Use the globally initialized wallets
+        const wallets = window.wallets || [];
 
         let wallet = null;
         let connection = null;
