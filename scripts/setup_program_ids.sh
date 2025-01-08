@@ -8,19 +8,19 @@ echo "Generating program IDs with glitch:1 prefix..."
 echo "This may take a few minutes..."
 
 # Generate main program ID
-MAIN_PROGRAM=$(solana-keygen grind --starts-with glitch:1 --num-threads 4)
+MAIN_PROGRAM=$(solana-keygen grind --starts-with glch1 --num-threads 4)
 echo "Main program ID: $MAIN_PROGRAM"
 
 # Generate governance program ID
-GOVERNANCE_PROGRAM=$(solana-keygen grind --starts-with glitch:1 --num-threads 4)
+GOVERNANCE_PROGRAM=$(solana-keygen grind --starts-with glch2 --num-threads 4)
 echo "Governance program ID: $GOVERNANCE_PROGRAM"
 
 # Generate token program ID
-TOKEN_PROGRAM=$(solana-keygen grind --starts-with glitch:1 --num-threads 4)
+TOKEN_PROGRAM=$(solana-keygen grind --starts-with glch3 --num-threads 4)
 echo "Token program ID: $TOKEN_PROGRAM"
 
 # Generate worker program ID
-WORKER_PROGRAM=$(solana-keygen grind --starts-with glitch:1 --num-threads 4)
+WORKER_PROGRAM=$(solana-keygen grind --starts-with glch4 --num-threads 4)
 echo "Worker program ID: $WORKER_PROGRAM"
 
 # Create program IDs config
