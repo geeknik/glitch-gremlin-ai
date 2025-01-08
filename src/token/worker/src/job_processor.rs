@@ -9,6 +9,27 @@ use solana_sdk::{
     sysvar::rent::Rent,
 };
 use std::error::Error;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum JobProcessorError {
+    #[error("Invalid job format")]
+    InvalidJobFormat,
+    #[error("Failed to parse program ID")]
+    ProgramIdParseError,
+    #[error("Test environment setup failed")]
+    TestSetupError,
+    #[error("Chaos test execution failed")]
+    TestExecutionError,
+    #[error("Request finalization failed")]
+    FinalizationError,
+}
+
+impl From<JobProcessorError> for Box<dyn Error + Send + Sync> {
+    fn from(e: JobProcessorError) -> Self {
+        Box::new(e)
+    }
+}
 use super::chaos_engine::{run_chaos_test, ChaosTestResult};
 use crate::instruction::GlitchInstruction;
 
@@ -16,7 +37,7 @@ pub async fn process_chaos_job(
     rpc_client: &RpcClient,
     program_id: &Pubkey,
     job_data: &str,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+) -> Result<(), JobProcessorError> {
     // Parse job data
     let parts: Vec<&str> = job_data.split('|').collect();
     if parts.len() < 3 {
@@ -97,10 +118,23 @@ async fn finalize_chaos_request(
     Ok(())
 }
 
-#[allow(dead_code)]
+#[derive(Default)]
 pub struct TestEnvironment {
     pub target_program: Pubkey,
-    // Other test environment fields
+    pub test_accounts: Vec<Pubkey>,
+    pub test_parameters: TestParameters,
+    pub start_time: std::time::Instant,
+}
+
+impl TestEnvironment {
+    pub fn new(target_program: Pubkey) -> Self {
+        Self {
+            target_program,
+            test_accounts: Vec::new(),
+            test_parameters: TestParameters::default(),
+            start_time: std::time::Instant::now(),
+        }
+    }
 }
 
 #[cfg(test)]
