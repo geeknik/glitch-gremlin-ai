@@ -1,9 +1,16 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{
     program_error::ProgramError,
-    pubkey::Pubkey
+    pubkey::Pubkey,
+    instruction::{AccountMeta, Instruction},
+    system_instruction
 };
-
+use solana_sdk::{
+    signer::keypair::Keypair,
+    transaction::Transaction,
+    signature::Signer
+};
+use crate::governance::GovernanceProposal;
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq)]
 pub enum GlitchInstruction {
     /// Initialize a new chaos request
@@ -292,6 +299,6 @@ mod tests {
         let proposal = GovernanceProposal::try_from_slice(&account.data).unwrap();
         assert_eq!(proposal.id, 1);
         assert_eq!(proposal.description, "Test proposal");
-        assert_eq!(proposal.amount, 1000);
+        assert_eq!(proposal.staked_amount, 1000);
     }
 }

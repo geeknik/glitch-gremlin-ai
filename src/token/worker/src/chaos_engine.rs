@@ -1,6 +1,10 @@
+use std::boxed::Box;
 use std::error::Error;
+use std::future::Future;
+use std::pin::Pin;
 use crate::job_processor::TestEnvironment;
 
+type BoxedFuture<T> = Pin<Box<dyn Future<Output = Result<T, Box<dyn Error>>> + Send + 'static>>;
 pub struct ChaosTestResult {
     pub status: TestStatus,
     pub logs: String,
@@ -29,11 +33,12 @@ pub async fn run_chaos_test(
 async fn run_load_test(
     test_env: &TestEnvironment,
     params: &ChaosParams,
-) -> Result<ChaosTestResult, Box<dyn Error>> {
+) -> Result<ChaosTestResult, Box<dyn Error + '_>> {
+    let mut tasks: Vec<Pin<Box<dyn Future<Output = Result<ConcurrencyResult, Box<dyn Error>>> + Send + 'static>>> = Vec::new();
+    
     // Simulate concurrent load
-    let mut tasks = Vec::new();
     for i in 0..params.intensity {
-        tasks.push(spawn_concurrent_task(test_env, i));
+        tasks.push(Box::pin(spawn_concurrent_task(test_env, i)));
     }
 
     // Wait for all tasks to complete
@@ -68,20 +73,17 @@ async fn spawn_concurrent_task(
         errors: Vec::new(),
     })
 }
-
-
 async fn await_all(
-    tasks: Vec<Box<dyn Future<Output = Result<ConcurrencyResult, Box<dyn Error>>>>>,
+    tasks: Vec<Pin<Box<dyn Future<Output = Result<ConcurrencyResult, Box<dyn Error>>> + Send + 'static>>>,
     _test_env: &TestEnvironment,
 ) -> Result<Vec<ConcurrencyResult>, Box<dyn Error>> {
-    // Wait for all tasks to complete
     let mut results = Vec::new();
     for task in tasks {
         results.push(task.await?);
     }
-    Ok(results)
-}
+    }
 
+    Ok(results)
 struct ConcurrencyResult {
     success: bool,
     latency: u64,
