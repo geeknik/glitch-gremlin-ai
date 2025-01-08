@@ -3,30 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>👹 Glitch Gremlin AI - Embrace The Chaos!</title>
+    <title>Glitch Gremlin AI - Embrace The Chaos!</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.js"></script>
-    <script src="https://unpkg.com/@solana/wallet-adapter-wallets@latest/lib/index.iife.js"></script>
-    <script src="https://unpkg.com/@solana/wallet-adapter-base@latest/lib/index.iife.js"></script>
     <script type="module">
-        // Wait for all scripts to load
-        window.addEventListener('load', async () => {
+        import { PhantomWalletAdapter, SolflareWalletAdapter, GlowWalletAdapter } from '@solana/wallet-adapter-wallets';
+        import { Connection } from '@solana/web3.js';
+        import { initWallet } from './src/wallet.js';
+
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', async () => {
             try {
-                // Dynamically import wallet adapters
-                const { PhantomWalletAdapter, SolflareWalletAdapter, GlowWalletAdapter } = await import('@solana/wallet-adapter-wallets');
-                
                 // Initialize wallets
-                window.wallets = [
+                const wallets = [
                     new PhantomWalletAdapter(),
                     new SolflareWalletAdapter(),
                     new GlowWalletAdapter()
                 ];
-                
-                console.log('Wallets initialized successfully');
+
+                // Initialize connection
+                const connection = new Connection('https://api.mainnet-beta.solana.com');
+
+                // Initialize wallet logic
+                await initWallet(wallets, connection);
+
+                console.log('Application initialized successfully');
             } catch (error) {
-                console.error('Failed to initialize wallets:', error);
+                console.error('Initialization failed:', error);
             }
         });
     </script>
