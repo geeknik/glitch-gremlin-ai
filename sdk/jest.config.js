@@ -24,11 +24,3 @@ export default {
   },
   setupFilesAfterEnv: ['./jest.setup.ts']
 };
-      lines: 80,
-      statements: 80
-    }
-  },
-  setupFilesAfterEnv: ['./jest.setup.ts']
-};
-
-module.exports = config;
