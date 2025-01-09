@@ -15,28 +15,18 @@ describe('RedisQueueWorker', () => {
     beforeAll(() => {
         // Mock Redis instead of real connection
         redis = {
-            lpush: jest.fn().mockResolvedValue(1),
-            rpop: jest.fn().mockResolvedValue(JSON.stringify({
-                targetProgram: "11111111111111111111111111111111",
-                testType: TestType.FUZZ,
-                duration: 60,
-                intensity: 5
-            })),
-            hset: jest.fn().mockResolvedValue(1),
-            hget: jest.fn().mockResolvedValue(JSON.stringify({
-                requestId: 'test-id',
-                status: 'completed',
-                resultRef: 'ipfs://test',
-                logs: ['Test completed'],
-                metrics: {
-                    totalTransactions: 100,
-                    errorRate: 0,
-                    avgLatency: 100
-                }
-            })),
+            incr: jest.fn().mockResolvedValue(1),
+            expire: jest.fn().mockResolvedValue(1),
+            get: jest.fn().mockResolvedValue(null),
+            set: jest.fn().mockResolvedValue('OK'),
+            on: jest.fn(),
             quit: jest.fn().mockResolvedValue('OK'),
             disconnect: jest.fn().mockResolvedValue('OK'),
-            flushall: jest.fn().mockResolvedValue('OK')
+            flushall: jest.fn().mockResolvedValue('OK'),
+            hset: jest.fn().mockResolvedValue(1),
+            hget: jest.fn().mockResolvedValue(null),
+            lpush: jest.fn().mockResolvedValue(1),
+            rpop: jest.fn().mockResolvedValue(null)
         } as unknown as Redis;
     });
 

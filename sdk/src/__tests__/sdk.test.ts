@@ -20,7 +20,15 @@ describe('GlitchSDK', () => {
             incr: jest.fn().mockResolvedValue(1),
             expire: jest.fn().mockResolvedValue(1),
             get: jest.fn().mockResolvedValue(null),
-            set: jest.fn().mockResolvedValue('OK')
+            set: jest.fn().mockResolvedValue('OK'),
+            on: jest.fn(),
+            quit: jest.fn().mockResolvedValue('OK'),
+            disconnect: jest.fn().mockResolvedValue('OK'),
+            flushall: jest.fn().mockResolvedValue('OK'),
+            hset: jest.fn().mockResolvedValue(1),
+            hget: jest.fn().mockResolvedValue(null),
+            lpush: jest.fn().mockResolvedValue(1),
+            rpop: jest.fn().mockResolvedValue(null)
         } as unknown as Redis;
 
         // Mock Solana connection methods
@@ -96,7 +104,7 @@ describe('GlitchSDK', () => {
             // Mock the connection's simulateTransaction to avoid actual network calls
             // Mock balance check
             const mockGetBalance = jest.spyOn(sdk['connection'], 'getBalance')
-                .mockResolvedValue(5000);
+                .mockResolvedValue(200_000_000); // 0.2 SOL
 
             const mockSimulateTransaction = jest.spyOn(sdk['connection'], 'simulateTransaction')
                 .mockResolvedValue({
@@ -133,6 +141,7 @@ describe('GlitchSDK', () => {
             // Clean up mocks
             mockSimulateTransaction.mockRestore();
             mockSendTransaction.mockRestore();
+            mockGetBalance.mockRestore();
         });
 
         it('should validate minimum stake amount', async () => {
@@ -173,6 +182,14 @@ describe('GlitchSDK', () => {
 
             it('should enforce rate limits for single requests', async () => {
                 jest.setTimeout(10000); // Increase timeout for this test
+                
+                // Mock incr to track request count
+                let requestCount = 0;
+                sdk['queueWorker']['redis'].incr.mockImplementation(async () => {
+                    requestCount++;
+                    return requestCount;
+                });
+
                 // First request should succeed
                 await sdk.createChaosRequest({
                     targetProgram: "11111111111111111111111111111111",
