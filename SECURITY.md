@@ -34,6 +34,9 @@ This security policy applies to:
 - Use official channels for downloads and updates
 - Keep your wallet software and operating system up to date
 - Never share your private keys or seed phrases
+- Use hardware wallets for large token holdings
+- Enable 2FA on all accounts
+- Verify transaction details before signing
 
 ### For Developers
 - Use the latest version of the SDK
@@ -41,6 +44,34 @@ This security policy applies to:
 - Implement proper input validation
 - Use the built-in error handling mechanisms
 - Regularly audit your code for vulnerabilities
+- Use rate limiting on all public endpoints
+- Implement proper access controls
+- Use multi-sig for privileged operations
+- Enable timelocks for critical changes
+- Monitor for suspicious activity
+- Use secure random number generation
+- Validate all on-chain data
+- Use proper error codes and messages
+- Implement proper logging and monitoring
+- Use secure storage for sensitive data
+- Regularly update dependencies
+- Use automated security scanning tools
+- Implement proper key management
+- Use secure communication protocols
+- Implement proper session management
+- Use secure password storage
+- Implement proper rate limiting
+- Use secure random number generation
+- Validate all on-chain data
+- Use proper error codes and messages
+- Implement proper logging and monitoring
+- Use secure storage for sensitive data
+- Regularly update dependencies
+- Use automated security scanning tools
+- Implement proper key management
+- Use secure communication protocols
+- Implement proper session management
+- Use secure password storage
 
 ## Future Enhancements
 

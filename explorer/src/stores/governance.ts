@@ -14,17 +14,66 @@ export const useGovernanceStore = defineStore('governance', () => {
     mainProgramId: new PublicKey(import.meta.env.VITE_MAIN_PROGRAM_ID)
   })
 
+  // Rate limiting state
+  const lastFetch = ref(0)
+  const fetchCount = ref(0)
+  
   async function fetchProposals() {
-    proposals.value = await worker.getProposals({
-      includeVotes: true,
-      includeStakes: true,
-      includeRewards: true
-    })
+    const now = Date.now()
+    
+    // Rate limiting
+    if (now - lastFetch.value < 2000) {
+      throw new Error('Rate limit exceeded - wait 2 seconds between fetches')
+    }
+    if (fetchCount.value > 10) {
+      throw new Error('Too many requests - wait 1 minute')
+    }
+    
+    try {
+      proposals.value = await worker.getProposals({
+        includeVotes: true,
+        includeStakes: true,
+        includeRewards: true
+      })
+      
+      // Update rate limiting state
+      lastFetch.value = now
+      fetchCount.value++
+      
+      // Reset counter after 1 minute
+      setTimeout(() => {
+        fetchCount.value = 0
+      }, 60000)
+      
+    } catch (error) {
+      console.error('Failed to fetch proposals:', error)
+      throw new GlitchError('Failed to fetch proposals', 1017)
+    }
   }
 
   async function delegateStake(stakeId: string, delegateAddress: string) {
-    await worker.delegateStake(stakeId, delegateAddress)
-    await fetchProposals()
+    try {
+      // Validate inputs
+      if (!stakeId || !delegateAddress) {
+        throw new GlitchError('Invalid stake ID or delegate address', 1018)
+      }
+      
+      // Check if delegate is valid
+      const isValid = await worker.validateDelegate(delegateAddress)
+      if (!isValid) {
+        throw new GlitchError('Invalid delegate address', 1019)
+      }
+      
+      // Perform delegation
+      await worker.delegateStake(stakeId, delegateAddress)
+      
+      // Refresh data
+      await fetchProposals()
+      
+    } catch (error) {
+      console.error('Delegation failed:', error)
+      throw new GlitchError('Delegation failed', 1020)
+    }
   }
 
   async function claimRewards(stakeId: string) {

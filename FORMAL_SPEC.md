@@ -36,15 +36,33 @@ The GlitchGremlinProgram is a Solana program that provides Chaos-as-a-Service (C
 ## 3. Security Model
 
 ### 3.1 Privileged Operations
-- Program upgrade (multisig controlled)
-- Fee structure modification
-- Escrow release authority
-- Governance parameter changes
+- Program upgrade (multisig controlled, 3/5 signatures)
+- Fee structure modification (governance controlled, 7 day timelock)
+- Escrow release authority (PDA controlled with signed proofs)
+- Governance parameter changes (governance controlled, 3 day timelock)
+- Emergency pause (multisig controlled, 2/3 signatures)
 
 ### 3.2 Rate Limiting
-- Max requests per user per time period
-- Max tokens escrowed per request
-- Minimum request duration
+- Max requests: 10 per minute per user
+- Max tokens escrowed: 1M GLITCH per request
+- Minimum request duration: 60 seconds
+- Maximum request duration: 3600 seconds
+- Minimum time between requests: 2 seconds
+- Maximum concurrent requests: 10 per user
+
+### 3.3 Access Control
+- ChaosRequest creation: Any verified user
+- Finalization: AI engine only (signed proofs)
+- Governance: Token holders with minimum stake
+- Configuration: Multisig only
+- Emergency operations: Multisig only
+
+### 3.4 Monitoring and Alerts
+- Real-time transaction monitoring
+- Anomaly detection
+- Automated alerts for suspicious activity
+- Regular security audits
+- Incident response plan
 
 ## 4. Error Handling
 
