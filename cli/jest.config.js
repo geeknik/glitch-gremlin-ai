@@ -1,20 +1,24 @@
 /** @type {import('ts-jest').JestConfigWithTsJest} */
-module.exports = {
-  preset: 'ts-jest',
+export default {
+  preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'node',
   testMatch: ['**/__tests__/**/*.test.ts'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
-    '^@glitch-gremlin/sdk$': '<rootDir>/../sdk/src/index.js'
+    '^@glitch-gremlin/sdk$': '<rootDir>/../sdk/src/index.js',
+    '^(\\.{1,2}/.*)\\.js$': '$1'
   },
   transform: {
-    '^.+\\.tsx?$': ['ts-jest', {
-      useESM: true,
-      tsconfig: 'tsconfig.json',
-      isolatedModules: true
-    }]
+    '^.+\\.tsx?$': [
+      'ts-jest',
+      {
+        useESM: true,
+        tsconfig: 'tsconfig.json',
+        isolatedModules: true
+      }
+    ]
   },
-  extensionsToTreatAsEsm: ['.ts'],
+  extensionsToTreatAsEsm: ['.ts', '.tsx'],
   modulePaths: ['<rootDir>/../sdk/src'],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.mjs'],
   globals: {

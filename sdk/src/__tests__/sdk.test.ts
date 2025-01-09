@@ -224,8 +224,6 @@ describe('GlitchSDK', () => {
                 const originalIncr = sdk['queueWorker']['redis'].incr;
                 // Track request times
                 const requestTimes: number[] = [];
-                
-                let requestCount = 0;
                 sdk['queueWorker']['redis'].incr.mockImplementation(async function() {
                     requestCount++;
                     if (requestCount > 1) {
