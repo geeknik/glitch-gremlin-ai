@@ -23,12 +23,19 @@ export async function initWallet(wallets, connection) {
             try {
                 const availableWallets = wallets.filter(w => w.available);
                 if (availableWallets.length === 0) {
-                    throw new Error('No wallet found. Please install a supported wallet like Phantom.');
+                    alert('No wallet found. Please install Phantom or Solflare wallet.');
+                    window.open('https://phantom.app', '_blank');
+                    return;
                 }
                 
                 // Use the first available wallet
                 const wallet = availableWallets[0];
                 await wallet.connect();
+                
+                if (!wallet.publicKey) {
+                    throw new Error('Failed to connect wallet');
+                }
+
                 const publicKey = wallet.publicKey;
                 
                 // Update UI
@@ -36,14 +43,14 @@ export async function initWallet(wallets, connection) {
                 if (walletAddress) walletAddress.textContent = publicKey.toBase58().slice(0, 6) + '...' + publicKey.toBase58().slice(-4);
                 
                 // Get balance
-                const balance = await connection.getBalance(publicKey.toBase58());
-                if (walletBalance) walletBalance.textContent = (Number(balance) / 1e9).toFixed(2);
+                const balance = await connection.getBalance(publicKey);
+                if (walletBalance) walletBalance.textContent = (balance / 1e9).toFixed(2);
 
                 // Load governance data
                 loadGovernanceData();
             } catch (error) {
                 console.error('Wallet connection failed:', error);
-                alert(`Wallet connection failed: ${error.message}`);
+                alert('Failed to connect wallet. Please try again.');
             }
         });
     }
