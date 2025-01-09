@@ -16,10 +16,16 @@ The main class for interacting with the Glitch Gremlin platform.
 
 ```typescript
 import { GlitchSDK, TestType } from '@glitch-gremlin/sdk';
+import { useAppKitAccount, useAppKitProvider } from '@reown/appkit/vue'
+import { useAppKitConnection } from '@reown/appkit-adapter-solana/vue'
 
+// Get wallet provider
+const { walletProvider } = useAppKitProvider('solana')
+
+// Initialize SDK with connected wallet
 const sdk = new GlitchSDK({
     cluster: 'devnet',  // or 'mainnet-beta'
-    wallet: yourWallet  // Solana wallet instance
+    wallet: walletProvider
 });
 ```
 
