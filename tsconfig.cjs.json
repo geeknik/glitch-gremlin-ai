@@ -6,11 +6,3 @@
     "declarationDir": "./dist/cjs"
   }
 }
-{
-  "extends": "./tsconfig.json",
-  "compilerOptions": {
-    "module": "CommonJS",
-    "outDir": "./dist/cjs",
-    "declarationDir": "./dist/cjs"
-  }
-}
