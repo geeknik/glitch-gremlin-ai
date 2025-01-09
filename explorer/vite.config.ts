@@ -20,8 +20,12 @@ export default defineConfig({
     global: 'globalThis'
   },
   optimizeDeps: {
-    exclude: ['ioredis', '@mapbox/node-pre-gyp'],
-    include: ['@solana/web3.js', '@solana/wallet-adapter-base'],
+    exclude: ['ioredis', '@mapbox/node-pre-gyp', 'mock-aws-s3', 'aws-sdk', 'nock'],
+    include: [
+      '@solana/web3.js', 
+      '@solana/wallet-adapter-base',
+      '@solana/wallet-adapter-wallets'
+    ],
     esbuildOptions: {
       define: {
         global: 'globalThis'

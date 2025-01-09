@@ -9,8 +9,16 @@ const connection = new Connection('https://api.devnet.solana.com', { commitment:
 
 // Initialize wallet adapters with proper config
 const wallets = [
-  new PhantomWalletAdapter({ network: 'devnet' })
+  new PhantomWalletAdapter()
 ]
+
+// Configure wallet network after initialization
+wallets.forEach(wallet => {
+  if (wallet.connected) {
+    wallet.disconnect();
+  }
+  wallet.config = { network: 'devnet' };
+});
 
 // Create Vue app
 const app = createApp(App)
