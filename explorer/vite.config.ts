@@ -8,7 +8,7 @@ export default defineConfig({
       stream: 'stream-browserify',
       buffer: 'buffer',
       util: 'util',
-      process: 'process/browser',
+      process: require.resolve('process/browser'),
       // Add these to handle problematic imports
       'mock-aws-s3': false,
       'aws-sdk': false,
