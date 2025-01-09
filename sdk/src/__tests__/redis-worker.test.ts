@@ -13,14 +13,31 @@ describe('RedisQueueWorker', () => {
     let redis: RedisType;
 
     beforeAll(() => {
-        redis = new Redis({
-            host: 'r.glitchgremlin.ai',
-            port: 6379,
-            lazyConnect: true,
-            maxRetriesPerRequest: 1, // Reduce retries for tests
-            retryStrategy: (times) => Math.min(times * 10, 500), // Faster retries
-            connectTimeout: 1000 // Shorter timeout
-        });
+        // Mock Redis instead of real connection
+        redis = {
+            lpush: jest.fn().mockResolvedValue(1),
+            rpop: jest.fn().mockResolvedValue(JSON.stringify({
+                targetProgram: "11111111111111111111111111111111",
+                testType: TestType.FUZZ,
+                duration: 60,
+                intensity: 5
+            })),
+            hset: jest.fn().mockResolvedValue(1),
+            hget: jest.fn().mockResolvedValue(JSON.stringify({
+                requestId: 'test-id',
+                status: 'completed',
+                resultRef: 'ipfs://test',
+                logs: ['Test completed'],
+                metrics: {
+                    totalTransactions: 100,
+                    errorRate: 0,
+                    avgLatency: 100
+                }
+            })),
+            quit: jest.fn().mockResolvedValue('OK'),
+            disconnect: jest.fn().mockResolvedValue('OK'),
+            flushall: jest.fn().mockResolvedValue('OK')
+        } as unknown as Redis;
     });
 
     beforeEach(() => {

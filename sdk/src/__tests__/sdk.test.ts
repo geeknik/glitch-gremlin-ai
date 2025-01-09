@@ -14,6 +14,28 @@ describe('GlitchSDK', () => {
             cluster: 'https://api.devnet.solana.com',
             wallet
         });
+
+        // Mock Redis connection
+        sdk['queueWorker']['redis'] = {
+            incr: jest.fn().mockResolvedValue(1),
+            expire: jest.fn().mockResolvedValue(1),
+            get: jest.fn().mockResolvedValue(null),
+            set: jest.fn().mockResolvedValue('OK')
+        } as unknown as Redis;
+
+        // Mock Solana connection methods
+        jest.spyOn(sdk['connection'], 'getBalance').mockResolvedValue(1_000_000_000);
+        jest.spyOn(sdk['connection'], 'sendTransaction').mockResolvedValue('mock-tx-signature');
+        jest.spyOn(sdk['connection'], 'simulateTransaction').mockResolvedValue({
+            context: { slot: 0 },
+            value: { 
+                err: null,
+                logs: [],
+                accounts: null,
+                unitsConsumed: 0,
+                returnData: null
+            }
+        });
     });
 
     afterEach(async () => {
