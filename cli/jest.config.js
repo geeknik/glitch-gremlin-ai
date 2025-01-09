@@ -5,12 +5,14 @@ module.exports = {
   testMatch: ['**/__tests__/**/*.test.ts'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
-    '^@glitch-gremlin/sdk$': '<rootDir>/../sdk/dist'
+    '^@glitch-gremlin/sdk$': '<rootDir>/../sdk/src/index.js'
   },
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
       useESM: true,
     }]
   },
-  extensionsToTreatAsEsm: ['.ts']
+  extensionsToTreatAsEsm: ['.ts'],
+  modulePaths: ['<rootDir>/../sdk/src'],
+  setupFiles: ['<rootDir>/jest.setup.js']
 };
