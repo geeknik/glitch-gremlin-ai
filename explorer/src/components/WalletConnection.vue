@@ -55,7 +55,6 @@ const { connected, publicKey, connect, disconnect, wallet } = useWallet();
 const gremlinBalance = ref(0);
 const votingPower = ref(0);
 const stakedBalance = ref(0);
-let sdkInstance = null;
 
 const shortAddress = computed(() => {
   if (!publicKey.value) return '';
