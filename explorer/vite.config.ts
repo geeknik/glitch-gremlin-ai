@@ -9,6 +9,10 @@ export default defineConfig({
       buffer: 'buffer',
       util: 'util',
       process: 'process/browser',
+      // Add these to handle problematic imports
+      'mock-aws-s3': false,
+      'aws-sdk': false,
+      'nock': false
     }
   },
   define: {
@@ -16,7 +20,7 @@ export default defineConfig({
     global: 'globalThis'
   },
   optimizeDeps: {
-    exclude: ['ioredis'],
+    exclude: ['ioredis', '@mapbox/node-pre-gyp'],
     esbuildOptions: {
       define: {
         global: 'globalThis'
@@ -25,7 +29,13 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      external: ['ioredis']
+      external: [
+        'ioredis',
+        '@mapbox/node-pre-gyp',
+        'mock-aws-s3',
+        'aws-sdk',
+        'nock'
+      ]
     },
     commonjsOptions: {
       include: [/node_modules/],
