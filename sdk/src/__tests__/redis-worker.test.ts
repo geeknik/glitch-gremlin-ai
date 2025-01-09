@@ -13,7 +13,7 @@ describe('RedisQueueWorker', () => {
     let redis: RedisType;
 
     beforeAll(() => {
-        // Enhanced Redis mock with error handling
+        // Enhanced Redis mock with proper error handling
         redis = {
             incr: jest.fn().mockImplementation(async () => {
                 if (this.connected === false) {
@@ -36,15 +36,28 @@ describe('RedisQueueWorker', () => {
             flushall: jest.fn().mockResolvedValue('OK'),
             hset: jest.fn().mockImplementation(async (key, field, value) => {
                 if (typeof value !== 'string') {
-                    throw new SyntaxError('Invalid JSON');
+                    throw new GlitchError('Invalid JSON');
                 }
                 return 1;
             }),
             hget: jest.fn().mockImplementation(async (key, field) => {
                 if (field === 'bad-result') {
-                    throw new SyntaxError('Invalid JSON');
+                    throw new GlitchError('Invalid JSON');
                 }
-                return JSON.stringify({test: 'data'});
+                if (field === 'non-existent-id') {
+                    return null;
+                }
+                return JSON.stringify({
+                    requestId: field,
+                    status: 'completed',
+                    resultRef: 'ipfs://test',
+                    logs: ['Test completed'],
+                    metrics: {
+                        totalTransactions: 100,
+                        errorRate: 0,
+                        avgLatency: 100
+                    }
+                });
             }),
             lpush: jest.fn().mockImplementation(async (key, value) => {
                 if (value === 'invalid-json') {

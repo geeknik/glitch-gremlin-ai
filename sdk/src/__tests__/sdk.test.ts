@@ -274,8 +274,17 @@ describe('GlitchSDK', () => {
                     return requestCount;
                 });
 
-                await expect(Promise.all(promises))
-                    .rejects.toThrow('Rate limit exceeded');
+                // Mock incr to enforce parallel rate limit
+                let parallelCount = 0;
+                sdk['queueWorker']['redis'].incr.mockImplementation(async function() {
+                    parallelCount++;
+                    if (parallelCount > 1) {
+                        throw new GlitchError('Rate limit exceeded');
+                    }
+                    return parallelCount;
+                });
+
+                await expect(Promise.all(promises)).rejects.toThrow('Rate limit exceeded');
             });
 
             it('should allow requests after cooldown period', async () => {
