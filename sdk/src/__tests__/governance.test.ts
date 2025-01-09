@@ -7,7 +7,7 @@ describe('Governance', () => {
     beforeAll(() => {
         // Create mock connection once for all tests
         const wallet = Keypair.generate();
-        sdk = new GlitchSDK({
+        sdk = await GlitchSDK.init({
             cluster: 'https://api.devnet.solana.com',
             wallet
         });
