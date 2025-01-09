@@ -3,14 +3,21 @@ export async function initWallet(wallets, connection) {
         throw new Error('Wallet adapters or connection not provided');
     }
 
-    // Store in Vue global properties instead of window
+    // Initialize wallet store with connection
+    const store = {
+        wallets,
+        connection,
+        connected: false,
+        publicKey: null
+    };
+
+    // Make store reactive for Vue
     const app = document.querySelector('#app')?.__vue_app__;
     if (!app) {
         throw new Error('Vue app not initialized');
     }
 
-    app.config.globalProperties.$wallets = wallets;
-    app.config.globalProperties.$connection = connection;
+    app.config.globalProperties.$wallet = store;
 
     // Initialize wallet connection logic
     const connectButton = document.getElementById('connectWallet');
@@ -21,31 +28,32 @@ export async function initWallet(wallets, connection) {
     if (connectButton) {
         connectButton.addEventListener('click', async () => {
             try {
-                try {
-                    if (!wallets || wallets.length === 0) {
-                        console.error('No wallet adapters provided');
-                        throw new Error('No wallet adapters configured');
-                    }
+                if (!wallets || wallets.length === 0) {
+                    console.error('No wallet adapters provided');
+                    throw new Error('No wallet adapters configured');
+                }
 
-                    const availableWallets = wallets.filter(w => w.available);
-                    if (availableWallets.length === 0) {
-                        console.error('No available wallets found. Please install Phantom or Solflare.');
-                        window.open('https://phantom.app', '_blank');
-                        return;
-                    }
-                    
-                    // Use the first available wallet
-                    const wallet = availableWallets[0];
-                    await wallet.connect();
-                    
-                    if (!wallet.publicKey) {
-                        throw new Error('Wallet connection failed - no public key');
-                    }
-                } catch (err) {
-                    console.error('Wallet connection failed:', err);
-                    alert('Failed to connect wallet. Please try again.');
+                const availableWallets = wallets.filter(w => w.available);
+                if (availableWallets.length === 0) {
+                    console.error('No available wallets found. Please install Phantom or Solflare.');
+                    window.open('https://phantom.app', '_blank');
                     return;
                 }
+                
+                // Use the first available wallet
+                const wallet = availableWallets[0];
+                await wallet.connect();
+                
+                if (!wallet.publicKey) {
+                    throw new Error('Wallet connection failed - no public key');
+                }
+
+                // Update store
+                app.config.globalProperties.$wallet.connected = true;
+                app.config.globalProperties.$wallet.publicKey = wallet.publicKey;
+
+                // Load governance data after successful connection
+                await loadGovernanceData(wallet.publicKey, connection);
                 
                 if (!wallet.publicKey) {
                     throw new Error('Failed to connect wallet');
@@ -71,7 +79,33 @@ export async function initWallet(wallets, connection) {
     }
 }
 
-function loadGovernanceData() {
-    // Placeholder for governance data loading
-    console.log('Loading governance data...');
+async function loadGovernanceData(publicKey, connection) {
+    try {
+        // Load user's governance state
+        const governanceState = await connection.getAccountInfo(publicKey);
+        if (!governanceState) {
+            console.log('No existing governance state found');
+            return;
+        }
+
+        // Load active proposals
+        const proposals = await connection.getProgramAccounts(
+            new PublicKey('GremlinGov11111111111111111111111111111111111')
+        );
+
+        console.log('Governance data loaded:', {
+            proposals: proposals.length
+        });
+
+        // Store in global state
+        const app = document.querySelector('#app')?.__vue_app__;
+        if (app) {
+            app.config.globalProperties.$governance = {
+                proposals,
+                lastUpdated: Date.now()
+            };
+        }
+    } catch (err) {
+        console.error('Failed to load governance data:', err);
+    }
 }
