@@ -21,26 +21,30 @@ export async function initWallet(wallets, connection) {
     if (connectButton) {
         connectButton.addEventListener('click', async () => {
             try {
-                if (!wallets || wallets.length === 0) {
-                    console.error('No wallet adapters provided');
-                    throw new Error('No wallet adapters configured');
-                }
-
-                const availableWallets = wallets.filter(w => w.available);
-                if (availableWallets.length === 0) {
-                    const err = new Error('No wallet found');
-                    console.error('No available wallets found. Please install Phantom or Solflare.');
-                    window.open('https://phantom.app', '_blank');
-                    throw err;
-                }
-                
-                // Use the first available wallet
-                const wallet = availableWallets[0];
                 try {
+                    if (!wallets || wallets.length === 0) {
+                        console.error('No wallet adapters provided');
+                        throw new Error('No wallet adapters configured');
+                    }
+
+                    const availableWallets = wallets.filter(w => w.available);
+                    if (availableWallets.length === 0) {
+                        console.error('No available wallets found. Please install Phantom or Solflare.');
+                        window.open('https://phantom.app', '_blank');
+                        return;
+                    }
+                    
+                    // Use the first available wallet
+                    const wallet = availableWallets[0];
                     await wallet.connect();
+                    
+                    if (!wallet.publicKey) {
+                        throw new Error('Wallet connection failed - no public key');
+                    }
                 } catch (err) {
-                    console.error('Failed to connect wallet:', err);
-                    throw new Error('Wallet connection failed');
+                    console.error('Wallet connection failed:', err);
+                    alert('Failed to connect wallet. Please try again.');
+                    return;
                 }
                 
                 if (!wallet.publicKey) {

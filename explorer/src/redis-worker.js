@@ -1,4 +1,4 @@
-import { Redis } from 'ioredis'
+const Redis = require('ioredis')
 
 export class RedisWorker {
     constructor(redisUrl = 'redis://r.glitchgremlin.ai:6379') {
