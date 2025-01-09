@@ -27,19 +27,30 @@ export class RedisQueueWorker {
     }
 
     async enqueueRequest(params: ChaosRequestParams): Promise<string> {
-        const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        await this.redis.lpush(this.queueKey, JSON.stringify({
-            id: requestId,
-            params,
-            timestamp: Date.now()
-        }));
-        return requestId;
+        try {
+            const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            await this.redis.lpush(this.queueKey, JSON.stringify({
+                id: requestId,
+                params,
+                timestamp: Date.now()
+            }));
+            return requestId;
+        } catch (err) {
+            throw new GlitchError('Failed to enqueue request', 2003);
+        }
     }
 
     async dequeueRequest(): Promise<{id: string, params: ChaosRequestParams} | null> {
-        const data = await this.redis.rpop(this.queueKey);
-        if (!data) return null;
-        return JSON.parse(data);
+        try {
+            const data = await this.redis.rpop(this.queueKey);
+            if (!data) return null;
+            return JSON.parse(data);
+        } catch (err) {
+            if (err instanceof SyntaxError) {
+                throw new GlitchError('Invalid queue data', 2001);
+            }
+            throw err;
+        }
     }
 
     async storeResult(requestId: string, result: ChaosResult): Promise<void> {
@@ -49,8 +60,16 @@ export class RedisQueueWorker {
     }
 
     async getResult(requestId: string): Promise<ChaosResult | null> {
-        const result = await this.redis.hget(this.resultKey, requestId);
-        return result ? JSON.parse(result) : null;
+        try {
+            const result = await this.redis.hget(this.resultKey, requestId);
+            if (!result) return null;
+            return JSON.parse(result);
+        } catch (err) {
+            if (err instanceof SyntaxError) {
+                throw new GlitchError('Invalid result data', 2002);
+            }
+            throw err;
+        }
     }
 
     async close(): Promise<void> {
