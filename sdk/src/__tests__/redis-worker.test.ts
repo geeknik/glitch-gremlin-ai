@@ -104,12 +104,18 @@ describe('RedisQueueWorker', () => {
                 intensity: 5
             };
 
+            // Enqueue request
             const requestId = await worker.enqueueRequest(params);
             expect(requestId).toBeDefined();
+            expect(typeof requestId).toBe('string');
+            expect(requestId.length).toBeGreaterThan(0);
 
+            // Dequeue request
             const dequeued = await worker.dequeueRequest();
             expect(dequeued).toBeDefined();
             expect(dequeued?.params).toEqual(params);
+            expect(dequeued?.id).toBe(requestId);
+            expect(typeof dequeued?.timestamp).toBe('number');
         });
 
         it('should handle empty queue', async () => {

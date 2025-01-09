@@ -16,14 +16,14 @@ describe('GlitchSDK', () => {
         });
 
         // Enhanced Redis mock with rate limiting
-        let requestCount = 0;
+        const requestCount = { count: 0 };
         sdk['queueWorker']['redis'] = {
             incr: jest.fn().mockImplementation(async () => {
-                requestCount++;
-                if (requestCount > 1) {
+                requestCount.count++;
+                if (requestCount.count > 1) {
                     throw new GlitchError('Rate limit exceeded');
                 }
-                return requestCount;
+                return requestCount.count;
             }),
             expire: jest.fn().mockResolvedValue(1),
             get: jest.fn().mockResolvedValue(null),
@@ -219,15 +219,18 @@ describe('GlitchSDK', () => {
             it('should enforce rate limits for single requests', async () => {
                 jest.setTimeout(10000); // Increase timeout for this test
                 
-                // Mock incr to track request count and enforce limit
-                let requestCount = 0;
+                // Track request count
+                const requestCount = { count: 0 };
+                
+                // Mock incr to enforce rate limit
                 sdk['queueWorker']['redis'].incr.mockImplementation(async function() {
                     const currentTime = Date.now();
                     if (currentTime - sdk['lastRequestTime'] < sdk['MIN_REQUEST_INTERVAL']) {
                         throw new GlitchError('Rate limit exceeded');
                     }
                     sdk['lastRequestTime'] = currentTime;
-                    return ++requestCount;
+                    requestCount.count++;
+                    return requestCount.count;
                 });
 
                 // First request should succeed
@@ -237,6 +240,7 @@ describe('GlitchSDK', () => {
                     duration: 60,
                     intensity: 1
                 });
+                expect(requestCount.count).toBe(1);
 
                 // Immediate second request should fail
                 await expect(sdk.createChaosRequest({
@@ -245,6 +249,7 @@ describe('GlitchSDK', () => {
                     duration: 60,
                     intensity: 1
                 })).rejects.toThrow('Rate limit exceeded');
+                expect(requestCount.count).toBe(1);
 
                 // After waiting, request should succeed
                 jest.advanceTimersByTime(2000);
@@ -254,6 +259,7 @@ describe('GlitchSDK', () => {
                     duration: 60,
                     intensity: 1
                 });
+                expect(requestCount.count).toBe(2);
             });
 
             it('should enforce rate limits for parallel requests', async () => {
