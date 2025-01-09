@@ -12,12 +12,13 @@
     },
     "./*": {
       "import": "./dist/*.js",
-      "require": "./dist/*.cjs", 
+      "require": "./dist/*.cjs",
       "types": "./dist/*.d.ts"
     }
   },
-  "main": "./dist/index.cjs",
+  "main": "./dist/index.js",
   "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "files": [
     "dist"
   ],
