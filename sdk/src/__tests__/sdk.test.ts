@@ -15,9 +15,16 @@ describe('GlitchSDK', () => {
             wallet
         });
 
-        // Mock Redis connection
+        // Enhanced Redis mock with rate limiting
+        let requestCount = 0;
         sdk['queueWorker']['redis'] = {
-            incr: jest.fn().mockResolvedValue(1),
+            incr: jest.fn().mockImplementation(async () => {
+                requestCount++;
+                if (requestCount > 1) {
+                    throw new GlitchError('Rate limit exceeded');
+                }
+                return requestCount;
+            }),
             expire: jest.fn().mockResolvedValue(1),
             get: jest.fn().mockResolvedValue(null),
             set: jest.fn().mockResolvedValue('OK'),
@@ -25,10 +32,30 @@ describe('GlitchSDK', () => {
             quit: jest.fn().mockResolvedValue('OK'),
             disconnect: jest.fn().mockResolvedValue('OK'),
             flushall: jest.fn().mockResolvedValue('OK'),
-            hset: jest.fn().mockResolvedValue(1),
-            hget: jest.fn().mockResolvedValue(null),
-            lpush: jest.fn().mockResolvedValue(1),
-            rpop: jest.fn().mockResolvedValue(null)
+            hset: jest.fn().mockImplementation(async (key, field, value) => {
+                if (typeof value !== 'string') {
+                    throw new SyntaxError('Invalid JSON');
+                }
+                return 1;
+            }),
+            hget: jest.fn().mockImplementation(async (key, field) => {
+                if (field === 'bad-result') {
+                    throw new SyntaxError('Invalid JSON');
+                }
+                return JSON.stringify({test: 'data'});
+            }),
+            lpush: jest.fn().mockImplementation(async (key, value) => {
+                if (value === 'invalid-json') {
+                    throw new SyntaxError('Invalid JSON');
+                }
+                return 1;
+            }),
+            rpop: jest.fn().mockImplementation(async (key) => {
+                if (key === 'empty-queue') {
+                    return null;
+                }
+                return JSON.stringify({test: 'data'});
+            })
         } as unknown as Redis;
 
         // Mock Solana connection methods

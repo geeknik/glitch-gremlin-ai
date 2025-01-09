@@ -13,20 +13,52 @@ describe('RedisQueueWorker', () => {
     let redis: RedisType;
 
     beforeAll(() => {
-        // Mock Redis instead of real connection
+        // Enhanced Redis mock with error handling
         redis = {
-            incr: jest.fn().mockResolvedValue(1),
+            incr: jest.fn().mockImplementation(async () => {
+                if (this.connected === false) {
+                    throw new GlitchError('Connection failed');
+                }
+                return 1;
+            }),
             expire: jest.fn().mockResolvedValue(1),
             get: jest.fn().mockResolvedValue(null),
             set: jest.fn().mockResolvedValue('OK'),
             on: jest.fn(),
-            quit: jest.fn().mockResolvedValue('OK'),
-            disconnect: jest.fn().mockResolvedValue('OK'),
+            quit: jest.fn().mockImplementation(async () => {
+                this.connected = false;
+                return 'OK';
+            }),
+            disconnect: jest.fn().mockImplementation(async () => {
+                this.connected = false;
+                return 'OK';
+            }),
             flushall: jest.fn().mockResolvedValue('OK'),
-            hset: jest.fn().mockResolvedValue(1),
-            hget: jest.fn().mockResolvedValue(null),
-            lpush: jest.fn().mockResolvedValue(1),
-            rpop: jest.fn().mockResolvedValue(null)
+            hset: jest.fn().mockImplementation(async (key, field, value) => {
+                if (typeof value !== 'string') {
+                    throw new SyntaxError('Invalid JSON');
+                }
+                return 1;
+            }),
+            hget: jest.fn().mockImplementation(async (key, field) => {
+                if (field === 'bad-result') {
+                    throw new SyntaxError('Invalid JSON');
+                }
+                return JSON.stringify({test: 'data'});
+            }),
+            lpush: jest.fn().mockImplementation(async (key, value) => {
+                if (value === 'invalid-json') {
+                    throw new SyntaxError('Invalid JSON');
+                }
+                return 1;
+            }),
+            rpop: jest.fn().mockImplementation(async (key) => {
+                if (key === 'empty-queue') {
+                    return null;
+                }
+                return JSON.stringify({test: 'data'});
+            }),
+            connected: true
         } as unknown as Redis;
     });
 
