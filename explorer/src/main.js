@@ -1,38 +1,37 @@
 import { createApp } from 'vue'
 import App from './App.vue'
-import { initWallet } from './wallet.js'
-import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets'
-import { Connection } from '@solana/web3.js'
-
-// Initialize connection
-const connection = new Connection('https://api.devnet.solana.com', { commitment: 'confirmed' })
-
-// Initialize wallet adapters with proper config
-const wallets = [
-  new PhantomWalletAdapter()
-]
-
-// Configure wallet network after initialization
-wallets.forEach(wallet => {
-  if (wallet.connected) {
-    wallet.disconnect();
-  }
-  wallet.config = { network: 'devnet' };
-});
+import { createAppKit } from '@reown/appkit-solana/vue'
+import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets'
+import { SolanaAdapter } from '@reown/appkit-adapter-solana/vue'
+import { solana, solanaDevnet } from '@reown/appkit/networks'
 
 // Create Vue app
 const app = createApp(App)
 
-// Pass wallet state to app
-app.config.globalProperties.$wallets = wallets
-app.config.globalProperties.$connection = connection
+// Initialize AppKit
+const projectId = process.env.REOWN_PROJECT_ID || 'YOUR_PROJECT_ID'
 
-// Mount app first
-app.mount('#app')
-
-// Then initialize wallet
-try {
-  await initWallet(wallets, connection)
-} catch (error) {
-  console.error('Failed to initialize wallet:', error)
+const metadata = {
+  name: 'Glitch Gremlin Explorer',
+  description: 'Explore Glitch Gremlin chaos tests and governance',
+  url: window.location.origin,
+  icons: ['https://glitchgremlin.ai/logo.png']
 }
+
+const solanaAdapter = new SolanaAdapter({
+  wallets: [new PhantomWalletAdapter(), new SolflareWalletAdapter()]
+})
+
+createAppKit({
+  adapters: [solanaAdapter],
+  metadata,
+  networks: [solana, solanaDevnet],
+  projectId,
+  wallets: [
+    new PhantomWalletAdapter(),
+    new SolflareWalletAdapter()
+  ]
+})
+
+// Mount app
+app.mount('#app')

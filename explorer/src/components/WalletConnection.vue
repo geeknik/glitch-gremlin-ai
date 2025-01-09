@@ -1,12 +1,9 @@
 <template>
   <div class="wallet-connection">
-    <button 
+    <appkit-button 
       v-if="!isConnected"
-      @click="connectWallet"
       class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded"
-    >
-      Connect Wallet
-    </button>
+    />
     <div v-else class="wallet-info bg-gray-800 p-4 rounded">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
