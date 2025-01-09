@@ -2,8 +2,13 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{
     program_error::ProgramError,
     pubkey::Pubkey,
+    instruction::{Instruction, AccountMeta},
+    system_instruction,
 };
-use crate::governance::GovernanceProposal;
+use solana_sdk::{
+    signature::{Keypair, Signer},
+    transaction::Transaction,
+};
 use crate::governance::GovernanceProposal;
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq)]
 pub enum GlitchInstruction {
