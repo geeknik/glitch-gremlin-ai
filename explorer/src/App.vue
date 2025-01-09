@@ -9,11 +9,11 @@
 
 <script setup>
 import { ref } from 'vue';
-import { useAppKitAccount } from '@reown/appkit/vue'
+import { ref, computed } from 'vue'
 import WalletConnection from './components/WalletConnection.vue';
 import GovernanceDashboard from './components/GovernanceDashboard.vue';
 import ProposalList from './components/ProposalList.vue';
 import StakingInterface from './components/StakingInterface.vue';
 
-const { isConnected } = useAppKitAccount()
+const isConnected = ref(false)
 </script>

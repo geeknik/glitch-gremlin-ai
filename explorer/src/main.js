@@ -1,9 +1,7 @@
 import { createApp } from 'vue'
 import App from './App.vue'
-import { createAppKit } from '@reown/appkit-solana/vue'
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets'
-import { SolanaAdapter } from '@reown/appkit-adapter-solana/vue'
-import { solana, solanaDevnet } from '@reown/appkit/networks'
+import { Connection } from '@solana/web3.js'
 
 // Create Vue app
 const app = createApp(App)
