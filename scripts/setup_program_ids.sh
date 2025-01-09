@@ -10,7 +10,7 @@ echo "This may take a few minutes..."
 # Generate main program IDs (ends with ggaig1tch)
 MAIN_PROGRAMS=()
 for i in {1..3}; do
-    MAIN_PROGRAMS+=("$(solana-keygen grind --ends-with ggaig1tch:1 --num-threads 4)")
+    MAIN_PROGRAMS+=("$(solana-keygen grind --ends-with ggaig1tch:1 --num-threads 11)")
 done
 echo "Main program IDs:"
 printf '%s\n' "${MAIN_PROGRAMS[@]}"
@@ -18,7 +18,7 @@ printf '%s\n' "${MAIN_PROGRAMS[@]}"
 # Generate governance program IDs (ends with ggaig0v)
 GOVERNANCE_PROGRAMS=()
 for i in {1..3}; do
-    GOVERNANCE_PROGRAMS+=("$(solana-keygen grind --ends-with ggaig0v:1 --num-threads 4)")
+    GOVERNANCE_PROGRAMS+=("$(solana-keygen grind --ends-with ggaig0v:1 --num-threads 11)")
 done
 echo "Governance program IDs:"
 printf '%s\n' "${GOVERNANCE_PROGRAMS[@]}"
@@ -26,7 +26,7 @@ printf '%s\n' "${GOVERNANCE_PROGRAMS[@]}"
 # Generate token program IDs (ends with ggait0k3n)
 TOKEN_PROGRAMS=()
 for i in {1..3}; do
-    TOKEN_PROGRAMS+=("$(solana-keygen grind --ends-with ggait0k3n:1 --num-threads 4)")
+    TOKEN_PROGRAMS+=("$(solana-keygen grind --ends-with ggait0k3n:1 --num-threads 11)")
 done
 echo "Token program IDs:"
 printf '%s\n' "${TOKEN_PROGRAMS[@]}"
@@ -34,7 +34,7 @@ printf '%s\n' "${TOKEN_PROGRAMS[@]}"
 # Generate worker program IDs (ends with ggaiw0rk3r)
 WORKER_PROGRAMS=()
 for i in {1..3}; do
-    WORKER_PROGRAMS+=("$(solana-keygen grind --ends-with ggaiw0rk3r:1 --num-threads 4)")
+    WORKER_PROGRAMS+=("$(solana-keygen grind --ends-with ggaiw0rk3r:1 --num-threads 11)")
 done
 echo "Worker program IDs:"
 printf '%s\n' "${WORKER_PROGRAMS[@]}"
