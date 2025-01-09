@@ -12,7 +12,7 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace.dependencies]
-borsh = { version = "0.10.3", features = ["derive"] }
+borsh = { version = "0.10.3", features = ["derive", "std"] }
 solana-program = "1.18.26"
 spl-token = { version = "3.2.0" }
 chrono = "0.4"
