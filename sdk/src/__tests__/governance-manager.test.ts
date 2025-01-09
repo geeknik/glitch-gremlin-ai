@@ -22,6 +22,52 @@ describe('GovernanceManager', () => {
     });
 
     describe('proposal lifecycle', () => {
+        it('should validate proposal parameters', async () => {
+            await expect(
+                governanceManager.createProposalAccount(
+                    connection,
+                    wallet,
+                    {
+                        votingPeriod: 0, // Invalid
+                        description: '',
+                        title: ''
+                    }
+                )
+            ).rejects.toThrow('Invalid proposal parameters');
+        });
+
+        it('should handle insufficient voting power', async () => {
+            const proposalAddress = new PublicKey(Keypair.generate().publicKey);
+            
+            jest.spyOn(TokenEconomics, 'validateStakeAmount')
+                .mockImplementation(() => {
+                    throw new GlitchError('Insufficient voting power');
+                });
+
+            await expect(
+                governanceManager.castVote(
+                    connection,
+                    wallet,
+                    proposalAddress,
+                    true
+                )
+            ).rejects.toThrow('Insufficient voting power');
+        });
+
+        it('should handle proposal execution errors', async () => {
+            const proposalAddress = new PublicKey(Keypair.generate().publicKey);
+            
+            jest.spyOn(connection, 'sendTransaction')
+                .mockRejectedValue(new Error('Execution failed'));
+
+            await expect(
+                governanceManager.executeProposal(
+                    connection,
+                    wallet,
+                    proposalAddress
+                )
+            ).rejects.toThrow('Execution failed');
+        });
         it('should create, vote on, and execute a proposal', async () => {
             jest.setTimeout(60000); // Increase timeout to 60 seconds
             

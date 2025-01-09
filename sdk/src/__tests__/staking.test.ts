@@ -19,6 +19,23 @@ describe('Staking', () => {
     });
 
     describe('stakeTokens', () => {
+        it('should handle transaction failures', async () => {
+            jest.spyOn(sdk['connection'], 'sendTransaction')
+                .mockRejectedValue(new Error('Transaction failed'));
+
+            await expect(sdk.stakeTokens(1000, 86400))
+                .rejects.toThrow('Transaction failed');
+        });
+
+        it('should validate maximum stake amount', async () => {
+            await expect(sdk.stakeTokens(20_000_000, 86400))
+                .rejects.toThrow('Stake amount cannot exceed');
+        });
+
+        it('should validate maximum lockup period', async () => {
+            await expect(sdk.stakeTokens(1000, 31536000 * 2)) // 2 years
+                .rejects.toThrow('Invalid lockup period');
+        });
         it('should validate minimum stake amount', async () => {
             await expect(sdk.stakeTokens(50, 86400))
                 .rejects.toThrow('Stake amount below minimum required');

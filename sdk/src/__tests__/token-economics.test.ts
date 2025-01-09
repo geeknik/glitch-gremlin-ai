@@ -3,6 +3,24 @@ import { GlitchError } from '../errors.js';
 
 describe('TokenEconomics', () => {
     describe('fee calculation', () => {
+        it('should throw for invalid test types', () => {
+            expect(() => TokenEconomics.calculateTestFee('INVALID' as any, 300, 5))
+                .toThrow('Invalid test type');
+        });
+
+        it('should calculate fees for all test types', () => {
+            const types = ['FUZZ', 'LOAD', 'EXPLOIT', 'CONCURRENCY'];
+            types.forEach(type => {
+                const fee = TokenEconomics.calculateTestFee(type as TestType, 300, 5);
+                expect(fee).toBeGreaterThan(0);
+            });
+        });
+
+        it('should handle edge case parameters', () => {
+            const minFee = TokenEconomics.calculateTestFee('FUZZ', 60, 1);
+            const maxFee = TokenEconomics.calculateTestFee('EXPLOIT', 3600, 10);
+            expect(minFee).toBeLessThan(maxFee);
+        });
         it('should calculate base fees correctly', () => {
             const fee = TokenEconomics.calculateTestFee('FUZZ', 300, 5);
             expect(fee).toBeGreaterThan(0);

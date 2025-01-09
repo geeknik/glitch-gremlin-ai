@@ -138,8 +138,41 @@ describe('RedisQueueWorker', () => {
 
         it('should handle malformed queue data', async () => {
             await redis.lpush(worker['queueKey'], 'invalid-json');
-            
+        
             await expect(worker.dequeueRequest()).rejects.toThrow(SyntaxError);
+        });
+
+        it('should handle connection errors during enqueue', async () => {
+            await redis.quit();
+        
+            await expect(worker.enqueueRequest({
+                targetProgram: "11111111111111111111111111111111",
+                testType: TestType.FUZZ,
+                duration: 60,
+                intensity: 5
+            })).rejects.toThrow(GlitchError);
+        });
+
+        it('should handle connection errors during dequeue', async () => {
+            await redis.quit();
+        
+            await expect(worker.dequeueRequest()).rejects.toThrow(GlitchError);
+        });
+
+        it('should handle connection errors during result storage', async () => {
+            await redis.quit();
+        
+            await expect(worker.storeResult('test-id', {
+                requestId: 'test-id',
+                status: 'completed',
+                resultRef: 'ipfs://test',
+                logs: ['Test completed'],
+                metrics: {
+                    totalTransactions: 100,
+                    errorRate: 0,
+                    avgLatency: 100
+                }
+            })).rejects.toThrow(GlitchError);
         });
 
         it('should handle malformed result data', async () => {
