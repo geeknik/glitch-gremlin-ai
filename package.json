@@ -28,11 +28,17 @@
   "dependencies": {
     "@glitch-gremlin/sdk": "^0.1.0",
     "@opentelemetry/exporter-prometheus": "^0.57.0",
+    "@reown/appkit": "^1.6.3",
+    "@reown/appkit-adapter-solana": "^1.6.3",
     "@solana/wallet-adapter-vue": "^0.4.5",
     "@solana/wallet-adapter-wallets": "^0.19.32",
     "@tensorflow/tfjs-node": "^4.22.0",
+    "buffer": "^6.0.3",
     "chalk": "^5.4.1",
     "dotenv": "^16.4.7",
-    "ioredis": "^5.3.2"
+    "ioredis": "^5.3.2",
+    "process": "^0.11.10",
+    "stream-browserify": "^3.0.0",
+    "util": "^0.12.5"
   }
 }
