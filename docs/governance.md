@@ -53,6 +53,9 @@ const results = await worker.getVoteResults(proposalId)
 - Rewards from protocol fees
 - Staking contract fully implemented and tested
 - Staking UI integrated in explorer
+- Auto-compounding rewards
+- Early unstake penalty (50% of staked amount)
+- Delegated staking support
 
 ## Proposals
 1. Create a proposal (requires minimum stake)

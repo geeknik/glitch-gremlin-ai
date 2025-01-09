@@ -131,7 +131,27 @@ Stake GLITCH tokens.
 ```typescript
 const txSignature = await sdk.stakeTokens(
     amount,     // Amount to stake
-    lockupPeriod // Duration in seconds
+    lockupPeriod, // Duration in seconds
+    delegateAddress // Optional delegate address
+);
+```
+
+#### delegateStake
+Delegate staked tokens to another address.
+
+```typescript
+const txSignature = await sdk.delegateStake(
+    stakeId,    // ID of existing stake
+    delegateAddress // Address to delegate to
+);
+```
+
+#### claimRewards
+Claim staking rewards.
+
+```typescript
+const txSignature = await sdk.claimRewards(
+    stakeId     // ID of stake to claim rewards for
 );
 ```
 

@@ -15,7 +15,21 @@ export const useGovernanceStore = defineStore('governance', () => {
   })
 
   async function fetchProposals() {
-    proposals.value = await worker.getProposals()
+    proposals.value = await worker.getProposals({
+      includeVotes: true,
+      includeStakes: true,
+      includeRewards: true
+    })
+  }
+
+  async function delegateStake(stakeId: string, delegateAddress: string) {
+    await worker.delegateStake(stakeId, delegateAddress)
+    await fetchProposals()
+  }
+
+  async function claimRewards(stakeId: string) {
+    await worker.claimRewards(stakeId)
+    await fetchProposals()
   }
 
   return {

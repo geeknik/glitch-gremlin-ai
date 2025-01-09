@@ -62,13 +62,19 @@ glitch governance execute <proposal-id>
 
 ```bash
 # Stake tokens
-glitch stake <amount> --lockup 30d
+glitch stake <amount> --lockup 30d [--delegate <address>]
 
 # Unstake tokens
-glitch unstake <stake-id>
+glitch unstake <stake-id> [--force]
+
+# Delegate stake
+glitch stake delegate <stake-id> <delegate-address>
+
+# Claim rewards
+glitch stake claim <stake-id>
 
 # View staking info
-glitch stake info <stake-id>
+glitch stake info <stake-id> [--rewards]
 ```
 
 ## Examples
