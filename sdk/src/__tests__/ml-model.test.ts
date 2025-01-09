@@ -1,4 +1,4 @@
-import { VulnerabilityDetectionModel, VulnerabilityType } from '../ai/vulnerability-detection.js';
+import { VulnerabilityDetectionModel, VulnerabilityType } from '../ai/vulnerability-detection';
 import * as tf from '@tensorflow/tfjs-node';
 
 describe('VulnerabilityDetectionModel Tests', () => {
