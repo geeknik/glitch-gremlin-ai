@@ -51,6 +51,8 @@ const results = await worker.getVoteResults(proposalId)
 - Lockup periods: 1 day to 1 year
 - Higher voting power with longer lockups
 - Rewards from protocol fees
+- Staking contract fully implemented and tested
+- Staking UI integrated in explorer
 
 ## Proposals
 1. Create a proposal (requires minimum stake)

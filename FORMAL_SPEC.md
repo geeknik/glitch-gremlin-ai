@@ -55,6 +55,9 @@ The GlitchGremlinProgram is a Solana program that provides Chaos-as-a-Service (C
 - InvalidInstructionError (1004): Malformed instruction data
 - UnauthorizedAccessError (1005): Invalid signer or authority
 - RateLimitExceededError (1006): Request threshold exceeded
+- InvalidProposalError (1007): Malformed governance proposal
+- VotingPeriodEndedError (1008): Attempt to vote after deadline
+- InsufficientStakeError (1009): Not enough tokens staked
 
 ### 4.2 Error Recovery
 - Failed requests refund tokens
