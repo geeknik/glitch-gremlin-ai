@@ -20,7 +20,7 @@
 import { readFileSync } from 'fs';
 import { Keypair } from '@solana/web3.js';
 import { Command } from 'commander';
-import { GlitchSDK, TestType, version as sdkVersion } from '@glitch-gremlin/sdk';
+import { GlitchSDK, TestType, version as sdkVersion } from '../sdk/dist';
 import ora from 'ora';
 import chalk from 'chalk';
 

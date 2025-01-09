@@ -11,7 +11,7 @@
     "test": "jest"
   },
   "dependencies": {
-    "@glitch-gremlin/sdk": "file:../sdk",
+    "@glitch-gremlin/sdk": "file:../sdk/dist",
     "@solana/web3.js": "^1.98.0",
     "chalk": "^4.1.2",
     "commander": "^11.0.0",
