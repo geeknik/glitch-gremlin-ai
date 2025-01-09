@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 borsh = { workspace = true }
+borsh-derive = { workspace = true }
 solana-program = { workspace = true }
 solana-client = { workspace = true }
 tokio = { workspace = true }

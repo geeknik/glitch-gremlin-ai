@@ -1,4 +1,5 @@
-use borsh::{BorshDeserialize, BorshSerialize};
+use borsh_derive::{BorshDeserialize, BorshSerialize};
+use borsh::{BorshDeserialize as _, BorshSerialize as _};
 use solana_program::pubkey::Pubkey;
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
