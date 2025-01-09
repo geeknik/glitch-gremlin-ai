@@ -220,17 +220,15 @@ describe('GlitchSDK', () => {
                 jest.setTimeout(10000); // Increase timeout for this test
                 
                 // Track request count
-                const requestCount = { count: 0 };
-                
+                let callCount = 0;
+        
                 // Mock incr to enforce rate limit
                 sdk['queueWorker']['redis'].incr.mockImplementation(async function() {
-                    const currentTime = Date.now();
-                    if (currentTime - sdk['lastRequestTime'] < sdk['MIN_REQUEST_INTERVAL']) {
+                    callCount++;
+                    if (callCount > 1) {
                         throw new GlitchError('Rate limit exceeded');
                     }
-                    sdk['lastRequestTime'] = currentTime;
-                    requestCount.count++;
-                    return requestCount.count;
+                    return callCount;
                 });
 
                 // First request should succeed

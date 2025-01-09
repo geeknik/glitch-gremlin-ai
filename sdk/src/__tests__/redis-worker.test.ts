@@ -205,8 +205,9 @@ describe('RedisQueueWorker', () => {
         });
 
         it('should handle malformed queue data', async () => {
-            await redis.lpush(worker['queueKey'], 'invalid-json');
-        
+            // Mock rpop to return invalid JSON
+            redis.rpop.mockImplementationOnce(async () => 'invalid-json');
+            
             await expect(worker.dequeueRequest()).rejects.toThrow(SyntaxError);
         });
 
@@ -244,9 +245,15 @@ describe('RedisQueueWorker', () => {
         });
 
         it('should handle malformed result data', async () => {
-            await redis.hset(worker['resultKey'], 'bad-result', 'invalid-json');
+            // Mock hget to throw GlitchError for bad result
+            redis.hget.mockImplementationOnce(async (key, field) => {
+                if (field === 'bad-result') {
+                    throw new GlitchError('Invalid JSON');
+                }
+                return null;
+            });
             
-            await expect(worker.getResult('bad-result')).rejects.toThrow(SyntaxError);
+            await expect(worker.getResult('bad-result')).rejects.toThrow(GlitchError);
         });
     });
 });

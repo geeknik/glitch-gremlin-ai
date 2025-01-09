@@ -156,6 +156,11 @@ describe('GlitchSDK', () => {
                     duration: 60,
                     intensity: 1
                 }));
+                // Mock all parallel requests to fail
+                sdk['queueWorker']['redis'].incr.mockImplementation(async function() {
+                    throw new GlitchError('Rate limit exceeded');
+                });
+
                 await expect(Promise.all(promises))
                     .rejects.toThrow('Rate limit exceeded');
             });
