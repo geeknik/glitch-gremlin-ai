@@ -1,9 +1,16 @@
 export async function initWallet(wallets, connection) {
-    // Store wallets globally
-    window.wallets = wallets;
-    
-    // Store connection globally
-    window.connection = connection;
+    if (!wallets || !connection) {
+        throw new Error('Wallet adapters or connection not provided');
+    }
+
+    // Store in Vue global properties instead of window
+    const app = document.querySelector('#app')?.__vue_app__;
+    if (!app) {
+        throw new Error('Vue app not initialized');
+    }
+
+    app.config.globalProperties.$wallets = wallets;
+    app.config.globalProperties.$connection = connection;
 
     // Initialize wallet connection logic
     const connectButton = document.getElementById('connectWallet');

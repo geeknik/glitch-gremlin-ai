@@ -15,6 +15,16 @@ const wallets = [
 // Create Vue app
 const app = createApp(App)
 
-// Initialize wallet after app creation
+// Pass wallet state to app
+app.config.globalProperties.$wallets = wallets
+app.config.globalProperties.$connection = connection
+
+// Mount app first
 app.mount('#app')
-initWallet(wallets, connection)
+
+// Then initialize wallet
+try {
+  await initWallet(wallets, connection)
+} catch (error) {
+  console.error('Failed to initialize wallet:', error)
+}
