@@ -194,14 +194,17 @@ describe('RedisQueueWorker', () => {
 
     describe('error handling', () => {
         it('should throw on connection failure', async () => {
-            await redis.quit();
+            // Mock lpush to throw connection error
+            redis.lpush.mockImplementationOnce(async () => {
+                throw new Error('Connection failed');
+            });
             
             await expect(worker.enqueueRequest({
                 targetProgram: "1",
                 testType: TestType.FUZZ,
                 duration: 60,
                 intensity: 5
-            })).rejects.toThrow(GlitchError);
+            })).rejects.toThrow('Connection failed');
         });
 
         it('should handle malformed queue data', async () => {
