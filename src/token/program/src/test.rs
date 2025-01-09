@@ -18,7 +18,8 @@ use {
     borsh::{BorshDeserialize, BorshSerialize},
 };
 
-use crate::id;
+use solana_program::declare_id;
+declare_id!("11111111111111111111111111111111");
 
 pub async fn program_test() -> (BanksClient, Keypair, Hash) {
     let program_id = Pubkey::new_unique();
