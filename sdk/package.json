@@ -8,15 +8,10 @@
 "exports": {
 ".": {
     "import": "./dist/esm/index.js",
-    "require": "./dist/cjs/index.js",
+    "require": "./dist/cjs/index.js", 
     "types": "./dist/esm/index.d.ts"
-},
-"./*": {
-    "import": "./dist/esm/*.js",
-    "require": "./dist/cjs/*.js",
-    "types": "./dist/esm/*.d.ts"
 }
-  },
+},
   "files": [
     "dist"
   ],
@@ -26,8 +21,8 @@
     "build:cjs": "tsc -p tsconfig.cjs.json",
     "build": "npm run build:esm && npm run build:cjs",
     "clean": "rm -rf dist",
-    "test": "NODE_OPTIONS=--experimental-vm-modules jest --maxWorkers=4 --detectOpenHandles",
-    "test:ci": "NODE_OPTIONS=--experimental-vm-modules jest --maxWorkers=4 --runInBand --detectOpenHandles --ci --reporters=default --reporters=jest-junit"
+    "test": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --maxWorkers=4 --detectOpenHandles",
+    "test:ci": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --maxWorkers=4 --runInBand --detectOpenHandles --ci --reporters=default --reporters=jest-junit"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.9",
