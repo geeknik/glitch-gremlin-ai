@@ -21,12 +21,10 @@ describe('Rate Limiting', () => {
         mockIncr = jest.fn(() => Promise.resolve(1));
         mockExpire = jest.fn(() => Promise.resolve(1));
         
-        sdk['queueWorker']['redis'] = {
-            incr: mockIncr,
-            expire: mockExpire,
-            quit: jest.fn(),
-            disconnect: jest.fn()
-        } as any;
+        sdk['queueWorker']['redis'] = new Redis({
+            host: 'r.glitchgremlin.ai',
+            port: 6379
+        });
     });
 
     beforeEach(() => {

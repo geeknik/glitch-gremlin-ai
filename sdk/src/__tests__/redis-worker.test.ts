@@ -14,7 +14,7 @@ describe('RedisQueueWorker', () => {
 
     beforeAll(() => {
         redis = new Redis({
-            host: 'localhost',
+            host: 'r.glitchgremlin.ai',
             port: 6379,
             lazyConnect: true,
             maxRetriesPerRequest: 1, // Reduce retries for tests
