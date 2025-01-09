@@ -1,6 +1,8 @@
 import { jest } from '@jest/globals';
 import { GlitchSDK, TestType } from '../index.js';
 import { Keypair } from '@solana/web3.js';
+import { GlitchError } from '../errors.js';
+import type { Redis } from 'ioredis';
 
 // Increase timeout for all tests
 jest.setTimeout(30000);

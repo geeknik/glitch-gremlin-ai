@@ -25,8 +25,8 @@ describe('RedisQueueWorker', () => {
             get: jest.fn().mockResolvedValue(null),
             set: jest.fn().mockResolvedValue('OK'),
             on: jest.fn(),
-            quit: jest.fn().mockImplementation(async () => {
-                this.connected = false;
+            quit: jest.fn().mockImplementation(async function() {
+                (this as any).connected = false;
                 return 'OK';
             }),
             disconnect: jest.fn().mockImplementation(async () => {
