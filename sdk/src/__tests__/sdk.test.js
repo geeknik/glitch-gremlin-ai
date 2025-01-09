@@ -118,7 +118,7 @@ describe('GlitchSDK', () => {
         });
         describe('rate limiting', () => {
             beforeEach(() => {
-                jest.useFakeTimers();
+                jest.useFakeTimers({ doNotFake: ['nextTick'] }); // Allow process.nextTick
             });
             afterEach(() => {
                 jest.useRealTimers();

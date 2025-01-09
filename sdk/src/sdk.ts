@@ -166,7 +166,7 @@ export class GlitchSDK {
         
             // Add delay to ensure rate limit is enforced in tests
             if (process.env.NODE_ENV === 'test') {
-                await new Promise(resolve => setTimeout(resolve, 100));
+                await new Promise(resolve => setTimeout(resolve, 10)); // Reduce delay
             }
             
             this.lastRequestTime = now;

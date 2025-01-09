@@ -229,9 +229,13 @@ describe('GovernanceManager', () => {
     });
         
 
-    afterEach(() => {
+    afterEach(async () => {
         jest.useRealTimers();
         jest.clearAllMocks();
+        // Ensure Redis is properly closed
+        if (governanceManager['queueWorker']) {
+            await governanceManager['queueWorker'].close();
+        }
     });
 
     describe('castVote', () => {
