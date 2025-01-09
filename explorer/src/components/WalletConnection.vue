@@ -42,15 +42,13 @@
 import { ref, computed, onMounted } from 'vue';
 import { useWallet, WalletAdapterNetwork } from '@solana/wallet-adapter-vue';
 import { 
-  PhantomWalletAdapter,
-  BraveWalletAdapter
+  PhantomWalletAdapter
 } from '@solana/wallet-adapter-wallets';
 import { GlitchSDK } from '@glitch-gremlin/sdk';
 
 // Initialize wallet adapters
 const wallets = [
-  new PhantomWalletAdapter(),
-  new BraveWalletAdapter()
+  new PhantomWalletAdapter()
 ];
 
 const { connected, publicKey, connect, disconnect, wallet } = useWallet();
