@@ -232,18 +232,34 @@ describe('GovernanceManager', () => {
     afterEach(async () => {
         jest.useRealTimers();
         jest.clearAllMocks();
+        jest.clearAllTimers();
+        
         // Ensure Redis is properly closed
         if (governanceManager['queueWorker']) {
-            await governanceManager['queueWorker'].close();
+            try {
+                await governanceManager['queueWorker'].close();
+            } catch (error) {
+                console.error('Error closing queue worker:', error);
+            }
         }
+        
+        // Add a small delay to ensure cleanup completes
+        await new Promise(resolve => setTimeout(resolve, 100));
     });
 
     describe('castVote', () => {
         beforeEach(() => {
             jest.clearAllMocks();
-            // Use fake timers
-            jest.useFakeTimers();
+            jest.clearAllTimers();
+            // Use fake timers but allow process.nextTick
+            jest.useFakeTimers({ doNotFake: ['nextTick'] });
             jest.setSystemTime(1641024000000); // Fixed timestamp
+        });
+
+        afterEach(() => {
+            jest.useRealTimers();
+            jest.clearAllMocks();
+            jest.clearAllTimers();
         });
 
         afterEach(() => {
@@ -351,7 +367,10 @@ describe('GovernanceManager', () => {
                             proposalAddress,
                             true
                         );
-                        await connection.simulateTransaction(tx1);
+                        await connection.simulateTransaction(tx1, [wallet]);
+                        
+                        // Advance timers to ensure rate limiting doesn't block
+                        jest.advanceTimersByTime(2000);
                         
                         const tx2 = await governanceManager.castVote(
                             connection,
@@ -359,7 +378,7 @@ describe('GovernanceManager', () => {
                             proposalAddress,
                             true
                         );
-                        await connection.simulateTransaction(tx2);
+                        await connection.simulateTransaction(tx2, [wallet]);
 
                         // Verify transactions were simulated
                         expect(simulateTransactionMock).toHaveBeenCalledTimes(2);

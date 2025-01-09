@@ -121,12 +121,17 @@ describe('GovernanceManager', () => {
                                 }
                             };
                         });
-                        // Mock transaction sending with proper async behavior
+                        // Mock transaction sending with proper async behavior and error handling
                         sendTransactionMock = jest.spyOn(connection, 'sendTransaction')
                             .mockImplementation(async () => {
-                            await new Promise(resolve => setTimeout(resolve, 10));
-                            return 'mock-signature';
-                        });
+                                try {
+                                    await new Promise(resolve => setTimeout(resolve, 10));
+                                    return 'mock-signature';
+                                } catch (error) {
+                                    console.error('Mock transaction failed:', error);
+                                    throw error;
+                                }
+                            });
                     });
                     afterEach(() => {
                         jest.restoreAllMocks();
