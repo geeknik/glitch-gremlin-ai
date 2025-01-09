@@ -191,7 +191,7 @@ describe('Governance', () => {
                     status: 'active',
                     title: "Test Proposal",
                     description: "Test Description",
-                    proposer: this.wallet.publicKey.toString(),
+                    proposer: wallet.publicKey.toString(),
                     startTime: Date.now() - 86400000,
                     endTime: Date.now() + 86400000,
                     votes: {
