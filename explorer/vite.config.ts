@@ -25,7 +25,6 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      plugins: [nodePolyfills()],
       external: ['ioredis']
     },
     commonjsOptions: {
