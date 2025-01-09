@@ -1,7 +1,9 @@
 import { createApp } from 'vue'
 import App from './App.vue'
+import { createAppKit } from '@reown/appkit-solana/vue'
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets'
-import { Connection } from '@solana/web3.js'
+import { SolanaAdapter } from '@reown/appkit-adapter-solana/vue'
+import { solana, solanaDevnet } from '@reown/appkit/networks'
 
 // Create Vue app
 const app = createApp(App)
@@ -16,10 +18,12 @@ const metadata = {
   icons: ['https://glitchgremlin.ai/logo.png']
 }
 
+// Create Solana adapter
 const solanaAdapter = new SolanaAdapter({
   wallets: [new PhantomWalletAdapter(), new SolflareWalletAdapter()]
 })
 
+// Initialize AppKit
 createAppKit({
   adapters: [solanaAdapter],
   metadata,
