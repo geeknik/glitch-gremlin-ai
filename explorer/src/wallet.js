@@ -36,8 +36,8 @@ export async function initWallet(wallets, connection) {
                 if (walletAddress) walletAddress.textContent = publicKey.toBase58().slice(0, 6) + '...' + publicKey.toBase58().slice(-4);
                 
                 // Get balance
-                const balance = await connection.getBalance(publicKey);
-                if (walletBalance) walletBalance.textContent = (balance / 1e9).toFixed(2);
+                const balance = await connection.getBalance(publicKey.toBase58());
+                if (walletBalance) walletBalance.textContent = (Number(balance) / 1e9).toFixed(2);
 
                 // Load governance data
                 loadGovernanceData();
