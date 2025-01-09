@@ -66,7 +66,7 @@ describe('RedisQueueWorker', () => {
                 }
                 this.queue.push(value);
                 return 1;
-            })
+            }),
             connected: true
         } as unknown as Redis;
     });

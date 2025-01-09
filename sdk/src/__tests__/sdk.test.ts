@@ -225,20 +225,13 @@ describe('GlitchSDK', () => {
                 // Track request times
                 const requestTimes: number[] = [];
                 
+                let requestCount = 0;
                 sdk['queueWorker']['redis'].incr.mockImplementation(async function() {
-                    const now = Date.now();
-                    
-                    // Remove old requests
-                    while (requestTimes.length > 0 && now - requestTimes[0] > sdk['MIN_REQUEST_INTERVAL']) {
-                        requestTimes.shift();
-                    }
-                    
-                    if (requestTimes.length >= 1) {
+                    requestCount++;
+                    if (requestCount > 1) {
                         throw new GlitchError('Rate limit exceeded');
                     }
-                    
-                    requestTimes.push(now);
-                    return requestTimes.length;
+                    return requestCount;
                 });
 
                 // First request should succeed
@@ -275,6 +268,15 @@ describe('GlitchSDK', () => {
                     duration: 60,
                     intensity: 1
                 }));
+
+                let requestCount = 0;
+                sdk['queueWorker']['redis'].incr.mockImplementation(async function() {
+                    requestCount++;
+                    if (requestCount > 1) {
+                        throw new GlitchError('Rate limit exceeded');
+                    }
+                    return requestCount;
+                });
 
                 await expect(Promise.all(promises))
                     .rejects.toThrow('Rate limit exceeded');
