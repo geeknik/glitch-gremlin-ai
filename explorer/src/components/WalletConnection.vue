@@ -39,8 +39,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import { useWallet, WalletAdapterNetwork } from '@solana/wallet-adapter-vue';
+import { ref, computed, onMounted, watch } from 'vue';
+import { useWallet } from '@solana/wallet-adapter-vue';
 import { 
   PhantomWalletAdapter
 } from '@solana/wallet-adapter-wallets';
