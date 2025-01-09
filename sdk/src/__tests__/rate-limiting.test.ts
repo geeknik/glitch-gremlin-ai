@@ -4,6 +4,9 @@ import { Keypair } from '@solana/web3.js';
 import { GlitchError } from '../errors.js';
 import type { Redis } from 'ioredis';
 
+// Initialize SDK before all tests
+let sdk: GlitchSDK;
+
 // Increase timeout for all tests
 jest.setTimeout(30000);
 
@@ -23,8 +26,16 @@ describe('Rate Limiting', () => {
         mockIncr = jest.fn(() => Promise.resolve(1));
         mockExpire = jest.fn(() => Promise.resolve(1));
         
+        let requestCount = 0;
         sdk['queueWorker']['redis'] = {
-            incr: jest.fn().mockResolvedValue(1),
+            incr: jest.fn().mockImplementation(async () => {
+                const currentTime = Date.now();
+                if (currentTime - sdk['lastRequestTime'] < sdk['MIN_REQUEST_INTERVAL']) {
+                    throw new GlitchError('Rate limit exceeded');
+                }
+                sdk['lastRequestTime'] = currentTime;
+                return ++requestCount;
+            }),
             expire: jest.fn().mockResolvedValue(1),
             get: jest.fn().mockResolvedValue(null),
             set: jest.fn().mockResolvedValue('OK')

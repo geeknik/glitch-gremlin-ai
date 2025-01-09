@@ -29,8 +29,8 @@ describe('RedisQueueWorker', () => {
                 (this as any).connected = false;
                 return 'OK';
             }),
-            disconnect: jest.fn().mockImplementation(async () => {
-                this.connected = false;
+            disconnect: jest.fn().mockImplementation(async function() {
+                (this as any).connected = false;
                 return 'OK';
             }),
             flushall: jest.fn().mockResolvedValue('OK'),
@@ -93,6 +93,7 @@ describe('RedisQueueWorker', () => {
         it('should handle empty queue', async () => {
             const dequeued = await worker.dequeueRequest();
             expect(dequeued).toBeNull();
+            expect(redis.rpop).toHaveBeenCalled();
         });
 
         it('should maintain FIFO order', async () => {
