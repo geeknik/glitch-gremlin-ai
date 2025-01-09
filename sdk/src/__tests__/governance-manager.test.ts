@@ -320,7 +320,7 @@ describe('GovernanceManager', () => {
 
                         expect(getAccountInfoMock).toHaveBeenCalledTimes(2);
                         expect(getAccountInfoMock).toHaveBeenCalledWith(proposalAddress);
-                        expect(getAccountInfoMock.mock.calls.every(call => 
+                        expect(getAccountInfoMock.mock.calls.every((call: any) => 
                             call[0].equals(proposalAddress)
                         )).toBe(true);
 

@@ -233,14 +233,17 @@ describe('Governance', () => {
 
             const mockGetProposalStatus = jest.spyOn(sdk, 'getProposalStatus')
                 .mockResolvedValueOnce({
-                    id: 'proposal-9012',
+                    id: 'proposal-9012', 
                     status: 'active',
                     votes: {
                         yes: 100,
                         no: 50,
                         abstain: 0
                     },
-                    votesAgainst: 50,
+                    title: "Test Proposal",
+                    description: "Test Description",
+                    proposer: "test-proposer",
+                    startTime: Date.now() - 86400000,
                     endTime: Date.now() - 86400000
                 });
 
