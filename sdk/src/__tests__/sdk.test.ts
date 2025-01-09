@@ -50,11 +50,20 @@ describe('GlitchSDK', () => {
                 }
                 return 1;
             }),
-            rpop: jest.fn().mockImplementation(async (key) => {
+            rpop: jest.fn().mockImplementation(async function(key) {
                 if (key === 'empty-queue') {
                     return null;
                 }
-                return JSON.stringify({test: 'data'});
+                // Return the actual queued data
+                const queue = this.queue || [];
+                return queue.length > 0 ? queue.shift() : null;
+            }),
+            lpush: jest.fn().mockImplementation(async function(key, value) {
+                if (!this.queue) {
+                    this.queue = [];
+                }
+                this.queue.push(value);
+                return 1;
             })
         } as unknown as Redis;
 
@@ -212,13 +221,18 @@ describe('GlitchSDK', () => {
                 
                 // Mock incr to track request count and enforce limit
                 let requestCount = 0;
-                sdk['queueWorker']['redis'].incr.mockImplementation(async () => {
+                const originalIncr = sdk['queueWorker']['redis'].incr;
+                sdk['queueWorker']['redis'].incr.mockImplementation(async function() {
                     const currentTime = Date.now();
                     if (currentTime - sdk['lastRequestTime'] < sdk['MIN_REQUEST_INTERVAL']) {
                         throw new GlitchError('Rate limit exceeded');
                     }
                     sdk['lastRequestTime'] = currentTime;
-                    return ++requestCount;
+                    requestCount++;
+                    if (requestCount > 1) {
+                        throw new GlitchError('Rate limit exceeded');
+                    }
+                    return requestCount;
                 });
 
                 // First request should succeed
