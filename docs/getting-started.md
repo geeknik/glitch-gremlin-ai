@@ -2,8 +2,43 @@
 
 ## Prerequisites
 - Node.js 16+
+- Solana CLI installed (`sh -c "$(curl -sSfL https://release.solana.com/stable/install)"`)
 - A Solana wallet with some $GREMLINAI tokens
 - Reown project ID (get from https://cloud.reown.com)
+
+## Program Deployment
+
+### 1. Build the Program
+```bash
+cd src/token/program
+cargo build-bpf
+```
+
+### 2. Deploy to Devnet
+```bash
+solana program deploy target/deploy/glitch_gremlin.so \
+  --url devnet \
+  --keypair ~/.config/solana/id.json
+```
+
+### 3. Get Program ID
+After deployment, the CLI will output:
+```
+Program Id: <your-program-id>
+```
+
+Save this ID in your .env file:
+```bash
+echo "PROGRAM_ID=<your-program-id>" >> .env
+```
+
+### 4. Assign Program Authority
+Set the program's upgrade authority to a multisig wallet:
+```bash
+solana program set-upgrade-authority <your-program-id> \
+  --new-upgrade-authority <multisig-address> \
+  --keypair ~/.config/solana/id.json
+```
 
 ## Wallet Setup
 Install required packages:

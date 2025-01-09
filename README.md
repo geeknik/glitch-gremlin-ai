@@ -29,7 +29,44 @@ $GREMLINAI is more than just a memecoin - it's a tool that provides controlled c
 
 ## Getting Started
 
-Documentation and integration guides coming soon.
+### Program Deployment
+
+1. Build the program:
+```bash
+cargo build-bpf
+```
+
+2. Deploy to devnet:
+```bash
+solana program deploy target/deploy/glitch_gremlin.so --url devnet
+```
+
+3. Save the Program ID:
+```bash
+export PROGRAM_ID=<your-program-id>
+```
+
+4. Set upgrade authority:
+```bash
+solana program set-upgrade-authority $PROGRAM_ID \
+  --new-upgrade-authority <multisig-address>
+```
+
+### Wallet Assignment
+
+Programs don't have wallet addresses - they have Program IDs. However, you can:
+1. Create a PDA (Program Derived Address) for your program:
+```typescript
+const [pda] = await PublicKey.findProgramAddress(
+  [Buffer.from("glitch_gremlin")],
+  programId
+);
+```
+
+2. Use this PDA as the program's "wallet" for:
+- Receiving tokens
+- Managing escrow
+- Storing program state
 
 ## Security
 
