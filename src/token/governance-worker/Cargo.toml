@@ -1,0 +1,14 @@
+[package]
+name = "glitch-governance-worker"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+borsh = { workspace = true }
+solana-program = { workspace = true }
+solana-client = { workspace = true }
+tokio = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
