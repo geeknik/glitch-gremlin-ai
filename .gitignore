@@ -55,6 +55,7 @@ id.json
 # Program keys and config
 program-keys/
 config/program_ids.json
+scripts/
 
 # Dependency files
 Cargo.lock

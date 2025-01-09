@@ -3,33 +3,49 @@
 # Create directories if they don't exist
 mkdir -p program-keys config
 
-# Generate program IDs with custom prefix
-echo "Generating program IDs with glitch:1 prefix..."
+# Generate program IDs with custom suffixes
+echo "Generating program IDs with custom suffixes..."
 echo "This may take a few minutes..."
 
-# Generate main program ID (starts with ggai, ends with g1tch)
-MAIN_PROGRAM=$(solana-keygen grind --starts-with ggai:1 --ends-with g1tch:1 --num-threads 4)
-echo "Main program ID: $MAIN_PROGRAM"
+# Generate 3 main program IDs (ends with ggaig1tch)
+MAIN_PROGRAMS=($(solana-keygen grind --ends-with ggaig1tch:1 --num-threads 4 --num-matches 3))
+echo "Main program IDs:"
+printf '%s\n' "${MAIN_PROGRAMS[@]}"
 
-# Generate governance program ID (starts with ggai, ends with g0v)
-GOVERNANCE_PROGRAM=$(solana-keygen grind --starts-with ggai:1 --ends-with g0v:1 --num-threads 4)
-echo "Governance program ID: $GOVERNANCE_PROGRAM"
+# Generate 3 governance program IDs (ends with ggaig0v)
+GOVERNANCE_PROGRAMS=($(solana-keygen grind --ends-with ggaig0v:1 --num-threads 4 --num-matches 3))
+echo "Governance program IDs:"
+printf '%s\n' "${GOVERNANCE_PROGRAMS[@]}"
 
-# Generate token program ID (starts with ggai, ends with t0k3n)
-TOKEN_PROGRAM=$(solana-keygen grind --starts-with ggai:1 --ends-with t0k3n:1 --num-threads 4)
-echo "Token program ID: $TOKEN_PROGRAM"
+# Generate 3 token program IDs (ends with ggait0k3n)
+TOKEN_PROGRAMS=($(solana-keygen grind --ends-with ggait0k3n:1 --num-threads 4 --num-matches 3))
+echo "Token program IDs:"
+printf '%s\n' "${TOKEN_PROGRAMS[@]}"
 
-# Generate worker program ID (starts with ggai, ends with w0rk3r)
-WORKER_PROGRAM=$(solana-keygen grind --starts-with ggai:1 --ends-with w0rk3r:1 --num-threads 4)
-echo "Worker program ID: $WORKER_PROGRAM"
+# Generate 3 worker program IDs (ends with ggaiw0rk3r)
+WORKER_PROGRAMS=($(solana-keygen grind --ends-with ggaiw0rk3r:1 --num-threads 4 --num-matches 3))
+echo "Worker program IDs:"
+printf '%s\n' "${WORKER_PROGRAMS[@]}"
 
-# Create program IDs config
+# Create program IDs config with alternates
 echo "{
-    \"glitch_gremlin\": \"$MAIN_PROGRAM\",
-    \"governance\": \"$GOVERNANCE_PROGRAM\",
-    \"token\": \"$TOKEN_PROGRAM\",
-    \"worker\": \"$WORKER_PROGRAM\"
+    \"glitch_gremlin\": {
+        \"primary\": \"${MAIN_PROGRAMS[0]}\",
+        \"alternates\": [\"${MAIN_PROGRAMS[1]}\", \"${MAIN_PROGRAMS[2]}\"]
+    },
+    \"governance\": {
+        \"primary\": \"${GOVERNANCE_PROGRAMS[0]}\",
+        \"alternates\": [\"${GOVERNANCE_PROGRAMS[1]}\", \"${GOVERNANCE_PROGRAMS[2]}\"]
+    },
+    \"token\": {
+        \"primary\": \"${TOKEN_PROGRAMS[0]}\",
+        \"alternates\": [\"${TOKEN_PROGRAMS[1]}\", \"${TOKEN_PROGRAMS[2]}\"]
+    },
+    \"worker\": {
+        \"primary\": \"${WORKER_PROGRAMS[0]}\",
+        \"alternates\": [\"${WORKER_PROGRAMS[1]}\", \"${WORKER_PROGRAMS[2]}\"]
+    }
 }" > config/program_ids.json
 
 echo "Program IDs setup complete!"
-echo "Saved to config/program_ids.json"
+echo "Saved primary and alternate IDs to config/program_ids.json"
