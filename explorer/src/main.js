@@ -2,10 +2,10 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import { initWallet } from './wallet.js'
 import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets'
-import { createSolanaConnection } from '@solana/web3.js'
+import { Connection } from '@solana/web3.js'
 
 // Initialize connection
-const connection = createSolanaConnection('devnet', { commitment: 'confirmed' })
+const connection = new Connection('https://api.devnet.solana.com', { commitment: 'confirmed' })
 
 // Initialize wallet adapters with proper config
 const wallets = [
