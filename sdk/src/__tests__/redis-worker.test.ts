@@ -52,12 +52,21 @@ describe('RedisQueueWorker', () => {
                 }
                 return 1;
             }),
-            rpop: jest.fn().mockImplementation(async (key) => {
+            rpop: jest.fn().mockImplementation(async function(key) {
                 if (key === 'empty-queue') {
                     return null;
                 }
-                return JSON.stringify({test: 'data'});
+                // Return the actual queued data
+                const queue = this.queue || [];
+                return queue.length > 0 ? queue.shift() : null;
             }),
+            lpush: jest.fn().mockImplementation(async function(key, value) {
+                if (!this.queue) {
+                    this.queue = [];
+                }
+                this.queue.push(value);
+                return 1;
+            })
             connected: true
         } as unknown as Redis;
     });

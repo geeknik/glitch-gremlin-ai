@@ -7,9 +7,6 @@ import type { Redis } from 'ioredis';
 // Initialize SDK before all tests
 let sdk: GlitchSDK;
 
-// Initialize SDK before all tests
-let sdk: GlitchSDK;
-
 // Increase timeout for all tests
 jest.setTimeout(30000);
 

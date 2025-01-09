@@ -222,17 +222,23 @@ describe('GlitchSDK', () => {
                 // Mock incr to track request count and enforce limit
                 let requestCount = 0;
                 const originalIncr = sdk['queueWorker']['redis'].incr;
+                // Track request times
+                const requestTimes: number[] = [];
+                
                 sdk['queueWorker']['redis'].incr.mockImplementation(async function() {
-                    const currentTime = Date.now();
-                    if (currentTime - sdk['lastRequestTime'] < sdk['MIN_REQUEST_INTERVAL']) {
+                    const now = Date.now();
+                    
+                    // Remove old requests
+                    while (requestTimes.length > 0 && now - requestTimes[0] > sdk['MIN_REQUEST_INTERVAL']) {
+                        requestTimes.shift();
+                    }
+                    
+                    if (requestTimes.length >= 1) {
                         throw new GlitchError('Rate limit exceeded');
                     }
-                    sdk['lastRequestTime'] = currentTime;
-                    requestCount++;
-                    if (requestCount > 1) {
-                        throw new GlitchError('Rate limit exceeded');
-                    }
-                    return requestCount;
+                    
+                    requestTimes.push(now);
+                    return requestTimes.length;
                 });
 
                 // First request should succeed
