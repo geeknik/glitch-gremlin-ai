@@ -19,7 +19,7 @@ describe('GlitchSDK', () => {
     afterEach(async () => {
         if (sdk) {
             await sdk['queueWorker'].close();
-            await sdk['connection'].disconnect();
+            // Connection cleanup not needed
             jest.clearAllTimers();
             jest.clearAllMocks();
         }

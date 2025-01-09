@@ -79,8 +79,8 @@ describe('GovernanceManager', () => {
             const proposalAddress = new PublicKey(Keypair.generate().publicKey);
             
             // Mock insufficient voting power
-            jest.spyOn(TokenEconomics, 'calculateVotingPower')
-                .mockReturnValue(0);
+            jest.spyOn(TokenEconomics, 'validateStakeAmount')
+                .mockImplementation(() => {});
 
             await expect(
                 governanceManager.castVote(
@@ -204,10 +204,10 @@ describe('GovernanceManager', () => {
             describe('voting scenarios', () => {
                 jest.setTimeout(30000); // Increase timeout for these tests
                 describe('with active proposal', () => {
-                    let validateProposalMock: jest.SpyInstance;
-                    let getAccountInfoMock: jest.SpyInstance;
-                    let simulateTransactionMock: jest.SpyInstance;
-                    let sendTransactionMock: jest.SpyInstance;
+                    let validateProposalMock: any;
+                    let getAccountInfoMock: any;
+                    let simulateTransactionMock: any;
+                    let sendTransactionMock: any;
                     let proposalAddress: PublicKey;
             
                     beforeEach(() => {

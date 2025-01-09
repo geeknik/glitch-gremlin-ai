@@ -595,7 +595,11 @@ export class GlitchSDK {
                         no: 50,
                         abstain: 0
                     },
-                    votesAgainst: 50,
+                    votes: {
+                        yes: 100,
+                        no: 50,
+                        abstain: 0
+                    },
                     endTime: Date.now() + 86400000
                 };
             }
