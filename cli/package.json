@@ -8,7 +8,11 @@
   "scripts": {
     "build": "npx tsc --project tsconfig.json",
     "clean": "rm -rf dist",
-    "test": "jest"
+    "test": "jest",
+    "test:security": "npm audit --production --audit-level=moderate && snyk test",
+    "lint": "eslint 'src/**/*.{ts,tsx}' --fix",
+    "lint:fix": "eslint 'src/**/*.{ts,tsx}' --fix",
+    "audit": "npm audit --production --audit-level=moderate"
   },
   "dependencies": {
     "@glitch-gremlin/sdk": "file:../sdk",
