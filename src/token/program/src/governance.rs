@@ -1,5 +1,9 @@
 use borsh::{BorshSerialize, BorshDeserialize};
-use solana_program::pubkey::Pubkey;
+use solana_program::{
+    pubkey::Pubkey,
+    program_error::ProgramError,
+};
+use crate::state::EscrowAccount;
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
 pub struct GovernanceProposal {
@@ -20,6 +24,19 @@ pub struct GovernanceProposal {
     pub deadline: i64,
     /// Status of the proposal
     pub status: ProposalStatus,
+    /// Escrow account for test funds
+    pub escrow_account: Option<Pubkey>,
+    /// Test parameters
+    pub test_params: TestParams,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug)]
+pub struct TestParams {
+    pub test_type: String, // FUZZ, LOAD, EXPLOIT, CONCURRENCY
+    pub duration: u64,    // in seconds
+    pub intensity: u8,    // 1-10
+    pub max_latency: u64, // in ms
+    pub error_threshold: u8,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq)]
@@ -38,6 +55,7 @@ impl GovernanceProposal {
         target_program: Pubkey,
         staked_amount: u64,
         deadline: i64,
+        test_params: TestParams,
     ) -> Self {
         Self {
             id,
@@ -49,6 +67,8 @@ impl GovernanceProposal {
             votes_against: 0,
             deadline,
             status: ProposalStatus::Pending,
+            escrow_account: None,
+            test_params,
         }
     }
 }

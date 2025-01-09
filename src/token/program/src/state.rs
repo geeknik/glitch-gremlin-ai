@@ -32,6 +32,8 @@ pub struct EscrowAccount {
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
 pub struct StakeAccount {
+    /// Unique ID of the stake
+    pub id: u64,
     /// Owner of the stake
     pub owner: Pubkey,
     /// Amount of tokens staked
@@ -42,6 +44,8 @@ pub struct StakeAccount {
     pub lockup_period: u64,
     /// Accumulated rewards
     pub rewards: u64,
+    /// Associated governance proposal (if any)
+    pub proposal_id: Option<u64>,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
