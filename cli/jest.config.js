@@ -10,9 +10,16 @@ module.exports = {
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
       useESM: true,
+      tsconfig: 'tsconfig.json',
+      isolatedModules: true
     }]
   },
   extensionsToTreatAsEsm: ['.ts'],
   modulePaths: ['<rootDir>/../sdk/src'],
-  setupFiles: ['<rootDir>/jest.setup.js']
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.mjs'],
+  globals: {
+    'ts-jest': {
+      useESM: true
+    }
+  }
 };
