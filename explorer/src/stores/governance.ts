@@ -9,7 +9,9 @@ export const useGovernanceStore = defineStore('governance', () => {
   
   const worker = new GovernanceWorker({
     rpcUrl: import.meta.env.VITE_SOLANA_RPC,
-    programId: import.meta.env.VITE_GOVERNANCE_PROGRAM_ID
+    programId: GOVERNANCE_CONFIG.programId,
+    tokenProgramId: GOVERNANCE_CONFIG.tokenProgramId,
+    mainProgramId: GOVERNANCE_CONFIG.mainProgramId
   })
 
   async function fetchProposals() {
