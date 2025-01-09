@@ -41,15 +41,15 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import { useWallet } from '@solana/wallet-adapter-vue';
-import { 
-  PhantomWalletAdapter
-} from '@solana/wallet-adapter-wallets';
-import { GlitchSDK } from '@glitch-gremlin/sdk';
+import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets';
 
 // Initialize wallet adapters
 const wallets = [
   new PhantomWalletAdapter()
 ];
+
+// Initialize SDK without Redis dependency
+let sdkInstance = null;
 
 const { connected, publicKey, connect, disconnect, wallet } = useWallet();
 const gremlinBalance = ref(0);
