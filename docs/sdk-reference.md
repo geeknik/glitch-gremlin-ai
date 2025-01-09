@@ -153,6 +153,38 @@ const fee = await sdk.calculateChaosRequestFee({
 });
 ```
 
+## Smart Contract Integration
+
+Example of integrating with governance smart contracts:
+
+```typescript
+import { PublicKey, Transaction } from '@solana/web3.js'
+import { useAppKitAccount, useAppKitProvider } from '@reown/appkit/vue'
+import { useAppKitConnection } from '@reown/appkit-adapter-solana/vue'
+
+const { address } = useAppKitAccount()
+const { connection } = useAppKitConnection()
+const { walletProvider } = useAppKitProvider('solana')
+
+async function createProposal(title: string, description: string) {
+  const programId = new PublicKey('GremlinGov11111111111111111111111111111111111')
+  
+  const instruction = new TransactionInstruction({
+    programId,
+    keys: [
+      { pubkey: address, isSigner: true, isWritable: false },
+      // Add other accounts
+    ],
+    data: Buffer.from([0]) // Proposal creation instruction
+  })
+
+  const tx = new Transaction().add(instruction)
+  tx.feePayer = address
+  tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash
+
+  await walletProvider.signAndSendTransaction(tx)
+}
+
 ## Error Handling
 
 The SDK throws `GlitchError` with specific error codes:

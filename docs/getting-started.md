@@ -1,9 +1,45 @@
 # Getting Started with Glitch Gremlin AI
 
 ## Prerequisites
-- Solana CLI tools installed
-- Node.js 14+ 
+- Node.js 16+
 - A Solana wallet with some $GREMLINAI tokens
+- Reown project ID (get from https://cloud.reown.com)
+
+## Wallet Setup
+Install required packages:
+```bash
+npm install @reown/appkit @reown/appkit-adapter-solana @solana/wallet-adapter-wallets
+```
+
+Basic setup:
+```typescript
+import { createAppKit } from '@reown/appkit-solana/vue'
+import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets'
+import { SolanaAdapter } from '@reown/appkit-adapter-solana/vue'
+import { solanaDevnet } from '@reown/appkit/networks'
+
+const projectId = 'YOUR_REOWN_PROJECT_ID'
+
+const solanaWeb3JsAdapter = new SolanaAdapter({
+  wallets: [new PhantomWalletAdapter(), new SolflareWalletAdapter()]
+})
+
+createAppKit({
+  adapters: [solanaWeb3JsAdapter],
+  metadata: {
+    name: 'Glitch Gremlin',
+    description: 'Chaos Testing Platform',
+    url: window.location.origin,
+    icons: ['https://glitchgremlin.ai/logo.png']
+  },
+  networks: [solanaDevnet],
+  projectId,
+  wallets: [
+    new PhantomWalletAdapter(),
+    new SolflareWalletAdapter(),
+  ]
+})
+```
 
 ## Test Coverage
 Our SDK has been thoroughly tested with:

@@ -3,6 +3,49 @@
 ## Overview
 The Glitch Gremlin governance system allows token holders to participate in decision-making through a democratic process. Holders can stake tokens, create proposals, vote, and earn rewards for participation.
 
+## Governance Worker Integration
+The governance worker processes proposals and voting in real-time. To integrate:
+
+```typescript
+import { GovernanceWorker } from '@glitch-gremlin/governance-worker'
+import { useAppKitAccount } from '@reown/appkit/vue'
+
+const { address } = useAppKitAccount()
+
+// Initialize worker
+const worker = new GovernanceWorker({
+  rpcUrl: 'https://api.devnet.solana.com',
+  programId: 'GremlinGov11111111111111111111111111111111111',
+  walletAddress: address
+})
+
+// Subscribe to governance events
+worker.on('proposalCreated', (proposal) => {
+  console.log('New proposal:', proposal)
+})
+
+worker.on('voteCast', (vote) => {
+  console.log('Vote recorded:', vote)
+})
+
+// Start worker
+await worker.start()
+```
+
+## Explorer Integration
+To display governance data in your explorer:
+
+```typescript
+// Get all proposals
+const proposals = await worker.getProposals()
+
+// Get proposal details
+const proposal = await worker.getProposal(proposalId)
+
+// Get voting results
+const results = await worker.getVoteResults(proposalId)
+```
+
 ## Staking
 - Minimum stake: 1000 GREMLINAI
 - Lockup periods: 1 day to 1 year
