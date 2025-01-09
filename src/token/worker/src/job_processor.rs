@@ -9,20 +9,42 @@ use solana_sdk::{
     sysvar::rent::Rent,
 };
 use std::error::Error;
-use thiserror::Error;
+use std::fmt;
+use std::error::Error;
 
-#[derive(Error, Debug)]
+#[derive(Debug)]
 pub enum JobProcessorError {
-    #[error("Invalid job format")]
     InvalidJobFormat,
-    #[error("Failed to parse program ID")]
     ProgramIdParseError,
-    #[error("Test environment setup failed")]
     TestSetupError,
-    #[error("Chaos test execution failed")]
     TestExecutionError,
-    #[error("Request finalization failed")]
     FinalizationError,
+}
+
+impl fmt::Display for JobProcessorError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            JobProcessorError::InvalidJobFormat => write!(f, "Invalid job format"),
+            JobProcessorError::ProgramIdParseError => write!(f, "Failed to parse program ID"),
+            JobProcessorError::TestSetupError => write!(f, "Test environment setup failed"),
+            JobProcessorError::TestExecutionError => write!(f, "Chaos test execution failed"),
+            JobProcessorError::FinalizationError => write!(f, "Request finalization failed"),
+        }
+    }
+}
+
+impl Error for JobProcessorError {}
+
+impl From<&str> for JobProcessorError {
+    fn from(err: &str) -> Self {
+        JobProcessorError::InvalidJobFormat
+    }
+}
+
+impl From<Box<dyn Error + Send + Sync>> for JobProcessorError {
+    fn from(_err: Box<dyn Error + Send + Sync>) -> Self {
+        JobProcessorError::TestExecutionError
+    }
 }
 
 impl From<JobProcessorError> for Box<dyn Error + Send + Sync> {
@@ -118,12 +140,22 @@ async fn finalize_chaos_request(
     Ok(())
 }
 
-#[derive(Default)]
 pub struct TestEnvironment {
     pub target_program: Pubkey,
     pub test_accounts: Vec<Pubkey>,
     pub test_parameters: TestParameters,
     pub start_time: std::time::Instant,
+}
+
+impl Default for TestEnvironment {
+    fn default() -> Self {
+        Self {
+            target_program: Pubkey::default(),
+            test_accounts: Vec::new(),
+            test_parameters: TestParameters::default(),
+            start_time: std::time::Instant::now(),
+        }
+    }
 }
 
 impl TestEnvironment {
