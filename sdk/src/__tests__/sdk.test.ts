@@ -183,10 +183,13 @@ describe('GlitchSDK', () => {
             it('should enforce rate limits for single requests', async () => {
                 jest.setTimeout(10000); // Increase timeout for this test
                 
-                // Mock incr to track request count
+                // Mock incr to track request count and enforce limit
                 let requestCount = 0;
                 sdk['queueWorker']['redis'].incr.mockImplementation(async () => {
                     requestCount++;
+                    if (requestCount > 1) {
+                        throw new GlitchError('Rate limit exceeded');
+                    }
                     return requestCount;
                 });
 

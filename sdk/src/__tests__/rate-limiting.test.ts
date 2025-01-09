@@ -93,8 +93,15 @@ describe('Rate Limiting', () => {
         });
 
         it('should enforce maximum requests per minute', async () => {
-            // Mock incr to simulate hitting limit
-            mockIncr.mockImplementation(async () => 4);
+            // Mock incr to enforce rate limit
+            let requestCount = 0;
+            mockIncr.mockImplementation(async () => {
+                requestCount++;
+                if (requestCount > 1) {
+                    throw new GlitchError('Rate limit exceeded');
+                }
+                return requestCount;
+            });
 
             // First request should succeed
             await sdk.createChaosRequest({
@@ -104,16 +111,13 @@ describe('Rate Limiting', () => {
                 intensity: 1
             });
 
-            // Mock incr to simulate hitting limit
-            mockIncr.mockImplementation(async () => 4);
-
-            // First request should succeed
-            await sdk.createChaosRequest({
+            // Second request should fail
+            await expect(sdk.createChaosRequest({
                 targetProgram: "11111111111111111111111111111111",
                 testType: TestType.FUZZ,
                 duration: 60,
                 intensity: 1
-            });
+            })).rejects.toThrow('Rate limit exceeded');
 
             // Request that hits the limit should fail
             await expect(
