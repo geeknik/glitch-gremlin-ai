@@ -20,11 +20,6 @@ use {
 
 use crate::id;
 
-// Program ID for tests
-pub fn id() -> Pubkey {
-    Pubkey::new_from_array([8; 32]) // Temporary test key
-}
-
 pub async fn program_test() -> (BanksClient, Keypair, Hash) {
     let program_id = Pubkey::new_unique();
     let program_test = ProgramTest::new(

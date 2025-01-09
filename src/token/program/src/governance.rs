@@ -1,9 +1,5 @@
 use borsh::{BorshSerialize, BorshDeserialize};
-use solana_program::{
-    pubkey::Pubkey,
-    program_error::ProgramError,
-};
-use crate::state::EscrowAccount;
+use solana_program::pubkey::Pubkey;
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
 pub struct GovernanceProposal {
