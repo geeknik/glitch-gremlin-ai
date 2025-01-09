@@ -2,8 +2,9 @@
   "name": "@glitch-gremlin/sdk",
   "version": "0.1.0",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/types/index.d.ts",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "import": "./dist/index.js",
@@ -16,15 +17,14 @@
       "types": "./dist/*.d.ts"
     }
   },
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "files": [
     "dist"
   ],
   "scripts": {
     "prebuild": "node -e \"require('dotenv').config()\"",
-    "build": "tsc -p .",
+    "build:esm": "tsc -p tsconfig.esm.json",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build": "npm run build:esm && npm run build:cjs",
     "clean": "rm -rf dist",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest"
   },
