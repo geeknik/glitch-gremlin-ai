@@ -6,18 +6,11 @@ use solana_program::{
     declare_id,
 };
 
-use serde_json::Value;
-use std::fs;
+use solana_program::pubkey::Pubkey;
 
-lazy_static::lazy_static! {
-    static ref PROGRAM_IDS: Value = {
-        let data = fs::read_to_string("../../config/program_ids.json")
-            .expect("Failed to read program IDs config");
-        serde_json::from_str(&data).expect("Failed to parse program IDs config")
-    };
-}
+const PROGRAM_ID: &str = "YourProgramIDHere";
 
-declare_id!(PROGRAM_IDS["glitch_gremlin"].as_str().unwrap());
+declare_id!(PROGRAM_ID);
 
 pub mod error;
 pub mod instruction;

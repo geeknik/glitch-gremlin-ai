@@ -1,3 +1,18 @@
 {
-    "glitch_gremlin": "GremLin111111111111111111111111111111111111111111"
+    "glitch_gremlin": {
+        "primary": "",
+        "alternates": ["", ""]
+    },
+    "governance": {
+        "primary": "",
+        "alternates": ["", ""]
+    },
+    "token": {
+        "primary": "",
+        "alternates": ["", ""]
+    },
+    "worker": {
+        "primary": "",
+        "alternates": ["", ""]
+    }
 }

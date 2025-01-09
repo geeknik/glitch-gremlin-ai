@@ -109,6 +109,14 @@ impl Processor {
         Self::validate_token_account(staking_info, proposer_info.key)?;
 
         // Create and serialize the proposal
+        let test_params = TestParams {
+            test_type: "EXPLOIT".to_string(),
+            duration: 300,
+            intensity: 5,
+            max_latency: 1000,
+            error_threshold: 2,
+        };
+
         let proposal = GovernanceProposal::new(
             id,
             *proposer_info.key,
@@ -116,6 +124,7 @@ impl Processor {
             target_program,
             staked_amount,
             deadline,
+            test_params,
         );
         proposal.serialize(&mut *proposal_info.data.borrow_mut())?;
 
