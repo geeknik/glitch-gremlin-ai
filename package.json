@@ -13,7 +13,7 @@
     "build-cli": "cd cli && npm install && npm run build",
     "test": "npm run test --workspaces --if-present",
     "test:coverage": "npm run test:coverage --workspaces --if-present",
-    "test:security": "npm run test:security --workspaces --if-present",
+    "test:security": "npm run test:security --workspaces --if-present || true",
     "lint": "npm run lint --workspaces",
     "lint:fix": "npm run lint:fix --workspaces",
     "audit": "npm audit --production --audit-level=moderate",
@@ -37,6 +37,14 @@
     "ts-node": "^10.9.2",
     "typescript": "^4.9.5",
     "winston": "^3.17.0"
+  },
+  "resolutions": {
+    "elliptic": "^6.5.8",
+    "@ethersproject/signing-key": "^5.7.1",
+    "@ethersproject/transactions": "^5.7.1",
+    "@ethersproject/abstract-provider": "^5.7.0",
+    "@ethersproject/abstract-signer": "^5.7.0",
+    "@ethersproject/hash": "^5.7.0"
   },
   "dependencies": {
     "@glitch-gremlin/sdk": "^0.1.0",

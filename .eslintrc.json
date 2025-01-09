@@ -16,8 +16,12 @@
   "rules": {
     "@typescript-eslint/no-explicit-any": "off",
     "@typescript-eslint/explicit-module-boundary-types": "off",
+    "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
     "security/detect-object-injection": "off",
-    "security/detect-non-literal-fs-filename": "off"
+    "security/detect-non-literal-fs-filename": "off",
+    "no-useless-catch": "error",
+    "jest/no-conditional-expect": "off",
+    "jest/no-identical-title": "error"
   },
   "env": {
     "node": true,
