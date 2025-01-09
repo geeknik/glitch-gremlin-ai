@@ -1,6 +1,7 @@
 {
   "name": "glitch-gremlin",
   "private": true,
+  "type": "module",
   "workspaces": [
     "sdk",
     "cli"

@@ -4,6 +4,7 @@ import { WalletAdapterNetwork } from '@solana/wallet-adapter-base'
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets'
 import { initWalletStore } from '@solana/wallet-adapter-vue'
 import { clusterApiUrl, Connection } from '@solana/web3.js'
+import { initWallet } from './wallet.js'
 
 // Create Vue app
 const app = createApp(App)
