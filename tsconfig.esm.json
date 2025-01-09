@@ -6,3 +6,11 @@
     "declarationDir": "./dist/esm"
   }
 }
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "outDir": "./dist/esm",
+    "declarationDir": "./dist/esm"
+  }
+}
