@@ -80,9 +80,9 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useWallet } from '@solana/wallet-adapter-vue';
-import { GlitchSDK } from '@glitch-gremlin/sdk';
+import { GovernanceService } from '../services/governance';
 
 const { connected, publicKey } = useWallet();
 const proposals = ref([]);
@@ -90,32 +90,29 @@ let sdkInstance = null;
 
 const isConnected = computed(() => connected.value && publicKey.value);
 
+const governanceService = new GovernanceService(window.connection);
+
 const fetchProposals = async () => {
   try {
-    if (!sdkInstance) {
-      sdkInstance = await GlitchSDK.init({
-        cluster: 'https://api.mainnet-beta.solana.com',
-        wallet: publicKey.value
-      });
-    }
-    
-    // Fetch active proposals
-    const activeProposals = await sdkInstance.getProposals();
-    proposals.value = activeProposals.map(p => ({
-      ...p,
-      progress: (p.votesYes / (p.votesYes + p.votesNo)) * 100
-    }));
+    proposals.value = await governanceService.getActiveProposals();
   } catch (error) {
     console.error('Failed to fetch proposals:', error);
   }
 };
 
+// Refresh proposals every 30 seconds
+onMounted(() => {
+  fetchProposals();
+  setInterval(fetchProposals, 30000);
+});
+
 const vote = async (proposalId, support) => {
   try {
-    await sdkInstance.vote(proposalId, support);
+    await governanceService.vote(proposalId, support);
     await fetchProposals();
   } catch (error) {
     console.error('Voting failed:', error);
+    alert('Failed to submit vote. Please try again.');
   }
 };
 
