@@ -590,17 +590,24 @@ export class GlitchSDK {
                 return {
                     id: proposalId,
                     status: 'active',
+                    title: "Test Proposal",
+                    description: "Test Description", 
+                    proposer: this.wallet.publicKey.toString(),
+                    startTime: Date.now() - 86400000,
+                    endTime: Date.now() + 86400000,
                     votes: {
                         yes: 100,
                         no: 50,
                         abstain: 0
                     },
-                    votes: {
-                        yes: 100,
-                        no: 50,
-                        abstain: 0
-                    },
-                    endTime: Date.now() + 86400000
+                    quorum: 100,
+                    stakedAmount: 1000,
+                    testParams: {
+                        targetProgram: "11111111111111111111111111111111",
+                        testType: TestType.FUZZ,
+                        duration: 300,
+                        intensity: 5
+                    }
                 };
             }
 
