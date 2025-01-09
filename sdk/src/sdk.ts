@@ -3,10 +3,8 @@ import {
     Keypair,
     PublicKey,
     Transaction,
-    TransactionInstruction,
-    SystemProgram
+    TransactionInstruction
 } from '@solana/web3.js';
-import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { Redis } from 'ioredis';
 import { TokenEconomics } from './token-economics.js';
 import { GovernanceConfig, ChaosRequestParams, ChaosResult, TestType, ProposalParams } from './types.js';
@@ -177,7 +175,7 @@ export class GlitchSDK {
         }
     }
 
-    async createChaosRequest(params: ChaosRequestParams): Promise<{
+    async createChaosRequest(_params: ChaosRequestParams): Promise<{
         requestId: string;
         waitForCompletion: () => Promise<ChaosResult>;
     }> {
@@ -495,31 +493,27 @@ export class GlitchSDK {
             }
         }
 
-        try {
-            // Create execution instruction
-            const instruction = new TransactionInstruction({
-                keys: [
-                    { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
-                    { pubkey: new PublicKey(proposalId), isSigner: false, isWritable: true }
-                ],
-                programId: this.programId,
-                data: Buffer.from([0x03]) // Execute instruction
-            });
+        // Create execution instruction
+        const instruction = new TransactionInstruction({
+            keys: [
+                { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+                { pubkey: new PublicKey(proposalId), isSigner: false, isWritable: true }
+            ],
+            programId: this.programId,
+            data: Buffer.from([0x03]) // Execute instruction
+        });
 
-            const transaction = new Transaction().add(instruction);
-            
-            // Simulate transaction first
-            await this.connection.simulateTransaction(transaction, [this.wallet]);
-            
-            // If simulation succeeds, send the actual transaction
-            const signature = await this.connection.sendTransaction(transaction, [this.wallet]);
-            return {
-                signature,
-                executedAt: Date.now()
-            };
-        } catch (error) {
-            throw new GlitchError('Failed to execute proposal', 1012);
-        }
+        const transaction = new Transaction().add(instruction);
+        
+        // Simulate transaction first
+        await this.connection.simulateTransaction(transaction, [this.wallet]);
+        
+        // If simulation succeeds, send the actual transaction
+        const signature = await this.connection.sendTransaction(transaction, [this.wallet]);
+        return {
+            signature,
+            executedAt: Date.now()
+        };
     }
 
     async calculateChaosRequestFee(params: Omit<ChaosRequestParams, 'targetProgram'>): Promise<number> {

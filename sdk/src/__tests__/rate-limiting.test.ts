@@ -8,7 +8,7 @@ import type { Redis } from 'ioredis';
 jest.setTimeout(30000);
 
 describe('Rate Limiting', () => {
-    let sdk: GlitchSDK;
+    let sdkInstance: GlitchSDK;
     let mockIncr: jest.Mock;
     let mockExpire: jest.Mock;
     
@@ -44,7 +44,7 @@ describe('Rate Limiting', () => {
     });
 
     describe('rate limiting', () => {
-        describe('request limits', () => {
+        describe('request rate limits', () => {
             it('should enforce cooldown between requests', async () => {
             const mockGet = jest.spyOn(sdk['queueWorker']['redis'], 'get')
                 .mockImplementation(() => Promise.resolve(null));
