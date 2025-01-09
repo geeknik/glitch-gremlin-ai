@@ -8,13 +8,13 @@ This document tracks the verified working versions of critical dependencies.
 
 - `@solana/wallet-adapter-base`: 0.9.23
 - `@solana/wallet-adapter-wallets`: 0.19.32
-- `@solana/wallet-adapter-vue`: 0.9.22
-- `@solana/wallet-adapter-vue-ui`: 0.9.22
+- `@solana/wallet-adapter-vue`: 0.9.20
+- `@solana/wallet-adapter-vue-ui`: 0.9.20
 - `@solana/web3.js`: 1.87.6 (pinned)
 
 ### Known Issues
 - WalletConnect integration has dependency conflicts with @solana/web3.js versions
-- Current workaround: Pin all wallet adapter packages to versions compatible with web3.js@1.87.6
+- Current workaround: Pin wallet adapter packages to v0.9.20 for compatibility
 - Tracking issue: Monitor for updated wallet adapter versions that resolve dependency conflicts
 
 ## Update Policy
