@@ -16,7 +16,7 @@ use crate::{
     instruction::GlitchInstruction, 
     error::GlitchError, 
     state::ChaosRequest,
-    governance::{GovernanceProposal, ProposalStatus},
+    governance::{GovernanceProposal, ProposalStatus, TestParams},
 };
 
 pub struct Processor;

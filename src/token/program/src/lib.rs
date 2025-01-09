@@ -6,11 +6,7 @@ use solana_program::{
     declare_id,
 };
 
-use solana_program::pubkey::Pubkey;
-
-const PROGRAM_ID: &str = "YourProgramIDHere";
-
-declare_id!(PROGRAM_ID);
+declare_id!("11111111111111111111111111111111");
 
 pub mod error;
 pub mod instruction;

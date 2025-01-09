@@ -1,18 +1,30 @@
 {
     "glitch_gremlin": {
-        "primary": "",
-        "alternates": ["", ""]
+        "primary": "11111111111111111111111111111111",
+        "alternates": [
+            "22222222222222222222222222222222",
+            "33333333333333333333333333333333"
+        ]
     },
     "governance": {
-        "primary": "",
-        "alternates": ["", ""]
+        "primary": "44444444444444444444444444444444",
+        "alternates": [
+            "55555555555555555555555555555555",
+            "66666666666666666666666666666666"
+        ]
     },
     "token": {
-        "primary": "",
-        "alternates": ["", ""]
+        "primary": "77777777777777777777777777777777",
+        "alternates": [
+            "88888888888888888888888888888888",
+            "99999999999999999999999999999999"
+        ]
     },
     "worker": {
-        "primary": "",
-        "alternates": ["", ""]
+        "primary": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "alternates": [
+            "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+            "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC"
+        ]
     }
 }
