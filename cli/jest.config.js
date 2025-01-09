@@ -23,7 +23,13 @@ export default {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.mjs'],
   globals: {
     'ts-jest': {
-      useESM: true
+      useESM: true,
+      diagnostics: {
+        ignoreCodes: [1343]
+      }
     }
-  }
+  },
+  transformIgnorePatterns: [
+    'node_modules/(?!(.*\\.mjs$|@solana/web3\\.js))'
+  ]
 };

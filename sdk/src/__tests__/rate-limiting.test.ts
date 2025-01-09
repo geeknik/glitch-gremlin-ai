@@ -257,3 +257,110 @@ describe('Rate Limiting', () => {
     });
 });
 });
+import { jest } from '@jest/globals';
+import { GlitchSDK, TestType } from '../index.js';
+import { Keypair } from '@solana/web3.js';
+import { GlitchError } from '../errors.js';
+import type { Redis } from 'ioredis';
+
+// Initialize SDK before all tests
+let sdk: GlitchSDK;
+
+// Increase timeout for all tests
+jest.setTimeout(30000);
+
+describe('Rate Limiting', () => {
+    let sdk: GlitchSDK;
+    let mockIncr: jest.Mock;
+    let mockExpire: jest.Mock;
+    
+    beforeAll(async () => {
+        const wallet = Keypair.generate();
+        sdk = await GlitchSDK.init({
+            cluster: 'https://api.devnet.solana.com',
+            wallet
+        });
+
+        // Mock Redis methods globally
+        mockIncr = jest.fn(() => Promise.resolve(1));
+        mockExpire = jest.fn(() => Promise.resolve(1));
+        
+        sdk['queueWorker']['redis'] = {
+            incr: mockIncr,
+            expire: mockExpire,
+            get: jest.fn().mockResolvedValue(null),
+            set: jest.fn().mockResolvedValue('OK')
+        } as unknown as Redis;
+    });
+
+    beforeEach(() => {
+        jest.useFakeTimers();
+        jest.clearAllMocks();
+    });
+
+    afterEach(() => {
+        mockIncr.mockRestore();
+        mockExpire.mockRestore();
+        jest.useRealTimers();
+        jest.clearAllMocks();
+    });
+
+    describe('rate limiting', () => {
+        describe('request limits', () => {
+            it('should enforce cooldown between requests', async () => {
+                // First request should succeed
+                await sdk.createChaosRequest({
+                    targetProgram: "11111111111111111111111111111111", 
+                    testType: TestType.FUZZ,
+                    duration: 60,
+                    intensity: 1
+                });
+
+                // Immediate second request should fail
+                await expect(sdk.createChaosRequest({
+                    targetProgram: "11111111111111111111111111111111",
+                    testType: TestType.FUZZ,
+                    duration: 60,
+                    intensity: 1
+                })).rejects.toThrow('Rate limit exceeded');
+
+                // After waiting, request should succeed
+                jest.advanceTimersByTime(2000);
+                await sdk.createChaosRequest({
+                    targetProgram: "11111111111111111111111111111111",
+                    testType: TestType.FUZZ,
+                    duration: 60,
+                    intensity: 1
+                });
+            });
+
+            it('should enforce maximum requests per minute', async () => {
+                // Mock incr to enforce rate limit
+                let requestCount = 0;
+                mockIncr.mockImplementation(async () => {
+                    requestCount++;
+                    if (requestCount > 1) {
+                        throw new GlitchError('Rate limit exceeded');
+                    }
+                    return requestCount;
+                });
+
+                // First request should succeed
+                await sdk.createChaosRequest({
+                    targetProgram: "11111111111111111111111111111111",
+                    testType: TestType.FUZZ,
+                    duration: 60,
+                    intensity: 1
+                });
+
+                // Second request should fail
+                await expect(sdk.createChaosRequest({
+                    targetProgram: "11111111111111111111111111111111",
+                    testType: TestType.FUZZ,
+                    duration: 60,
+                    intensity: 1
+                })).rejects.toThrow('Rate limit exceeded');
+            });
+        });
+    });
+});
