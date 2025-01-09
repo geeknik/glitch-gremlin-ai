@@ -12,15 +12,18 @@ describe('RedisQueueWorker', () => {
     let worker: RedisQueueWorker;
     let redis: RedisType;
 
-    beforeEach(() => {
+    beforeAll(() => {
         redis = new Redis({
             host: 'localhost',
             port: 6379,
             lazyConnect: true,
-            maxRetriesPerRequest: 3, // Allow retries
-            retryStrategy: (times) => Math.min(times * 50, 2000),
-            connectTimeout: 5000
+            maxRetriesPerRequest: 1, // Reduce retries for tests
+            retryStrategy: (times) => Math.min(times * 10, 500), // Faster retries
+            connectTimeout: 1000 // Shorter timeout
         });
+    });
+
+    beforeEach(() => {
         worker = new RedisQueueWorker(redis);
     });
 

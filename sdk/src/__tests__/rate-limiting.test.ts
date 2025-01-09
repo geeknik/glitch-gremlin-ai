@@ -10,23 +10,28 @@ describe('Rate Limiting', () => {
     let mockIncr: jest.Mock;
     let mockExpire: jest.Mock;
     
-    beforeEach(async () => {
+    beforeAll(() => {
         const wallet = Keypair.generate();
-        sdk = await GlitchSDK.init({
+        sdk = new GlitchSDK({
             cluster: 'https://api.devnet.solana.com',
             wallet
         });
 
-        // Initialize mock functions with explicit return types
+        // Mock Redis methods globally
         mockIncr = jest.fn(() => Promise.resolve(1));
         mockExpire = jest.fn(() => Promise.resolve(1));
         
-        // Assign mocks to redis methods
-        // Type assertion needed since we're mocking internal Redis client
-        sdk['queueWorker']['redis'].incr = mockIncr as any;
-        sdk['queueWorker']['redis'].expire = mockExpire as any;
-        
+        sdk['queueWorker']['redis'] = {
+            incr: mockIncr,
+            expire: mockExpire,
+            quit: jest.fn(),
+            disconnect: jest.fn()
+        } as any;
+    });
+
+    beforeEach(() => {
         jest.useFakeTimers();
+        jest.clearAllMocks();
     });
 
     afterEach(() => {

@@ -4,14 +4,15 @@ import { Keypair, PublicKey } from '@solana/web3.js';
 describe('Governance', () => {
     let sdk: GlitchSDK;
     
-    beforeEach(async () => {
+    beforeAll(() => {
+        // Create mock connection once for all tests
         const wallet = Keypair.generate();
-        sdk = await GlitchSDK.init({
+        sdk = new GlitchSDK({
             cluster: 'https://api.devnet.solana.com',
             wallet
         });
 
-        // Mock Solana RPC calls
+        // Mock all connection methods upfront
         jest.spyOn(sdk['connection'], 'getBalance')
             .mockResolvedValue(1_000_000_000); // 1 SOL
 
@@ -22,7 +23,15 @@ describe('Governance', () => {
             });
 
         jest.spyOn(sdk['connection'], 'sendTransaction')
-            .mockResolvedValue('mock-tx-signature');
+            .mockImplementation(async () => {
+                await new Promise(resolve => setTimeout(resolve, 10)); // Minimal delay
+                return 'mock-tx-signature';
+            });
+    });
+
+    beforeEach(() => {
+        // Reset mocks before each test
+        jest.clearAllMocks();
     });
 
     afterEach(async () => {

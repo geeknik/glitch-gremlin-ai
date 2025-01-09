@@ -26,7 +26,8 @@
     "build:cjs": "tsc -p tsconfig.cjs.json",
     "build": "npm run build:esm && npm run build:cjs",
     "clean": "rm -rf dist",
-    "test": "NODE_OPTIONS=--experimental-vm-modules jest"
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest --maxWorkers=4 --runInBand --detectOpenHandles",
+    "test:ci": "NODE_OPTIONS=--experimental-vm-modules jest --maxWorkers=4 --runInBand --detectOpenHandles --ci --reporters=default --reporters=jest-junit"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.9",
