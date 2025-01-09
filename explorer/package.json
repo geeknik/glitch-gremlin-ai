@@ -33,5 +33,8 @@
     "@vitejs/plugin-vue": "^4.6.2",
     "vite": "^5.0.0",
     "vitest": "^1.0.0"
+  },
+  "resolutions": {
+    "vite": "^5.0.0"
   }
 }
