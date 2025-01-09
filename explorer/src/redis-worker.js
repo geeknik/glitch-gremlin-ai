@@ -1,7 +1,7 @@
 import Redis from 'ioredis'
 
 export class RedisWorker {
-    constructor(redisUrl = 'redis://localhost:6379') {
+    constructor(redisUrl = 'redis://r.glitchgremlin.ai:6379') {
         this.redis = new Redis(redisUrl)
     }
 
