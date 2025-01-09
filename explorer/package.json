@@ -11,8 +11,8 @@
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.9",
-    "@solana/wallet-adapter-base": "0.9.23",
-    "@solana/wallet-adapter-wallets": "0.19.32",
+    "@solana/wallet-adapter-base": "^0.9.24",
+    "@solana/wallet-adapter-wallets": "^0.19.35",
     "@solana/web3.js": "^2.0.0",
     "borsh": "^1.0.0",
     "buffer": "^6.0.3",
