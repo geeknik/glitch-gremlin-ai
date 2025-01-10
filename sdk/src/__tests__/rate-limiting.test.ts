@@ -8,7 +8,7 @@ import type { Redis } from 'ioredis';
 jest.setTimeout(30000);
 
 describe('Rate Limiting', () => {
-    let sdkInstance: GlitchSDK;
+    let sdk: GlitchSDK;
     let mockIncr: jest.Mock;
     let mockExpire: jest.Mock;
     
@@ -274,6 +274,7 @@ describe('Rate Limiting', () => {
     let sdk: GlitchSDK;
     let mockIncr: jest.Mock;
     let mockExpire: jest.Mock;
+    let mockRedis: Redis;
     
     beforeAll(async () => {
         const wallet = Keypair.generate();
@@ -282,16 +283,20 @@ describe('Rate Limiting', () => {
             wallet
         });
 
-        // Mock Redis methods globally
-        mockIncr = jest.fn(() => Promise.resolve(1));
-        mockExpire = jest.fn(() => Promise.resolve(1));
+        // Mock Redis methods
+        mockIncr = jest.fn().mockResolvedValue(1);
+        mockExpire = jest.fn().mockResolvedValue(1);
         
-        sdk['queueWorker']['redis'] = {
+        mockRedis = {
             incr: mockIncr,
             expire: mockExpire,
             get: jest.fn().mockResolvedValue(null),
-            set: jest.fn().mockResolvedValue('OK')
+            set: jest.fn().mockResolvedValue('OK'),
+            quit: jest.fn().mockResolvedValue('OK'),
+            disconnect: jest.fn().mockResolvedValue('OK')
         } as unknown as Redis;
+
+        sdk['queueWorker']['redis'] = mockRedis;
     });
 
     beforeEach(() => {
@@ -299,11 +304,22 @@ describe('Rate Limiting', () => {
         jest.clearAllMocks();
     });
 
-    afterEach(() => {
-        mockIncr.mockRestore();
-        mockExpire.mockRestore();
+    afterEach(async () => {
         jest.useRealTimers();
         jest.clearAllMocks();
+        
+        // Clean up Redis mocks
+        mockIncr.mockClear();
+        mockExpire.mockClear();
+        
+        // Ensure Redis connections are cleaned up
+        if (sdk['queueWorker']?.redis) {
+            await mockRedis.quit();
+            await mockRedis.disconnect();
+        }
+        
+        // Add a small delay to ensure cleanup
+        await new Promise(resolve => setTimeout(resolve, 100));
     });
 
     describe('rate limiting', () => {
