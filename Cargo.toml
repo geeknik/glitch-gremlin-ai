@@ -7,9 +7,6 @@ members = [
     "src/token/governance-worker"
 ]
 
-[dependencies]
-bytemuck_derive = { version = "1.4.0", default-features = false }
-
 [workspace.dependencies]
 borsh = "0.10.3"
 borsh-derive = "0.10.3"
