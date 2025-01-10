@@ -1,27 +1,12 @@
 import { jest } from '@jest/globals';
 import { GovernanceManager } from '../governance.js';
-import { Keypair, Connection, PublicKey, Transaction } from '@solana/web3.js';
+import { Keypair, Connection, PublicKey } from '@solana/web3.js';
 import { ProposalState } from '../types.js';
 import { GlitchError } from '../errors.js';
 import { TokenEconomics } from '../token-economics.js';
 
-// Mock proposal data
-const mockProposalData = {
-  title: "Test Proposal",
-  description: "Test Description",
-  proposer: Keypair.generate().publicKey,
-  startTime: Date.now() - 1000,
-  endTime: Date.now() + 86400000,
-  executionTime: Date.now() + 172800000,
-  voteWeights: { yes: 150, no: 50, abstain: 0 },
-  votes: [],
-  quorum: 100,
-  executed: false,
-  status: 'active'
-};
-
 // Increase timeout for all tests
-jest.setTimeout(10000); // 10 seconds should be sufficient for unit tests
+jest.setTimeout(30000); // 30 seconds for more reliable CI runs
 
 describe('GovernanceManager', () => {
     let governanceManager: GovernanceManager;

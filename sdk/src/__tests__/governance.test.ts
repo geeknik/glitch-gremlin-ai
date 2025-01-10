@@ -5,7 +5,7 @@ import { Keypair, PublicKey } from '@solana/web3.js';
 describe('Governance', () => {
     let sdk: GlitchSDK;
     
-    beforeAll(() => {
+    beforeAll(async () => {
         // Create mock connection once for all tests
         const wallet = Keypair.generate();
         sdk = await GlitchSDK.init({

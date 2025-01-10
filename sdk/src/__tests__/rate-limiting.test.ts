@@ -270,14 +270,10 @@ import { Keypair } from '@solana/web3.js';
 import { GlitchError } from '../errors.js';
 import type { Redis } from 'ioredis';
 
-// Initialize SDK before all tests
-let sdk: GlitchSDK;
-
-// Increase timeout for all tests
-jest.setTimeout(30000);
-
 describe('Rate Limiting', () => {
     let sdk: GlitchSDK;
+    let mockIncr: jest.Mock;
+    let mockExpire: jest.Mock;
     let mockIncr: jest.Mock;
     let mockExpire: jest.Mock;
     
