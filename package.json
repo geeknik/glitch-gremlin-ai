@@ -2,6 +2,15 @@
   "name": "glitch-gremlin",
   "private": true,
   "type": "module",
+  "homepage": "https://glitchgremlin.ai",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/geeknik/glitch-gremlin-ai"
+  },
+  "bugs": {
+    "url": "https://github.com/geeknik/glitch-gremlin-ai/issues"
+  },
+  "docs": "https://ggai.gitbook.io/ggai-docs"
   "jest": {
     "transform": {
       "^.+\\.tsx?$": "ts-jest"
