@@ -80,6 +80,8 @@ export class GlitchSDK {
         };
         
         // Validate and set cluster URL
+        import path from 'path';
+        import fs from 'fs';
         // Load .env from root directory
         const envPath = path.join(__dirname, '../../../.env');
         if (fs.existsSync(envPath)) {

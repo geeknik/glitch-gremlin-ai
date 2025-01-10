@@ -1,8 +1,10 @@
 import { jest } from '@jest/globals';
+import path from 'path';
+import fs from 'fs';
 
 jest.setTimeout(10000);
 
-// Mock Helius API key for all tests
+// Mock environment variables
 process.env.HELIUS_API_KEY = 'test-key';
 
 // Mock Redis for all tests
@@ -11,6 +13,16 @@ jest.mock('ioredis', () => {
     incr: jest.fn().mockResolvedValue(1),
     expire: jest.fn().mockResolvedValue(1),
     get: jest.fn().mockResolvedValue(null),
-    set: jest.fn().mockResolvedValue('OK')
+    set: jest.fn().mockResolvedValue('OK'),
+    on: jest.fn()
   }));
 });
+
+// Mock path and fs
+jest.mock('path', () => ({
+  join: jest.fn().mockImplementation((...args) => args.join('/'))
+}));
+
+jest.mock('fs', () => ({
+  existsSync: jest.fn().mockReturnValue(true)
+}));
