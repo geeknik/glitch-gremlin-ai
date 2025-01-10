@@ -1,14 +1,14 @@
 [workspace]
 resolver = "2"
-
-[dependencies]
-bytemuck_derive = { version = "1.4.0", default-features = false }
 members = [
     "src/token/program",
     "src/token/worker", 
     "src/token/shared",
     "src/token/governance-worker"
 ]
+
+[dependencies]
+bytemuck_derive = { version = "1.4.0", default-features = false }
 
 [workspace.dependencies]
 borsh = "0.10.3"
