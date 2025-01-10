@@ -37,15 +37,11 @@ describe('Rate Limiting', () => {
     });
 
     afterEach(async () => {
-        // Restore original implementations
-        mockIncr.mockRestore();
-        mockExpire.mockRestore();
+        // Reset mocks
+        jest.clearAllMocks();
         
         // Restore real timers
         jest.useRealTimers();
-        
-        // Clear all mocks
-        jest.clearAllMocks();
         
         // Ensure Redis is properly closed
         if (sdk['queueWorker']?.redis) {

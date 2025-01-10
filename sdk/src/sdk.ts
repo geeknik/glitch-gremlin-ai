@@ -80,9 +80,6 @@ export class GlitchSDK {
         };
         
         // Validate and set cluster URL
-        const dotenv = require('dotenv');
-        dotenv.config();
-        
         const heliusApiKey = config.heliusApiKey || process.env.HELIUS_API_KEY;
         if (!heliusApiKey) {
             throw new Error('Helius API key is required. Please set HELIUS_API_KEY in .env');
