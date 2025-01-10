@@ -54,7 +54,7 @@ export class Fuzzer {
     }
 
     async analyzeFuzzResult(
-        result: any,
+        result: { error?: string },
         input: { instruction: number; data: Buffer }
     ): Promise<{
         type: VulnerabilityType | null;

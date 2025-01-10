@@ -66,9 +66,9 @@ export class GovernanceManager {
     }
 
     public async createProposalAccount(
-        connection: any,
-        wallet: any,
-        params: any
+        connection: Connection,
+        wallet: Keypair,
+        params: { votingPeriod: number }
     ): Promise<{ proposalAddress: PublicKey; tx: Transaction }> {
         const minPeriod = this.config.minVotingPeriod;
         const maxPeriod = this.config.maxVotingPeriod;
@@ -96,7 +96,7 @@ export class GovernanceManager {
         return { proposalAddress, tx };
     }
 
-    async getProposalState(connection: any, proposalAddress: PublicKey): Promise<ProposalState> {
+    async getProposalState(connection: Connection, proposalAddress: PublicKey): Promise<ProposalState> {
         const account = await connection.getAccountInfo(proposalAddress);
         if (!account) {
             throw new GlitchError('Proposal not found', 2002);
@@ -163,8 +163,8 @@ export class GovernanceManager {
     }
 
     async executeProposal(
-        connection: any,
-        wallet: any,
+        connection: Connection,
+        wallet: Keypair,
         proposalAddress: PublicKey
     ): Promise<Transaction> {
         const state = await this.getProposalState(connection, proposalAddress);

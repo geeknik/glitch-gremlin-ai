@@ -9,12 +9,12 @@ export class RedisQueueWorker {
     private readonly resultKey = 'glitch:chaos:results';
 
     constructor(redisClient?: RedisType) {
-        this.redis = redisClient || new (IORedis as any)({
+        this.redis = redisClient || new IORedis({
             host: 'r.glitchgremlin.ai',
             port: 6379,
             connectTimeout: 5000,
             maxRetriesPerRequest: 3,
-            retryStrategy: (times: number) => {
+            retryStrategy: (times: number): number => {
                 const delay = Math.min(times * 50, 2000);
                 return delay;
             },
@@ -22,8 +22,8 @@ export class RedisQueueWorker {
             lazyConnect: true
         });
 
-        this.redis.on('error', (err: Error) => {
-            console.error('Redis connection error:', err);
+        this.redis.on('error', (err: Error): void => {
+            console.error('Redis connection error:', err.message, err.stack);
         });
     }
 
@@ -37,7 +37,7 @@ export class RedisQueueWorker {
             }));
             return requestId;
         } catch (err) {
-            throw new GlitchError('Failed to enqueue request', 2003);
+            throw new GlitchError(`Failed to enqueue request: ${err instanceof Error ? err.message : 'Unknown error'}`, 2003);
         }
     }
 
