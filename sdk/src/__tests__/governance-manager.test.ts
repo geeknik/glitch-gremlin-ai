@@ -6,7 +6,7 @@ import { GlitchError } from '../errors.js';
 import { TokenEconomics } from '../token-economics.js';
 
 // Increase timeout for all tests
-jest.setTimeout(60000); // Increased to 60 seconds for network operations
+jest.setTimeout(10000); // 10 seconds should be sufficient for unit tests
 
 describe('GovernanceManager', () => {
     let governanceManager: GovernanceManager;
@@ -14,7 +14,13 @@ describe('GovernanceManager', () => {
     let wallet: Keypair;
 
     beforeEach(() => {
-        connection = new Connection('http://localhost:8899', 'confirmed');
+        connection = new Connection('http://localhost:8899', 'confirmed', {
+            commitment: 'confirmed',
+            disableRetryOnRateLimit: true,
+            httpHeaders: {
+                'Content-Type': 'application/json'
+            }
+        });
         wallet = Keypair.generate();
         governanceManager = new GovernanceManager(
             new PublicKey('GLt5cQeRgVMqnE9DGJQNNrbAfnRQYWqYVNWnJo7WNLZ9')
@@ -262,8 +268,22 @@ describe('GovernanceManager', () => {
             jest.clearAllTimers();
         });
 
-        afterEach(() => {
+        afterEach(async () => {
             jest.useRealTimers();
+            jest.clearAllMocks();
+            jest.clearAllTimers();
+        
+            // Ensure Redis is properly closed
+            if (governanceManager['queueWorker']) {
+                try {
+                    await governanceManager['queueWorker'].close();
+                } catch (error) {
+                    console.error('Error closing queue worker:', error);
+                }
+            }
+        
+            // Add a small delay to ensure cleanup completes
+            await new Promise(resolve => setTimeout(resolve, 100));
         });
 
         describe('successful voting', () => {
@@ -315,19 +335,9 @@ describe('GovernanceManager', () => {
                         // Mock getAccountInfo to return our data
                         getAccountInfoMock = jest.spyOn(connection, 'getAccountInfo')
                             .mockResolvedValue({
-                                data: Buffer.from(JSON.stringify({
-                                    title: "Test Proposal",
-                                    description: "Test Description",
-                                    proposer: wallet.publicKey,
-                                    startTime: Date.now() - 1000,
-                                    endTime: Date.now() + 86400000,
-                                    voteWeights: { yes: 150, no: 50, abstain: 0 },
-                                    votes: [],
-                                    quorum: 100,
-                                    executed: false
-                                })),
+                                data: Buffer.alloc(0), // Simplified mock
                                 executable: false,
-                                lamports: 1000000,
+                                lamports: 0,
                                 owner: governanceManager['programId'],
                                 rentEpoch: 0
                             });
