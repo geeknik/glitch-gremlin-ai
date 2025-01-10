@@ -55,6 +55,9 @@ export class TokenEconomics {
         duration: number,
         intensity: number
     ): number {
+        if (!this.DEFAULT_FEE_STRUCTURE.testTypeMultipliers[testType]) {
+            throw new GlitchError('Invalid test type', 3005);
+        }
         const structure = this.DEFAULT_FEE_STRUCTURE;
         const typeMultiplier = structure.testTypeMultipliers[testType] || 1.0;
         

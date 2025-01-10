@@ -80,14 +80,8 @@ export class GlitchSDK {
         };
         
         // Validate and set cluster URL
-        import path from 'path';
-        import fs from 'fs';
-        import dotenv from 'dotenv';
-        // Load .env from root directory
-        const envPath = path.join(__dirname, '../../../.env');
-        if (fs.existsSync(envPath)) {
-            dotenv.config({ path: envPath });
-        }
+        const dotenv = require('dotenv');
+        dotenv.config();
         
         const heliusApiKey = config.heliusApiKey || process.env.HELIUS_API_KEY;
         if (!heliusApiKey) {
