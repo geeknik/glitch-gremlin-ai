@@ -14,13 +14,12 @@ describe('GovernanceManager', () => {
     let wallet: Keypair;
 
     beforeEach(() => {
-        connection = new Connection('http://localhost:8899', 'confirmed', {
-            commitment: 'confirmed',
-            disableRetryOnRateLimit: true,
-            httpHeaders: {
-                'Content-Type': 'application/json'
-            }
-        });
+        connection = {
+            getAccountInfo: jest.fn(),
+            sendTransaction: jest.fn(),
+            simulateTransaction: jest.fn(),
+            getVersion: jest.fn().mockResolvedValue({ 'solana-core': '1.18.26' })
+        } as unknown as Connection;
         wallet = Keypair.generate();
         governanceManager = new GovernanceManager(
             new PublicKey('GLt5cQeRgVMqnE9DGJQNNrbAfnRQYWqYVNWnJo7WNLZ9')
