@@ -235,18 +235,24 @@ describe('GovernanceManager', () => {
         
 
     afterEach(async () => {
-        jest.useRealTimers();
+        // Reset all mocks
         jest.clearAllMocks();
-        jest.clearAllTimers();
         
-        // Ensure Redis is properly closed
-        if (governanceManager['queueWorker']) {
+        // Restore real timers
+        jest.useRealTimers();
+        
+        // Clean up Redis connection
+        if (governanceManager['queueWorker']?.redis) {
             try {
-                await governanceManager['queueWorker'].close();
+                await governanceManager['queueWorker'].redis.quit();
+                await governanceManager['queueWorker'].redis.disconnect();
             } catch (error) {
-                console.error('Error closing queue worker:', error);
+                console.error('Error closing Redis:', error);
             }
         }
+        
+        // Clear any pending timers
+        jest.clearAllTimers();
         
         // Add a small delay to ensure cleanup completes
         await new Promise(resolve => setTimeout(resolve, 100));

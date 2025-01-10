@@ -36,11 +36,29 @@ describe('Rate Limiting', () => {
         jest.clearAllMocks();
     });
 
-    afterEach(() => {
+    afterEach(async () => {
+        // Restore original implementations
         mockIncr.mockRestore();
         mockExpire.mockRestore();
+        
+        // Restore real timers
         jest.useRealTimers();
+        
+        // Clear all mocks
         jest.clearAllMocks();
+        
+        // Ensure Redis is properly closed
+        if (sdk['queueWorker']?.redis) {
+            try {
+                await sdk['queueWorker'].redis.quit();
+                await sdk['queueWorker'].redis.disconnect();
+            } catch (error) {
+                console.error('Error closing Redis:', error);
+            }
+        }
+        
+        // Add a small delay to ensure cleanup completes
+        await new Promise(resolve => setTimeout(resolve, 100));
     });
 
     describe('rate limiting', () => {
