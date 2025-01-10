@@ -279,19 +279,21 @@ describe('Rate Limiting', () => {
             wallet
         });
 
-        // Mock Redis methods
-        mockIncr = jest.fn().mockResolvedValue(1);
+        // Mock Redis methods globally
+        mockIncr = jest.fn().mockImplementation(async () => {
+            throw new GlitchError('Rate limit exceeded', 1007);
+        });
         mockExpire = jest.fn().mockResolvedValue(1);
         
-        mockRedis = {
+        const mockRedis = {
             incr: mockIncr,
             expire: mockExpire,
-            get: jest.fn().mockResolvedValue(null),
+            get: jest.fn().mockResolvedValue(Date.now().toString()),
             set: jest.fn().mockResolvedValue('OK'),
             quit: jest.fn().mockResolvedValue('OK'),
             disconnect: jest.fn().mockResolvedValue('OK')
-        } as unknown as Redis;
-
+        };
+        
         sdk['queueWorker']['redis'] = mockRedis;
     });
 
@@ -300,22 +302,9 @@ describe('Rate Limiting', () => {
         jest.clearAllMocks();
     });
 
-    afterEach(async () => {
+    afterEach(() => {
         jest.useRealTimers();
         jest.clearAllMocks();
-        
-        // Clean up Redis mocks
-        mockIncr.mockClear();
-        mockExpire.mockClear();
-        
-        // Ensure Redis connections are cleaned up
-        if (sdk['queueWorker']?.redis) {
-            await mockRedis.quit();
-            await mockRedis.disconnect();
-        }
-        
-        // Add a small delay to ensure cleanup
-        await new Promise(resolve => setTimeout(resolve, 100));
     });
 
     describe('rate limiting', () => {
