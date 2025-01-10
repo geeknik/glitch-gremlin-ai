@@ -4,17 +4,19 @@ export default {
   testMatch: ['**/__tests__/**/*.test.ts'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
-    '^(\\.{1,2}/.*)\\.js$': '$1'
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+    '^path$': require.resolve('path-browserify')
   },
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
       useESM: true,
-      tsconfig: 'tsconfig.esm.json'
+      tsconfig: 'tsconfig.esm.json',
+      isolatedModules: true
     }]
   },
   extensionsToTreatAsEsm: ['.ts'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
-  testTimeout: 10000,
+  testTimeout: 30000,
   verbose: true,
   detectOpenHandles: true,
   transformIgnorePatterns: [
@@ -27,5 +29,6 @@ export default {
       tsconfig: 'tsconfig.esm.json'
     }
   },
-  setupFiles: ['./src/__tests__/setup.ts']
+  setupFiles: ['./src/__tests__/setup.ts'],
+  setupFilesAfterEnv: ['./src/__tests__/setupAfterEnv.ts']
 };
