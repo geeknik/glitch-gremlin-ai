@@ -1,9 +1,14 @@
-# Glitch Gremlin AI Documentation
+# 👹 Glitch Gremlin AI - Embrace The Chaos!
 
 [![Tests](https://img.shields.io/badge/tests-24%20passed-brightgreen.svg)](./test-results.md)
+[![Documentation](https://img.shields.io/badge/docs-gitbook-blue)](https://ggai.gitbook.io/ggai-docs)
 
 ## Overview
-Glitch Gremlin AI provides Chaos-as-a-Service (CaaS) for Solana dApps through a combination of on-chain programs and off-chain AI testing capabilities.
+$GREMLINAI is more than just another memecoin - it's a revolutionary Chaos-as-a-Service (CaaS) platform that helps developers stress-test their Solana dApps through controlled chaos. Our AI-powered Glitch Gremlin creates unpredictable scenarios and simulates real-world attacks, helping you build more resilient applications.
+
+**Follow us to stay up to date:**
+- [X (Twitter)](https://x.com/glitchgremlinai)
+- [GitHub](https://github.com/geeknik/glitch-gremlin-ai)
 
 ## Quick Start
 ```typescript
