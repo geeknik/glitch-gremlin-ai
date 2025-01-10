@@ -5,7 +5,7 @@ export default {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^(\\.{1,2}/.*)\\.js$': '$1',
-    '^path$': require.resolve('path-browserify')
+    '^path$': 'path-browserify'
   },
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {

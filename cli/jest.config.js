@@ -18,7 +18,7 @@ module.exports = {
     ]
   },
   modulePaths: ['<rootDir>/../sdk/src'],
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+  setupFilesAfterEnv: [],
   globals: {
     'ts-jest': {
       useESM: true,
