@@ -38,7 +38,7 @@ describe('GovernanceManager', () => {
                         title: ''
                     }
                 )
-            ).rejects.toThrow('Invalid proposal parameters');
+            ).rejects.toThrow('Invalid voting period');
         });
 
         it('should handle insufficient voting power', async () => {

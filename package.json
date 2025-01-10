@@ -2,6 +2,17 @@
   "name": "glitch-gremlin",
   "private": true,
   "type": "module",
+  "jest": {
+    "transform": {
+      "^.+\\.tsx?$": "ts-jest"
+    },
+    "extensionsToTreatAsEsm": [".ts"],
+    "globals": {
+      "ts-jest": {
+        "useESM": true
+      }
+    }
+  },
   "workspaces": [
     "sdk",
     "cli"

@@ -1,4 +1,4 @@
-export default { 
+export default {
   preset: 'ts-jest',
   testEnvironment: 'node',
   testMatch: ['**/__tests__/**/*.test.ts'],
@@ -25,5 +25,6 @@ export default {
       useESM: true,
       isolatedModules: true
     }
-  }
+  },
+  setupFiles: ['./src/__tests__/setup.ts']
 };
