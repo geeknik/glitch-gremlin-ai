@@ -1,5 +1,5 @@
 [workspace]
-resolver = "2"
+resolver = "1"
 members = [
     "src/token/program",
     "src/token/worker", 

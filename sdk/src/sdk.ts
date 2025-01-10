@@ -106,7 +106,7 @@ export class GlitchSDK {
         
         // Use an obfuscated program ID if not specified
         this.programId = new PublicKey(
-            config.programId || 'GLt5cQeRgVMqnE9DGJQNNrbAfnRQYWqYVNWnJo7WNLZ9'
+            config.programId || process.env.PROGRAM_ID || 'GLt5cQeRgVMqnE9DGJQNNrbAfnRQYWqYVNWnJo7WNLZ9'
         );
 
         this.wallet = config.wallet;
