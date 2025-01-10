@@ -22,6 +22,7 @@
   "devDependencies": {
     "@opentelemetry/api": "^1.9.0",
     "@solana/web3.js": "^1.98.0",
+    "@tensorflow/tfjs-node": "^4.22.0",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.10.5",
     "@typescript-eslint/eslint-plugin": "^6.19.0",
@@ -49,12 +50,11 @@
   "dependencies": {
     "@glitch-gremlin/sdk": "^0.1.0",
     "@opentelemetry/exporter-prometheus": "^0.57.0",
-    "@reown/appkit": "^1.6.3",
-    "@reown/appkit-adapter-solana": "^1.6.3",
+    "@reown/appkit": "^1.6.0",
+    "@reown/appkit-adapter-solana": "^1.6.0",
     "@solana/spl-token": "^0.4.9",
     "@solana/wallet-adapter-vue": "^0.4.5",
     "@solana/wallet-adapter-wallets": "^0.19.32",
-    "@tensorflow/tfjs-node": "^4.22.0",
     "@tensorflow/tfjs-node-gpu": "^4.22.0",
     "buffer": "^6.0.3",
     "chalk": "^5.4.1",
