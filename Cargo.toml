@@ -1,17 +1,11 @@
-cargo-features = ["workspace-inheritance"]
-
 [workspace]
 resolver = "2"
 members = [
     "src/token/program",
-    "src/token/worker",
+    "src/token/worker", 
     "src/token/shared",
     "src/token/governance-worker"
 ]
-
-[workspace.package]
-version = "0.1.0"
-edition = "2021"
 
 [workspace.dependencies]
 borsh = "0.10.3"
