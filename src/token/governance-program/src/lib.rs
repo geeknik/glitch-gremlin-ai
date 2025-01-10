@@ -17,6 +17,9 @@ const MAX_PROPOSAL_DURATION: i64 = 604800; // 1 week
 const MIN_STAKE_AMOUNT: u64 = 1000; // Minimum tokens to stake
 const VOTE_QUORUM: u64 = 10; // Percentage of total stake required
 const EXECUTION_DELAY: i64 = 86400; // 1 day delay after vote passes
+const MAX_PROPOSALS_PER_USER: u64 = 3; // Max active proposals per user
+const MIN_TIME_BETWEEN_PROPOSALS: i64 = 3600; // 1 hour between proposals
+const MAX_VOTES_PER_USER: u64 = 1; // Only 1 vote per user per proposal
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
 pub struct GovernanceState {
@@ -26,6 +29,9 @@ pub struct GovernanceState {
     pub total_votes: u64,
     pub config: GovernanceConfig,
     pub is_initialized: bool,
+    pub user_proposal_counts: HashMap<Pubkey, u64>, // Track proposals per user
+    pub last_proposal_times: HashMap<Pubkey, i64>, // Track last proposal time per user
+    pub user_votes: HashMap<Pubkey, HashSet<Pubkey>>, // Track votes per user
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
@@ -46,7 +52,7 @@ impl IsInitialized for GovernanceState {
 }
 
 impl Pack for GovernanceState {
-    const LEN: usize = 8 + 8 + 8 + 8 + 1 + 8 + 8 + 8 + 8 + 8 + 32;
+    const LEN: usize = 8 + 8 + 8 + 8 + 1 + 8 + 8 + 8 + 8 + 8 + 32 + 1000; // Additional space for hash maps
     
     fn pack_into_slice(&self, dst: &mut [u8]) {
         let mut slice = dst;
@@ -125,6 +131,8 @@ pub struct Proposal {
     pub execution_time: Option<i64>,
     pub staked_amount: u64,
     pub voters: Vec<Pubkey>,
+    pub vote_weights: HashMap<Pubkey, u64>, // Track vote weights
+    pub total_voting_power: u64, // Total voting power for this proposal
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq)]
@@ -145,7 +153,7 @@ impl IsInitialized for Proposal {
 }
 
 impl Pack for Proposal {
-    const LEN: usize = 8 + 32 + 32 + 32 + 32 + 1 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 32 * 100; // Max 100 voters
+    const LEN: usize = 8 + 32 + 32 + 32 + 32 + 1 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 32 * 100 + 1000; // Additional space for vote weights
     
     fn pack_into_slice(&self, dst: &mut [u8]) {
         let mut slice = dst;
