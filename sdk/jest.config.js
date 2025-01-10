@@ -1,33 +1,26 @@
+/** @type {import('jest').Config} */
 export default {
-  preset: 'ts-jest',
-  testEnvironment: 'node',
-  testMatch: ['**/__tests__/**/*.test.ts'],
-  moduleNameMapper: {
+extensionsToTreatAsEsm: ['.ts', '.tsx'],
+moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^(\\.{1,2}/.*)\\.js$': '$1'
-  },
-  transform: {
-    '^.+\\.tsx?$': ['ts-jest', {
-      useESM: true,
-      tsconfig: 'tsconfig.esm.json',
-      isolatedModules: true
+},
+transform: {
+    '^.+\\.(ts|tsx)$': ['ts-jest', {
+    useESM: true,
+    tsconfig: 'tsconfig.esm.json',
+    isolatedModules: true
     }]
-  },
-  extensionsToTreatAsEsm: ['.ts'],
-  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
-  testTimeout: 30000,
-  verbose: true,
-  detectOpenHandles: true,
-  transformIgnorePatterns: [
+},
+testEnvironment: 'node',
+testMatch: ['**/__tests__/**/*.test.ts'],
+moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
+testTimeout: 30000,
+verbose: true,
+detectOpenHandles: true,
+transformIgnorePatterns: [
     'node_modules/(?!(?:@solana|ioredis)/)'
-  ],
-  globals: {
-    'ts-jest': {
-      useESM: true,
-      isolatedModules: true,
-      tsconfig: 'tsconfig.esm.json'
-    }
-  },
-  setupFiles: ['./src/__tests__/setup.ts'],
-  setupFilesAfterEnv: ['./src/__tests__/setupAfterEnv.ts']
+],
+setupFiles: ['./src/__tests__/setup.ts'],
+setupFilesAfterEnv: ['./src/__tests__/setupAfterEnv.ts']
 };

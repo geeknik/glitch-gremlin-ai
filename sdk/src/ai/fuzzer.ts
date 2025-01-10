@@ -6,7 +6,7 @@ export class Fuzzer {
     
     constructor(private readonly maxIterations: number = 1000) {}
 
-    async generateFuzzInputs(programId: string | PublicKey): Promise<Array<{
+    async generateFuzzInputs(_programId: string | PublicKey): Promise<Array<{
         instruction: number;
         data: Buffer;
         probability: number;

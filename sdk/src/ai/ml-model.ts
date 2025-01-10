@@ -1,8 +1,7 @@
 import * as tf from '@tensorflow/tfjs-node';
 import { VulnerabilityType } from '../types.js';
 import { mkdirSync, existsSync } from 'fs';
-import { join } from 'path';
-
+import { mkdirSync, existsSync } from 'fs';
 export class VulnerabilityDetectionModel {
     private initialized: boolean = false;
     private model: tf.LayersModel;
@@ -108,7 +107,7 @@ export class VulnerabilityDetectionModel {
         };
     }
 
-    private analyzePrediction(features: number[], confidence: number): string {
+    private analyzePrediction(features: number[], _confidence: number): string {
         const patterns = [];
         
         // Analyze feature patterns

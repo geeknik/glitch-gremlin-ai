@@ -112,37 +112,33 @@ export class GovernanceManager {
         support: boolean,
         weight?: number
     ): Promise<Transaction> {
-        try {
-            const metadata = await this.validateProposal(connection, proposalAddress);
-            
-            // Check if wallet has already voted
-            const hasVoted = metadata.votes.some(v => v.voter.equals(wallet.publicKey));
-            if (hasVoted) {
-                throw new GlitchError('Already voted on this proposal', 2004);
-            }
+        const metadata = await this.validateProposal(connection, proposalAddress);
 
-            // Calculate vote weight if not provided
-            const voteWeight = weight || 1000; // Default weight for tests
-        
-            const voteData = Buffer.from([
-                0x01, // Vote instruction
-                support ? 0x01 : 0x00,
-                ...new Uint8Array(new Float64Array([voteWeight]).buffer)
-            ]);
-
-            const voteIx = new TransactionInstruction({
-                keys: [
-                    { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
-                    { pubkey: proposalAddress, isSigner: false, isWritable: true }
-                ],
-                programId: this.programId,
-                data: voteData
-            });
-
-            return new Transaction().add(voteIx);
-        } catch (error) {
-            throw error;
+        // Check if wallet has already voted
+        const hasVoted = metadata.votes.some(v => v.voter.equals(wallet.publicKey));
+        if (hasVoted) {
+            throw new GlitchError('Already voted on this proposal', 2004);
         }
+
+        // Calculate vote weight if not provided
+        const voteWeight = weight || 1000; // Default weight for tests
+
+        const voteData = Buffer.from([
+            0x01, // Vote instruction
+            support ? 0x01 : 0x00,
+            ...new Uint8Array(new Float64Array([voteWeight]).buffer)
+        ]);
+
+        const voteIx = new TransactionInstruction({
+            keys: [
+                { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
+                { pubkey: proposalAddress, isSigner: false, isWritable: true }
+            ],
+            programId: this.programId,
+            data: voteData
+        });
+
+        return new Transaction().add(voteIx);
     }
 
     private async calculateVoteWeight(

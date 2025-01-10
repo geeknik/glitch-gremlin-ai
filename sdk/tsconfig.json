@@ -1,25 +1,26 @@
 {
-  "compilerOptions": {
+"compilerOptions": {
+    "target": "ES2020",
+    "module": "ES2020",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
     "declaration": true,
     "declarationMap": true,
-    "emitDeclarationOnly": false,
-    "declarationDir": "./dist/types",
-    "outDir": "./dist",
+    "sourceMap": true,
+    "outDir": "./dist/esm",
     "rootDir": "./src",
-    "composite": true,
-    "module": "NodeNext",
-    "target": "ES2020",
-    "moduleResolution": "NodeNext",
-    "esModuleInterop": true,
     "strict": true,
-    "forceConsistentCasingInFileNames": true,
-    "skipLibCheck": true,
     "allowJs": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
+    "isolatedModules": true,
+    "types": ["jest", "node"],
     "paths": {
-      "@solana/*": ["./node_modules/@solana/*"]
+    "@/*": ["./src/*"],
+    "@solana/*": ["./node_modules/@solana/*"]
     }
-  },
-  "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist"]
+},
+"include": ["src/**/*", "src/__tests__/**/*"],
+"exclude": ["node_modules", "dist"]
 }

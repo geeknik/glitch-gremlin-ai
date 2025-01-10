@@ -220,7 +220,7 @@ export class GlitchSDK {
         });
 
         // Send transaction
-        const transaction = new Transaction().add(instruction);
+        new Transaction().add(instruction);
         
         // TODO: Implement actual transaction sending
         const requestId = 'mock-request-id';
@@ -245,7 +245,7 @@ export class GlitchSDK {
     }
 
     async getRequestStatus(requestId: string): Promise<ChaosResult> {
-        const instruction = new TransactionInstruction({
+        new TransactionInstruction({
             keys: [
                 // Add account metas
             ],
@@ -272,7 +272,7 @@ export class GlitchSDK {
         };
     }
 
-    async cancelRequest(requestId: string): Promise<void> {
+    async cancelRequest(_requestId: string): Promise<void> {
         const instruction = new TransactionInstruction({
             keys: [
                 // Add account metas
@@ -316,40 +316,30 @@ export class GlitchSDK {
 
         const transaction = new Transaction().add(instruction);
         
-        try {
-            const balance = await this.connection.getBalance(this.wallet.publicKey);
-            if (balance < params.stakingAmount) {
-                throw new GlitchError('Insufficient stake amount', 1008);
-            }
-            // Simulate the transaction first
-            await this.connection.simulateTransaction(transaction, [this.wallet]);
-                
-            // If simulation succeeds, send the actual transaction
-            const signature = await this.connection.sendTransaction(transaction, [this.wallet]);
-                
-            return {
-                id: 'proposal-' + signature.slice(0, 8),
-                signature,
-                title: params.title,
-                description: params.description,
-                status: 'draft',
-                votes: {
-                    yes: 0,
-                    no: 0,
-                    abstain: 0
-                },
-                endTime: Date.now() + ((this.governanceConfig?.votingPeriod || 259200) * 1000)
-            };
-        } catch (error) {
-            throw error;
+        const balance = await this.connection.getBalance(this.wallet.publicKey);
+        if (balance < params.stakingAmount) {
+            throw new GlitchError('Insufficient stake amount', 1008);
         }
+        // Simulate the transaction first
+        await this.connection.simulateTransaction(transaction, [this.wallet]);
+            
+        // If simulation succeeds, send the actual transaction
+        return {
+            id: 'proposal-' + signature.slice(0, 8),
+            signature,
+            title: params.title,
+            description: params.description,
+            status: 'draft',
+            votes: {
+                yes: 0,
+                no: 0,
+                abstain: 0
+            },
+            endTime: Date.now() + ((this.governanceConfig?.votingPeriod || 259200) * 1000)
+        };
     }
 
-    async vote(proposalId: string, support: boolean): Promise<string> {
-        // Mock balance for testing
-        const mockBalance = 2000; // Enough to vote
-
-        // Then check token balance
+    public async vote(proposalId: string, support: boolean): Promise<string> {
         const balance = await this.connection.getBalance(this.wallet.publicKey);
         if (balance < 1000) { // Minimum balance required to vote
             throw new GlitchError('Insufficient token balance to vote', 1009);
@@ -381,7 +371,7 @@ export class GlitchSDK {
         }
     }
 
-    async stakeTokens(amount: number, lockupPeriod: number): Promise<string> {
+    public async stakeTokens(amount: number, lockupPeriod: number): Promise<string> {
         TokenEconomics.validateStakeAmount(amount);
 
         if (lockupPeriod < this.MIN_STAKE_LOCKUP || lockupPeriod > this.MAX_STAKE_LOCKUP) {
@@ -410,7 +400,7 @@ export class GlitchSDK {
         return await this.connection.sendTransaction(transaction, [this.wallet]);
     }
 
-    async unstakeTokens(stakeId: string): Promise<string> {
+    public async unstakeTokens(stakeId: string): Promise<string> {
         const stakeInfo = await this.getStakeInfo(stakeId);
         if (!stakeInfo) {
             throw new GlitchError('Stake not found', 1015);
@@ -432,7 +422,7 @@ export class GlitchSDK {
         return await this.connection.sendTransaction(transaction, [this.wallet]);
     }
 
-    async getStakeInfo(stakeId: string): Promise<{
+    public async getStakeInfo(stakeId: string): Promise<{
         amount: bigint;
         lockupPeriod: bigint;
         startTime: bigint;
@@ -464,7 +454,7 @@ export class GlitchSDK {
         }
     }
 
-    async executeProposal(proposalId: string): Promise<{
+    public async executeProposal(proposalId: string): Promise<{
         signature: string;
         executedAt: number;
         results?: ChaosResult;
@@ -517,7 +507,7 @@ export class GlitchSDK {
         };
     }
 
-    async calculateChaosRequestFee(params: Omit<ChaosRequestParams, 'targetProgram'>): Promise<number> {
+    public async calculateChaosRequestFee(params: Omit<ChaosRequestParams, 'targetProgram'>): Promise<number> {
         TokenEconomics.validateTestParameters(params.duration, params.intensity);
         return TokenEconomics.calculateTestFee(
             params.testType,

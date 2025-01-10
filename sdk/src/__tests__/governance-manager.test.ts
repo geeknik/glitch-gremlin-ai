@@ -300,7 +300,6 @@ describe('GovernanceManager', () => {
                     let simulateTransactionMock: any;
                     let sendTransactionMock: any;
                     let proposalAddress: PublicKey;
-            
                     beforeEach(() => {
                         jest.resetAllMocks();
                         proposalAddress = new PublicKey(Keypair.generate().publicKey);
@@ -323,13 +322,6 @@ describe('GovernanceManager', () => {
                                 };
 
                                 // Get account info as part of validation
-                                const mockAccountInfo = {
-                                    data: Buffer.from(JSON.stringify(mockProposalData)),
-                                    executable: false,
-                                    lamports: 1000000,
-                                    owner: governanceManager['programId'],
-                                    rentEpoch: 0
-                                };
                                 
                                 // Call the mock through connection.getAccountInfo
                                 await connection.getAccountInfo(proposalAddress);

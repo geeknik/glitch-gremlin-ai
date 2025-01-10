@@ -1,6 +1,8 @@
 import { jest } from '@jest/globals';
 import { GlitchSDK, TestType } from '../index.js'; 
 import { Keypair } from '@solana/web3.js';
+import { Redis } from 'ioredis';
+import { GlitchError } from '../errors.js';
 
 // Increase timeout for all tests
 jest.setTimeout(30000);
@@ -15,15 +17,28 @@ describe('GlitchSDK', () => {
             wallet
         });
 
-        // Enhanced Redis mock with rate limiting
-        const requestCount = { count: 0 };
-        sdk['queueWorker']['redis'] = {
+        // Redis mock setup with rate limiting
+        const mockRequestCount = { value: 0 };
+        const mockRedisClient = {
             incr: jest.fn().mockImplementation(async () => {
-                requestCount.count++;
-                if (requestCount.count > 1) {
+                mockRequestCount.value++;
+                if (mockRequestCount.value > 1) {
                     throw new GlitchError('Rate limit exceeded');
                 }
-                return requestCount.count;
+                return mockRequestCount.value;
+            }),
+                if (mockRequestCount.value > 1) {
+                    throw new GlitchError('Rate limit exceeded');
+                }
+                return mockRequestCount.value;
+            const mockRequestCount = { value: 0 };
+            sdk['queueWorker']['redis'] = {
+            incr: jest.fn().mockImplementation(async () => {
+                requestCount++;
+                if (requestCount > 1) {
+                    throw new GlitchError('Rate limit exceeded');
+                }
+                return requestCount;
             }),
             expire: jest.fn().mockResolvedValue(1),
             get: jest.fn().mockResolvedValue(null),
@@ -58,13 +73,7 @@ describe('GlitchSDK', () => {
                 const queue = this.queue || [];
                 return queue.length > 0 ? queue.shift() : null;
             }),
-            lpush: jest.fn().mockImplementation(async function(key, value) {
-                if (!this.queue) {
-                    this.queue = [];
-                }
-                this.queue.push(value);
-                return 1;
-            })
+            lpush: jest.fn().mockResolvedValue(1)
         } as unknown as Redis;
 
         // Mock Solana connection methods
@@ -85,10 +94,10 @@ describe('GlitchSDK', () => {
     afterEach(async () => {
         if (sdk) {
             await sdk['queueWorker'].close();
-            // Connection cleanup not needed
-            jest.clearAllTimers();
-            jest.clearAllMocks();
         }
+        mockRequestCount.value = 0;
+        jest.clearAllTimers();
+        jest.clearAllMocks();
     });
 
     afterAll(async () => {
@@ -238,7 +247,7 @@ describe('GlitchSDK', () => {
                     duration: 60,
                     intensity: 1
                 });
-                expect(requestCount.count).toBe(1);
+                expect(requestCount).toBe(1);
 
                 // Immediate second request should fail
                 await expect(sdk.createChaosRequest({
@@ -247,7 +256,7 @@ describe('GlitchSDK', () => {
                     duration: 60,
                     intensity: 1
                 })).rejects.toThrow('Rate limit exceeded');
-                expect(requestCount.count).toBe(1);
+                expect(requestCount).toBe(1);
 
                 // After waiting, request should succeed
                 jest.advanceTimersByTime(2000);
@@ -257,7 +266,7 @@ describe('GlitchSDK', () => {
                     duration: 60,
                     intensity: 1
                 });
-                expect(requestCount.count).toBe(2);
+                expect(requestCount).toBe(2);
             });
 
             it('should enforce rate limits for parallel requests', async () => {

@@ -158,7 +158,7 @@ describe('Governance', () => {
 
     describe('proposal execution', () => {
         it('should only execute passed proposals', async () => {
-            const mockGetAccountInfo = jest.spyOn(sdk['connection'], 'getAccountInfo')
+            const _mockGetAccountInfo = jest.spyOn(sdk['connection'], 'getAccountInfo')
                 .mockResolvedValueOnce({
                     data: Buffer.from('{"status":"failed"}'),
                     executable: false,
@@ -176,7 +176,7 @@ describe('Governance', () => {
             const now = 1641024000000; // Fixed timestamp
             jest.spyOn(Date, 'now').mockImplementation(() => now);
 
-            const mockGetAccountInfo = jest.spyOn(sdk['connection'], 'getAccountInfo')
+            const _mockGetAccountInfo = jest.spyOn(sdk['connection'], 'getAccountInfo')
                 .mockResolvedValueOnce({
                     data: Buffer.from(JSON.stringify({
                         status: 'active',
@@ -229,7 +229,7 @@ describe('Governance', () => {
         });
 
         it('should check quorum requirements', async () => {
-            const mockGetAccountInfo = jest.spyOn(sdk['connection'], 'getAccountInfo')
+            const _mockGetAccountInfo = jest.spyOn(sdk['connection'], 'getAccountInfo')
                 .mockResolvedValueOnce({
                     data: Buffer.from(JSON.stringify({
                         status: 'active',

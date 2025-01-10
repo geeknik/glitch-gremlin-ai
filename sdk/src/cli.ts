@@ -11,13 +11,28 @@ program
   .version(pkg.version)
   .command('create-chaos-request')
   .description('Create a chaos request')
-  .action(async () => {
-    const sdk = await GlitchSDK.init({
-        cluster: 'devnet',
-        wallet: Keypair.generate()
-    });
-    // Add chaos request creation logic
-  });
+.action(async () => {
+    try {
+        const sdk = await GlitchSDK.init({
+            cluster: 'devnet', 
+            wallet: Keypair.generate()
+        });
+        await sdk.createChaosRequest({
+            targetProgram: program.targetProgram,
+            testType: TestType.FUZZ,
+            duration: program.duration || 60,
+            intensity: program.intensity || 1
+        });
+        console.log('Chaos request created successfully');
+    } catch (error) {
+        if (error instanceof GlitchError) {
+            console.error(`Failed to create chaos request: ${error.message}`);
+            process.exit(1);
+        }
+        console.error('Unexpected error:', error);
+        process.exit(1);
+    }
+});
 
 program
   .command('version')
