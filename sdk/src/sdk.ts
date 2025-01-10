@@ -80,8 +80,9 @@ export class GlitchSDK {
         };
         
         // Validate and set cluster URL
-        import path from 'path';
-        import fs from 'fs';
+        const path = require('path');
+        const fs = require('fs');
+        const dotenv = require('dotenv');
         // Load .env from root directory
         const envPath = path.join(__dirname, '../../../.env');
         if (fs.existsSync(envPath)) {
@@ -184,7 +185,7 @@ export class GlitchSDK {
         }
     }
 
-    async createChaosRequest(_params: ChaosRequestParams): Promise<{
+    async createChaosRequest(params: ChaosRequestParams): Promise<{
         requestId: string;
         waitForCompletion: () => Promise<ChaosResult>;
     }> {
