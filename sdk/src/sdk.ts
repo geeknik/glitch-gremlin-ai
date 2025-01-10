@@ -80,12 +80,19 @@ export class GlitchSDK {
         };
         
         // Validate and set cluster URL
-        const heliusApiKey = config.heliusApiKey || process.env.HELIUS_API_KEY;
-        if (!heliusApiKey) {
-            throw new Error('Helius API key is required');
+        // Load .env from root directory
+        const envPath = path.join(__dirname, '../../../.env');
+        if (fs.existsSync(envPath)) {
+            dotenv.config({ path: envPath });
         }
         
-        const clusterUrl = config.cluster || `https://mainnet.helius-rpc.com/?api-key=${heliusApiKey}`;
+        const heliusApiKey = config.heliusApiKey || process.env.HELIUS_API_KEY;
+        if (!heliusApiKey) {
+            throw new Error('Helius API key is required. Please set HELIUS_API_KEY in .env');
+        }
+        
+        const clusterUrl = config.cluster || 
+            `https://mainnet.helius-rpc.com/?api-key=${heliusApiKey}`;
         this.connection = new Connection(clusterUrl, {
             commitment: 'confirmed',
             disableRetryOnRateLimit: false,
