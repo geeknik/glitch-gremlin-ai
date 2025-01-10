@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { GlitchSDK, TestType } from '../index.js';
 import { Keypair, PublicKey } from '@solana/web3.js';
 
