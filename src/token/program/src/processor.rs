@@ -252,7 +252,27 @@ impl Processor {
         accounts: &[AccountInfo],
         amount: u64,
         params: Vec<u8>,
+        rate_limit: RateLimitConfig,
     ) -> ProgramResult {
+        // Validate rate limits
+        let clock = Clock::get()?;
+        let rate_limit_info = RateLimitInfo::try_from_slice(&accounts[3].data.borrow())?;
+        
+        // Check minimum interval
+        if clock.unix_timestamp - rate_limit_info.last_request < rate_limit.min_interval {
+            return Err(GlitchError::RateLimitExceeded.into());
+        }
+        
+        // Check window limits
+        if clock.unix_timestamp - rate_limit_info.window_start < rate_limit.window_duration {
+            if rate_limit_info.request_count >= rate_limit.max_requests {
+                return Err(GlitchError::RateLimitExceeded.into());
+            }
+        } else {
+            // Reset window
+            rate_limit_info.window_start = clock.unix_timestamp;
+            rate_limit_info.request_count = 0;
+        }
         let account_info_iter = &mut accounts.iter();
         let chaos_request_info = next_account_info(account_info_iter)?;
         let token_account_info = next_account_info(account_info_iter)?;

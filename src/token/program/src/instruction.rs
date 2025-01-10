@@ -18,11 +18,14 @@ pub enum GlitchInstruction {
     /// 1. `[writable]` The chaos request account
     /// 2. `[writable]` The token account to debit
     /// 3. `[signer]` The request owner
+    /// 4. `[]` The rate limit account
     InitializeChaosRequest {
         /// Amount of tokens to lock
         amount: u64,
         /// Parameters for the chaos test
         params: Vec<u8>,
+        /// Rate limit configuration
+        rate_limit: RateLimitConfig,
     },
 
     /// Finalize a chaos request

@@ -59,6 +59,16 @@ pub struct RateLimitInfo {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
+pub struct RateLimitConfig {
+    /// Maximum requests per window
+    pub max_requests: u32,
+    /// Window duration in seconds
+    pub window_duration: i64,
+    /// Minimum time between requests in seconds
+    pub min_interval: i64,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug)]
 pub struct GovernanceProposal {
     /// Unique proposal ID
     pub id: u64,
