@@ -17,7 +17,7 @@ module.exports = {
     ]
   },
   modulePaths: ['<rootDir>/../sdk/src'],
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.mjs'],
   globals: {
     'ts-jest': {
       diagnostics: {

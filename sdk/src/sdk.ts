@@ -80,9 +80,9 @@ export class GlitchSDK {
         };
         
         // Validate and set cluster URL
-        const path = require('path');
-        const fs = require('fs');
-        const dotenv = require('dotenv');
+        import path from 'path';
+        import fs from 'fs';
+        import dotenv from 'dotenv';
         // Load .env from root directory
         const envPath = path.join(__dirname, '../../../.env');
         if (fs.existsSync(envPath)) {
