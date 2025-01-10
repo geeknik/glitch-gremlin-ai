@@ -1,6 +1,4 @@
 import { jest } from '@jest/globals';
-import path from 'path';
-import fs from 'fs';
 
 jest.setTimeout(10000);
 
@@ -17,12 +15,3 @@ jest.mock('ioredis', () => {
     on: jest.fn()
   }));
 });
-
-// Mock path and fs
-jest.mock('path', () => ({
-  join: jest.fn().mockImplementation((...args) => args.join('/'))
-}));
-
-jest.mock('fs', () => ({
-  existsSync: jest.fn().mockReturnValue(true)
-}));
