@@ -10,7 +10,7 @@
   "bugs": {
     "url": "https://github.com/geeknik/glitch-gremlin-ai/issues"
   },
-  "docs": "https://ggai.gitbook.io/ggai-docs"
+  "docs": "https://ggai.gitbook.io/ggai-docs",
   "jest": {
     "transform": {
       "^.+\\.tsx?$": "ts-jest"
