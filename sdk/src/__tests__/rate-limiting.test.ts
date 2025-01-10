@@ -274,8 +274,6 @@ describe('Rate Limiting', () => {
     let sdk: GlitchSDK;
     let mockIncr: jest.Mock;
     let mockExpire: jest.Mock;
-    let mockIncr: jest.Mock;
-    let mockExpire: jest.Mock;
     
     beforeAll(async () => {
         const wallet = Keypair.generate();
