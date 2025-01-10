@@ -5,7 +5,7 @@ import {
     Transaction,
     TransactionInstruction
 } from '@solana/web3.js';
-import { Redis } from 'ioredis';
+import Redis from 'ioredis';
 import { TokenEconomics } from './token-economics.js';
 import { GovernanceConfig, ChaosRequestParams, ChaosResult, TestType, ProposalParams } from './types.js';
 import { GovernanceManager } from './governance.js';
