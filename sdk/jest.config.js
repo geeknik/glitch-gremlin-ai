@@ -1,5 +1,5 @@
 export default {
-  preset: 'ts-jest/presets/default-esm',
+  preset: 'ts-jest',
   testEnvironment: 'node',
   testMatch: ['**/__tests__/**/*.test.ts'],
   moduleNameMapper: {

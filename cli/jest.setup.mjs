@@ -1,3 +1,5 @@
+import { jest } from '@jest/globals';
+
 export default () => {
   jest.setTimeout(30000);
   process.env.SOLANA_CLUSTER = 'https://api.devnet.solana.com';

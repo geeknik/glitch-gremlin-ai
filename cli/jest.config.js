@@ -11,15 +11,17 @@ module.exports = {
     '^.+\\.tsx?$': [
       'ts-jest',
       {
+        useESM: true,
         tsconfig: 'tsconfig.json',
         isolatedModules: true
       }
     ]
   },
   modulePaths: ['<rootDir>/../sdk/src'],
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.mjs'],
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   globals: {
     'ts-jest': {
+      useESM: true,
       diagnostics: {
         ignoreCodes: [1343]
       }
@@ -27,5 +29,6 @@ module.exports = {
   },
   transformIgnorePatterns: [
     'node_modules/(?!(.*\\.mjs$|@solana/web3\\.js))'
-  ]
+  ],
+  extensionsToTreatAsEsm: ['.ts']
 };
