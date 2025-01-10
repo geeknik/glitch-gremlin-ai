@@ -13,13 +13,17 @@ use std::convert::TryInto;
 
 // Governance parameters
 const MIN_PROPOSAL_DURATION: i64 = 86400; // 1 day
-const MAX_PROPOSAL_DURATION: i64 = 604800; // 1 week
+const MAX_PROPOSAL_DURATION: i64 = 604800; // 1 week 
 const MIN_STAKE_AMOUNT: u64 = 1000; // Minimum tokens to stake
 const VOTE_QUORUM: u64 = 10; // Percentage of total stake required
 const EXECUTION_DELAY: i64 = 86400; // 1 day delay after vote passes
 const MAX_PROPOSALS_PER_USER: u64 = 3; // Max active proposals per user
 const MIN_TIME_BETWEEN_PROPOSALS: i64 = 3600; // 1 hour between proposals
 const MAX_VOTES_PER_USER: u64 = 1; // Only 1 vote per user per proposal
+const MAX_PROPOSAL_TITLE_LENGTH: usize = 100; // Max proposal title length
+const MAX_PROPOSAL_DESC_LENGTH: usize = 1000; // Max proposal description length
+const MAX_PROPOSAL_PARAMS_SIZE: usize = 1024; // Max proposal params size in bytes
+const MAX_ACTIVE_PROPOSALS: u64 = 100; // Max active proposals system-wide
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
 pub struct GovernanceState {
@@ -32,6 +36,17 @@ pub struct GovernanceState {
     pub user_proposal_counts: HashMap<Pubkey, u64>, // Track proposals per user
     pub last_proposal_times: HashMap<Pubkey, i64>, // Track last proposal time per user
     pub user_votes: HashMap<Pubkey, HashSet<Pubkey>>, // Track votes per user
+    pub active_proposal_ids: Vec<Pubkey>, // Track active proposals
+    pub proposal_metadata: HashMap<Pubkey, ProposalMetadata>, // Additional proposal metadata
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug)]
+pub struct ProposalMetadata {
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub version: u8,
+    pub ipfs_cid: String, // IPFS CID for additional proposal data
+    pub audit_logs: Vec<String>, // Audit trail of proposal changes
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
@@ -52,7 +67,7 @@ impl IsInitialized for GovernanceState {
 }
 
 impl Pack for GovernanceState {
-    const LEN: usize = 8 + 8 + 8 + 8 + 1 + 8 + 8 + 8 + 8 + 8 + 32 + 1000; // Additional space for hash maps
+    const LEN: usize = 8 + 8 + 8 + 8 + 1 + 8 + 8 + 8 + 8 + 8 + 32 + 2000; // Increased space for additional metadata
     
     fn pack_into_slice(&self, dst: &mut [u8]) {
         let mut slice = dst;
