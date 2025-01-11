@@ -1,30 +1,69 @@
-import { jest } from '@jest/globals';
+import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { GovernanceManager } from '../governance.js';
-import { Keypair, Connection, PublicKey } from '@solana/web3.js';
+import { 
+Keypair, 
+Connection, 
+PublicKey,
+Transaction,
+SimulatedTransactionResponse,
+Version
+} from '@solana/web3.js';
 import { ProposalState } from '../types.js';
 import { GlitchError } from '../errors.js';
 import { TokenEconomics } from '../token-economics.js';
-
-// Increase timeout for all tests
 jest.setTimeout(30000); // 30 seconds for more reliable CI runs
 
 describe('GovernanceManager', () => {
     let governanceManager: GovernanceManager;
-    let connection: Connection;
+    let connection: jest.MockedObject<Connection>;
     let wallet: Keypair;
+    let governanceManager: GovernanceManager;
 
     beforeEach(() => {
+        // Initialize mocks
         connection = {
             getAccountInfo: jest.fn(),
             sendTransaction: jest.fn(),
             simulateTransaction: jest.fn(),
-            getVersion: jest.fn().mockResolvedValue({ 'solana-core': '1.18.26' })
-        } as unknown as Connection;
+            getVersion: jest.fn(),
+            commitment: 'confirmed',
+            rpcEndpoint: 'http://localhost:8899'
+        } as unknown as jest.MockedObject<Connection>;
+
+        // Configure default mock implementations
+        (connection.getAccountInfo as jest.Mock).mockResolvedValue({
+            data: Buffer.from(JSON.stringify({
+                state: ProposalState.Active,
+                votingPower: 1000,
+                proposer: Keypair.generate().publicKey.toBase58()
+            })),
+            executable: false,
+            lamports: 1000000,
+            owner: new PublicKey('GLt5cQeRgVMqnE9DGJQNNrbAfnRQYWqYVNWnJo7WNLZ9'),
+            rentEpoch: 0
+        });
+
+        (connection.sendTransaction as jest.Mock<Promise<string>>).mockResolvedValue('mock-signature');
+        (connection.simulateTransaction as jest.Mock<Promise<SimulatedTransactionResponse>>).mockResolvedValue({
+            context: { slot: 0 },
+            value: { 
+                err: null,
+                logs: [],
+                accounts: null,
+                unitsConsumed: 0,
+                returnData: null
+            }
+        });
+        (connection.getVersion as jest.Mock<Promise<any>>).mockResolvedValue({ 'solana-core': '1.18.26' });
+        
         wallet = Keypair.generate();
         governanceManager = new GovernanceManager(
             new PublicKey('GLt5cQeRgVMqnE9DGJQNNrbAfnRQYWqYVNWnJo7WNLZ9')
         );
-    });
+        
+        // Reset all mocks before each test
+        jest.clearAllMocks();
+        });
 
     describe('proposal lifecycle', () => {
         it('should validate proposal parameters', async () => {
@@ -33,9 +72,7 @@ describe('GovernanceManager', () => {
                     connection,
                     wallet,
                     {
-                        votingPeriod: 0, // Invalid
-                        description: '',
-                        title: ''
+                        votingPeriod: 0 // Invalid
                     }
                 )
             ).rejects.toThrow('Invalid voting period');
@@ -44,9 +81,24 @@ describe('GovernanceManager', () => {
         it('should handle insufficient voting power', async () => {
             const proposalAddress = new PublicKey(Keypair.generate().publicKey);
             
+            // Mock account info to return valid proposal
+            jest.spyOn(connection, 'getAccountInfo')
+                .mockResolvedValueOnce({
+                    data: Buffer.from(JSON.stringify({
+                        state: ProposalState.Active,
+                        votingPower: 1000,
+                        proposer: wallet.publicKey.toBase58()
+                    })),
+                    executable: false,
+                    lamports: 1000000,
+                    owner: governanceManager['programId'],
+                    rentEpoch: 0
+                });
+            
+            // Mock insufficient voting power check
             jest.spyOn(TokenEconomics, 'validateStakeAmount')
                 .mockImplementation(() => {
-                    throw new GlitchError('Insufficient voting power');
+                    throw new GlitchError('Insufficient voting power', 2001);
                 });
 
             await expect(
@@ -57,6 +109,9 @@ describe('GovernanceManager', () => {
                     true
                 )
             ).rejects.toThrow('Insufficient voting power');
+            
+            expect(TokenEconomics.validateStakeAmount).toHaveBeenCalled();
+            expect(connection.getAccountInfo).toHaveBeenCalledWith(proposalAddress);
         });
 
         it('should handle proposal execution errors', async () => {
@@ -84,9 +139,7 @@ describe('GovernanceManager', () => {
                 connection,
                 wallet,
                 {
-                    votingPeriod: 259200,
-                    description: 'Test proposal',
-                    title: 'Test Title'
+                    votingPeriod: 259200
                 }
             );
             expect(proposalAddress).toBeDefined();
@@ -116,9 +169,7 @@ describe('GovernanceManager', () => {
                     connection,
                     wallet,
                     {
-                        votingPeriod: 3600, // Too short
-                        description: 'Test proposal',
-                        title: ''
+                        votingPeriod: 3600 // Too short
                     }
                 )
             ).rejects.toThrow('Invalid proposal parameters');
@@ -208,9 +259,7 @@ describe('GovernanceManager', () => {
                     connection,
                     wallet,
                     {
-                        votingPeriod: 259200,
-                        description: 'Test proposal',
-                        title: 'Test Title'
+                        votingPeriod: 259200
                     }
                 )
             ).rejects.toThrow('Connection failed');
@@ -234,37 +283,44 @@ describe('GovernanceManager', () => {
     });
         
 
-    afterEach(async () => {
-        // Reset all mocks
+    afterEach(() => {
         jest.clearAllMocks();
-        
-        // Restore real timers
-        jest.useRealTimers();
-        
-        // Clean up Redis connection
-        if (governanceManager['queueWorker']?.redis) {
-            try {
-                await governanceManager['queueWorker'].redis.quit();
-                await governanceManager['queueWorker'].redis.disconnect();
-            } catch (error) {
-                console.error('Error closing Redis:', error);
-            }
-        }
-        
-        // Clear any pending timers
+        jest.useRealTimers(); 
         jest.clearAllTimers();
-        
-        // Add a small delay to ensure cleanup completes
-        await new Promise(resolve => setTimeout(resolve, 100));
     });
-
     describe('castVote', () => {
+        let proposalAddress: PublicKey;
+        let mockProposalData: any;
+        
         beforeEach(() => {
             jest.clearAllMocks();
             jest.clearAllTimers();
-            // Use fake timers but allow process.nextTick
+            
+            // Use fake timers but allow nextTick
             jest.useFakeTimers({ doNotFake: ['nextTick'] });
             jest.setSystemTime(1641024000000); // Fixed timestamp
+            
+            // Setup mock proposal data
+            proposalAddress = new PublicKey(Keypair.generate().publicKey);
+            mockProposalData = {
+                state: ProposalState.Active,
+                votingPower: 1000,
+                votes: [],
+                proposer: wallet.publicKey.toBase58(),
+                startTime: 1641024000000,
+                endTime: 1641024000000 + 86400000,
+                quorum: 100
+            };
+            
+            // Setup default account info mock
+            jest.spyOn(connection, 'getAccountInfo')
+                .mockResolvedValue({
+                    data: Buffer.from(JSON.stringify(mockProposalData)),
+                    executable: false,
+                    lamports: 1000000,
+                    owner: governanceManager['programId'],
+                    rentEpoch: 0
+                });
         });
 
         afterEach(() => {
@@ -273,23 +329,6 @@ describe('GovernanceManager', () => {
             jest.clearAllTimers();
         });
 
-        afterEach(async () => {
-            jest.useRealTimers();
-            jest.clearAllMocks();
-            jest.clearAllTimers();
-        
-            // Ensure Redis is properly closed
-            if (governanceManager['queueWorker']) {
-                try {
-                    await governanceManager['queueWorker'].close();
-                } catch (error) {
-                    console.error('Error closing queue worker:', error);
-                }
-            }
-        
-            // Add a small delay to ensure cleanup completes
-            await new Promise(resolve => setTimeout(resolve, 100));
-        });
 
         describe('successful voting', () => {
             describe('voting scenarios', () => {

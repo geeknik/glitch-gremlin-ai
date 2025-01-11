@@ -1,3 +1,4 @@
+import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import { GlitchSDK } from '../sdk.js';
 import { Keypair } from '@solana/web3.js';
 import { InsufficientFundsError } from '../errors.js';

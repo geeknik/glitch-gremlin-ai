@@ -10,6 +10,23 @@ export interface RedisClient {
     disconnect(): Promise<void>;
 }
 
+export interface MockRedisClient extends RedisClient {
+    queue?: string[];
+    connected?: boolean;
+    incr: jest.Mock<Promise<number>, [string]>;
+    expire: jest.Mock<Promise<number>, [string, number]>;
+    get: jest.Mock<Promise<string | null>, [string]>;
+    set: jest.Mock<Promise<'OK'>, [string, string]>;
+    flushall: jest.Mock<Promise<'OK'>, []>;
+    quit: jest.Mock<Promise<'OK'>, []>;
+    disconnect: jest.Mock<Promise<void>, []>;
+    on: jest.Mock<void, [string, () => void]>;
+    hset: jest.Mock<Promise<number>, [string, string, string]>;
+    hget: jest.Mock<Promise<string | null>, [string, string]>;
+    lpush: jest.Mock<Promise<number>, [string, string]>;
+    rpop: jest.Mock<Promise<string | null>, [string]>;
+}
+
 export enum VulnerabilityType {
     Reentrancy = 'reentrancy',
     ArithmeticOverflow = 'arithmetic-overflow',

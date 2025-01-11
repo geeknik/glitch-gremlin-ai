@@ -1,4 +1,4 @@
-import { TokenEconomics } from '../token-economics.js';
+import { TokenEconomics, TestType } from '../token-economics.js';
 
 describe('TokenEconomics', () => {
     describe('fee calculation', () => {
@@ -8,39 +8,39 @@ describe('TokenEconomics', () => {
         });
 
         it('should calculate fees for all test types', () => {
-            const types = ['FUZZ', 'LOAD', 'EXPLOIT', 'CONCURRENCY'];
+            const types = [TestType.FUZZ, TestType.LOAD, TestType.EXPLOIT, TestType.CONCURRENCY];
             types.forEach(type => {
-                const fee = TokenEconomics.calculateTestFee(type as TestType, 300, 5);
+                const fee = TokenEconomics.calculateTestFee(type, 300, 5);
                 expect(fee).toBeGreaterThan(0);
             });
         });
 
         it('should handle edge case parameters', () => {
-            const minFee = TokenEconomics.calculateTestFee('FUZZ', 60, 1);
-            const maxFee = TokenEconomics.calculateTestFee('EXPLOIT', 3600, 10);
+            const minFee = TokenEconomics.calculateTestFee(TestType.FUZZ, 60, 1);
+            const maxFee = TokenEconomics.calculateTestFee(TestType.EXPLOIT, 3600, 10);
             expect(minFee).toBeLessThan(maxFee);
         });
         it('should calculate base fees correctly', () => {
-            const fee = TokenEconomics.calculateTestFee('FUZZ', 300, 5);
+            const fee = TokenEconomics.calculateTestFee(TestType.FUZZ, 300, 5);
             expect(fee).toBeGreaterThan(0);
             expect(typeof fee).toBe('number');
         });
 
         it('should scale fees with test type', () => {
-            const fuzzFee = TokenEconomics.calculateTestFee('FUZZ', 300, 5);
-            const exploitFee = TokenEconomics.calculateTestFee('EXPLOIT', 300, 5);
+            const fuzzFee = TokenEconomics.calculateTestFee(TestType.FUZZ, 300, 5);
+            const exploitFee = TokenEconomics.calculateTestFee(TestType.EXPLOIT, 300, 5);
             expect(exploitFee).toBeGreaterThan(fuzzFee);
         });
 
         it('should scale fees with duration', () => {
-            const shortTest = TokenEconomics.calculateTestFee('FUZZ', 300, 5);
-            const longTest = TokenEconomics.calculateTestFee('FUZZ', 600, 5);
+            const shortTest = TokenEconomics.calculateTestFee(TestType.FUZZ, 300, 5);
+            const longTest = TokenEconomics.calculateTestFee(TestType.FUZZ, 600, 5);
             expect(longTest).toBeGreaterThan(shortTest);
         });
 
         it('should scale fees with intensity', () => {
-            const lowIntensity = TokenEconomics.calculateTestFee('FUZZ', 300, 2);
-            const highIntensity = TokenEconomics.calculateTestFee('FUZZ', 300, 8);
+            const lowIntensity = TokenEconomics.calculateTestFee(TestType.FUZZ, 300, 2);
+            const highIntensity = TokenEconomics.calculateTestFee(TestType.FUZZ, 300, 8);
             expect(highIntensity).toBeGreaterThan(lowIntensity);
         });
     });

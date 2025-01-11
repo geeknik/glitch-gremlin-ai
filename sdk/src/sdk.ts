@@ -10,7 +10,7 @@ import { TokenEconomics } from './token-economics.js';
 import { GovernanceConfig, ChaosRequestParams, ChaosResult, TestType, ProposalParams } from './types.js';
 import { GovernanceManager } from './governance.js';
 import { RedisQueueWorker } from './queue/redis-worker.js';
-import { GlitchError, InsufficientFundsError, InvalidProgramError } from './errors.js';
+import { GlitchError, InsufficientFundsError, InvalidProgramError, ErrorCode } from './errors.js';
 
 /**
  * GlitchSDK provides the main interface for interacting with the Glitch Gremlin AI platform.
@@ -141,7 +141,7 @@ export class GlitchSDK {
         this.initialized = true;
     }
 
-    private async checkRateLimit() {
+    private async checkRateLimit(): Promise<void> {
         const now = Date.now();
         const timeSinceLastRequest = now - this.lastRequestTime;
         
@@ -227,7 +227,7 @@ export class GlitchSDK {
 
         return {
             requestId,
-            waitForCompletion: async () => {
+            waitForCompletion: async (): Promise<ChaosResult> => {
                 // Poll for completion
                 return {
                     requestId,
@@ -320,23 +320,33 @@ export class GlitchSDK {
         if (balance < params.stakingAmount) {
             throw new GlitchError('Insufficient stake amount', 1008);
         }
-        // Simulate the transaction first
-        await this.connection.simulateTransaction(transaction, [this.wallet]);
+
+        try {
+            // Simulate the transaction first
+            await this.connection.simulateTransaction(transaction, [this.wallet]);
             
-        // If simulation succeeds, send the actual transaction
-        return {
-            id: 'proposal-' + signature.slice(0, 8),
-            signature,
-            title: params.title,
-            description: params.description,
-            status: 'draft',
-            votes: {
-                yes: 0,
-                no: 0,
-                abstain: 0
-            },
-            endTime: Date.now() + ((this.governanceConfig?.votingPeriod || 259200) * 1000)
-        };
+            // If simulation succeeds, send the actual transaction
+            const signature = await this.connection.sendTransaction(transaction, [this.wallet]);
+
+            return {
+                id: 'proposal-' + signature.slice(0, 8),
+                signature,
+                title: params.title,
+                description: params.description,
+                status: 'draft',
+                votes: {
+                    yes: 0,
+                    no: 0,
+                    abstain: 0
+                },
+                endTime: Date.now() + ((this.governanceConfig?.votingPeriod || 259200) * 1000)
+            };
+        } catch (error) {
+            if (error instanceof Error) {
+                throw new GlitchError('Failed to create proposal: ' + error.message, 1008);
+            }
+            throw error;
+        }
     }
 
     public async vote(proposalId: string, support: boolean): Promise<string> {
@@ -473,7 +483,7 @@ export class GlitchSDK {
 
         const passThreshold = metadata.voteWeights.yes > metadata.voteWeights.no;
         if (!passThreshold) {
-            throw new GlitchError('Proposal did not pass', 1013);
+            throw new GlitchError('Proposal did not pass', ErrorCode.PROPOSAL_REJECTED);
         }
 
         // For test proposals, skip timelock check
@@ -522,7 +532,7 @@ export class GlitchSDK {
                 new PublicKey(proposalId + '-vote-' + this.wallet.publicKey.toString())
             );
             return voteAccount !== null;
-        } catch (error) {
+        } catch {
             return false;
         }
     }

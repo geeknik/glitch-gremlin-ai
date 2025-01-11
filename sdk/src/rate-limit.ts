@@ -7,7 +7,7 @@ export async function incrementUsage(redis: Redis, key: string): Promise<number>
     return count;
 }
 
-export function checkThreshold(count: number, limit: number) {
+export function checkThreshold(count: number, limit: number): void {
     if (count > limit) {
         throw new GlitchError('Rate limit exceeded', 1007);
     }

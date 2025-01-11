@@ -2,102 +2,87 @@ import { jest } from '@jest/globals';
 import { GlitchSDK, TestType } from '../index.js'; 
 import { Keypair } from '@solana/web3.js';
 import { Redis } from 'ioredis';
-import { GlitchError } from '../errors.js';
+import { GlitchError, ErrorCode } from '../errors.js';
+import type { MockRedisClient } from '../types';
+import { SimulatedTransactionResponse } from '@solana/web3.js';
 
-// Increase timeout for all tests
 jest.setTimeout(30000);
+
+let mockRequestCount = { value: 0 };
 
 describe('GlitchSDK', () => {
     let sdk: GlitchSDK;
+    let mockRedisClient: MockRedisClient;
     
     beforeEach(async () => {
-        const wallet = Keypair.generate();
-        sdk = await GlitchSDK.init({
-            cluster: 'https://api.devnet.solana.com',
-            wallet
-        });
-
-        // Redis mock setup with rate limiting
-        const mockRequestCount = { value: 0 };
-        const mockRedisClient = {
-            incr: jest.fn().mockImplementation(async () => {
-                mockRequestCount.value++;
-                if (mockRequestCount.value > 1) {
-                    throw new GlitchError('Rate limit exceeded');
+        // Set up Redis mock client
+        // Set up Redis mock client
+        mockRedisClient = {
+            queue: [],
+            incr: jest.fn<Promise<number>, [string]>().mockImplementation(
+                async (key: string): Promise<number> => {
+                    mockRequestCount.value++; 
+                    if (mockRequestCount.value > 1) {
+                        throw new GlitchError('Rate limit exceeded', ErrorCode.RATE_LIMIT_EXCEEDED);
+                    }
+                    return mockRequestCount.value;
                 }
-                return mockRequestCount.value;
-            }),
-                if (mockRequestCount.value > 1) {
-                    throw new GlitchError('Rate limit exceeded');
+            ),
+            expire: jest.fn<Promise<number>, [string, number]>().mockResolvedValue(1),
+            get: jest.fn<Promise<string | null>, [string]>().mockResolvedValue(null),
+            set: jest.fn<Promise<'OK'>, [string, string]>().mockResolvedValue('OK'),
+            on: jest.fn<void, [string, () => void]>(),
+            quit: jest.fn<Promise<'OK'>, []>().mockResolvedValue('OK'),
+            disconnect: jest.fn<Promise<void>, []>().mockResolvedValue(undefined),
+            flushall: jest.fn<Promise<'OK'>, []>().mockResolvedValue('OK'),
+            hset: jest.fn<Promise<number>, [string, string, string]>()
+                .mockImplementation(async (key: string, field: string, value: string): Promise<number> => {
+                    if (typeof value !== 'string') {
+                        throw new GlitchError('Invalid JSON', ErrorCode.INVALID_JSON);
+                    }
+                    return 1;
+                }),
+            hget: jest.fn<Promise<string | null>, [string, string]>()
+                .mockImplementation(async (key: string, field: string): Promise<string | null> => {
+                    if (field === 'bad-result') {
+                        throw new GlitchError('Invalid JSON', ErrorCode.INVALID_JSON);
+                    }
+                    return JSON.stringify({test: 'data'});
+                }),
+            lpush: jest.fn<Promise<number>, [string, string]>()
+                .mockImplementation(async (key: string, value: string): Promise<number> => {
+                    if (value === 'invalid-json') {
+                        throw new GlitchError('Invalid JSON', ErrorCode.INVALID_JSON);
+                    }
+                    return 1;
+                }),
+            rpop: jest.fn<Promise<string | null>, [string]>()
+                .mockImplementation(async function(this: MockRedisClient, key: string): Promise<string | null> {
+                    if (key === 'empty-queue') {
+                        return null;
+                    }
+                    return this.queue?.length ? this.queue.shift() ?? null : null;
+                })
+        };
+                    accounts: null,
+                    unitsConsumed: 0,
+                    returnData: null
                 }
-                return mockRequestCount.value;
-            const mockRequestCount = { value: 0 };
-            sdk['queueWorker']['redis'] = {
-            incr: jest.fn().mockImplementation(async () => {
-                requestCount++;
-                if (requestCount > 1) {
-                    throw new GlitchError('Rate limit exceeded');
-                }
-                return requestCount;
-            }),
-            expire: jest.fn().mockResolvedValue(1),
-            get: jest.fn().mockResolvedValue(null),
-            set: jest.fn().mockResolvedValue('OK'),
-            on: jest.fn(),
-            quit: jest.fn().mockResolvedValue('OK'),
-            disconnect: jest.fn().mockResolvedValue('OK'),
-            flushall: jest.fn().mockResolvedValue('OK'),
-            hset: jest.fn().mockImplementation(async (key, field, value) => {
-                if (typeof value !== 'string') {
-                    throw new SyntaxError('Invalid JSON');
-                }
-                return 1;
-            }),
-            hget: jest.fn().mockImplementation(async (key, field) => {
-                if (field === 'bad-result') {
-                    throw new SyntaxError('Invalid JSON');
-                }
-                return JSON.stringify({test: 'data'});
-            }),
-            lpush: jest.fn().mockImplementation(async (key, value) => {
-                if (value === 'invalid-json') {
-                    throw new SyntaxError('Invalid JSON');
-                }
-                return 1;
-            }),
-            rpop: jest.fn().mockImplementation(async function(key) {
-                if (key === 'empty-queue') {
-                    return null;
-                }
-                // Return the actual queued data
-                const queue = this.queue || [];
-                return queue.length > 0 ? queue.shift() : null;
-            }),
-            lpush: jest.fn().mockResolvedValue(1)
-        } as unknown as Redis;
-
-        // Mock Solana connection methods
-        jest.spyOn(sdk['connection'], 'getBalance').mockResolvedValue(1_000_000_000);
-        jest.spyOn(sdk['connection'], 'sendTransaction').mockResolvedValue('mock-tx-signature');
-        jest.spyOn(sdk['connection'], 'simulateTransaction').mockResolvedValue({
-            context: { slot: 0 },
-            value: { 
-                err: null,
-                logs: [],
-                accounts: null,
-                unitsConsumed: 0,
-                returnData: null
-            }
-        });
+            }));
     });
 
     afterEach(async () => {
-        if (sdk) {
-            await sdk['queueWorker'].close();
+        try {
+            if (sdk?.['queueWorker']?.close) {
+                await sdk['queueWorker'].close();
+            }
+            mockRequestCount.value = 0;
+            await mockRedisClient.flushall();
+            jest.clearAllMocks();
+            jest.clearAllTimers();
+        } catch (err) {
+            console.error('Error during cleanup:', err);
         }
-        mockRequestCount.value = 0;
-        jest.clearAllTimers();
-        jest.clearAllMocks();
     });
 
     afterAll(async () => {
@@ -231,13 +216,13 @@ describe('GlitchSDK', () => {
                 // Track request count
                 let callCount = 0;
         
+                // Track request count
+                let callCount = 0;
+        
                 // Mock incr to enforce rate limit
-                sdk['queueWorker']['redis'].incr.mockImplementation(async function() {
+                mockRedisClient.incr.mockImplementation(async () => {
                     callCount++;
                     if (callCount > 1) {
-                        throw new GlitchError('Rate limit exceeded');
-                    }
-                    return callCount;
                 });
 
                 // First request should succeed
@@ -247,7 +232,7 @@ describe('GlitchSDK', () => {
                     duration: 60,
                     intensity: 1
                 });
-                expect(requestCount).toBe(1);
+                expect(mockRequestCount.value).toBe(1);
 
                 // Immediate second request should fail
                 await expect(sdk.createChaosRequest({
@@ -256,7 +241,7 @@ describe('GlitchSDK', () => {
                     duration: 60,
                     intensity: 1
                 })).rejects.toThrow('Rate limit exceeded');
-                expect(requestCount).toBe(1);
+                expect(mockRequestCount.value).toBe(1);
 
                 // After waiting, request should succeed
                 jest.advanceTimersByTime(2000);
@@ -266,7 +251,7 @@ describe('GlitchSDK', () => {
                     duration: 60,
                     intensity: 1
                 });
-                expect(requestCount).toBe(2);
+                expect(mockRequestCount.value).toBe(2);
             });
 
             it('should enforce rate limits for parallel requests', async () => {
@@ -278,21 +263,20 @@ describe('GlitchSDK', () => {
                     intensity: 1
                 }));
 
-                let requestCount = 0;
+                let localRequestCount = { value: 0 };
                 sdk['queueWorker']['redis'].incr.mockImplementation(async function() {
-                    requestCount++;
-                    if (requestCount > 1) {
-                        throw new GlitchError('Rate limit exceeded');
+                    localRequestCount.value++;
+                    if (localRequestCount.value > 1) {
+                        throw new GlitchError('Rate limit exceeded', ErrorCode.RATE_LIMIT_EXCEEDED);
                     }
-                    return requestCount;
+                    return localRequestCount.value;
                 });
-
                 // Mock incr to enforce parallel rate limit
                 let parallelCount = 0;
                 sdk['queueWorker']['redis'].incr.mockImplementation(async function() {
                     parallelCount++;
                     if (parallelCount > 1) {
-                        throw new GlitchError('Rate limit exceeded');
+                        throw new GlitchError('Rate limit exceeded', ErrorCode.RATE_LIMIT_EXCEEDED);
                     }
                     return parallelCount;
                 });

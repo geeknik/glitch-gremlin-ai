@@ -1,7 +1,7 @@
 import { jest } from '@jest/globals';
 import { GlitchSDK, TestType } from '../index.js';
 import { Keypair } from '@solana/web3.js';
-import { GlitchError } from '../errors.js';
+import { GlitchError, ErrorCode } from '../errors.js';
 import type { Redis } from 'ioredis';
 
 // Increase timeout for all tests
@@ -94,7 +94,7 @@ describe('Rate Limiting', () => {
             mockIncr.mockImplementation(async () => {
                 requestCount++;
                 if (requestCount > 1) {
-                    throw new GlitchError('Rate limit exceeded');
+                    throw new GlitchError('Rate limit exceeded', ErrorCode.RATE_LIMIT_EXCEEDED);
                 }
                 return requestCount;
             });
@@ -135,7 +135,7 @@ describe('Rate Limiting', () => {
                 mockIncr.mockImplementation(() => {
                     proposalCount++;
                     if (proposalCount > 1) {
-                        return Promise.reject(new GlitchError('Rate limit exceeded', 1007));
+                        return Promise.reject(new GlitchError('Rate limit exceeded', ErrorCode.RATE_LIMIT_EXCEEDED));
                     }
                     return Promise.resolve(1);
                 });

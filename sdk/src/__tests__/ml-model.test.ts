@@ -1,3 +1,4 @@
+import { jest, describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from '@jest/globals';
 import { VulnerabilityDetectionModel, VulnerabilityType } from '../ai/vulnerability-detection.js';
 import * as tf from '@tensorflow/tfjs-node';
 

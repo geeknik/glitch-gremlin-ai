@@ -1,7 +1,6 @@
 import * as tf from '@tensorflow/tfjs-node';
 import { VulnerabilityType } from '../types.js';
 import { mkdirSync, existsSync } from 'fs';
-import { mkdirSync, existsSync } from 'fs';
 export class VulnerabilityDetectionModel {
     private initialized: boolean = false;
     private model: tf.LayersModel;
@@ -10,7 +9,7 @@ export class VulnerabilityDetectionModel {
         this.model = this.buildModel();
     }
 
-    public async ensureInitialized() {
+    public async ensureInitialized(): Promise<void> {
         if (!this.initialized) {
             await tf.ready();
             await tf.setBackend('cpu');
@@ -19,7 +18,7 @@ export class VulnerabilityDetectionModel {
         }
     }
 
-    public async cleanup() {
+    public async cleanup(): Promise<void> {
         tf.dispose();
         this.initialized = false;
     }
@@ -67,7 +66,7 @@ export class VulnerabilityDetectionModel {
             batchSize: 32,
             validationSplit: 0.2,
             callbacks: {
-                onEpochEnd: (epoch: number, logs?: tf.Logs) => {
+                onEpochEnd: (epoch: number, logs?: {loss: number; accuracy: number}) => {
                     if (logs?.loss) {
                         console.log(`Epoch ${epoch}: loss = ${logs.loss.toFixed(4)}`);
                     }
@@ -107,8 +106,11 @@ export class VulnerabilityDetectionModel {
         };
     }
 
-    private analyzePrediction(features: number[], _confidence: number): string {
-        const patterns = [];
+    private analyzePrediction(features: number[], confidence: number): string {
+        const patterns = []; 
+        
+        // Use confidence in analysis
+        if (confidence > 0.9) patterns.push('High confidence prediction');
         
         // Analyze feature patterns
         if (features[0] > 0.8) patterns.push('High transaction volume');

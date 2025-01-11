@@ -52,7 +52,7 @@ describe('Fuzzer', () => {
         });
 
         it('should handle clean results', async () => {
-            const result = { success: true };
+            const result = { error: undefined };
             const input = {
                 instruction: 3,
                 data: Buffer.from([0, 0, 0, 0])

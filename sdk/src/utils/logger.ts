@@ -8,11 +8,11 @@ export class Logger extends EventEmitter {
         this.name = name;
     }
 
-    info(message: string) {
+    info(message: string): void {
         console.log(`[${this.name}] INFO: ${message}`);
     }
 
-    error(message: string) {
+    error(message: string): void {
         console.error(`[${this.name}] ERROR: ${message}`);
     }
 }
