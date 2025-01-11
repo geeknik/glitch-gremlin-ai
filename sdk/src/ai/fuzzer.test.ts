@@ -4,7 +4,7 @@ import { VulnerabilityType } from '../types';
 
 describe('Fuzzer', () => {
   let fuzzer: Fuzzer;
-  const testProgramId = new PublicKey('TestProgram111111111111111111111111111111111111');
+  const testProgramId = new PublicKey('11111111111111111111111111111111'); // Use valid base58 public key
 
   beforeEach(() => {
     fuzzer = new Fuzzer();
