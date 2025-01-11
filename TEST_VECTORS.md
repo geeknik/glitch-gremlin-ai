@@ -37,12 +37,20 @@
 - Voting with valid tokens
 - Proposal execution on approval
 - Vote tally accuracy
+- Staking tokens for governance power
+- Delegating voting power
+- Claiming staking rewards
+- Early unstake with penalty
 
 ### 3.2 Invalid Governance Operations
 - Proposal with insufficient stake
 - Double voting attempt
 - Voting after deadline
 - Unauthorized proposal execution
+- Invalid staking parameters
+- Delegation to invalid address
+- Early unstake without penalty
+- Reward claim before lockup period
 
 ## 4. Edge Cases
 

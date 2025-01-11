@@ -49,6 +49,8 @@ The GlitchGremlinProgram is a Solana program that provides Chaos-as-a-Service (C
 - Maximum request duration: 3600 seconds
 - Minimum time between requests: 2 seconds
 - Maximum concurrent requests: 10 per user
+- Governance proposals: 1 per day per user
+- Voting cooldown: 1 hour between votes
 
 ### 3.3 Access Control
 - ChaosRequest creation: Any verified user

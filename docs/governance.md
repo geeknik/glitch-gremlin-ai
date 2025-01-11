@@ -3,7 +3,15 @@
 ## Overview
 The Glitch Gremlin governance system allows token holders to participate in decision-making through a democratic process. Holders can stake tokens, create proposals, vote, and earn rewards for participation.
 
-## Governance Worker Integration
+## Governance Smart Contract Details
+
+### Key Components
+- ProposalManager: Handles proposal lifecycle
+- VoteTracker: Manages voting and tallying
+- StakingPool: Handles token staking and rewards
+- DelegationManager: Manages voting power delegation
+
+### Governance Worker Integration
 The governance worker processes proposals and voting in real-time. To integrate:
 
 ```typescript
