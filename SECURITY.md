@@ -29,6 +29,13 @@ This security policy applies to:
 
 ## Security Best Practices
 
+### Deployment Security
+- Use multisig for all privileged operations
+- Verify all program accounts before deployment
+- Test thoroughly on devnet before mainnet
+- Monitor deployment process closely
+- Keep deployment keys secure
+
 ### For Users
 - Always verify the smart contract address before interacting
 - Use official channels for downloads and updates

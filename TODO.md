@@ -13,6 +13,8 @@
   - [x] Prepare audit readiness documentation
   - [x] Schedule audit with reputable firm
   - [x] Implement multisig for critical functions
+  - [x] Finalize deployment scripts
+  - [x] Set up mainnet configuration
 
 ## Immediate Action Items (Next 2 Weeks)
 - [ ] Security Audit Preparation
