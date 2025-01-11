@@ -12,11 +12,19 @@ Total tests: 24 passing across 5 test suites
 - Governance Integration ✓
 - Chaos Request Flow ✓
 
-### AI Engine Tests (4 tests)
+### AI Engine Tests (12 tests)
 - ML Model Training ✓
 - Vulnerability Detection ✓
 - Pattern Recognition ✓
 - Confidence Scoring ✓
+- Performance Prediction ✓
+- Anomaly Detection ✓
+- Exploit Pattern Matching ✓
+- Fuzz Optimization ✓
+- Model Update Verification ✓
+- Feature Extraction ✓
+- Adversarial Resistance ✓
+- Edge Case Handling ✓
 
 ### Worker Tests (4 tests)
 - Queue Processing ✓
