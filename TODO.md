@@ -50,6 +50,9 @@
     - [x] Staking mechanism
     - [x] Proposal creation/voting
     - [x] Treasury management
+    - [x] Delegation system
+    - [x] Reward distribution
+    - [x] Edge case handling
 
 ## High Priority
 - [x] Test Coverage
