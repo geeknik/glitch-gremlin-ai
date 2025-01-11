@@ -65,13 +65,7 @@ export class VulnerabilityDetectionModel {
             epochs: 50,
             batchSize: 32,
             validationSplit: 0.2,
-            callbacks: {
-                onEpochEnd: (epoch: number, logs?: {loss: number; accuracy: number}) => {
-                    if (logs?.loss) {
-                        console.log(`Epoch ${epoch}: loss = ${logs.loss.toFixed(4)}`);
-                    }
-                }
-            }
+            callbacks: tf.node.tensorBoard('./logs') // Use built-in TensorBoard callback
         });
 
         xs.dispose();
