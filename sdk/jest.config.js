@@ -12,7 +12,7 @@ export default {
         }]
     },
     testEnvironment: 'jest-environment-node',
-    testMatch: ['**/__tests__/**/*.test.ts'],
+    testMatch: ['**/*.test.ts'],
     moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
     testTimeout: 30000,
     verbose: true,

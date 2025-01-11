@@ -21,7 +21,7 @@
     "build:cjs": "tsc -p tsconfig.cjs.json",
     "build": "npm run build:esm && npm run build:cjs",
     "clean": "rm -rf dist",
-    "test": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --maxWorkers=4 --detectOpenHandles",
+    "test": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --maxWorkers=4 --detectOpenHandles --passWithNoTests",
     "test:ci": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --maxWorkers=4 --runInBand --detectOpenHandles --ci --reporters=default --reporters=jest-junit",
     "test:security": "npm audit --production --audit-level=moderate && snyk test",
     "lint": "eslint 'src/**/*.{ts,tsx}' --fix",
