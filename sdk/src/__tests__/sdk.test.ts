@@ -64,11 +64,6 @@ describe('GlitchSDK', () => {
                     return this.queue?.length ? this.queue.shift() ?? null : null;
                 })
         };
-                    accounts: null,
-                    unitsConsumed: 0,
-                    returnData: null
-                }
-            }));
     });
 
     afterEach(async () => {
@@ -223,6 +218,9 @@ describe('GlitchSDK', () => {
                 mockRedisClient.incr.mockImplementation(async () => {
                     callCount++;
                     if (callCount > 1) {
+                        throw new GlitchError('Rate limit exceeded', ErrorCode.RATE_LIMIT_EXCEEDED);
+                    }
+                    return callCount;
                 });
 
                 // First request should succeed

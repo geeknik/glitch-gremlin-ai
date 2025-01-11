@@ -17,7 +17,6 @@ describe('GovernanceManager', () => {
     let governanceManager: GovernanceManager;
     let connection: jest.MockedObject<Connection>;
     let wallet: Keypair;
-    let governanceManager: GovernanceManager;
 
     beforeEach(() => {
         // Initialize mocks
@@ -31,7 +30,7 @@ describe('GovernanceManager', () => {
         } as unknown as jest.MockedObject<Connection>;
 
         // Configure default mock implementations
-        (connection.getAccountInfo as jest.Mock).mockResolvedValue({
+        (connection.getAccountInfo as jest.Mock<Promise<AccountInfo<Buffer> | null>>).mockResolvedValue({
             data: Buffer.from(JSON.stringify({
                 state: ProposalState.Active,
                 votingPower: 1000,
@@ -43,8 +42,8 @@ describe('GovernanceManager', () => {
             rentEpoch: 0
         });
 
-        (connection.sendTransaction as jest.Mock<Promise<string>>).mockResolvedValue('mock-signature');
-        (connection.simulateTransaction as jest.Mock<Promise<SimulatedTransactionResponse>>).mockResolvedValue({
+        (connection.sendTransaction as jest.Mock<Promise<string>, [Transaction, Signer[], SendOptions?]>).mockResolvedValue('mock-signature');
+        (connection.simulateTransaction as jest.Mock<Promise<SimulatedTransactionResponse>, [Transaction, Signer[]?, boolean?]>).mockResolvedValue({
             context: { slot: 0 },
             value: { 
                 err: null,
@@ -54,7 +53,7 @@ describe('GovernanceManager', () => {
                 returnData: null
             }
         });
-        (connection.getVersion as jest.Mock<Promise<any>>).mockResolvedValue({ 'solana-core': '1.18.26' });
+        (connection.getVersion as jest.Mock<Promise<Version>>).mockResolvedValue({ 'feature-set': 1, 'solana-core': '1.18.26' });
         
         wallet = Keypair.generate();
         governanceManager = new GovernanceManager(

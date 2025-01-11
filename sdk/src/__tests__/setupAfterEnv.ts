@@ -8,9 +8,9 @@ jest.useFakeTimers({ doNotFake: ['nextTick'] });
 
 // Reset request count and clear mocks before each test
 beforeEach(() => {
-    // @ts-ignore - accessing global mock
+    // @ts-expect-error - accessing global mock
     if (global.mockRequestCount) {
-        // @ts-ignore - accessing global mock
+        // @ts-expect-error - accessing global mock
         global.mockRequestCount.value = 0;
     }
     jest.clearAllMocks();

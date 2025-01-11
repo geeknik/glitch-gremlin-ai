@@ -78,6 +78,7 @@ describe('RedisQueueWorker', () => {
         };
 
         redis = redisMock as unknown as Redis;
+    });
 
     beforeEach(() => {
         worker = new RedisQueueWorker(redis);
