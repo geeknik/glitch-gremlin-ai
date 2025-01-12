@@ -48,6 +48,7 @@ export enum ErrorCode {
     INSUFFICIENT_STAKE = 2011,
     DELEGATION_NOT_ALLOWED = 2012,
     EMERGENCY_PAUSE_ACTIVE = 2013,
+    PROPOSAL_ENDED = 2015,
     PROPOSAL_EXECUTION_FAILED = 2014,
     
     // Connection and system errors (5000-5099)

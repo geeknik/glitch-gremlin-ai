@@ -33,8 +33,15 @@ describe('GovernanceManager', () => {
             simulateTransaction: jest.fn(),
             getVersion: jest.fn(),
             commitment: 'confirmed' as Commitment,
-            rpcEndpoint: 'http://localhost:8899'
-        } as MockedObject<Connection>;
+            rpcEndpoint: 'http://localhost:8899',
+            getBalance: jest.fn().mockResolvedValue(1000000000),
+            getRecentBlockhash: jest.fn().mockResolvedValue({
+                blockhash: 'test-blockhash',
+                feeCalculator: {
+                    lamportsPerSignature: 5000
+                }
+            })
+        } as unknown as MockedObject<Connection>;
         // Configure default mock implementations
         (connection.getAccountInfo as jest.MockedFunction<Connection['getAccountInfo']>).mockResolvedValue({
             data: Buffer.from(JSON.stringify({
@@ -463,7 +470,7 @@ describe('GovernanceManager', () => {
                     beforeEach(() => {
                         jest.restoreAllMocks();
                         jest.spyOn(governanceManager, 'validateProposal')
-                            .mockRejectedValue(new GlitchError('Proposal voting has ended', ErrorCode.ProposalEnded));
+                            .mockRejectedValue(new GlitchError('Proposal voting has ended', ErrorCode.PROPOSAL_ENDED));
                     });
 
                     afterEach(() => {

@@ -227,6 +227,15 @@ describe('Governance', () => {
                         testType: TestType.FUZZ,
                         duration: 300,
                         intensity: 5
+                    },
+                    state: {
+                        isActive: true,
+                        isPassed: false,
+                        isExecuted: false,
+                        isExpired: false,
+                        canExecute: false,
+                        canVote: true,
+                        timeRemaining: 86400000
                     }
                 });
 
