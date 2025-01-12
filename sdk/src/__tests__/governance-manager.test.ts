@@ -34,13 +34,13 @@ describe('GovernanceManager', () => {
             getVersion: jest.fn(),
             commitment: 'confirmed' as Commitment,
             rpcEndpoint: 'http://localhost:8899',
-            getBalance: jest.fn().mockResolvedValue(1000000000),
-            getRecentBlockhash: jest.fn().mockResolvedValue({
+            getBalance: jest.fn().mockImplementation(async () => 1000000000),
+            getRecentBlockhash: jest.fn().mockImplementation(async () => ({
                 blockhash: 'test-blockhash',
                 feeCalculator: {
                     lamportsPerSignature: 5000
                 }
-            })
+            }))
         } as unknown as MockedObject<Connection>;
         // Configure default mock implementations
         (connection.getAccountInfo as jest.MockedFunction<Connection['getAccountInfo']>).mockResolvedValue({
