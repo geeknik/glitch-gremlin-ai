@@ -152,6 +152,69 @@ describe('GovernanceManager', () => {
     });
 
     describe('proposal lifecycle', () => {
+        it('should handle multiple concurrent proposals', async () => {
+            const proposal1 = new PublicKey(Keypair.generate().publicKey);
+            const proposal2 = new PublicKey(Keypair.generate().publicKey);
+            
+            // Mock proposal data
+            jest.spyOn(connection, 'getAccountInfo')
+                .mockImplementation(async (address: PublicKey) => {
+                    if (address.equals(proposal1)) {
+                        return {
+                            data: Buffer.from(JSON.stringify({
+                                state: ProposalState.Active,
+                                votingPower: 1000,
+                                votes: [],
+                                proposer: wallet.publicKey.toBase58(),
+                                startTime: Date.now() - 1000,
+                                endTime: Date.now() + 86400000,
+                                quorum: 100
+                            })),
+                            executable: false,
+                            lamports: 1000000,
+                            owner: governanceManager['programId'],
+                            rentEpoch: 0
+                        };
+                    }
+                    if (address.equals(proposal2)) {
+                        return {
+                            data: Buffer.from(JSON.stringify({
+                                state: ProposalState.Active,
+                                votingPower: 1000,
+                                votes: [],
+                                proposer: wallet.publicKey.toBase58(),
+                                startTime: Date.now() - 1000,
+                                endTime: Date.now() + 86400000,
+                                quorum: 100
+                            })),
+                            executable: false,
+                            lamports: 1000000,
+                            owner: governanceManager['programId'],
+                            rentEpoch: 0
+                        };
+                    }
+                    return null;
+                });
+
+            // Cast votes on both proposals
+            await expect(
+                governanceManager.castVote(
+                    connection,
+                    wallet,
+                    proposal1,
+                    true
+                )
+            ).resolves.not.toThrow();
+
+            await expect(
+                governanceManager.castVote(
+                    connection,
+                    wallet,
+                    proposal2,
+                    true
+                )
+            ).resolves.not.toThrow();
+        });
         it('should validate proposal parameters', async () => {
             await expect(
                 governanceManager.createProposalAccount(
@@ -380,6 +443,28 @@ describe('GovernanceManager', () => {
     });
 
     describe('voting', () => {
+        it('should handle delegated voting power', async () => {
+            const proposalAddress = new PublicKey(Keypair.generate().publicKey);
+            const delegateWallet = Keypair.generate();
+            
+            // Mock delegated voting power
+            jest.spyOn(governanceManager as any, 'calculateVoteWeight')
+                .mockImplementation(async (wallet: PublicKey) => {
+                    if (wallet.equals(delegateWallet.publicKey)) {
+                        return 1000;
+                    }
+                    return 0;
+                });
+
+            await expect(
+                governanceManager.castVote(
+                    connection,
+                    delegateWallet,
+                    proposalAddress,
+                    true
+                )
+            ).resolves.not.toThrow();
+        });
         it('should validate voting power', async () => {
             const proposalAddress = new PublicKey(Keypair.generate().publicKey);
             
@@ -522,6 +607,22 @@ describe('GovernanceManager', () => {
     });
 
     describe('proposal execution', () => {
+        it('should handle exact quorum threshold', async () => {
+            const proposalAddress = new PublicKey(Keypair.generate().publicKey);
+            
+            // Mock exact quorum votes
+            jest.spyOn(governanceManager as any, 'getVoteCount')
+                .mockResolvedValue({ yes: 100, no: 0, abstain: 0 });
+
+            await expect(
+                governanceManager.executeProposal(
+                    connection,
+                    wallet,
+                    proposalAddress
+                )
+            ).resolves.not.toThrow();
+        });
+
         it('should validate quorum requirements', async () => {
             const proposalAddress = new PublicKey(Keypair.generate().publicKey);
             
