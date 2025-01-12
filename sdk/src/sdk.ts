@@ -50,6 +50,10 @@ export class GlitchSDK {
     private governanceConfig: GovernanceConfig;
     private readonly MIN_STAKE_LOCKUP = 86400; // 1 day in seconds
     private readonly MAX_STAKE_LOCKUP = 31536000; // 1 year in seconds
+    private readonly MIN_STAKE_AMOUNT = 1000; // Minimum stake amount
+    private readonly MAX_REQUESTS_PER_MINUTE = 3;
+    private readonly REQUEST_COOLDOWN = 2000; // 2 seconds
+    private lastRequestTime = 0;
 
     private static instance: GlitchSDK;
     private initialized = false;
@@ -381,8 +385,10 @@ export class GlitchSDK {
         }
     }
 
-    public async stakeTokens(amount: number, lockupPeriod: number): Promise<string> {
-        TokenEconomics.validateStakeAmount(amount);
+    public async stakeTokens(amount: number, lockupPeriod: number, delegateAddress?: string): Promise<string> {
+        if (amount < this.MIN_STAKE_AMOUNT) {
+            throw new GlitchError(`Minimum stake amount is ${this.MIN_STAKE_AMOUNT}`, 1014);
+        }
 
         if (lockupPeriod < this.MIN_STAKE_LOCKUP || lockupPeriod > this.MAX_STAKE_LOCKUP) {
             throw new GlitchError('Invalid lockup period', 1014);
@@ -394,15 +400,47 @@ export class GlitchSDK {
             throw new InsufficientFundsError();
         }
 
+        const instructionData = [
+            0x03, // Stake instruction
+            ...new Array(8).fill(0).map((_, i) => (amount >> (8 * i)) & 0xff),
+            ...new Array(8).fill(0).map((_, i) => (lockupPeriod >> (8 * i)) & 0xff)
+        ];
+
+        if (delegateAddress) {
+            const delegatePubkey = new PublicKey(delegateAddress);
+            instructionData.push(...delegatePubkey.toBuffer());
+        }
+
         const instruction = new TransactionInstruction({
             keys: [
-                { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true }
+                { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+                { pubkey: this.programId, isSigner: false, isWritable: true }
+            ],
+            programId: this.programId,
+            data: Buffer.from(instructionData)
+        });
+
+        const transaction = new Transaction().add(instruction);
+        return await this.connection.sendTransaction(transaction, [this.wallet]);
+    }
+
+    public async delegateStake(stakeId: string, delegateAddress: string): Promise<string> {
+        const stakeInfo = await this.getStakeInfo(stakeId);
+        if (!stakeInfo) {
+            throw new GlitchError('Stake not found', 1015);
+        }
+
+        const delegatePubkey = new PublicKey(delegateAddress);
+        
+        const instruction = new TransactionInstruction({
+            keys: [
+                { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+                { pubkey: new PublicKey(stakeId), isSigner: false, isWritable: true }
             ],
             programId: this.programId,
             data: Buffer.from([
-                0x03, // Stake instruction
-                ...new Array(8).fill(0).map((_, i) => (amount >> (8 * i)) & 0xff),
-                ...new Array(8).fill(0).map((_, i) => (lockupPeriod >> (8 * i)) & 0xff)
+                0x05, // Delegate instruction
+                ...delegatePubkey.toBuffer()
             ])
         });
 
@@ -410,22 +448,50 @@ export class GlitchSDK {
         return await this.connection.sendTransaction(transaction, [this.wallet]);
     }
 
-    public async unstakeTokens(stakeId: string): Promise<string> {
+    public async unstakeTokens(stakeId: string, force = false): Promise<string> {
         const stakeInfo = await this.getStakeInfo(stakeId);
         if (!stakeInfo) {
             throw new GlitchError('Stake not found', 1015);
         }
 
-        if (Date.now() / 1000 < stakeInfo.startTime + stakeInfo.lockupPeriod) {
+        const currentTime = Date.now() / 1000;
+        const lockupEnd = stakeInfo.startTime + stakeInfo.lockupPeriod;
+
+        if (currentTime < lockupEnd && !force) {
             throw new GlitchError('Tokens are still locked', 1016);
+        }
+
+        const instructionData = [0x04]; // Unstake instruction
+        if (force) {
+            instructionData.push(0x01); // Force flag
         }
 
         const instruction = new TransactionInstruction({
             keys: [
-                { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true }
+                { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+                { pubkey: new PublicKey(stakeId), isSigner: false, isWritable: true }
             ],
             programId: this.programId,
-            data: Buffer.from([0x04]) // Unstake instruction
+            data: Buffer.from(instructionData)
+        });
+
+        const transaction = new Transaction().add(instruction);
+        return await this.connection.sendTransaction(transaction, [this.wallet]);
+    }
+
+    public async claimRewards(stakeId: string): Promise<string> {
+        const stakeInfo = await this.getStakeInfo(stakeId);
+        if (!stakeInfo) {
+            throw new GlitchError('Stake not found', 1015);
+        }
+
+        const instruction = new TransactionInstruction({
+            keys: [
+                { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+                { pubkey: new PublicKey(stakeId), isSigner: false, isWritable: true }
+            ],
+            programId: this.programId,
+            data: Buffer.from([0x06]) // Claim rewards instruction
         });
 
         const transaction = new Transaction().add(instruction);
