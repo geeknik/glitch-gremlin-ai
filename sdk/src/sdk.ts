@@ -41,7 +41,6 @@ export class GlitchSDK {
     private readonly MIN_REQUEST_INTERVAL = 2000; // 2 seconds between requests
     private readonly MAX_REQUESTS_PER_MINUTE = 3;
     private readonly REQUEST_COOLDOWN = 2000; // 2 seconds
-    private lastRequestTime = 0;
 
     private async checkRateLimit(): Promise<void> {
         const now = Date.now();

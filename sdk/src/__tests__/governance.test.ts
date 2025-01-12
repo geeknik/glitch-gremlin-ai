@@ -160,7 +160,18 @@ describe('Governance', () => {
         it('should only execute passed proposals', async () => {
             const _mockGetAccountInfo = jest.spyOn(sdk['connection'], 'getAccountInfo')
                 .mockResolvedValueOnce({
-                    data: Buffer.from('{"status":"failed"}'),
+                    data: Buffer.from(JSON.stringify({
+                        status: 'failed',
+                        state: {
+                            isActive: false,
+                            isPassed: false,
+                            isExecuted: false,
+                            isExpired: true,
+                            canExecute: false,
+                            canVote: false,
+                            timeRemaining: 0
+                        }
+                    })),
                     executable: false,
                     lamports: 0,
                     owner: sdk['programId'],
