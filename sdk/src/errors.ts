@@ -17,7 +17,7 @@ export enum ErrorCode {
     TIMELOCK_NOT_ELAPSED_VOTING = 1012,
 
     // Staking and balance errors (1100-1199)
-    INSUFFICIENT_STAKE = 1101,
+    // Removed duplicate INSUFFICIENT_STAKE
     INSUFFICIENT_BALANCE = 1102,
     STAKE_TOO_LOW = 1103, 
     STAKE_TOO_HIGH = 1104,
