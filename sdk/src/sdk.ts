@@ -294,13 +294,23 @@ export class GlitchSDK {
         signature: string;
         title: string;
         description: string;
-        status: string;
+        status: 'draft' | 'active' | 'passed' | 'failed' | 'executed';
         votes: {
             yes: number;
             no: number;
             abstain: number;
         };
         endTime: number;
+        executionTime?: number;
+        state: {
+            isActive: boolean;
+            isPassed: boolean;
+            isExecuted: boolean;
+            isExpired: boolean;
+            canExecute: boolean;
+            canVote: boolean;
+            timeRemaining: number;
+        };
     }> {
         // Validate parameters first
         if (params.stakingAmount < 100) { // Minimum stake amount

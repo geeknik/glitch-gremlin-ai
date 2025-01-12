@@ -1,7 +1,15 @@
 # Governance Features
 
 ## Overview
-The Glitch Gremlin governance system allows token holders to participate in decision-making through a democratic process. Holders can stake tokens, create proposals, vote, and earn rewards for participation.
+The Glitch Gremlin governance system allows token holders to participate in decision-making through a democratic process. Key features include:
+
+- On-chain proposal creation and voting
+- Delegated voting power
+- Staking with lockup periods
+- Transparent vote tallying
+- Timelock execution of passed proposals
+- Emergency pause functionality
+- Comprehensive security controls
 
 ## Governance Smart Contract Details
 
@@ -65,11 +73,34 @@ const results = await worker.getVoteResults(proposalId)
 - Early unstake penalty (50% of staked amount)
 - Delegated staking support
 
-## Proposals
-1. Create a proposal (requires minimum stake)
-2. Community voting period (3 days)
-3. Execution delay (24 hours if passed)
-4. Implementation by protocol
+## Governance Lifecycle
+
+### 1. Proposal Creation
+- Minimum stake: 1000 GREMLINAI
+- Proposal types:
+  - Protocol parameter changes
+  - Treasury allocations
+  - Chaos test campaigns
+  - Emergency measures
+- Proposal metadata includes:
+  - Title
+  - Description
+  - Target program (if applicable)
+  - Test parameters (for chaos campaigns)
+  - Execution instructions
+
+### 2. Voting Period
+- Duration: 3 days (configurable)
+- Quorum: 10% of circulating supply
+- Vote options: Yes/No/Abstain
+- Voting power based on staked amount
+- Delegated votes allowed
+
+### 3. Execution
+- Successful proposals enter timelock
+- Execution delay: 24 hours
+- Multisig execution for security
+- Failed proposals refund stake
 
 ## Creating a Proposal
 ```typescript
