@@ -1,36 +1,43 @@
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { GovernanceManager } from '../governance.js';
 import { 
-Keypair, 
-Connection, 
+Keypair,
+Connection,
 PublicKey,
 Transaction,
 SimulatedTransactionResponse,
-Version
+Version,
+AccountInfo,
+GetAccountInfoConfig,
+Commitment,
+SendOptions,
+Signer
 } from '@solana/web3.js';
+import { MockedObject } from 'jest-mock';
 import { ProposalState } from '../types.js';
+import { ErrorCode } from '../errors.js';
 import { GlitchError } from '../errors.js';
 import { TokenEconomics } from '../token-economics.js';
 jest.setTimeout(30000); // 30 seconds for more reliable CI runs
 
 describe('GovernanceManager', () => {
     let governanceManager: GovernanceManager;
-    let connection: jest.MockedObject<Connection>;
+    let connection: MockedObject<Connection>;
     let wallet: Keypair;
 
     beforeEach(() => {
         // Initialize mocks
+        // Initialize mocks with proper types
         connection = {
             getAccountInfo: jest.fn(),
             sendTransaction: jest.fn(),
             simulateTransaction: jest.fn(),
             getVersion: jest.fn(),
-            commitment: 'confirmed',
+            commitment: 'confirmed' as Commitment,
             rpcEndpoint: 'http://localhost:8899'
-        } as unknown as jest.MockedObject<Connection>;
-
+        } as MockedObject<Connection>;
         // Configure default mock implementations
-        (connection.getAccountInfo as jest.Mock<Promise<AccountInfo<Buffer> | null>>).mockResolvedValue({
+        (connection.getAccountInfo as jest.MockedFunction<Connection['getAccountInfo']>).mockResolvedValue({
             data: Buffer.from(JSON.stringify({
                 state: ProposalState.Active,
                 votingPower: 1000,
@@ -42,10 +49,10 @@ describe('GovernanceManager', () => {
             rentEpoch: 0
         });
 
-        (connection.sendTransaction as jest.Mock<Promise<string>, [Transaction, Signer[], SendOptions?]>).mockResolvedValue('mock-signature');
-        (connection.simulateTransaction as jest.Mock<Promise<SimulatedTransactionResponse>, [Transaction, Signer[]?, boolean?]>).mockResolvedValue({
+        (connection.sendTransaction as jest.MockedFunction<Connection['sendTransaction']>).mockResolvedValue('mock-signature');
+        (connection.simulateTransaction as jest.MockedFunction<Connection['simulateTransaction']>).mockResolvedValue({
             context: { slot: 0 },
-            value: { 
+            value: {
                 err: null,
                 logs: [],
                 accounts: null,
@@ -53,7 +60,10 @@ describe('GovernanceManager', () => {
                 returnData: null
             }
         });
-        (connection.getVersion as jest.Mock<Promise<Version>>).mockResolvedValue({ 'feature-set': 1, 'solana-core': '1.18.26' });
+        (connection.getVersion as jest.MockedFunction<Connection['getVersion']>).mockResolvedValue({
+            'feature-set': 1,
+            'solana-core': '1.18.26'
+        });
         
         wallet = Keypair.generate();
         governanceManager = new GovernanceManager(
@@ -454,7 +464,7 @@ describe('GovernanceManager', () => {
                     beforeEach(() => {
                         jest.restoreAllMocks();
                         jest.spyOn(governanceManager, 'validateProposal')
-                            .mockRejectedValue(new GlitchError('Proposal voting has ended', 2006));
+                            .mockRejectedValue(new GlitchError('Proposal voting has ended', ErrorCode.ProposalEnded));
                     });
 
                     afterEach(() => {

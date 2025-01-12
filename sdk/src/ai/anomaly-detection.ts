@@ -28,9 +28,19 @@ export interface AnomalyDetectionResult {
 * @fires AnomalyDetectionModel#epochEnd - Emitted after each training epoch
 * @fires AnomalyDetectionModel#anomalyDetected - Emitted when an anomaly is detected
 */
-export class AnomalyDetectionModel extends EventEmitter {
+export interface AnomalyDetectionModel {
+    initialize(): Promise<void>;
+    train(data: TimeSeriesMetrics[]): Promise<void>;
+    detect(metrics: TimeSeriesMetrics[]): Promise<AnomalyDetectionResult>;
+    dispose(): Promise<void>;
+    save(path: string): Promise<void>;
+    load(path: string): Promise<void>;
+}
+
+export class AnomalyDetectionModel extends EventEmitter implements AnomalyDetectionModel {
     private model: tf.LayersModel | null = null;
     private logger: Logger;
+    private initialized: boolean = false;
     private readonly inputWindowSize = 100;
     private readonly outputWindowSize = 1;
     private readonly featureSize = 4;
@@ -38,8 +48,27 @@ export class AnomalyDetectionModel extends EventEmitter {
         mean?: tf.Tensor1D;
         std?: tf.Tensor1D;
     } = {};
-    private initialized = false;
 
+    /**
+    * Initializes the anomaly detection model.
+    * @returns {Promise<void>}
+    * @throws {Error} If model is already initialized or initialization fails
+    */
+    public async initialize(): Promise<void> {
+        if (this.initialized) {
+            throw new Error('Model is already initialized');
+        }
+
+        try {
+            this.model = this.buildModel();
+            this.initialized = true;
+            this.logger.info('Model initialized successfully');
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            this.logger.error(`Initialization failed: ${errorMessage}`);
+            throw new Error(`Initialization failed: ${errorMessage}`);
+        }
+    }
     /**
     * Creates an instance of AnomalyDetectionModel.
     * @constructor
@@ -108,25 +137,30 @@ export class AnomalyDetectionModel extends EventEmitter {
     }
 
     private async normalizeData(data: tf.Tensor3D): Promise<tf.Tensor3D> {
-        const reshapedData = data.reshape([
-            data.shape[0] * data.shape[1],
-            data.shape[2]
-        ]);
+        return tf.tidy(() => {
+            const reshapedData = data.reshape([
+                data.shape[0] * data.shape[1],
+                data.shape[2]
+            ]);
 
-        if (!this.normalizedStats.mean || !this.normalizedStats.std) {
-            this.normalizedStats.mean = tf.mean(reshapedData, 0) as tf.Tensor1D;
-            this.normalizedStats.std = tf.std(reshapedData, 0) as tf.Tensor1D;
-        }
+            if (!this.normalizedStats.mean || !this.normalizedStats.std) {
+                const moments = tf.moments(reshapedData, 0);
+                this.normalizedStats.mean = tf.mean(reshapedData, 0) as tf.Tensor1D;
+                this.normalizedStats.std = moments.variance.sqrt() as tf.Tensor1D;
+                moments.mean.dispose();
+                moments.variance.dispose();
+            }
 
-        const normalizedData = reshapedData
-            .sub(this.normalizedStats.mean)
-            .div(this.normalizedStats.std.add(tf.scalar(1e-8)));
+            const normalizedData = reshapedData
+                .sub(this.normalizedStats.mean)
+                .div(this.normalizedStats.std.add(tf.scalar(1e-8)));
 
-        return normalizedData.reshape([
-            data.shape[0],
-            data.shape[1],
-            data.shape[2]
-        ]);
+            return normalizedData.reshape([
+                data.shape[0],
+                data.shape[1], 
+                data.shape[2]
+            ]) as tf.Tensor3D;
+        });
     }
 
     private createWindows(data: TimeSeriesMetrics[]): tf.Tensor3D {
@@ -159,30 +193,52 @@ export class AnomalyDetectionModel extends EventEmitter {
     * @fires AnomalyDetectionModel#trainingStart
     * @fires AnomalyDetectionModel#trainingComplete
     */
-    async train(data: TimeSeriesMetrics[]): Promise<void> {
-        if (!data || data.length < this.inputWindowSize) {
-            throw new Error(`Insufficient data points. Minimum required: ${this.inputWindowSize}`);
+    public async train(data: TimeSeriesMetrics[]): Promise<void> {
+        if (!data) {
+            throw new Error('Training data cannot be null/undefined');
         }
 
-        this.model = this.buildModel();
-        
-        try {
-            // Create sliding windows
-            const windows = this.createWindows(data);
-            const normalizedWindows = await this.normalizeData(windows);
+        if (data.length < this.inputWindowSize) {
+            throw new Error(`Insufficient data points. Minimum req        try {
+            return tf.tidy(async () => {
+                // Create sliding windows  
+                const windows = this.createWindows(data);
+                const normalizedWindows = await this.normalizeData(windows);
 
-            // Prepare training data
-            const xs = normalizedWindows.slice([0, 0, 0], [
-                -1,
-                this.inputWindowSize,
-                this.featureSize
-            ]);
+                // Prepare training data
+                const xs = normalizedWindows.slice([0, 0, 0], [
+                    -1,
+                    this.inputWindowSize, 
+                    this.featureSize
+                ]);
 
-            const ys = normalizedWindows.slice([0, this.inputWindowSize - 1, 0], [
-                -1,
-                1,
-                this.featureSize
-            ]).reshape([-1, this.featureSize]);
+                const ys = normalizedWindows.slice([0, this.inputWindowSize - 1, 0], [
+                    -1,
+                    1,
+                    this.featureSize  
+                ]).reshape([-1, this.featureSize]);
+
+                await this.model!.fit(xs, ys, {
+                    epochs: 50,
+                    batchSize: 32,
+                    validationSplit: 0.2,
+                    callbacks: {
+                        onEpochEnd: async (epoch, logs) => {
+                            this.emit('epochEnd', { epoch, logs });
+                            this.logger.info(
+                                `Epoch ${epoch}: loss = ${logs?.loss.toFixed(4)}, accuracy = ${logs?.accuracy.toFixed(4)}`
+                            );
+                        }
+                    }
+                });
+
+                this.logger.info('Model training completed successfully');
+            });
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            this.logger.error(`Training failed: ${errorMessage}`);
+            throw new Error(`Training failed: ${errorMessage}`);
+        }
 
             // Train model
             await this.model.fit(xs, ys, {
@@ -214,40 +270,43 @@ export class AnomalyDetectionModel extends EventEmitter {
     * @throws {Error} If model is not trained or metrics are invalid
     * @fires AnomalyDetectionModel#anomalyDetected
     */
-    async detect(metrics: TimeSeriesMetrics[]): Promise<AnomalyDetectionResult> {
+    public async detect(metrics: TimeSeriesMetrics[]): Promise<AnomalyDetectionResult> {
         if (!this.model) {
             throw new Error('Model not trained');
+        }
+
+        if (!metrics) {
+            throw new Error('Detection data cannot be null/undefined');
+        }
+
+        if (!Array.isArray(metrics)) {
+            throw new Error('Invalid data format');
         }
 
         if (metrics.length < this.inputWindowSize) {
             throw new Error(`Insufficient data points. Minimum required: ${this.inputWindowSize}`);
         }
 
-        try {
-            // Prepare input data
-            const window = this.createWindows([...metrics].slice(-this.inputWindowSize));
-            const normalizedWindow = await this.normalizeData(window);
+        return tf.tidy(async () => {
+            try {
+                // Prepare input data
+                const window = this.createWindows([...metrics].slice(-this.inputWindowSize));
+                const normalizedWindow = await this.normalizeData(window);
 
-            // Get prediction
-            const prediction = this.model.predict(normalizedWindow) as tf.Tensor;
-            const actual = normalizedWindow.slice([
-                0,
-                this.inputWindowSize - 1,
-                0
-            ], [-1, 1, this.featureSize]);
+                // Get prediction
+                const prediction = this.model!.predict(normalizedWindow) as tf.Tensor;
+                const actual = normalizedWindow.slice([
+                    0,
+                    this.inputWindowSize - 1,
+                    0
+                ], [-1, 1, this.featureSize]);
 
-            // Calculate anomaly scores
-            const predictionData = await prediction.array() as number[][];
-            const actualData = await actual.reshape([-1, this.featureSize]).array() as number[][];
-            
-            const anomalyScores = this.calculateAnomalyScores(predictionData[0], actualData[0]);
-            
-            // Cleanup tensors
-            prediction.dispose();
-            actual.dispose();
-            normalizedWindow.dispose();
-
-            return this.interpretAnomalyScores(anomalyScores);
+                // Calculate anomaly scores
+                const predictionData = await prediction.array() as number[][];
+                const actualData = await actual.reshape([-1, this.featureSize]).array() as number[][];
+                
+                const anomalyScores = this.calculateAnomalyScores(predictionData[0], actualData[0]);                
+                return this.interpretAnomalyScores(anomalyScores);
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             this.logger.error(`Anomaly detection failed: ${errorMessage}`);
@@ -300,7 +359,7 @@ export class AnomalyDetectionModel extends EventEmitter {
         };
     }
 
-    async cleanup(): Promise<void> {
+    public async dispose(): Promise<void> {
         try {
             if (this.model) {
                 this.model.dispose();
@@ -320,20 +379,23 @@ export class AnomalyDetectionModel extends EventEmitter {
             // Force garbage collection
             tf.disposeVariables();
             
+            this.initialized = false;
             this.logger.info('Model cleanup completed successfully');
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             this.logger.error(`Cleanup failed: ${errorMessage}`);
             throw new Error(`Cleanup failed: ${errorMessage}`);
         }
-    async save(path: string): Promise<void> {
+    }
+
+    public async save(path: string): Promise<void> {
         if (!this.model) {
             throw new Error('Model not trained. Cannot save untrained model.');
         }
 
         try {
-            // Save the model
-            await this.model.save(`file://${path}`);
+            // Save the model architecture and weights
+            await this.model.save(`file://${path}/model`);
 
             // Save normalization statistics
             if (this.normalizedStats.mean && this.normalizedStats.std) {
@@ -342,9 +404,12 @@ export class AnomalyDetectionModel extends EventEmitter {
                     std: Array.from(await this.normalizedStats.std.data())
                 };
                 
-                await tf.io.writeFile(
+                // Use Node.js fs to write the stats file
+                const fs = require('fs').promises;
+                await fs.writeFile(
                     `${path}/normalization_stats.json`,
-                    JSON.stringify(statsData)
+                    JSON.stringify(statsData, null, 2),
+                    'utf8'
                 );
             }
 
@@ -356,14 +421,14 @@ export class AnomalyDetectionModel extends EventEmitter {
         }
     }
 
-    async load(path: string): Promise<void> {
+    public async load(path: string): Promise<void> {
         if (!path) {
             throw new Error('Invalid path provided');
         }
 
         try {
             // Cleanup existing model and stats
-            await this.cleanup();
+            await this.dispose();
 
             // Load the model
             this.model = await tf.loadLayersModel(`file://${path}/model.json`);
@@ -376,8 +441,9 @@ export class AnomalyDetectionModel extends EventEmitter {
 
             // Load normalization statistics
             try {
-                const statsFile = await tf.io.readFile(`${path}/normalization_stats.json`);
-                const statsData = JSON.parse(new TextDecoder().decode(statsFile));
+                const fs = require('fs').promises;
+                const statsFile = await fs.readFile(`${path}/normalization_stats.json`, 'utf8');
+                const statsData = JSON.parse(statsFile);
                 
                 this.normalizedStats = {
                     mean: tf.tensor1d(statsData.mean),
@@ -390,7 +456,7 @@ export class AnomalyDetectionModel extends EventEmitter {
             this.initialized = true;
             this.logger.info(`Model and statistics loaded successfully from ${path}`);
         } catch (error) {
-            await this.cleanup();
+            await this.dispose();
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             this.logger.error(`Failed to load model: ${errorMessage}`);
             throw new Error(`Model load failed: ${errorMessage}`);

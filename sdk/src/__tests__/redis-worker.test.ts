@@ -3,6 +3,36 @@ import { RedisQueueWorker } from '../queue/redis-worker.js';
 import { TestType } from '../types.js';
 import { Redis } from 'ioredis';
 import type { Redis as RedisType } from 'ioredis';
+import type { Callback } from 'ioredis';
+
+interface MockRedis extends Omit<RedisType, 'quit' | 'disconnect' | 'on' | 'incr' | 'expire' | 'get' | 'set' | 'flushall' | 'hset' | 'hget' | 'lpush' | 'rpop'> {
+    queue: string[];
+    connected: boolean;
+    quit: jest.MockedFunction<() => Promise<'OK'>>;
+    disconnect: jest.MockedFunction<() => Promise<void>>;
+    on: jest.MockedFunction<(event: string, callback: Function) => void>;
+    incr: jest.MockedFunction<(key: string) => Promise<number>>;
+    expire: jest.MockedFunction<(key: string, seconds: number) => Promise<number>>;
+    get: jest.MockedFunction<(key: string) => Promise<string | null>>;
+    set: jest.MockedFunction<(key: string, value: string) => Promise<'OK'>>;
+    flushall: jest.MockedFunction<() => Promise<'OK'>>;
+    hset: jest.MockedFunction<(key: string, field: string, value: string) => Promise<number>>;
+    hget: jest.MockedFunction<(key: string, field: string) => Promise<string | null>>;
+    lpush: jest.MockedFunction<(key: string, value: string) => Promise<number>>;
+    rpop: jest.MockedFunction<(key: string) => Promise<string | null>>;
+}
+    disconnect: jest.Mock<Promise<void>>;
+    on: jest.Mock;
+    incr: jest.Mock<Promise<number>>;
+    expire: jest.Mock<Promise<number>>;
+    get: jest.Mock<Promise<string | null>>;
+    set: jest.Mock<Promise<'OK'>>;
+    flushall: jest.Mock<Promise<'OK'>>;
+    hset: jest.Mock<Promise<number>>;
+    hget: jest.Mock<Promise<string | null>>;
+    lpush: jest.Mock<Promise<number>>;
+    rpop: jest.Mock<Promise<string | null>>;
+}
 import { GlitchError } from '../errors.js';
 import { ErrorCode } from '../errors.js';
 // Increase timeout for all tests
@@ -10,40 +40,38 @@ jest.setTimeout(30000);
 
 describe('RedisQueueWorker', () => {
     let worker: RedisQueueWorker;
-    let redis: RedisType;
+    let redis: MockRedis;
 
     beforeAll(() => {
-        // Enhanced Redis mock with proper error handling
-        // Enhanced Redis mock with proper error handling
-        const redisMock = {
+        // Enhanced Redis mock with proper error handling and typed implementations
+        const redisMock: MockRedis = {
             connected: true,
             queue: [] as string[],
-            incr: jest.fn().mockImplementation(async () => {
+            incr: jest.fn().mockImplementation(async (key: string): Promise<number> => {
                 if (redisMock.connected === false) {
                     throw new GlitchError('Connection failed', ErrorCode.CONNECTION_ERROR);
                 }
                 return 1;
             }),
-            expire: jest.fn().mockResolvedValue(1),
-            get: jest.fn().mockResolvedValue(null),
-            set: jest.fn().mockResolvedValue('OK'),
+            expire: jest.fn().mockImplementation(async (key: string, seconds: number): Promise<number> => 1),
+            get: jest.fn().mockImplementation(async (key: string): Promise<string | null> => null),
+            set: jest.fn().mockImplementation(async (key: string, value: string): Promise<'OK'> => 'OK'),
             on: jest.fn(),
-            quit: jest.fn().mockImplementation(async () => {
+            quit: jest.fn().mockImplementation(async (): Promise<'OK'> => {
                 redisMock.connected = false;
                 return 'OK';
             }),
-            disconnect: jest.fn().mockImplementation(async () => {
-                redisMock.connected = false;
-                return 'OK';
-            }),
-            flushall: jest.fn().mockResolvedValue('OK'),
-            hset: jest.fn().mockImplementation(async (key, field, value) => {
+            disconnect: jest.fn().mockImplementation(async (): Promise<void> => {
+                    redisMock.connected = false;
+                }),
+            flushall: jest.fn().mockImplementation(async (): Promise<'OK'> => 'OK'),
+            hset: jest.fn().mockImplementation(async (key: string, field: string, value: string): Promise<number> => {
                 if (typeof value !== 'string') {
                     throw new GlitchError('Invalid JSON', ErrorCode.INVALID_JSON);
                 }
                 return 1;
             }),
-            hget: jest.fn().mockImplementation(async (key, field) => {
+            hget: jest.fn().mockImplementation(async (key: string, field: string): Promise<string | null> => {
                 if (field === 'bad-result') {
                     throw new GlitchError('Invalid JSON', ErrorCode.INVALID_JSON);
                 }
@@ -53,7 +81,7 @@ describe('RedisQueueWorker', () => {
                 return JSON.stringify({
                     requestId: field,
                     status: 'completed',
-                    resultRef: 'ipfs://test',
+                    resultRef: 'ipfs://test', 
                     logs: ['Test completed'],
                     metrics: {
                         totalTransactions: 100,
@@ -62,14 +90,14 @@ describe('RedisQueueWorker', () => {
                     }
                 });
             }),
-            lpush: jest.fn().mockImplementation(async (key, value) => {
+            lpush: jest.fn().mockImplementation(async (key: string, value: string): Promise<number> => {
                 if (value === 'invalid-json') {
                     throw new GlitchError('Invalid JSON', ErrorCode.INVALID_JSON);
                 }
                 redisMock.queue.push(value);
                 return 1;
             }),
-            rpop: jest.fn().mockImplementation(async (key) => {
+            rpop: jest.fn().mockImplementation(async (key: string): Promise<string | null> => {
                 if (key === 'empty-queue') {
                     return null;
                 }
@@ -77,7 +105,7 @@ describe('RedisQueueWorker', () => {
             })
         };
 
-        redis = redisMock as unknown as Redis;
+        redis = redisMock;
     });
 
     beforeEach(() => {
@@ -85,10 +113,14 @@ describe('RedisQueueWorker', () => {
     });
 
     afterEach(async () => {
-        await worker.close();
-        await redis.flushall();
-        await redis.quit();
-        await redis.disconnect();
+        try {
+            await worker.close();
+            await redis.flushall();
+            await redis.quit();
+            await redis.disconnect();
+        } catch (error) {
+            console.error('Error in test cleanup:', error);
+        }
     });
 
     describe('queue operations', () => {
@@ -191,10 +223,10 @@ describe('RedisQueueWorker', () => {
     describe('error handling', () => {
         it('should throw on connection failure', async () => {
             // Mock lpush to throw connection error
-            redis.lpush.mockImplementationOnce(async () => {
-                throw new GlitchError('Connection failed', ErrorCode.CONNECTION_ERROR);
-            });
-            
+            // Mock lpush to throw connection error
+            redis.lpush.mockImplementationOnce((key: string, value: string) => 
+                Promise.reject(new GlitchError('Connection failed', ErrorCode.CONNECTION_ERROR))
+            );
             await expect(worker.enqueueRequest({
                 targetProgram: "1",
                 testType: TestType.FUZZ,
@@ -205,7 +237,7 @@ describe('RedisQueueWorker', () => {
 
         it('should handle malformed queue data', async () => {
             // Mock rpop to return invalid JSON
-            redis.rpop.mockImplementationOnce(async () => 'invalid-json');
+            redis.rpop.mockImplementationOnce((key: string) => Promise.resolve('invalid-json'));
             
             await expect(worker.dequeueRequest()).rejects.toThrow(SyntaxError);
         });
@@ -245,9 +277,9 @@ describe('RedisQueueWorker', () => {
 
         it('should handle malformed result data', async () => {
             // Mock hget to throw GlitchError for bad result
-            redis.hget.mockImplementationOnce(async (key, field) => {
+            redis.hget.mockImplementationOnce((key: string, field: string) => {
                 if (field === 'bad-result') {
-                    throw new GlitchError('Invalid JSON');
+                    throw new GlitchError('Invalid JSON', ErrorCode.INVALID_JSON);
                 }
                 return null;
             });

@@ -9,8 +9,8 @@ jest.setTimeout(30000);
 
 describe('Rate Limiting', () => {
     let sdk: GlitchSDK;
-    let mockIncr: jest.Mock;
-    let mockExpire: jest.Mock;
+    let mockIncr: jest.Mock<Promise<number>, [string]>;
+    let mockExpire: jest.Mock<Promise<number>, [string, number]>;
     
     beforeAll(async () => {
         const wallet = Keypair.generate();
@@ -20,28 +20,41 @@ describe('Rate Limiting', () => {
         });
 
         // Mock Redis methods globally
-        // Mock Redis methods consistently
-        mockIncr = jest.fn().mockImplementation((key: string) => {
+        // Mock Redis methods consistently with proper types
+        mockIncr = jest.fn().mockImplementation(
+        async (key: string): Promise<number> => {
             if (key.includes('proposal')) {
-                return Promise.resolve(1);
+                return 1;
             }
-            return Promise.resolve(2);
-        });
-        mockExpire = jest.fn(() => Promise.resolve(1));
+            return 2;
+        }
+        ) as jest.Mock<Promise<number>, [string]>;
+
+        mockExpire = jest.fn().mockImplementation(
+        async (key: string, seconds: number): Promise<number> => 1
+        ) as jest.Mock<Promise<number>, [string, number]>;
 
         // Create a complete Redis mock with consistent behavior
         const redisMock = {
             incr: mockIncr,
             expire: mockExpire,
-            get: jest.fn().mockImplementation((key: string) => {
-                if (key.includes('proposal')) {
-                    return Promise.resolve(null);
+            get: jest.fn().mockImplementation(
+                async (key: string): Promise<string | null> => {
+                    if (key.includes('proposal')) {
+                        return null;
+                    }
+                    return Date.now().toString();
                 }
-                return Promise.resolve(Date.now().toString());
-            }),
-            set: jest.fn().mockResolvedValue('OK'),
-            quit: jest.fn().mockResolvedValue('OK'),
-            disconnect: jest.fn().mockResolvedValue('OK')
+            ) as jest.Mock<Promise<string | null>, [string]>,
+            set: jest.fn().mockImplementation(
+                async (key: string, value: string): Promise<'OK'> => 'OK'
+            ) as jest.Mock<Promise<'OK'>, [string, string]>,
+            quit: jest.fn().mockImplementation(
+                async (): Promise<'OK'> => 'OK'
+            ) as jest.Mock<Promise<'OK'>, []>,
+            disconnect: jest.fn().mockImplementation(
+                async (): Promise<'OK'> => 'OK'
+            ) as jest.Mock<Promise<'OK'>, []>
         } as unknown as Redis;
         
         sdk['queueWorker']['redis'] = redisMock;
@@ -91,13 +104,15 @@ describe('Rate Limiting', () => {
         it('should properly handle multiple rate limit attempts', async () => {
             // Mock incr to enforce rate limit
             let requestCount = 0;
-            mockIncr.mockImplementation(async () => {
-                requestCount++;
-                if (requestCount > 1) {
-                    throw new GlitchError('Rate limit exceeded', ErrorCode.RATE_LIMIT_EXCEEDED);
+            mockIncr.mockImplementation(
+                async (key: string): Promise<number> => {
+                    requestCount++;
+                    if (requestCount > 1) {
+                        throw new GlitchError('Rate limit exceeded', ErrorCode.RATE_LIMIT_EXCEEDED);
+                    }
+                    return requestCount;
                 }
-                return requestCount;
-            });
+            );
 
             // First request should succeed
             await sdk.createChaosRequest({
@@ -132,13 +147,15 @@ describe('Rate Limiting', () => {
         describe('governance rate limiting', () => {
             it('should limit proposals per day', async () => {
                 let proposalCount = 0;
-                mockIncr.mockImplementation(() => {
-                    proposalCount++;
-                    if (proposalCount > 1) {
-                        return Promise.reject(new GlitchError('Rate limit exceeded', ErrorCode.RATE_LIMIT_EXCEEDED));
+                mockIncr.mockImplementation(
+                    async (key: string): Promise<number> => {
+                        proposalCount++;
+                        if (proposalCount > 1) {
+                            throw new GlitchError('Rate limit exceeded', ErrorCode.RATE_LIMIT_EXCEEDED);
+                        }
+                        return 1;
                     }
-                    return Promise.resolve(1);
-                });
+                );
 
                 // First proposal should succeed
                 await sdk.createProposal({

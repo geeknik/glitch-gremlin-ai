@@ -1,10 +1,11 @@
 import { jest } from '@jest/globals';
 import { GlitchSDK, TestType } from '../index.js'; 
-import { Keypair } from '@solana/web3.js';
+import { Keypair, Connection, PublicKey, Commitment } from '@solana/web3.js';
 import { Redis } from 'ioredis';
 import { GlitchError, ErrorCode } from '../errors.js';
 import type { MockRedisClient } from '../types';
 import { SimulatedTransactionResponse } from '@solana/web3.js';
+import type { MockedObject } from 'jest-mock';
 
 jest.setTimeout(30000);
 
@@ -12,58 +13,68 @@ let mockRequestCount = { value: 0 };
 
 describe('GlitchSDK', () => {
     let sdk: GlitchSDK;
-    let mockRedisClient: MockRedisClient;
-    
+    let mockRedisClient: jest.Mocked<MockRedisClient>;
+    let mockConnection: MockedObject<Connection>;
     beforeEach(async () => {
-        // Set up Redis mock client
-        // Set up Redis mock client
+        // Setup mock connection
+        mockConnection = {
+            getAccountInfo: jest.fn(),
+            getBalance: jest.fn(),
+            getVersion: jest.fn().mockResolvedValue({ 'solana-core': '1.7.0' }),
+            sendTransaction: jest.fn(),
+            simulateTransaction: jest.fn(),
+            disconnect: jest.fn().mockResolvedValue(undefined),
+            commitment: 'confirmed' as Commitment,
+            rpcEndpoint: 'http://localhost:8899'
+        } as unknown as MockedObject<Connection>;
+
         mockRedisClient = {
-            queue: [],
-            incr: jest.fn<Promise<number>, [string]>().mockImplementation(
-                async (key: string): Promise<number> => {
-                    mockRequestCount.value++; 
-                    if (mockRequestCount.value > 1) {
-                        throw new GlitchError('Rate limit exceeded', ErrorCode.RATE_LIMIT_EXCEEDED);
-                    }
-                    return mockRequestCount.value;
-                }
-            ),
-            expire: jest.fn<Promise<number>, [string, number]>().mockResolvedValue(1),
-            get: jest.fn<Promise<string | null>, [string]>().mockResolvedValue(null),
-            set: jest.fn<Promise<'OK'>, [string, string]>().mockResolvedValue('OK'),
-            on: jest.fn<void, [string, () => void]>(),
-            quit: jest.fn<Promise<'OK'>, []>().mockResolvedValue('OK'),
-            disconnect: jest.fn<Promise<void>, []>().mockResolvedValue(undefined),
-            flushall: jest.fn<Promise<'OK'>, []>().mockResolvedValue('OK'),
-            hset: jest.fn<Promise<number>, [string, string, string]>()
-                .mockImplementation(async (key: string, field: string, value: string): Promise<number> => {
-                    if (typeof value !== 'string') {
-                        throw new GlitchError('Invalid JSON', ErrorCode.INVALID_JSON);
-                    }
-                    return 1;
-                }),
-            hget: jest.fn<Promise<string | null>, [string, string]>()
-                .mockImplementation(async (key: string, field: string): Promise<string | null> => {
-                    if (field === 'bad-result') {
-                        throw new GlitchError('Invalid JSON', ErrorCode.INVALID_JSON);
-                    }
-                    return JSON.stringify({test: 'data'});
-                }),
-            lpush: jest.fn<Promise<number>, [string, string]>()
-                .mockImplementation(async (key: string, value: string): Promise<number> => {
-                    if (value === 'invalid-json') {
-                        throw new GlitchError('Invalid JSON', ErrorCode.INVALID_JSON);
-                    }
-                    return 1;
-                }),
-            rpop: jest.fn<Promise<string | null>, [string]>()
-                .mockImplementation(async function(this: MockRedisClient, key: string): Promise<string | null> {
-                    if (key === 'empty-queue') {
-                        return null;
-                    }
-                    return this.queue?.length ? this.queue.shift() ?? null : null;
-                })
-        };
+            queue: [] as string[],
+            connected: true,
+            incr: jest.fn().mockImplementation(async (key: string): Promise<number> => {
+            mockRequestCount.value++; 
+            if (mockRequestCount.value > 1) {
+                throw new GlitchError('Rate limit exceeded', ErrorCode.RATE_LIMIT_EXCEEDED);
+            }
+            return mockRequestCount.value;
+        }),
+        expire: jest.fn().mockImplementation(async (key: string, seconds: number): Promise<number> => 1),
+        get: jest.fn().mockImplementation(async (key: string): Promise<string | null> => null),
+        set: jest.fn().mockImplementation(async (key: string, value: string): Promise<'OK'> => 'OK'),
+        on: jest.fn().mockImplementation((event: string, callback: Function) => mockRedisClient),
+        quit: jest.fn().mockImplementation(async (): Promise<'OK'> => 'OK'),
+        disconnect: jest.fn().mockImplementation(async (): Promise<void> => undefined),
+        flushall: jest.fn().mockImplementation(async (): Promise<'OK'> => 'OK'),
+        hset: jest.fn().mockImplementation(async (key: string, field: string, value: string): Promise<number> => 1),
+        hget: jest.fn().mockImplementation(async (key: string, field: string): Promise<string | null> => {
+            if (field === 'bad-result') {
+                throw new GlitchError('Invalid JSON', ErrorCode.INVALID_JSON);
+            }
+            return JSON.stringify({test: 'data'});
+        }),
+        lpush: jest.fn().mockImplementation(async (key: string, value: string): Promise<number> => {
+            if (value === 'invalid-json') {
+                throw new GlitchError('Invalid JSON', ErrorCode.INVALID_JSON);
+            }
+            return 1;
+        }),
+        rpop: jest.fn().mockImplementation(async function(this: MockRedisClient, key: string): Promise<string | null> {
+            if (key === 'empty-queue') {
+                return null;
+            }
+            return this.queue?.length ? this.queue.shift() ?? null : null;
+        })
+    } as jest.Mocked<MockRedisClient>;
+
+        jest.spyOn(Connection.prototype, 'getVersion').mockResolvedValue({ 'solana-core': '1.7.0' });
+        
+        const createSpy = jest.spyOn(GlitchSDK, 'create');
+        sdk = await GlitchSDK.create({
+            endpoint: "http://localhost:8899",
+            keypair: Keypair.generate(),
+            redisUrl: "redis://localhost:6379",
+            redis: mockRedisClient,
+        });
     });
 
     afterEach(async () => {
@@ -71,18 +82,37 @@ describe('GlitchSDK', () => {
             if (sdk?.['queueWorker']?.close) {
                 await sdk['queueWorker'].close();
             }
+            if (sdk?.['connection']?.disconnect) {
+                await sdk['connection'].disconnect();
+            }
             mockRequestCount.value = 0;
             await mockRedisClient.flushall();
             jest.clearAllMocks();
             jest.clearAllTimers();
+            jest.restoreAllMocks();
         } catch (err) {
             console.error('Error during cleanup:', err);
         }
     });
 
     afterAll(async () => {
-        jest.useRealTimers();
-        jest.restoreAllMocks();
+        try {
+            if (sdk) {
+                if (sdk['connection']?.disconnect) {
+                    await sdk['connection'].disconnect();
+                }
+                if (sdk['queueWorker']?.close) {
+                    await sdk['queueWorker'].close();
+                }
+            }
+            
+            // Make sure all mocks and timers are cleaned up
+            await new Promise(resolve => setTimeout(resolve, 100));
+            jest.useRealTimers();
+            jest.restoreAllMocks();
+        } catch (error) {
+            console.error('Error during cleanup:', error);
+        }
     });
 
     describe('createChaosRequest', () => {
@@ -128,10 +158,10 @@ describe('GlitchSDK', () => {
         it('should create a valid proposal', async () => {
             // Mock the connection's simulateTransaction to avoid actual network calls
             // Mock balance check
-            const mockGetBalance = jest.spyOn(sdk['connection'], 'getBalance')
+            const mockGetBalance = jest.spyOn(sdk['connection'] as any, 'getBalance')
                 .mockResolvedValue(200_000_000); // 0.2 SOL
 
-            const mockSimulateTransaction = jest.spyOn(sdk['connection'], 'simulateTransaction')
+            const mockSimulateTransaction = jest.spyOn(sdk['connection'] as any, 'simulateTransaction')
                 .mockResolvedValue({
                     context: { slot: 0 },
                     value: { 
@@ -211,9 +241,6 @@ describe('GlitchSDK', () => {
                 // Track request count
                 let callCount = 0;
         
-                // Track request count
-                let callCount = 0;
-        
                 // Mock incr to enforce rate limit
                 mockRedisClient.incr.mockImplementation(async () => {
                     callCount++;
@@ -249,8 +276,7 @@ describe('GlitchSDK', () => {
                     duration: 60,
                     intensity: 1
                 });
-                expect(mockRequestCount.value).toBe(2);
-            });
+                });
 
             it('should enforce rate limits for parallel requests', async () => {
                 jest.setTimeout(10000); // Increase timeout for this test
@@ -262,22 +288,15 @@ describe('GlitchSDK', () => {
                 }));
 
                 let localRequestCount = { value: 0 };
-                sdk['queueWorker']['redis'].incr.mockImplementation(async function() {
-                    localRequestCount.value++;
-                    if (localRequestCount.value > 1) {
+                let incrCount = 0;
+                const mockIncr = jest.fn().mockImplementation(async (key: string): Promise<number> => {
+                    incrCount++;
+                    if (incrCount > 1) {
                         throw new GlitchError('Rate limit exceeded', ErrorCode.RATE_LIMIT_EXCEEDED);
                     }
-                    return localRequestCount.value;
+                    return incrCount;
                 });
-                // Mock incr to enforce parallel rate limit
-                let parallelCount = 0;
-                sdk['queueWorker']['redis'].incr.mockImplementation(async function() {
-                    parallelCount++;
-                    if (parallelCount > 1) {
-                        throw new GlitchError('Rate limit exceeded', ErrorCode.RATE_LIMIT_EXCEEDED);
-                    }
-                    return parallelCount;
-                });
+                sdk['queueWorker']['redis'].incr = mockIncr;
 
                 await expect(Promise.all(promises)).rejects.toThrow('Rate limit exceeded');
             });

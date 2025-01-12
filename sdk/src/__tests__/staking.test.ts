@@ -21,8 +21,13 @@ describe('Staking', () => {
 
     describe('stakeTokens', () => {
         it('should handle transaction failures', async () => {
+            // Mock sufficient balance to pass the initial check
+            jest.spyOn(sdk['connection'], 'getBalance')
+                .mockResolvedValueOnce(2000);
+            
+            // Mock the transaction failure
             jest.spyOn(sdk['connection'], 'sendTransaction')
-                .mockRejectedValue(new Error('Transaction failed'));
+                .mockRejectedValueOnce(new Error('Transaction failed'));
 
             await expect(sdk.stakeTokens(1000, 86400))
                 .rejects.toThrow('Transaction failed');

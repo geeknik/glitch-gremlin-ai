@@ -6,7 +6,7 @@ import {
     TransactionInstruction 
 } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
-import { GlitchError } from './errors.js';
+import { GlitchError, ErrorCode } from './errors.js';
 import { ProposalState, GovernanceConfig, ProposalMetadata } from './types.js';
 
 export class GovernanceManager {
@@ -36,24 +36,24 @@ export class GovernanceManager {
     ): Promise<ProposalMetadata> {
         const account = await connection.getAccountInfo(proposalAddress);
         if (!account) {
-            throw new GlitchError('Proposal not found', 2002);
+            throw new GlitchError('Proposal not found', ErrorCode.PROPOSAL_NOT_FOUND);
         }
 
         // Deserialize account data into ProposalMetadata
         const metadata = this.deserializeProposalData(account.data);
         
         if (Date.now() < metadata.startTime) {
-            throw new GlitchError('Proposal voting has not started', 2005);
+            throw new GlitchError('Proposal voting has not started', ErrorCode.PROPOSAL_NOT_ACTIVE);
         }
         
         if (Date.now() > metadata.endTime) {
-            throw new GlitchError('Proposal voting has ended', 2006);
+            throw new GlitchError('Proposal voting has ended', ErrorCode.PROPOSAL_REJECTED);
         }
 
         // Check quorum
         const totalVotes = metadata.voteWeights.yes + metadata.voteWeights.no + metadata.voteWeights.abstain;
         if (totalVotes < metadata.quorum) {
-            throw new GlitchError('Proposal has not reached quorum', 2007);
+            throw new GlitchError('Proposal has not reached quorum', ErrorCode.PROPOSAL_NOT_REACHED_QUORUM);
         }
 
         return metadata;
@@ -75,7 +75,7 @@ export class GovernanceManager {
         
         if (params.votingPeriod < minPeriod ||
             params.votingPeriod > maxPeriod) {
-            throw new GlitchError('Invalid voting period', 2001);
+            throw new GlitchError('Invalid voting period', ErrorCode.INSUFFICIENT_VOTING_POWER);
         }
 
         const proposalAddress = PublicKey.findProgramAddressSync(
@@ -99,7 +99,7 @@ export class GovernanceManager {
     async getProposalState(connection: Connection, proposalAddress: PublicKey): Promise<ProposalState> {
         const account = await connection.getAccountInfo(proposalAddress);
         if (!account) {
-            throw new GlitchError('Proposal not found', 2002);
+            throw new GlitchError('Proposal not found', ErrorCode.PROPOSAL_NOT_FOUND);
         }
         // TODO: Deserialize account data
         return ProposalState.Active;
@@ -117,7 +117,7 @@ export class GovernanceManager {
         // Check if wallet has already voted
         const hasVoted = metadata.votes.some(v => v.voter.equals(wallet.publicKey));
         if (hasVoted) {
-            throw new GlitchError('Already voted on this proposal', 2004);
+            throw new GlitchError('Already voted on this proposal', ErrorCode.INVALID_VOTE);
         }
 
         // Calculate vote weight if not provided
@@ -169,7 +169,7 @@ export class GovernanceManager {
     ): Promise<Transaction> {
         const state = await this.getProposalState(connection, proposalAddress);
         if (state !== ProposalState.Succeeded) {
-            throw new GlitchError('Proposal cannot be executed', 2004);
+            throw new GlitchError('Proposal cannot be executed', ErrorCode.INVALID_VOTE);
         }
 
         const executeIx = new TransactionInstruction({

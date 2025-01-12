@@ -80,9 +80,9 @@ export class GlitchSDK {
         };
         
         // Validate and set cluster URL
-        const heliusApiKey = config.heliusApiKey || process.env.HELIUS_API_KEY;
+        const heliusApiKey = config.heliusApiKey || process.env.VITE_HELIUS_API_KEY || process.env.HELIUS_API_KEY;
         if (!heliusApiKey) {
-            throw new Error('Helius API key is required. Please set HELIUS_API_KEY in .env');
+            throw new Error('Helius API key is required. Please set VITE_HELIUS_API_KEY or HELIUS_API_KEY in environment variables');
         }
         
         const clusterUrl = config.cluster || 

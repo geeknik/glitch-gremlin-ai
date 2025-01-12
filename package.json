@@ -79,11 +79,12 @@
     "@solana/wallet-adapter-vue": "^0.4.5",
     "@solana/wallet-adapter-wallets": "^0.19.32",
     "@tensorflow/tfjs-node-gpu": "^4.22.0",
+    "@types/ioredis": "^4.28.10",
     "buffer": "^6.0.3",
     "chalk": "^5.4.1",
     "dotenv": "^16.4.7",
     "eventemitter3": "^5.0.1",
-    "ioredis": "^5.3.2",
+    "ioredis": "^5.4.2",
     "process": "^0.11.10",
     "stream-browserify": "^3.0.0",
     "util": "^0.12.5"

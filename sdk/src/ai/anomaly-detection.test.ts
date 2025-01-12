@@ -1,5 +1,32 @@
 import * as tf from '@tensorflow/tfjs-node';
+import * as fs from 'fs';
 import { AnomalyDetectionModel, TimeSeriesMetrics } from './anomaly-detection';
+
+const generateNormalMetrics = (count: number): TimeSeriesMetrics[] => {
+    return Array.from({ length: count }, (_, i) => ({
+        instructionFrequency: [Math.sin(i * 0.1) + 1],
+        memoryAccess: [Math.cos(i * 0.1) + 1],
+        accountAccess: [Math.sin(i * 0.05) + 1],
+        stateChanges: [Math.cos(i * 0.05) + 1],
+        timestamp: Date.now() + i * 1000
+    }));
+};
+
+const generateAnomalousMetrics = (count: number): TimeSeriesMetrics[] => {
+    const metrics = generateNormalMetrics(count);
+    // Inject anomaly in the middle
+    const anomalyIndex = Math.floor(count / 2);
+    metrics[anomalyIndex] = {
+        instructionFrequency: [10], // Spike in instruction frequency
+        memoryAccess: [8], // Unusual memory access
+        accountAccess: [5], // Higher account access
+        stateChanges: [7], // More state changes
+        timestamp: Date.now() + anomalyIndex * 1000
+    };
+    return metrics;
+};
+
+export { generateAnomalousMetrics };
 
 describe('AnomalyDetectionModel', () => {
     let model: AnomalyDetectionModel;
@@ -12,29 +39,6 @@ describe('AnomalyDetectionModel', () => {
         await model.cleanup();
     });
 
-    const generateNormalMetrics = (count: number): TimeSeriesMetrics[] => {
-        return Array.from({ length: count }, (_, i) => ({
-            instructionFrequency: [Math.sin(i * 0.1) + 1],
-            memoryAccess: [Math.cos(i * 0.1) + 1],
-            accountAccess: [Math.sin(i * 0.05) + 1],
-            stateChanges: [Math.cos(i * 0.05) + 1],
-            timestamp: Date.now() + i * 1000
-        }));
-    };
-
-    const generateAnomalousMetrics = (count: number): TimeSeriesMetrics[] => {
-        const metrics = generateNormalMetrics(count);
-        // Inject anomaly in the middle
-        const anomalyIndex = Math.floor(count / 2);
-        metrics[anomalyIndex] = {
-            instructionFrequency: [10], // Spike in instruction frequency
-            memoryAccess: [8], // Unusual memory access
-            accountAccess: [5], // Higher account access
-            stateChanges: [7], // More state changes
-            timestamp: Date.now() + anomalyIndex * 1000
-        };
-        return metrics;
-    };
 
     describe('train', () => {
         it('should train successfully with sufficient data', async () => {
@@ -113,7 +117,7 @@ describe('AnomalyDetectionModel', () => {
 
     describe('error handling', () => {
         it('should handle training with invalid data', async () => {
-            const invalidData = [{ ...generateNormalMetrics(1)[0], instructionFrequency: ['invalid'] }];
+            const invalidData = [{ ...generateNormalMetrics(1)[0], instructionFrequency: [-1] }];
             await expect(model.train(invalidData)).rejects.toThrow('Invalid data format');
         });
 
@@ -200,3 +204,4 @@ describe('AnomalyDetectionModel', () => {
             expect(afterLoad.confidence).toBeCloseTo(beforeSave.confidence, 2);
         });
     });
+});
