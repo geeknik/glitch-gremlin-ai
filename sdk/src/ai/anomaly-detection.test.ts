@@ -8,6 +8,10 @@ const generateNormalMetrics = (count: number): TimeSeriesMetrics[] => {
         memoryAccess: [Math.cos(i * 0.1) + 1],
         accountAccess: [Math.sin(i * 0.05) + 1],
         stateChanges: [Math.cos(i * 0.05) + 1],
+        pdaValidation: [Math.sin(i * 0.15) + 1],
+        accountDataMatching: [Math.cos(i * 0.15) + 1],
+        cpiSafety: [Math.sin(i * 0.08) + 1],
+        authorityChecks: [Math.cos(i * 0.08) + 1],
         timestamp: Date.now() + i * 1000
     }));
 };
@@ -21,6 +25,10 @@ const generateAnomalousMetrics = (count: number): TimeSeriesMetrics[] => {
         memoryAccess: [8], // Unusual memory access
         accountAccess: [5], // Higher account access
         stateChanges: [7], // More state changes
+        pdaValidation: [9], // PDA validation failure
+        accountDataMatching: [8], // Account data mismatch
+        cpiSafety: [7], // Unsafe CPI pattern
+        authorityChecks: [6], // Authority validation issues
         timestamp: Date.now() + anomalyIndex * 1000
     };
     return metrics;
@@ -149,9 +157,86 @@ describe('AnomalyDetectionModel', () => {
             await expect(model.train(incompleteMetrics as any)).rejects.toThrow('Missing required metrics fields');
         });
     });
+    152|});
 
-    describe('save/load', () => {
-        const testModelPath = './test-model';
+    153|    describe('Solana Vulnerability Detection', () => {
+    154|        beforeEach(async () => {
+    155|            // Train model with normal Solana transaction patterns
+    156|            const trainingData = generateNormalMetrics(200);
+    157|            await model.train(trainingData);
+    158|        });
+    159|
+    160|        it('should detect PDA validation issues', async () => {
+    161|            const testData = generateNormalMetrics(100);
+    162|            testData[50].pdaValidation = [9.5]; // Inject PDA validation anomaly
+    163|            const result = await model.detect(testData);
+    164|            
+    165|            expect(result.isAnomaly).toBe(true);
+    166|            expect(result.details.find(d => d.type === 'pdaValidation')).toBeDefined();
+    167|            expect(result.confidence).toBeGreaterThan(0.7);
+    168|        });
+    169|
+    170|        it('should detect account data matching vulnerabilities', async () => {
+    171|            const testData = generateNormalMetrics(100);
+    172|            testData[50].accountDataMatching = [8.5]; // Inject account data mismatch
+    173|            const result = await model.detect(testData);
+    174|            
+    175|            expect(result.isAnomaly).toBe(true);
+    176|            expect(result.details.find(d => d.type === 'accountDataMatching')).toBeDefined();
+    177|            expect(result.confidence).toBeGreaterThan(0.6);
+    178|        });
+    179|
+    180|        it('should detect unsafe CPI patterns', async () => {
+    181|            const testData = generateNormalMetrics(100);
+    182|            testData[50].cpiSafety = [7.5]; // Inject unsafe CPI pattern
+    183|            const result = await model.detect(testData);
+    184|            
+    185|            expect(result.isAnomaly).toBe(true);
+    186|            expect(result.details.find(d => d.type === 'cpiSafety')).toBeDefined();
+    187|            expect(result.confidence).toBeGreaterThan(0.65);
+    188|        });
+    189|
+    190|        it('should detect authority validation issues', async () => {
+    191|            const testData = generateNormalMetrics(100);
+    192|            testData[50].authorityChecks = [6.5]; // Inject authority validation issue
+    193|            const result = await model.detect(testData);
+    194|            
+    195|            expect(result.isAnomaly).toBe(true);
+    196|            expect(result.details.find(d => d.type === 'authorityChecks')).toBeDefined();
+    197|            expect(result.confidence).toBeGreaterThan(0.75);
+    198|        });
+    199|
+    200|        it('should detect combined vulnerability patterns', async () => {
+    201|            const testData = generateNormalMetrics(100);
+    202|            // Inject multiple security issues
+    203|            testData[50] = {
+    204|                ...testData[50],
+    205|                pdaValidation: [8.0],
+    206|                accountDataMatching: [7.5],
+    207|                cpiSafety: [6.5],
+    208|                authorityChecks: [5.5]
+    209|            };
+    210|            const result = await model.detect(testData);
+    211|            
+    212|            expect(result.isAnomaly).toBe(true);
+    213|            expect(result.confidence).toBeGreaterThan(0.85);
+    214|            expect(result.details.filter(d => d.score > 0.6)).toHaveLength(4);
+    215|        });
+    216|
+    217|        it('should perform correlation analysis between different vulnerabilities', async () => {
+    218|            const testData = generateNormalMetrics(100);
+    219|            // Create correlated vulnerability pattern
+    220|            testData[50].pdaValidation = [8.5];
+    221|            testData[51].accountDataMatching = [7.5];
+    222|            testData[52].cpiSafety = [6.5];
+    223|            
+    224|            const result = await model.detect(testData);
+    225|            expect(result.isAnomaly).toBe(true);
+    226|            expect(result.details.some(d => d.correlatedPatterns?.length > 0)).toBe(true);
+    227|        });
+    228|    });
+    229|
+    230|    describe('save/load', () => {
 
         beforeEach(async () => {
             // Train model with some data before saving
