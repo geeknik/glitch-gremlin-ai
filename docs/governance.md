@@ -131,6 +131,7 @@ const stakingInfo = await worker.getStakingInfo(address)
 
 ### Staking
 - Minimum stake: 1000 GREMLINAI
+- Maximum stake: 1M GREMLINAI per address
 - Lockup periods: 1 day to 1 year
 - Higher voting power with longer lockups
 - Rewards from protocol fees
@@ -138,6 +139,10 @@ const stakingInfo = await worker.getStakingInfo(address)
 - Delegated staking support
 - Auto-compounding rewards
 - Real-time staking metrics
+- Staking tiers with bonus rewards:
+  - Bronze: 1k-10k GREMLINAI
+  - Silver: 10k-100k GREMLINAI  
+  - Gold: 100k+ GREMLINAI
 
 ### Treasury Management
 - Multi-sig controlled (3/5 signatures)

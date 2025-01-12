@@ -469,10 +469,19 @@ export class GlitchSDK {
         return await this.connection.sendTransaction(transaction, [this.wallet]);
     }
 
-    public async delegateStake(stakeId: string, delegateAddress: string): Promise<string> {
+    public async delegateStake(stakeId: string, delegateAddress: string, percentage: number = 100): Promise<string> {
+        if (percentage < 0 || percentage > 100) {
+            throw new GlitchError('Invalid delegation percentage', 1018);
+        }
+
         const stakeInfo = await this.getStakeInfo(stakeId);
         if (!stakeInfo) {
             throw new GlitchError('Stake not found', 1015);
+        }
+
+        // Check if stake is already delegated
+        if (stakeInfo.delegate && stakeInfo.delegate.toString() !== delegateAddress) {
+            throw new GlitchError('Stake already delegated to another address', 1019);
         }
 
         const delegatePubkey = new PublicKey(delegateAddress);
@@ -480,17 +489,36 @@ export class GlitchSDK {
         const instruction = new TransactionInstruction({
             keys: [
                 { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
-                { pubkey: new PublicKey(stakeId), isSigner: false, isWritable: true }
+                { pubkey: new PublicKey(stakeId), isSigner: false, isWritable: true },
+                { pubkey: delegatePubkey, isSigner: false, isWritable: true }
             ],
             programId: this.programId,
             data: Buffer.from([
                 0x05, // Delegate instruction
+                percentage,
                 ...delegatePubkey.toBuffer()
             ])
         });
 
         const transaction = new Transaction().add(instruction);
         return await this.connection.sendTransaction(transaction, [this.wallet]);
+    }
+
+    public async getDelegationInfo(stakeId: string): Promise<{
+        delegate: PublicKey | null;
+        percentage: number;
+        votingPower: bigint;
+    }> {
+        const stakeInfo = await this.getStakeInfo(stakeId);
+        if (!stakeInfo) {
+            throw new GlitchError('Stake not found', 1015);
+        }
+
+        return {
+            delegate: stakeInfo.delegate || null,
+            percentage: stakeInfo.delegate ? 100 : 0,
+            votingPower: stakeInfo.delegate ? stakeInfo.amount : BigInt(0)
+        };
     }
 
     public async unstakeTokens(stakeId: string, force = false): Promise<string> {
@@ -530,17 +558,58 @@ export class GlitchSDK {
             throw new GlitchError('Stake not found', 1015);
         }
 
+        // Calculate rewards based on staking tier
+        const stakingTier = this.getStakingTier(stakeInfo.amount);
+        const baseRewards = await this.calculateBaseRewards(stakeId);
+        const bonusRewards = this.calculateBonusRewards(baseRewards, stakingTier);
+        const totalRewards = baseRewards + bonusRewards;
+
+        if (totalRewards <= 0) {
+            throw new GlitchError('No rewards available', 1017);
+        }
+
         const instruction = new TransactionInstruction({
             keys: [
                 { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
-                { pubkey: new PublicKey(stakeId), isSigner: false, isWritable: true }
+                { pubkey: new PublicKey(stakeId), isSigner: false, isWritable: true },
+                { pubkey: this.programId, isSigner: false, isWritable: true }
             ],
             programId: this.programId,
-            data: Buffer.from([0x06]) // Claim rewards instruction
+            data: Buffer.from([
+                0x06, // Claim rewards instruction
+                ...new Array(8).fill(0).map((_, i) => (totalRewards >> (8 * i)) & 0xff)
+            ])
         });
 
         const transaction = new Transaction().add(instruction);
         return await this.connection.sendTransaction(transaction, [this.wallet]);
+    }
+
+    private getStakingTier(amount: bigint): string {
+        if (amount < BigInt(10000)) return 'bronze';
+        if (amount < BigInt(100000)) return 'silver';
+        return 'gold';
+    }
+
+    private async calculateBaseRewards(stakeId: string): Promise<number> {
+        const stakeInfo = await this.getStakeInfo(stakeId);
+        if (!stakeInfo) return 0;
+        
+        const currentTime = Date.now() / 1000;
+        const stakingDuration = currentTime - Number(stakeInfo.startTime);
+        
+        // Base reward rate: 0.1% per day
+        const baseRate = 0.001;
+        return Number(stakeInfo.amount) * baseRate * (stakingDuration / 86400);
+    }
+
+    private calculateBonusRewards(baseRewards: number, tier: string): number {
+        switch(tier) {
+            case 'bronze': return baseRewards * 0.1;
+            case 'silver': return baseRewards * 0.2;
+            case 'gold': return baseRewards * 0.5;
+            default: return 0;
+        }
     }
 
     public async getStakeInfo(stakeId: string): Promise<{
