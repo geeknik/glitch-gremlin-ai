@@ -39,6 +39,32 @@ export class GlitchSDK {
     private governanceManager: GovernanceManager;
     private lastRequestTime = 0;
     private readonly MIN_REQUEST_INTERVAL = 2000; // 2 seconds between requests
+    private readonly MAX_REQUESTS_PER_MINUTE = 3;
+    private readonly REQUEST_COOLDOWN = 2000; // 2 seconds
+    private lastRequestTime = 0;
+
+    private async checkRateLimit(): Promise<void> {
+        const now = Date.now();
+        const timeSinceLastRequest = now - this.lastRequestTime;
+        
+        if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
+            const waitTime = this.MIN_REQUEST_INTERVAL - timeSinceLastRequest;
+            throw new GlitchError(`Rate limit exceeded. Wait ${waitTime}ms`, 1007);
+        }
+
+        // Check global rate limit counter
+        const currentMinute = Math.floor(now / 60000);
+        const requestKey = `requests:${currentMinute}`;
+        
+        const requestCount = await this.queueWorker['redis'].incr(requestKey);
+        await this.queueWorker['redis'].expire(requestKey, 60);
+    
+        if (requestCount > this.MAX_REQUESTS_PER_MINUTE) {
+            throw new GlitchError('Rate limit exceeded', 1007);
+        }
+        
+        this.lastRequestTime = now;
+    }
 
     /**
      * Creates a new GlitchSDK instance
@@ -396,12 +422,21 @@ export class GlitchSDK {
     }
 
     public async stakeTokens(amount: number, lockupPeriod: number, delegateAddress?: string): Promise<string> {
+        // Check rate limit first
+        await this.checkRateLimit();
+        
         if (amount < this.MIN_STAKE_AMOUNT) {
             throw new GlitchError(`Minimum stake amount is ${this.MIN_STAKE_AMOUNT}`, 1014);
         }
 
         if (lockupPeriod < this.MIN_STAKE_LOCKUP || lockupPeriod > this.MAX_STAKE_LOCKUP) {
             throw new GlitchError('Invalid lockup period', 1014);
+        }
+
+        // Check treasury balance
+        const treasuryBalance = await this.getTreasuryBalance();
+        if (treasuryBalance < amount * 0.1) { // Ensure 10% buffer
+            throw new GlitchError('Insufficient treasury balance', 1017);
         }
 
         // Check if user has enough tokens
@@ -513,6 +548,9 @@ export class GlitchSDK {
         lockupPeriod: bigint;
         startTime: bigint;
         owner: PublicKey;
+        rewards: bigint;
+        status: 'active' | 'pending' | 'completed';
+        delegate?: PublicKey;
     } | null> {
         try {
             const stakeAccount = await this.connection.getAccountInfo(new PublicKey(stakeId));

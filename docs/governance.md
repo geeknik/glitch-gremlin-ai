@@ -62,11 +62,26 @@ const proposal = await worker.getProposal(proposalId)
 const results = await worker.getVoteResults(proposalId)
 ```
 
-## Staking
+## Staking & Treasury Management
+
+### Staking
 - Minimum stake: 1000 GREMLINAI
 - Lockup periods: 1 day to 1 year
 - Higher voting power with longer lockups
 - Rewards from protocol fees
+- Early unstake penalty (50% of staked amount)
+- Delegated staking support
+
+### Treasury Management
+- Multi-sig controlled (3/5 signatures)
+- Funds allocated for:
+  - Governance proposals
+  - Community initiatives
+  - Protocol development
+  - Emergency reserves
+- Transparent allocation tracking
+- Monthly treasury reports
+- Allocation limits per period
 - Staking contract fully implemented and tested
 - Staking UI integrated in explorer
 - Auto-compounding rewards
