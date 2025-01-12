@@ -5,6 +5,7 @@ import { ProposalState } from './types';
 export class GovernanceManager {
     programId;
     DEFAULT_CONFIG = {
+        minVotingPower: 100, // Minimum voting power required
         minStakeAmount: 1000,
         votingPeriod: 259200, // 3 days in seconds
         quorum: 10, // 10% of total supply
@@ -18,6 +19,22 @@ export class GovernanceManager {
         this.programId = programId;
         this.config = { ...this.DEFAULT_CONFIG, ...config };
     }
+
+    async checkVotingPower(connection, wallet) {
+        const votingPower = await this.calculateVoteWeight(connection, wallet.publicKey);
+        if (votingPower < this.config.minVotingPower) {
+            throw new GlitchError('Insufficient voting power', 2003);
+        }
+        return votingPower;
+    }
+
+    async checkQuorum(metadata) {
+        const totalVotes = metadata.voteWeights.yes + metadata.voteWeights.no + metadata.voteWeights.abstain;
+        if (totalVotes < metadata.quorum) {
+            throw new GlitchError('Proposal has not reached quorum', 2007);
+        }
+    }
+
     async validateProposal(connection, proposalAddress) {
         const account = await connection.getAccountInfo(proposalAddress);
         if (!account) {
@@ -31,11 +48,7 @@ export class GovernanceManager {
         if (Date.now() > metadata.endTime) {
             throw new GlitchError('Proposal voting has ended', 2006);
         }
-        // Check quorum
-        const totalVotes = metadata.voteWeights.yes + metadata.voteWeights.no + metadata.voteWeights.abstain;
-        if (totalVotes < metadata.quorum) {
-            throw new GlitchError('Proposal has not reached quorum', 2007);
-        }
+
         return metadata;
     }
     deserializeProposalData(data) {
@@ -92,13 +105,19 @@ export class GovernanceManager {
     async castVote(connection, wallet, proposalAddress, support, weight) {
         try {
             const metadata = await this.validateProposal(connection, proposalAddress);
-            // Check if wallet has already voted
-            const hasVoted = metadata.votes.some(v => v.voter.equals(wallet.publicKey));
+            const votingPower = await this.checkVotingPower(connection, wallet);
+            
+            // Check if wallet has already voted - convert stored voter string to PublicKey
+            const hasVoted = metadata.votes.some(v => 
+                new PublicKey(v.voter).equals(wallet.publicKey)
+            );
+            
             if (hasVoted) {
                 throw new GlitchError('Already voted on this proposal', 2004);
             }
-            // Calculate vote weight if not provided
-            const voteWeight = weight || 1000; // Default weight for tests
+
+            // Use calculated voting power if weight not provided
+            const voteWeight = weight || votingPower;
             const voteData = Buffer.from([
                 0x01, // Vote instruction
                 support ? 0x01 : 0x00,
@@ -134,10 +153,16 @@ export class GovernanceManager {
         return totalBalance;
     }
     async executeProposal(connection, wallet, proposalAddress) {
+        const account = await connection.getAccountInfo(proposalAddress);
+        if (!account) {
+            throw new GlitchError('Proposal not found', 2002);
+        }
+        const metadata = this.deserializeProposalData(account.data);
         const state = await this.getProposalState(connection, proposalAddress);
         if (state !== ProposalState.Succeeded) {
             throw new GlitchError('Proposal cannot be executed', 2004);
         }
+        await this.checkQuorum(metadata);
         const executeIx = new TransactionInstruction({
             keys: [
                 { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
