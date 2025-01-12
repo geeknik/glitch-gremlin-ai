@@ -22,7 +22,7 @@ jest.setTimeout(30000); // 30 seconds for more reliable CI runs
 
 describe('GovernanceManager', () => {
     let governanceManager: GovernanceManager;
-    let connection: jest.Mocked<Connection>;
+    let connection: jest.MockedObject<Connection>;
     let wallet: Keypair;
 
     beforeEach(() => {
@@ -34,13 +34,13 @@ describe('GovernanceManager', () => {
             getVersion: jest.fn(),
             commitment: 'confirmed' as Commitment,
             rpcEndpoint: 'http://localhost:8899',
-            getBalance: jest.fn().mockResolvedValue(Promise.resolve(1000000000)),
-            getRecentBlockhash: jest.fn().mockResolvedValue(Promise.resolve({
+            getBalance: jest.fn().mockResolvedValue(1000000000),
+            getRecentBlockhash: jest.fn().mockResolvedValue({
                 blockhash: 'test-blockhash',
                 feeCalculator: {
                     lamportsPerSignature: 5000
                 }
-            }))
+            })
         } as unknown as MockedObject<Connection>;
         // Configure default mock implementations
         (connection.getAccountInfo as jest.MockedFunction<Connection['getAccountInfo']>).mockResolvedValue({
