@@ -449,8 +449,8 @@ describe('GovernanceManager', () => {
             
             // Mock delegated voting power
             jest.spyOn(governanceManager as any, 'calculateVoteWeight')
-                .mockImplementation(async (wallet: PublicKey) => {
-                    if (wallet.equals(delegateWallet.publicKey)) {
+                .mockImplementation(async (wallet: unknown) => {
+                    if (wallet instanceof PublicKey && wallet.equals(delegateWallet.publicKey)) {
                         return 1000;
                     }
                     return 0;
