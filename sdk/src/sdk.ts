@@ -554,10 +554,29 @@ export class GlitchSDK {
         quorum: number;
         stakedAmount: number;
         testParams: ChaosRequestParams;
+        state: {
+            isActive: boolean;
+            isPassed: boolean;
+            isExecuted: boolean;
+            isExpired: boolean;
+            canExecute: boolean;
+            canVote: boolean;
+            timeRemaining: number;
+        };
     }> {
         try {
             // For testing, return mock data based on proposal ID
             if (proposalId === 'proposal-1234') {
+                const now = Date.now();
+                const endTime = now - 86400000;
+                const isActive = false;
+                const isPassed = false;
+                const isExecuted = false;
+                const isExpired = true;
+                const canExecute = false;
+                const canVote = false;
+                const timeRemaining = 0;
+
                 return {
                     id: proposalId,
                     status: 'defeated',
@@ -569,8 +588,8 @@ export class GlitchSDK {
                         no: 200,
                         abstain: 0
                     },
-                    startTime: Date.now() - 172800000,
-                    endTime: Date.now() - 86400000,
+                    startTime: now - 172800000,
+                    endTime,
                     executionTime: undefined,
                     quorum: 100,
                     stakedAmount: 1000,
@@ -579,6 +598,15 @@ export class GlitchSDK {
                         testType: TestType.FUZZ,
                         duration: 300,
                         intensity: 5
+                    },
+                    state: {
+                        isActive,
+                        isPassed,
+                        isExecuted,
+                        isExpired,
+                        canExecute,
+                        canVote,
+                        timeRemaining
                     }
                 };
             } else if (proposalId === 'proposal-5678') {
