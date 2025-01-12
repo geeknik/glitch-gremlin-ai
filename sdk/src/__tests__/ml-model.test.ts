@@ -186,7 +186,11 @@ describe('VulnerabilityDetectionModel Tests', () => {
             try {
                 await model.predict([]);
             } catch (error) {
-                expect(error.message).toContain('Invalid features array');
+                if (error instanceof Error) {
+                    expect(error.message).toContain('Invalid features array');
+                } else {
+                    fail('Expected an Error but got something else');
+                }
             }
 
             // Verify model still works
