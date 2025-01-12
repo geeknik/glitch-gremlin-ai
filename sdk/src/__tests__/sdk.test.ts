@@ -32,12 +32,12 @@ describe('GlitchSDK', () => {
             queue: [] as string[],
             connected: true,
             incr: jest.fn().mockImplementation(async (key: string): Promise<number> => {
-            mockRequestCount.value++; 
-            if (mockRequestCount.value > 1) {
-                throw new GlitchError('Rate limit exceeded', ErrorCode.RATE_LIMIT_EXCEEDED);
-            }
-            return mockRequestCount.value;
-        }),
+                mockRequestCount.value++;
+                if (mockRequestCount.value > 1) {
+                    throw new GlitchError('Rate limit exceeded', ErrorCode.RATE_LIMIT_EXCEEDED);
+                }
+                return mockRequestCount.value;
+            }),
         expire: jest.fn().mockImplementation(async (key: string, seconds: number): Promise<number> => 1),
         get: jest.fn().mockImplementation(async (key: string): Promise<string | null> => null),
         set: jest.fn().mockImplementation(async (key: string, value: string): Promise<'OK'> => 'OK'),

@@ -26,7 +26,6 @@ describe('GovernanceManager', () => {
     let wallet: Keypair;
 
     beforeEach(() => {
-        // Initialize mocks
         // Initialize mocks with proper types
         connection = {
             getAccountInfo: jest.fn(),

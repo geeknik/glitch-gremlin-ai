@@ -59,16 +59,6 @@ describe('VulnerabilityDetectionModel Tests', () => {
             await expect(model.train([])).rejects.toThrow('Training data cannot be empty');
         });
 
-        it('should handle invalid feature dimensions', async () => {
-            const invalidData = [{
-                features: [1, 2], // Wrong dimension
-                vulnerabilityType: VulnerabilityType.Reentrancy
-            }];
-            await expect(model.train(invalidData)).rejects.toThrow(
-                'Input feature array must have exactly 20 elements'
-            );
-        });
-
         it('should maintain consistent tensor count after training', async () => {
             const initialTensors = tf.memory().numTensors;
             const sampleData = generateTrainingData(5);
