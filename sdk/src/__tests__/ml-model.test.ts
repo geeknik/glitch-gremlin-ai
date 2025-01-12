@@ -173,15 +173,7 @@ describe('VulnerabilityDetectionModel Tests', () => {
             await model.train(trainData);
 
             // Force an error
-            try {
-                await model.predict([]);
-            } catch (error) {
-                if (error instanceof Error) {
-                    expect(error.message).toContain('Invalid features array');
-                } else {
-                    fail('Expected an Error but got something else');
-                }
-            }
+            await expect(model.predict([])).rejects.toThrow('Invalid features array');
 
             // Verify model still works
             const validFeatures = new Array(20).fill(0).map(() => Math.random());

@@ -42,28 +42,6 @@ export class GlitchSDK {
     private readonly MAX_REQUESTS_PER_MINUTE = 3;
     private readonly REQUEST_COOLDOWN = 2000; // 2 seconds
 
-    private async checkRateLimit(): Promise<void> {
-        const now = Date.now();
-        const timeSinceLastRequest = now - this.lastRequestTime;
-        
-        if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
-            const waitTime = this.MIN_REQUEST_INTERVAL - timeSinceLastRequest;
-            throw new GlitchError(`Rate limit exceeded. Wait ${waitTime}ms`, 1007);
-        }
-
-        // Check global rate limit counter
-        const currentMinute = Math.floor(now / 60000);
-        const requestKey = `requests:${currentMinute}`;
-        
-        const requestCount = await this.queueWorker['redis'].incr(requestKey);
-        await this.queueWorker['redis'].expire(requestKey, 60);
-    
-        if (requestCount > this.MAX_REQUESTS_PER_MINUTE) {
-            throw new GlitchError('Rate limit exceeded', 1007);
-        }
-        
-        this.lastRequestTime = now;
-    }
 
     /**
      * Creates a new GlitchSDK instance
