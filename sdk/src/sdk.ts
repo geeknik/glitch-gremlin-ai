@@ -415,12 +415,35 @@ export class GlitchSDK {
         // Check rate limit first
         await this.checkRateLimit();
         
+        // Validate stake amount
+        if (typeof amount !== 'number' || isNaN(amount) || amount <= 0) {
+            throw new GlitchError('Invalid stake amount', ErrorCode.INVALID_AMOUNT);
+        }
+        
         if (amount < this.MIN_STAKE_AMOUNT) {
-            throw new GlitchError(`Minimum stake amount is ${this.MIN_STAKE_AMOUNT}`, 1014);
+            throw new GlitchError(
+                `Minimum stake amount is ${this.MIN_STAKE_AMOUNT}`, 
+                ErrorCode.STAKE_TOO_LOW
+            );
+        }
+
+        if (amount > 10_000_000) { // 10M max stake
+            throw new GlitchError(
+                'Maximum stake amount exceeded',
+                ErrorCode.STAKE_TOO_HIGH
+            );
+        }
+
+        // Validate lockup period
+        if (typeof lockupPeriod !== 'number' || isNaN(lockupPeriod) || lockupPeriod <= 0) {
+            throw new GlitchError('Invalid lockup period', ErrorCode.INVALID_LOCKUP_PERIOD);
         }
 
         if (lockupPeriod < this.MIN_STAKE_LOCKUP || lockupPeriod > this.MAX_STAKE_LOCKUP) {
-            throw new GlitchError('Invalid lockup period', 1014);
+            throw new GlitchError(
+                `Lockup period must be between ${this.MIN_STAKE_LOCKUP} and ${this.MAX_STAKE_LOCKUP} seconds`,
+                ErrorCode.INVALID_LOCKUP_PERIOD
+            );
         }
 
         // Check treasury balance
@@ -460,8 +483,33 @@ export class GlitchSDK {
     }
 
     public async delegateStake(stakeId: string, delegateAddress: string, percentage: number = 100): Promise<string> {
-        if (percentage < 0 || percentage > 100) {
-            throw new GlitchError('Invalid delegation percentage', 1018);
+        // Validate stake ID
+        if (!stakeId || typeof stakeId !== 'string') {
+            throw new GlitchError('Invalid stake ID', ErrorCode.INVALID_STAKE_ID);
+        }
+
+        // Validate delegate address
+        try {
+            new PublicKey(delegateAddress);
+        } catch {
+            throw new GlitchError('Invalid delegate address', ErrorCode.INVALID_ADDRESS);
+        }
+
+        // Validate percentage
+        if (typeof percentage !== 'number' || isNaN(percentage) || percentage < 0 || percentage > 100) {
+            throw new GlitchError(
+                'Delegation percentage must be between 0 and 100',
+                ErrorCode.INVALID_DELEGATION_PERCENTAGE
+            );
+        }
+
+        // Check if stake is already delegated
+        const stakeInfo = await this.getStakeInfo(stakeId);
+        if (stakeInfo.delegate && stakeInfo.delegate.toString() !== delegateAddress) {
+            throw new GlitchError(
+                'Stake is already delegated to another address',
+                ErrorCode.STAKE_ALREADY_DELEGATED
+            );
         }
 
         const stakeInfo = await this.getStakeInfo(stakeId);
@@ -543,19 +591,47 @@ export class GlitchSDK {
     }
 
     public async claimRewards(stakeId: string): Promise<string> {
-        const stakeInfo = await this.getStakeInfo(stakeId);
-        if (!stakeInfo) {
-            throw new GlitchError('Stake not found', 1015);
+        // Validate stake ID
+        if (!stakeId || typeof stakeId !== 'string') {
+            throw new GlitchError('Invalid stake ID', ErrorCode.INVALID_STAKE_ID);
         }
 
-        // Calculate rewards based on staking tier
+        const stakeInfo = await this.getStakeInfo(stakeId);
+        if (!stakeInfo) {
+            throw new GlitchError('Stake not found', ErrorCode.STAKE_NOT_FOUND);
+        }
+
+        // Check if rewards are available
+        if (stakeInfo.rewards <= 0) {
+            throw new GlitchError('No rewards available', ErrorCode.NO_REWARDS_AVAILABLE);
+        }
+
+        // Verify stake is not locked
+        const currentTime = Math.floor(Date.now() / 1000);
+        if (currentTime < Number(stakeInfo.startTime) + Number(stakeInfo.lockupPeriod)) {
+            throw new GlitchError(
+                'Cannot claim rewards while stake is locked',
+                ErrorCode.STAKE_LOCKED
+            );
+        }
+
+        // Calculate rewards
         const stakingTier = this.getStakingTier(stakeInfo.amount);
         const baseRewards = await this.calculateBaseRewards(stakeId);
-        const bonusRewards = await this.calculateBonusRewards(baseRewards, stakingTier, stakeInfo.owner);
+        const bonusRewards = await this.calculateBonusRewards(
+            baseRewards, 
+            stakingTier, 
+            stakeInfo.owner
+        );
         const totalRewards = baseRewards + bonusRewards;
 
-        if (totalRewards <= 0) {
-            throw new GlitchError('No rewards available', 1017);
+        // Verify treasury has sufficient funds
+        const treasuryBalance = await this.getTreasuryBalance();
+        if (treasuryBalance < totalRewards) {
+            throw new GlitchError(
+                'Insufficient treasury balance to pay rewards',
+                ErrorCode.INSUFFICIENT_TREASURY_BALANCE
+            );
         }
 
         const instruction = new TransactionInstruction({
