@@ -379,7 +379,16 @@ export class GlitchSDK {
                     no: 0,
                     abstain: 0
                 },
-                endTime: Date.now() + ((this.governanceConfig?.votingPeriod || 259200) * 1000)
+                endTime: Date.now() + ((this.governanceConfig?.votingPeriod || 259200) * 1000),
+                state: {
+                    isActive: true,
+                    isPassed: false,
+                    isExecuted: false,
+                    isExpired: false,
+                    canExecute: false,
+                    canVote: true,
+                    timeRemaining: this.governanceConfig?.votingPeriod || 259200
+                }
             };
         } catch (error) {
             if (error instanceof Error) {
