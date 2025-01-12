@@ -10,6 +10,8 @@ export enum ErrorCode {
     INVALID_JSON = 1008,
     TREASURY_ERROR = 1009,
     INVALID_AMOUNT = 1010,
+    TREASURY_ERROR = 1009,
+    INVALID_AMOUNT = 1010,
     // Voting and balance errors (1000-1099) 
     INSUFFICIENT_VOTE_BALANCE = 1009,
     ALREADY_VOTED = 1010,
