@@ -133,6 +133,11 @@ const stakingInfo = await worker.getStakingInfo(address)
 - Minimum stake: 1000 GREMLINAI
 - Maximum stake: 1M GREMLINAI per address
 - Lockup periods: 1 day to 1 year
+- SP00GE token holder benefits:
+  - 2x voting power multiplier for SP00GE holders
+  - 25% bonus on staking rewards
+  - Early access to new features
+  - Exclusive governance proposals
 - Higher voting power with longer lockups
 - Rewards from protocol fees
 - Early unstake penalty (50% of staked amount)

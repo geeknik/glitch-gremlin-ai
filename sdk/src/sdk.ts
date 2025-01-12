@@ -395,6 +395,10 @@ export class GlitchSDK {
             throw new GlitchError('Insufficient token balance to vote', 1009);
         }
 
+        // Check for SP00GE holder status
+        const isSP00GEHolder = await this.isSP00GEHolder(this.wallet.publicKey);
+        const votingPowerMultiplier = isSP00GEHolder ? 2 : 1;
+
         // Check for double voting
         const hasVoted = await this.hasVotedOnProposal(proposalId);
         if (hasVoted) {
@@ -561,7 +565,7 @@ export class GlitchSDK {
         // Calculate rewards based on staking tier
         const stakingTier = this.getStakingTier(stakeInfo.amount);
         const baseRewards = await this.calculateBaseRewards(stakeId);
-        const bonusRewards = this.calculateBonusRewards(baseRewards, stakingTier);
+        const bonusRewards = await this.calculateBonusRewards(baseRewards, stakingTier, stakeInfo.owner);
         const totalRewards = baseRewards + bonusRewards;
 
         if (totalRewards <= 0) {
@@ -603,12 +607,36 @@ export class GlitchSDK {
         return Number(stakeInfo.amount) * baseRate * (stakingDuration / 86400);
     }
 
-    private calculateBonusRewards(baseRewards: number, tier: string): number {
+    private async calculateBonusRewards(baseRewards: number, tier: string, walletAddress: PublicKey): Promise<number> {
+        let bonus = 0;
+        
+        // Tier bonuses
         switch(tier) {
-            case 'bronze': return baseRewards * 0.1;
-            case 'silver': return baseRewards * 0.2;
-            case 'gold': return baseRewards * 0.5;
-            default: return 0;
+            case 'bronze': bonus += baseRewards * 0.1; break;
+            case 'silver': bonus += baseRewards * 0.2; break;
+            case 'gold': bonus += baseRewards * 0.5; break;
+        }
+
+        // SP00GE holder bonus
+        const isSP00GEHolder = await this.isSP00GEHolder(walletAddress);
+        if (isSP00GEHolder) {
+            bonus += baseRewards * 0.25;
+        }
+
+        return bonus;
+    }
+
+    private readonly SP00GE_TOKEN_ADDRESS = new PublicKey('34D7VCSA7uKsCHe5rRs5NpnkGRy7PW4g41asJnZ9pump');
+
+    public async isSP00GEHolder(walletAddress: PublicKey): Promise<boolean> {
+        try {
+            const tokenAccounts = await this.connection.getParsedTokenAccountsByOwner(walletAddress, {
+                mint: this.SP00GE_TOKEN_ADDRESS
+            });
+            return tokenAccounts.value.length > 0;
+        } catch (error) {
+            console.error('Error checking SP00GE balance:', error);
+            return false;
         }
     }
 
@@ -620,6 +648,7 @@ export class GlitchSDK {
         rewards: bigint;
         status: 'active' | 'pending' | 'completed';
         delegate?: PublicKey;
+        isSP00GEHolder: boolean;
     } | null> {
         try {
             const stakeAccount = await this.connection.getAccountInfo(new PublicKey(stakeId));
