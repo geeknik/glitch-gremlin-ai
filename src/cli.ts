@@ -10,13 +10,6 @@ interface ProgramOptions {
     intensity: number;
 }
 
-interface ProgramOptions {
-    targetProgram: string;
-    type: string;
-    duration: string;
-    intensity: string;
-}
-
 const program = new Command();
 
 program

@@ -1,5 +1,5 @@
 import * as tf from '@tensorflow/tfjs-node';
-import { MutationOperator } from './mutation-operators';
+import { SmartMutationOperator } from './reinforcement-fuzzing-utils.js';
 
 /**
 * Interface defining the state representation for the RL agent
@@ -8,7 +8,7 @@ interface FuzzingState {
     programCounter: number;
     coverage: number;
     lastCrash: number;
-    mutationHistory: MutationOperator[];
+    mutationHistory: string[];
     executionTime: number;
 }
 

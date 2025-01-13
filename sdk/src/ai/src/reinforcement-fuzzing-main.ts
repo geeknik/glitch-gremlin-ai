@@ -1,10 +1,10 @@
 import { Command } from 'commander';
-import { TestType } from './ai/src/types.js';
-import { GlitchError } from './errors.js';
+import { TestType } from './types.js';
+import { GlitchError } from '../../errors.js';
 import winston from 'winston';
 import { Server as WebSocketServer } from 'ws';
 import { RLFuzzingModel } from './reinforcement-fuzzing';
-import { MetricsCollector } from './reinforcement-fuzzing-utils';
+import { MetricsCollector } from './reinforcement-fuzzing-utils.js';
 import { DashboardServer } from './dashboard-server';
 
 // Configuration types
