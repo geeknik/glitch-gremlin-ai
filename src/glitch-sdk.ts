@@ -1,11 +1,17 @@
-class GlitchSDK {
-private constructor(config: any) {
-    // Initialize with config
+export interface GlitchSDKConfig {
+    cluster?: string;
+    wallet?: any;
+    modelPath?: string;
 }
 
-static create(config: any) {
-    return new GlitchSDK(config);
-}
+export class GlitchSDK {
+    private constructor(config: GlitchSDKConfig) {
+        // Initialize with config
+    }
+
+    static async init(config: GlitchSDKConfig): Promise<GlitchSDK> {
+        return new GlitchSDK(config);
+    }
 }
 
 export default GlitchSDK;
