@@ -235,13 +235,13 @@ jest.setTimeout(30000); // 30 seconds for more reliable CI runs
 // Mock proposal data at top level scope
 
 
-beforeEach(() => {
+beforeAll(() => {
     connection = {
         commitment: 'confirmed',
         rpcEndpoint: 'http://localhost:8899',
         getAccountInfo: jest.fn().mockResolvedValue({
             data: Buffer.alloc(0),
-            executable: false,
+            executable: false, 
             lamports: 0,
             owner: PublicKey.default,
             rentEpoch: 0
@@ -249,7 +249,7 @@ beforeEach(() => {
         sendTransaction: jest.fn().mockImplementation(
             async (transaction: Transaction | VersionedTransaction, signers?: Signer[], options?: SendOptions) => 'mock-signature'
         ),
-        simulateTransaction: jest.fn().mockImplementation(async () => ({
+        simulateTransaction: jest.fn().mockResolvedValue({
             context: { slot: 0 },
             value: {
                 err: null,
@@ -258,22 +258,8 @@ beforeEach(() => {
                 unitsConsumed: 0,
                 returnData: null
             }
-        })),
-            async (transaction: Transaction | VersionedTransaction, config?: SimulateTransactionConfig) => ({
-                context: { slot: 0 },
-                value: {
-                    err: null,
-                    logs: [],
-                    accounts: null,
-                    unitsConsumed: 0,
-                    returnData: null
-                }
-            })
-        ),
-        getLatestBlockhash: jest.fn().mockResolvedValue({
-            blockhash: 'mock-blockhash',
-            lastValidBlockHeight: 1000
         }),
+        getLatestBlockhash: jest.fn().mockResolvedValue({
             blockhash: 'mock-blockhash',
             lastValidBlockHeight: 1000
         }),
@@ -293,27 +279,39 @@ beforeEach(() => {
             value: []
         })
     };
+});
+    beforeEach(() => {
+        wallet = Keypair.generate();
+        governanceManager = new GovernanceManager(
+            new PublicKey('GLt5cQeRgVMqnE9DGJQNNrbAfnRQYWqYVNWnJo7WNLZ9')
+        );
 
-    wallet = Keypair.generate();
-    governanceManager = new GovernanceManager(
-        new PublicKey('GLt5cQeRgVMqnE9DGJQNNrbAfnRQYWqYVNWnJo7WNLZ9')
-    );
+        mockProposalData = {
+            state: ProposalState.Active,
+            executed: false,
+            title: "Test Proposal",
+            description: "Test Description",
+            proposer: wallet.publicKey,
+            startTime: Date.now() - 1000,
+            endTime: Date.now() + 86400000,
+            timeLockEnd: Date.now() + 172800000,
+            voteWeights: { yes: 0, no: 0, abstain: 0 },
+            votes: [],
+            yesVotes: 0,
+            noVotes: 0,
+            quorumRequired: 100,
+            status: 'active'
+        };
 
-    mockProposalData = {
-        state: ProposalState.Active,
-        executed: false,
-        title: "Test Proposal",
-        description: "Test Description",
-        proposer: wallet.publicKey,
-        startTime: Date.now() - 1000,
-        endTime: Date.now() + 86400000,
-        timeLockEnd: Date.now() + 172800000,
-        voteWeights: { yes: 0, no: 0, abstain: 0 },
-        votes: [],
-        yesVotes: 0,
-        noVotes: 0,
-        quorumRequired: 100
-    };
+        validateProposalMock = jest.spyOn(governanceManager as any, 'validateProposal')
+            .mockImplementation(() => Promise.resolve(mockProposalData));
+            
+        getAccountInfoMock = jest.spyOn(connection, 'getAccountInfo');
+        simulateTransactionMock = jest.spyOn(connection, 'simulateTransaction'); 
+        sendTransactionMock = jest.spyOn(connection, 'sendTransaction');
+        
+        proposalAddress = new PublicKey(Keypair.generate().publicKey);
+    });
 
     validateProposalMock = jest.spyOn(governanceManager as any, 'validateProposal')
         .mockImplementation(() => Promise.resolve(mockProposalData));
@@ -1111,7 +1109,6 @@ describe('executeProposal', () => {
             jest.spyOn(governanceManager as any, 'getVoteCount')
                 .mockResolvedValue({ yes: 100, no: 0, abstain: 0 });
 
-                    beforeEach(() => {
                     wallet = Keypair.generate();
                     connection = {
                         commitment: 'confirmed' as Commitment,
