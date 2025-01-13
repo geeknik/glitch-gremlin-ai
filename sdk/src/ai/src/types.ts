@@ -28,3 +28,24 @@ export interface TrainingConfig {
     validationSplit: number;
     patience?: number;
 }
+export interface MetricsCollector {
+    collect(): Promise<void>;
+    stop(): Promise<void>;
+}
+
+export interface TimeSeriesMetric {
+    timestamp: number;
+    value: number;
+    type: string;
+}
+
+export interface SecurityMetric {
+    score: number;
+    details: string[];
+    location?: string;
+}
+
+export interface SecurityMetrics {
+    arithmetic?: SecurityMetric;
+    input?: SecurityMetric;
+}

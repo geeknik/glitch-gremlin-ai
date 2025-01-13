@@ -4,7 +4,11 @@ import { VulnerabilityType } from '../types.js';
 export class Fuzzer {
     private readonly MAX_UINT64 = BigInt('18446744073709551615');
     
-    constructor(config: { port: number; metricsCollector: MetricsCollector }) {
+    private port: number;
+    private metricsCollector: any; // TODO: Add proper type
+    private maxIterations: number = 1000;
+
+    constructor(config: { port: number; metricsCollector: any }) {
         this.port = config.port;
         this.metricsCollector = config.metricsCollector;
     }

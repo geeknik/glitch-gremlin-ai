@@ -3,6 +3,13 @@ import { GlitchSDK } from './glitch-sdk.js';
 import { TestType } from './types.js';
 import { GlitchError } from './errors.js';
 
+interface ProgramOptions {
+    targetProgram: string;
+    type: string;
+    duration: string;
+    intensity: string;
+}
+
 const program = new Command();
 
 program
