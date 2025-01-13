@@ -159,7 +159,7 @@ async train(metrics: TimeSeriesMetric[]): Promise<void> {
     const threshold = sorted[index]; // Manual quantile calculation
     
     this.thresholds = {
-    reconstruction: threshold.dataSync()[0]
+    reconstruction: threshold
     };
 }
 
