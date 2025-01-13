@@ -1,10 +1,10 @@
 {
-  "name": "glitch-gremlin", // Or whatever your root project's name is
+  "name": "glitch-gremlin",
   "version": "1.0.0",
   "workspaces": [
     "sdk"
   ],
-  "private": true, // Add this if you don't want to publish the root package
+  "private": true,
   "scripts": {
     "build": "npm run build --workspace=@glitch-gremlin/sdk"
   }
