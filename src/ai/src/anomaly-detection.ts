@@ -135,10 +135,11 @@ async train(metrics: TimeSeriesMetric[]): Promise<void> {
     const tensorData = this.preprocessMetrics(metrics);
 
     const trainCallback = {
-    onEpochEnd: (epoch: number) => {
+    onEpochEnd: (epoch: number, logs?: tf.Logs) => {
         this.emit('trainingProgress', {
         epoch,
-        totalEpochs: this.config.epochs
+        totalEpochs: this.config.epochs,
+        loss: logs?.loss?.toFixed(4)
         });
     }
     };
