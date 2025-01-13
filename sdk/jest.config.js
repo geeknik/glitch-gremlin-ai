@@ -1,5 +1,5 @@
 /** @type {import('jest').Config} */
-export default {
+module.exports = {
     extensionsToTreatAsEsm: ['.ts', '.tsx'],
     moduleNameMapper: {
         '^@/(.*)$': '<rootDir>/src/$1',
