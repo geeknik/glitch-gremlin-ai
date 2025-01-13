@@ -1,36 +1,17 @@
-{
-"compilerOptions": {
-    "target": "ESNext",
-    "module": "ESNext",
-    "moduleResolution": "node",
-    "allowJs": true,
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "baseUrl": ".",
-    "paths": {
-    "@glitch-gremlin/sdk": ["./sdk/src/index.ts"],
-    "@glitch-gremlin/*": ["./*/src"]
-    },
-    "declaration": true,
-    "sourceMap": true,
-    "composite": true
-},
-"references": [
-    { "path": "./sdk" },
-    { "path": "./cli" }
-],
-"include": [
-    "src/**/*.ts",
-    "src/**/*.js",
-    "src/**/*.json",
-    "src/**/__tests__/**/*.ts"
-],
-"exclude": [
-    "node_modules",
-    "dist"
-]
-}
+// src/index.ts
+import GlitchSDK from './glitch-sdk';
+
+const sdk1 = await GlitchSDK.init({
+    cluster: process.env.SOLANA_CLUSTER || 'https://api.testnet.solana.com',
+    // other config
+});
+
+const sdk2 = await GlitchSDK.init({
+    cluster: process.env.SOLANA_CLUSTER || 'devnet',
+    // other config
+});
+
+const sdk3 = await GlitchSDK.init({
+    cluster: process.env.SOLANA_CLUSTER || 'devnet',
+    // other config
+});
