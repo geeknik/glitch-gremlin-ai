@@ -4,6 +4,11 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "outDir": "./dist/esm",
-    "declarationDir": "./dist/esm"
-  }
+    "declarationDir": "./dist/esm",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["src/**/*.test.ts", "src/**/__tests__/**"]
 }
