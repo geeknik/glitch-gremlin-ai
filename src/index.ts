@@ -1,5 +1,6 @@
 // src/index.ts
 import GlitchSDK from './glitch-sdk';
+export { VulnerabilityDetectionModel } from './ai/src/ml-model.js';
 
 async function initializeSDKs() {
     const sdk1 = await GlitchSDK.init({

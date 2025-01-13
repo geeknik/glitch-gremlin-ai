@@ -1,4 +1,5 @@
 import * as tf from '@tensorflow/tfjs-node';
+import { VulnerabilityType } from '../../../types';
 
 export interface ModelOutput {
     prediction: number[];
@@ -6,14 +7,14 @@ export interface ModelOutput {
 }
 
 export class MLModel {
-    private model: tf.LayersModel;
-    private isInitialized: boolean = false;
+    protected model: tf.LayersModel;
+    protected isInitialized: boolean = false;
 
     constructor() {
         this.model = this.buildModel();
     }
 
-    private buildModel(): tf.LayersModel {
+    protected buildModel(): tf.LayersModel {
         const model = tf.sequential({
             layers: [
                 tf.layers.dense({ units: 64, activation: 'relu', inputShape: [20] }),
