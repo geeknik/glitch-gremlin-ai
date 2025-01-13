@@ -10,7 +10,7 @@ interface MockRedis extends Omit<RedisType, 'quit' | 'disconnect' | 'on' | 'incr
     connected: boolean;
     quit: jest.MockedFunction<() => Promise<'OK'>>;
     disconnect: jest.MockedFunction<() => Promise<void>>;
-    on: jest.MockedFunction<(event: string, callback: Function) => void>;
+    on: jest.MockedFunction<(event: string, callback: Callback) => void>;
     incr: jest.MockedFunction<(key: string) => Promise<number>>;
     expire: jest.MockedFunction<(key: string, seconds: number) => Promise<number>>;
     get: jest.MockedFunction<(key: string) => Promise<string | null>>;
@@ -21,66 +21,7 @@ interface MockRedis extends Omit<RedisType, 'quit' | 'disconnect' | 'on' | 'incr
     lpush: jest.MockedFunction<(key: string, value: string) => Promise<number>>;
     rpop: jest.MockedFunction<(key: string) => Promise<string | null>>;
 }
-    disconnect: jest.fn().mockImplementation(async (): Promise<void> => {
-        redisMock.connected = false;
-            on: jest.fn(),
-    incr: jest.fn().mockImplementation(async (key: string): Promise<number> => 1),
-lve();
-    }),
-    on: jest.fn(),
-    incr: jest.fn().mockImplementation(async (key: string): Promise<number> => {
-        if (redisMock.connected === false) {
-            throw new GlitchError('Connection failed', ErrorCode.CONNECTION_ERROR);
-        }
-        return 1;
-    }),
-    expire: jest.fn().mockImplementation(async (key: string, seconds: number): Promise<number> => 1),
-    get: jest.fn().mockImplementation(async (key: string): Promise<string | null> => null),
-    set: jest.fn().mockImplementation(async (key: string, value: string): Promise<'OK'> => 'OK'),
-    flushall: jest.fn().mockImplementation(async (): Promise<'OK'> => 'OK'),
-    hset: jest.fn().mockImplementation(async (key: string, field: string, value: string): Promise<number> => {
-    get: jest.fn().mockImplementation(async (key: string): Promise<string | null> => null);
-    set: jest.fn().mockImplementation(async (key: string, value: string): Promise<'OK'> => 'OK');
-    flushall: jest.fn().mockImplementation(async (): Promise<'OK'> => 'OK');
-    hset: jest.fn().mockImplementation(async (key: string, field: string, value: string): Promise<number> => {
-        if (typeof value !== 'string') {
-            throw new GlitchError('Invalid JSON', ErrorCode.INVALID_JSON);
-        }
-        return 1;
-    }),
-    hget: jest.fn().mockImplementation(async (key: string, field: string): Promise<string | null> => {
-        if (field === 'bad-result') {
-            throw new GlitchError('Invalid JSON', ErrorCode.INVALID_JSON);
-        }
-        if (field === 'non-existent-id') {
-            return null;
-        }
-        return JSON.stringify({
-            requestId: field,
-            status: 'completed',
-            resultRef: 'ipfs://test',
-            logs: ['Test completed'],
-            metrics: {
-                totalTransactions: 100,
-                errorRate: 0,
-                avgLatency: 100
-            }
-        });
-    }),
-    lpush: jest.fn().mockImplementation(async (key: string, value: string): Promise<number> => {
-        if (value === 'invalid-json') {
-            throw new GlitchError('Invalid JSON', ErrorCode.INVALID_JSON);
-        }
-        redisMock.queue.push(value);
-        return 1;
-    }),
-    rpop: jest.fn().mockImplementation(async (key: string): Promise<string | null> => {
-        if (key === 'empty-queue') {
-            return null;
-        }
-        return redisMock.queue.length > 0 ? redisMock.queue.shift() : null;
-    })
-};
+
 import { GlitchError } from '../errors.js';
 import { ErrorCode } from '../errors.js';
 // Increase timeout for all tests
@@ -91,10 +32,17 @@ describe('RedisQueueWorker', () => {
     let redis: MockRedis;
 
     beforeAll(() => {
-        // Enhanced Redis mock with proper error handling and typed implementations
         const redisMock: MockRedis = {
             connected: true,
             queue: [] as string[],
+            quit: jest.fn().mockImplementation(async (): Promise<'OK'> => {
+                redisMock.connected = false;
+                return 'OK';
+            }),
+            disconnect: jest.fn().mockImplementation(async (): Promise<void> => {
+                redisMock.connected = false;
+            }),
+            on: jest.fn(),
             incr: jest.fn().mockImplementation(async (key: string): Promise<number> => {
                 if (redisMock.connected === false) {
                     throw new GlitchError('Connection failed', ErrorCode.CONNECTION_ERROR);
@@ -104,14 +52,6 @@ describe('RedisQueueWorker', () => {
             expire: jest.fn().mockImplementation(async (key: string, seconds: number): Promise<number> => 1),
             get: jest.fn().mockImplementation(async (key: string): Promise<string | null> => null),
             set: jest.fn().mockImplementation(async (key: string, value: string): Promise<'OK'> => 'OK'),
-            on: jest.fn(),
-            quit: jest.fn().mockImplementation(async (): Promise<'OK'> => {
-                redisMock.connected = false;
-                return 'OK';
-            }),
-            disconnect: jest.fn().mockImplementation(async (): Promise<void> => {
-                    redisMock.connected = false;
-                }),
             flushall: jest.fn().mockImplementation(async (): Promise<'OK'> => 'OK'),
             hset: jest.fn().mockImplementation(async (key: string, field: string, value: string): Promise<number> => {
                 if (typeof value !== 'string') {
@@ -129,7 +69,7 @@ describe('RedisQueueWorker', () => {
                 return JSON.stringify({
                     requestId: field,
                     status: 'completed',
-                    resultRef: 'ipfs://test', 
+                    resultRef: 'ipfs://test',
                     logs: ['Test completed'],
                     metrics: {
                         totalTransactions: 100,
@@ -152,7 +92,6 @@ describe('RedisQueueWorker', () => {
                 return redisMock.queue.length > 0 ? redisMock.queue.shift() : null;
             })
         };
-
         redis = redisMock;
     });
 
@@ -180,13 +119,11 @@ describe('RedisQueueWorker', () => {
                 intensity: 5
             };
 
-            // Enqueue request
             const requestId = await worker.enqueueRequest(params);
             expect(requestId).toBeDefined();
             expect(typeof requestId).toBe('string');
             expect(requestId.length).toBeGreaterThan(0);
 
-            // Dequeue request
             const dequeued = await worker.dequeueRequest();
             expect(dequeued).toBeDefined();
             expect(dequeued?.params).toEqual(params);
@@ -220,7 +157,7 @@ describe('RedisQueueWorker', () => {
             const requestId = 'test-request-id';
             const result = {
                 requestId,
-                status: 'completed' as const,
+                status: 'completed',
                 resultRef: 'ipfs://test',
                 logs: ['Test completed'],
                 metrics: {
@@ -242,11 +179,11 @@ describe('RedisQueueWorker', () => {
 
         it('should expire results after TTL', async () => {
             jest.useFakeTimers();
-            
+
             const requestId = 'test-request-id';
             const result = {
                 requestId,
-                status: 'completed' as const,
+                status: 'completed',
                 resultRef: 'ipfs://test',
                 logs: ['Test completed'],
                 metrics: {
@@ -257,24 +194,19 @@ describe('RedisQueueWorker', () => {
             };
 
             await worker.storeResult(requestId, result);
-            
-            // Advance time by 25 hours
+
             jest.advanceTimersByTime(25 * 60 * 60 * 1000);
-            
+
             const retrieved = await worker.getResult(requestId);
             expect(retrieved).toBeNull();
-            
+
             jest.useRealTimers();
         });
     });
 
     describe('error handling', () => {
         it('should throw on connection failure', async () => {
-            // Mock lpush to throw connection error
-            // Mock lpush to throw connection error
-            redis.lpush.mockImplementationOnce((key: string, value: string) => 
-                Promise.reject(new GlitchError('Connection failed', ErrorCode.CONNECTION_ERROR))
-            );
+            redis.lpush.mockImplementationOnce(() => Promise.reject(new GlitchError('Connection failed', ErrorCode.CONNECTION_ERROR)));
             await expect(worker.enqueueRequest({
                 targetProgram: "1",
                 testType: TestType.FUZZ,
@@ -284,15 +216,12 @@ describe('RedisQueueWorker', () => {
         });
 
         it('should handle malformed queue data', async () => {
-            // Mock rpop to return invalid JSON
-            redis.rpop.mockImplementationOnce((key: string) => Promise.resolve('invalid-json'));
-            
+            redis.rpop.mockImplementationOnce(() => Promise.resolve('invalid-json'));
             await expect(worker.dequeueRequest()).rejects.toThrow(SyntaxError);
         });
 
         it('should handle connection errors during enqueue', async () => {
             await redis.quit();
-        
             await expect(worker.enqueueRequest({
                 targetProgram: "11111111111111111111111111111111",
                 testType: TestType.FUZZ,
@@ -303,13 +232,11 @@ describe('RedisQueueWorker', () => {
 
         it('should handle connection errors during dequeue', async () => {
             await redis.quit();
-        
             await expect(worker.dequeueRequest()).rejects.toThrow(GlitchError);
         });
 
         it('should handle connection errors during result storage', async () => {
             await redis.quit();
-        
             await expect(worker.storeResult('test-id', {
                 requestId: 'test-id',
                 status: 'completed',
@@ -324,14 +251,12 @@ describe('RedisQueueWorker', () => {
         });
 
         it('should handle malformed result data', async () => {
-            // Mock hget to throw GlitchError for bad result
             redis.hget.mockImplementationOnce((key: string, field: string) => {
                 if (field === 'bad-result') {
                     throw new GlitchError('Invalid JSON', ErrorCode.INVALID_JSON);
                 }
                 return null;
             });
-            
             await expect(worker.getResult('bad-result')).rejects.toThrow(GlitchError);
         });
     });
