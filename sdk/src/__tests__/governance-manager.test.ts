@@ -115,9 +115,7 @@ describe('GovernanceManager', () => {
             quorumRequired: 100,
             executionTime: Date.now() + 172800000,
             quorum: 100,
-            status: 'active',
-            executionTime: Date.now() + 172800000,
-            quorum: 100
+            status: 'active'
         };
 
         validateProposalMock = jest.spyOn(governanceManager as any, 'validateProposal')
@@ -307,11 +305,10 @@ beforeEach(() => {
 afterEach(() => {
     jest.clearAllMocks();
 });
-        ),
-        sendTransaction: jest.fn<typeof Connection.prototype.sendTransaction>().mockImplementation(
+        sendTransaction: jest.fn().mockImplementation(
             async (transaction: Transaction, signers: Signer[]) => 'mock-signature'
         ),
-        simulateTransaction: jest.fn<typeof Connection.prototype.simulateTransaction>().mockImplementation(
+        simulateTransaction: jest.fn().mockImplementation(
             async (transaction: Transaction) => ({
                 context: { slot: 0 },
                 value: {
@@ -329,7 +326,7 @@ afterEach(() => {
         }),
         getBalance: jest.fn().mockResolvedValue(1000000),
         getProgramAccounts: jest.fn().mockResolvedValue([])
-    } as MockedConnectionType;
+    };
             data: Buffer.alloc(0),
             executable: false,
             lamports: 0,
@@ -432,15 +429,30 @@ describe('executeProposal', () => {
         const mockConnection: Partial<Connection> = {
             commitment: 'confirmed' as Commitment,
             rpcEndpoint: 'http://localhost:8899',
-            getAccountInfo: jest.fn<typeof Connection.prototype.getAccountInfo>(),
-            sendTransaction: jest.fn<typeof Connection.prototype.sendTransaction>(),
-            simulateTransaction: jest.fn<typeof Connection.prototype.simulateTransaction>(),
-            getLatestBlockhash: jest.fn<typeof Connection.prototype.getLatestBlockhash>().mockResolvedValue({
+            getAccountInfo: jest.fn().mockImplementation(async () => ({
+                data: Buffer.alloc(0),
+                executable: false,
+                lamports: 0,
+                owner: PublicKey.default,
+                rentEpoch: 0
+            })),
+            sendTransaction: jest.fn().mockResolvedValue('mock-signature'),
+            simulateTransaction: jest.fn().mockResolvedValue({
+                context: { slot: 0 },
+                value: {
+                    err: null,
+                    logs: [],
+                    accounts: null,
+                    unitsConsumed: 0,
+                    returnData: null
+                }
+            }),
+            getLatestBlockhash: jest.fn().mockResolvedValue({
                 blockhash: 'test-blockhash',
                 lastValidBlockHeight: 0
             }),
-            getBalance: jest.fn<typeof Connection.prototype.getBalance>().mockResolvedValue(1000000),
-            getProgramAccounts: jest.fn<typeof Connection.prototype.getProgramAccounts>().mockResolvedValue([])
+            getBalance: jest.fn().mockResolvedValue(1000000),
+            getProgramAccounts: jest.fn().mockResolvedValue([])
         };
         getProgramAccounts: jest.fn<Connection['getProgramAccounts']>()
         .mockImplementation(async () => []),
