@@ -20,7 +20,7 @@ export interface AnomalyDetectionResult {
     }[];
 }
 
-export class AnomalyDetectionModel extends EventEmitter implements AnomalyDetectionModel {
+export class AnomalyDetectionModel extends EventEmitter {
     private model: tf.LayersModel | null = null;
     private logger: Logger;
     private initialized: boolean = false;
@@ -86,7 +86,7 @@ export class AnomalyDetectionModel extends EventEmitter implements AnomalyDetect
         model.add(tf.layers.dropout({ rate: 0.2 }));
 
         model.add(tf.layers.dense({
-            units: this.featureSize,
+            units: this.outputWindowSize, // Corrected output shape
             activation: 'linear'
         }));
 
@@ -108,10 +108,9 @@ export class AnomalyDetectionModel extends EventEmitter implements AnomalyDetect
 
             if (!this.normalizedStats.mean || !this.normalizedStats.std) {
                 const moments = tf.moments(reshapedData, 0);
-                this.normalizedStats.mean = tf.mean(reshapedData, 0) as tf.Tensor1D;
+                this.normalizedStats.mean = moments.mean as tf.Tensor1D;
                 this.normalizedStats.std = moments.variance.sqrt() as tf.Tensor1D;
-                moments.mean.dispose();
-                moments.variance.dispose();
+                moments.dispose();
             }
 
             const normalizedData = reshapedData
@@ -162,6 +161,110 @@ export class AnomalyDetectionModel extends EventEmitter implements AnomalyDetect
                 const windows = this.createWindows(data);
                 const normalizedWindows = await this.normalizeData(windows);
 
-                const xs = normalizedWindows.slice([0, 0, 0], [
-                    -1,
-                    this.inputWindowSize,
+                const xs = normalizedWindows; // Removed incorrect slice operation
+
+                const ys = normalizedWindows.slice([0, 1, 0], [-1, 1, -1]); // Predict next timestep
+
+                await this.model!.fit(xs, ys, {
+                    epochs: 10,
+                    batchSize: 32,
+                    callbacks: {
+                        onEpochEnd: (epoch, logs) => {
+                            this.emit('epochEnd', { epoch, logs });
+                        }
+                    }
+                });
+
+                this.logger.info('Model trained successfully');
+                xs.dispose();
+                ys.dispose();
+                normalizedWindows.dispose();
+                windows.dispose();
+            });
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            this.logger.error(`Training failed: ${errorMessage}`);
+            throw new Error(`Training failed: ${errorMessage}`);
+        }
+    }
+
+
+    public async detect(data: TimeSeriesMetrics[]): Promise<AnomalyDetectionResult> {
+        if (!this.model) {
+            throw new Error('Model not trained');
+        }
+        if (data.length < this.inputWindowSize) {
+            throw new Error(`Insufficient data points. Minimum required: ${this.inputWindowSize}`);
+        }
+
+        try {
+            return tf.tidy(() => {
+                const windows = this.createWindows(data);
+                const normalizedWindows = this.normalizeData(windows);
+                const predictions = this.model!.predict(normalizedWindows) as tf.Tensor;
+                const anomalyScores = predictions.sub(normalizedWindows).abs().mean(2);
+                const isAnomaly = anomalyScores.greater(tf.scalar(0.5));
+                const confidence = anomalyScores.sigmoid();
+                const details = this.extractDetails(anomalyScores, normalizedWindows);
+
+                const result = {
+                    isAnomaly: isAnomaly.dataSync()[0] > 0,
+                    confidence: confidence.dataSync()[0],
+                    details
+                };
+
+                predictions.dispose();
+                anomalyScores.dispose();
+                isAnomaly.dispose();
+                confidence.dispose();
+                normalizedWindows.dispose();
+                windows.dispose();
+                return result;
+            });
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            this.logger.error(`Detection failed: ${errorMessage}`);
+            throw new Error(`Detection failed: ${errorMessage}`);
+        }
+    }
+
+    private extractDetails(anomalyScores: tf.Tensor1D, normalizedWindows: tf.Tensor3D): { category: string; score: number; threshold: number; }[] {
+        const details: { category: string; score: number; threshold: number; }[] = [];
+        const scores = anomalyScores.dataSync();
+        const threshold = 0.5;
+
+        for (let i = 0; i < scores.length; i++) {
+            details.push({
+                category: `Metric ${i + 1}`,
+                score: scores[i],
+                threshold
+            });
+        }
+
+        return details;
+    }
+
+    public async save(path: string): Promise<void> {
+        if (!this.model) {
+            throw new Error('Model not trained');
+        }
+        await this.model.save(`file://${path}/model.json`);
+        this.logger.info(`Model saved to ${path}`);
+    }
+
+    public async load(path: string): Promise<void> {
+        if (this.model) {
+            this.model.dispose();
+        }
+        this.model = await tf.loadLayersModel(`file://${path}/model.json`);
+        this.logger.info(`Model loaded from ${path}`);
+    }
+
+    public async cleanup(): Promise<void> {
+        if (this.model) {
+            this.model.dispose();
+            this.model = null;
+            this.logger.info('Model disposed');
+        }
+    }
+}
