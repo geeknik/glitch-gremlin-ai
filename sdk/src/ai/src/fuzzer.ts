@@ -4,7 +4,10 @@ import { VulnerabilityType } from '../types.js';
 export class Fuzzer {
     private readonly MAX_UINT64 = BigInt('18446744073709551615');
     
-    constructor(private readonly maxIterations: number = 1000) {}
+    constructor(config: { port: number; metricsCollector: MetricsCollector }) {
+        this.port = config.port;
+        this.metricsCollector = config.metricsCollector;
+    }
 
     async generateFuzzInputs(_programId: string | PublicKey): Promise<Array<{
         instruction: number;
