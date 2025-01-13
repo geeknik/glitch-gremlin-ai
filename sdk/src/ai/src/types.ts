@@ -1,3 +1,10 @@
+export enum TestType {
+    FUZZ = 'FUZZ',
+    LOAD = 'LOAD',
+    EXPLOIT = 'EXPLOIT',
+    CONCURRENCY = 'CONCURRENCY'
+}
+
 export enum VulnerabilityType {
     ArithmeticOverflow = 'ArithmeticOverflow',
     AccessControl = 'AccessControl',
@@ -28,6 +35,7 @@ export interface TrainingConfig {
     validationSplit: number;
     patience?: number;
 }
+
 export interface MetricsCollector {
     collect(): Promise<void>;
     stop(): Promise<void>;
@@ -48,4 +56,25 @@ export interface SecurityMetric {
 export interface SecurityMetrics {
     arithmetic?: SecurityMetric;
     input?: SecurityMetric;
+}
+
+export interface SecurityPattern {
+    type: string;
+    severity: 'HIGH' | 'MEDIUM' | 'LOW';
+    details: string[];
+}
+
+export interface SecurityScore {
+    score: number;
+    weight: number;
+    risk: 'HIGH' | 'MEDIUM' | 'LOW';
+    details?: string[];
+    location?: string;
+    overallScore?: number;
+}
+
+export interface FuzzingResult {
+    type: string;
+    details: string[];
+    severity: 'HIGH' | 'MEDIUM' | 'LOW';
 }
