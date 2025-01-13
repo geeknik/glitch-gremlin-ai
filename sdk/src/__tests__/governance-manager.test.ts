@@ -22,7 +22,7 @@ import { GovernanceManager } from '../governance.js';
 import { ErrorCode, GlitchError } from '../errors.js';
 
 type MockedConnection = {
-    [K in keyof Connection]: MockedFunction<Connection[K]>;
+    [K in keyof Connection]: jest.Mock<Connection[K]>;
 };
 interface VoteWeights {
     yes: number;
@@ -59,8 +59,6 @@ describe('GovernanceManager', () => {
 
     beforeEach(() => {
         connection = {
-            commitment: 'confirmed',
-            rpcEndpoint: 'http://localhost:8899',
             getAccountInfo: jest.fn().mockResolvedValue({
                 data: Buffer.alloc(0),
                 executable: false,
@@ -68,21 +66,17 @@ describe('GovernanceManager', () => {
                 owner: PublicKey.default,
                 rentEpoch: 0
             }),
-            sendTransaction: jest.fn().mockImplementation(
-                async (transaction: Transaction | VersionedTransaction, signers?: Signer[], options?: SendOptions) => 'mock-signature'
-            ),
-            simulateTransaction: jest.fn().mockImplementation(
-                async (transaction: Transaction | VersionedTransaction, config?: SimulateTransactionConfig) => ({
-                    context: { slot: 0 },
-                    value: {
-                        err: null,
-                        logs: [],
-                        accounts: null,
-                        unitsConsumed: 0,
-                        returnData: null
-                    }
-                })
-            ),
+            sendTransaction: jest.fn().mockResolvedValue('mock-signature'),
+            simulateTransaction: jest.fn().mockResolvedValue({
+                context: { slot: 0 },
+                value: {
+                    err: null,
+                    logs: [],
+                    accounts: null,
+                    unitsConsumed: 0,
+                    returnData: null
+                }
+            }),
             getLatestBlockhash: jest.fn().mockResolvedValue({
                 blockhash: 'mock-blockhash',
                 lastValidBlockHeight: 1000
@@ -102,7 +96,7 @@ describe('GovernanceManager', () => {
                 context: { slot: 0 },
                 value: []
             })
-        } as MockedConnection;
+        } as unknown as MockedConnection;
 
         wallet = Keypair.generate();
         governanceManager = new GovernanceManager(
@@ -122,7 +116,10 @@ describe('GovernanceManager', () => {
             votes: [],
             yesVotes: 0,
             noVotes: 0,
-            quorumRequired: 100
+            quorumRequired: 100,
+            executionTime: Date.now() + 172800000,
+            quorum: 100,
+            status: 'active'
         };
 
         validateProposalMock = jest.spyOn(governanceManager as any, 'validateProposal')
@@ -230,15 +227,6 @@ jest.setTimeout(30000); // 30 seconds for more reliable CI runs
 
 // Mock proposal data at top level scope
 
-let connection: MockedConnection;
-let wallet: Keypair;
-let governanceManager: GovernanceManager;
-let proposalAddress: PublicKey;
-let mockProposalData: ProposalData;
-let validateProposalMock: jest.SpiedFunction<typeof governanceManager['validateProposal']>;
-let getAccountInfoMock: jest.SpiedFunction<typeof connection.getAccountInfo>;
-let simulateTransactionMock: jest.SpiedFunction<typeof connection.simulateTransaction>;
-let sendTransactionMock: jest.SpiedFunction<typeof connection.sendTransaction>;
 
 beforeEach(() => {
     connection = {
