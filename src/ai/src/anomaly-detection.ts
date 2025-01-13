@@ -1,6 +1,7 @@
 import * as tf from '@tensorflow/tfjs-node';
 import { EventEmitter } from 'events';
-import * as fs from 'fs/promises';
+import * as fs from 'fs';
+import { promises as fsPromises } from 'fs';
 import * as path from 'path';
 
 // Types for metrics and model interfaces

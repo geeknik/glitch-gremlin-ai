@@ -1,5 +1,5 @@
 import { PublicKey } from '@solana/web3.js';
-import { VulnerabilityType } from '../types.js';
+import { VulnerabilityType } from './types.js';
 
 export class Fuzzer {
     private readonly MAX_UINT64 = BigInt('18446744073709551615');
