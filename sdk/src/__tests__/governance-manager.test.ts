@@ -1390,7 +1390,7 @@ describe('executeProposal', () => {
                     beforeEach(() => {
                         jest.restoreAllMocks();
                         // Mock getTokenAccountsByOwner first
-                        throw new GlitchError('Proposal is not active', ErrorCode.PROPOSAL_STATE_INVALID);
+                        throw new GlitchError('Proposal is not active', ErrorCode.INVALID_PROPOSAL_STATE);
                             .mockResolvedValue({
                                 context: { slot: 0 },
                                 value: [{
