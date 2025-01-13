@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   testEnvironment: 'node',
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   moduleNameMapper: {
@@ -9,17 +9,12 @@ module.exports = {
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
       tsconfig: 'tsconfig.json',
-      isolatedModules: true,
       useESM: true,
       diagnostics: {
         ignoreCodes: [1005, 1128, 1109, 1157, 1192, 1198, 7006, 7016, 7031]
       }
     }]
   },
-  extensionsToTreatAsEsm: ['.ts'],
-  transformIgnorePatterns: [
-    'node_modules/(?!(@solana|@project-serum|@metaplex|@coral-xyz|@holaplex|@nfteyez)/.*)'
-  ],
   extensionsToTreatAsEsm: ['.ts'],
   transformIgnorePatterns: [
     'node_modules/(?!(@solana|@project-serum|@metaplex|@coral-xyz|@holaplex|@nfteyez)/.*)'
@@ -41,10 +36,5 @@ module.exports = {
     '!src/**/*.test.{js,ts}',
     '!src/types/**/*'
   ],
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
-  globals: {
-    'ts-jest': {
-      useESM: false
-    }
-  }
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js']
 }
