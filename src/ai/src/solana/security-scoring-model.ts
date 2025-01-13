@@ -80,12 +80,13 @@ export class SecurityScoringModel {
         const score = this.calculateScore(metrics);
         const validation = await this.validateProgram(programId);
         const risks = await this.detectRiskPatterns(metrics);
+        const patterns = await this.detectSecurityPatterns(metrics);
         
         return {
             analysis: {
-                score,
-                patterns: await this.detectSecurityPatterns(metrics),
-                timestamp: new Date(),
+                score: score,
+                patterns: patterns,
+                timestamp: new Date()
             },
             validation: validation,
             suggestions: this.generateSuggestions(score, validation)
@@ -99,9 +100,9 @@ export class SecurityScoringModel {
         if (metrics.access.score < this.config.thresholds.medium) {
             patterns.push({
                 type: 'ACCESS_CONTROL',
-                severity: 'HIGH',
+                severity: 'HIGH' as const,
                 description: 'Insufficient access controls detected',
-                timestamp
+                timestamp: timestamp
             });
         }
 
@@ -110,20 +111,35 @@ export class SecurityScoringModel {
 
     private calculateScore(metrics: SecurityMetrics): SecurityScore {
         const score = metrics.access.score;
+        let risk: RiskLevel = 'HIGH';
+        
+        if (score >= this.config.thresholds.high) {
+            risk = 'LOW';
+        } else if (score >= this.config.thresholds.medium) {
+            risk = 'MEDIUM';
+        }
+
         return {
-            score,
+            score: score,
             weight: this.config.weightings.access,
             details: ['Access control implementation analysis'],
-            risk: score >= this.config.thresholds.high ? 'LOW' :
-                  score >= this.config.thresholds.medium ? 'MEDIUM' : 'HIGH'
+            risk: risk
         };
     }
 
     private async validateProgram(programId: string): Promise<ValidationResult> {
-        return {
-            isValid: true,
-            errors: []
-        };
+        try {
+            const programInfo = await this.connection.getAccountInfo(new PublicKey(programId));
+            return {
+                isValid: !!programInfo,
+                errors: programInfo ? [] : ['Program account not found']
+            };
+        } catch (error) {
+            return {
+                isValid: false,
+                errors: ['Failed to validate program']
+            };
+        }
     }
 
     private generateSuggestions(score: SecurityScore, validation: ValidationResult): string[] {
@@ -133,8 +149,8 @@ export class SecurityScoringModel {
             suggestions.push('Implement stronger access controls');
         }
 
-        if (!validation.isValid) {
-            suggestions.push(...validation.errors);
+        if (!validation.isValid && validation.errors.length > 0) {
+            suggestions.push(...validation.errors.map(err => `Fix validation error: ${err}`));
         }
 
         return suggestions;
