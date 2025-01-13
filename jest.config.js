@@ -9,8 +9,8 @@ module.exports = {
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
       tsconfig: 'tsconfig.json',
-      isolatedModules: false, // Changed to false
-      useESM: true,
+      isolatedModules: true,
+      useESM: false,
       diagnostics: {
         ignoreCodes: [1005, 1128, 1109, 1157, 1192, 1198, 7006, 7016, 7031]
       }

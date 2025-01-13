@@ -8,7 +8,7 @@
         "forceConsistentCasingInFileNames": true,
         "outDir": "./dist",
         "rootDir": "./src",
-        "moduleResolution": "node16", // Updated to node16
+        "moduleResolution": "node", // Revert to node
         "types": ["jest", "node"],
         "paths": {
             "@/*": ["./src/*"]
