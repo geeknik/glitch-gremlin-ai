@@ -1,51 +1,24 @@
 {
-  "name": "glitch-gremlin",
-"private": true,
-"homepage": "https://glitchgremlin.ai",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/geeknik/glitch-gremlin-ai"
-  },
-  "bugs": {
-    "url": "https://github.com/geeknik/glitch-gremlin-ai/issues"
-  },
-  "docs": "https://ggai.gitbook.io/ggai-docs",
-  "jest": {
-    "transform": {
-      "^.+\\.tsx?$": "ts-jest"
-    },
-    "extensionsToTreatAsEsm": [
-      ".ts"
-    ],
-    "globals": {
-      "ts-jest": {
-        "useESM": true
-      }
-    }
-  },
-  "workspaces": [
-    "sdk",
-    "cli"
-  ],
+  "name": "@glitch-gremlin/sdk",
+  "version": "0.1.0",
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
+  "types": "dist/esm/index.d.ts",
   "scripts": {
-    "clean": "rm -rf node_modules package-lock.json sdk/dist cli/dist",
-    "build": "npm run build-sdk && npm run build-cli",
-    "build-sdk": "cd sdk && npm install && npm run build",
-    "build-cli": "cd cli && npm install && npm run build",
-    "test": "npm run test --workspaces --if-present",
-    "test:coverage": "npm run test:coverage --workspaces --if-present",
-    "test:security": "npm run test:security --workspaces --if-present || true",
-    "lint": "npm run lint --workspaces",
-    "lint:fix": "npm run lint:fix --workspaces",
-    "audit": "npm audit --production --audit-level=moderate",
-    "demo": "cd demo && npm install && NODE_OPTIONS='--loader ts-node/esm' ts-node --esm demo.ts"
+    "build": "npm run build:esm && npm run build:cjs",
+    "build:esm": "tsc -p tsconfig.esm.json",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "prebuild": "node -e \"require('dotenv').config()\"",
+    "prepare": "npm run build"
   },
   "devDependencies": {
-    "@opentelemetry/api": "^1.9.0",
-    "@solana/web3.js": "1.89.1",
-    "@tensorflow/tfjs-node": "^4.22.0",
+    "@types/bn.js": "^6.0.0",
+    "@types/ioredis": "^5.0.1",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.10.5",
+    "@types/ws": "^8.5.5",
     "@typescript-eslint/eslint-plugin": "^6.19.0",
     "@typescript-eslint/parser": "^6.19.0",
     "eslint": "^8.56.0",
@@ -53,43 +26,16 @@
     "eslint-plugin-jest": "^27.6.0",
     "eslint-plugin-security": "^1.7.1",
     "jest": "^29.7.0",
-    "jest-environment-node": "^29.7.0",
-    "prom-client": "^14.2.0",
-    "snyk": "^1.1264.0",
     "ts-jest": "^29.2.5",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.7.3",
-    "winston": "^3.17.0"
+    "typescript": "^5.7.3"
   },
-"resolutions": {
-"elliptic": "^6.5.8",
-"@ethersproject/signing-key": "^5.7.1", 
-"@ethersproject/transactions": "^5.7.1",
-"@ethersproject/abstract-provider": "^5.7.0",
-"@ethersproject/abstract-signer": "^5.7.0",
-"@ethersproject/hash": "^5.7.0",
-"@solana/web3.js": "1.89.1",
-"@solana/spl-token": "0.3.9",
-"@solana/wallet-adapter-vue": "0.4.3", 
-"@solana/wallet-adapter-wallets": "0.19.25"
-},
   "dependencies": {
-    "@glitch-gremlin/sdk": "^0.1.0",
-    "@opentelemetry/exporter-prometheus": "^0.57.0",
-    "@reown/appkit": "^1.6.0",
-    "@reown/appkit-adapter-solana": "^1.6.0",
-    "@solana/spl-token": "0.3.9",
-    "@solana/wallet-adapter-vue": "0.4.3",
-    "@solana/wallet-adapter-wallets": "0.19.25",
-    "@tensorflow/tfjs-node-gpu": "^4.22.0",
-    "@types/ioredis": "^4.28.10",
-    "buffer": "^6.0.3",
-    "chalk": "^5.4.1",
-    "dotenv": "^16.4.7",
-    "eventemitter3": "^5.0.1",
+    "@solana/web3.js": "^1.89.1",
+    "@tensorflow/tfjs-node": "^4.22.0",
+    "bn.js": "^6.0.0",
     "ioredis": "^5.4.2",
-    "process": "^0.11.10",
-    "stream-browserify": "^3.0.0",
-    "util": "^0.12.5"
-  }
+    "winston": "^3.17.0",
+    "ws": "^8.11.0"
+  },
+  "type": "module"
 }

@@ -1,5 +1,5 @@
-import { Fuzzer } from '../ai/fuzzer.js';
-import { VulnerabilityType } from '../types.js';
+import { Fuzzer } from '../ai/fuzzer';
+import { VulnerabilityType } from '../types';
 import { PublicKey } from '@solana/web3.js';
 
 describe('Fuzzer', () => {
@@ -18,7 +18,7 @@ describe('Fuzzer', () => {
             expect(inputs[0]).toHaveProperty('instruction');
             expect(inputs[0]).toHaveProperty('data');
             expect(inputs[0]).toHaveProperty('probability');
-            
+
             // Verify inputs are sorted by probability
             expect(inputs[0].probability).toBeGreaterThanOrEqual(inputs[1].probability);
         });
@@ -27,13 +27,13 @@ describe('Fuzzer', () => {
     describe('analyzeFuzzResult', () => {
         it('should detect arithmetic overflow', async () => {
             const result = { error: 'arithmetic overflow detected' };
-            const input = { 
-                instruction: 1, 
+            const input = {
+                instruction: 1,
                 data: Buffer.from([255, 255, 255, 255])
             };
 
             const analysis = await fuzzer.analyzeFuzzResult(result, input);
-            
+
             expect(analysis.type).toBe(VulnerabilityType.ArithmeticOverflow);
             expect(analysis.confidence).toBeGreaterThan(0.7);
         });
@@ -46,7 +46,7 @@ describe('Fuzzer', () => {
             };
 
             const analysis = await fuzzer.analyzeFuzzResult(result, input);
-            
+
             expect(analysis.type).toBe(VulnerabilityType.AccessControl);
             expect(analysis.confidence).toBeGreaterThan(0.6);
         });
@@ -59,7 +59,7 @@ describe('Fuzzer', () => {
             };
 
             const analysis = await fuzzer.analyzeFuzzResult(result, input);
-            
+
             expect(analysis.type).toBeNull();
             expect(analysis.confidence).toBe(0);
         });
