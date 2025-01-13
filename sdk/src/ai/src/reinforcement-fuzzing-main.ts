@@ -1,4 +1,6 @@
 import { Command } from 'commander';
+import { TestType } from './ai/src/types.js';
+import { GlitchError } from './errors.js';
 import winston from 'winston';
 import { Server as WebSocketServer } from 'ws';
 import { RLFuzzingModel } from './reinforcement-fuzzing';
