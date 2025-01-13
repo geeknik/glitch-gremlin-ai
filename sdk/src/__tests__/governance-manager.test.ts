@@ -52,9 +52,20 @@ interface ProposalData {
 }
 
 describe('GovernanceManager', () => {
+    let connection: MockedConnection;
+    let wallet: Keypair;
+    let governanceManager: GovernanceManager;
+    let mockProposalData: ProposalData;
+    let validateProposalMock: jest.SpyInstance;
+    let getAccountInfoMock: jest.SpyInstance;
+    let simulateTransactionMock: jest.SpyInstance;
+    let sendTransactionMock: jest.SpyInstance;
+    let proposalAddress: PublicKey;
 
     beforeEach(() => {
-        const mockConnection: Partial<Connection> = {
+        connection = {
+            commitment: 'confirmed',
+            rpcEndpoint: 'http://localhost:8899',
             getAccountInfo: jest.fn().mockResolvedValue({
                 data: Buffer.alloc(0),
                 executable: false,
@@ -92,7 +103,7 @@ describe('GovernanceManager', () => {
                 context: { slot: 0 },
                 value: []
             })
-        } as MockedConnection;
+        } as unknown as MockedConnection;
 
         wallet = Keypair.generate();
         governanceManager = new GovernanceManager(
