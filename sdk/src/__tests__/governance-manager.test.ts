@@ -22,7 +22,7 @@ import { GovernanceManager } from '../governance.js';
 import { ErrorCode, GlitchError } from '../errors.js';
 
 type MockedConnection = {
-    [K in keyof Connection]: jest.Mock<Connection[K]>;
+    [K in keyof Connection]: jest.Mock<ReturnType<Connection[K]>, Parameters<Connection[K]>>;
 };
 interface VoteWeights {
     yes: number;
@@ -47,56 +47,57 @@ interface ProposalData {
 }
 
 describe('GovernanceManager', () => {
-    let connection: MockedConnection;
-    let wallet: Keypair;
-    let governanceManager: GovernanceManager;
-    let proposalAddress: PublicKey;
-    let mockProposalData: ProposalData;
-    let validateProposalMock: jest.SpiedFunction<typeof governanceManager['validateProposal']>;
-    let getAccountInfoMock: jest.SpiedFunction<typeof connection.getAccountInfo>;
-    let simulateTransactionMock: jest.SpiedFunction<typeof connection.simulateTransaction>;
-    let sendTransactionMock: jest.SpiedFunction<typeof connection.sendTransaction>;
 
     beforeEach(() => {
         connection = {
-            getAccountInfo: jest.fn().mockResolvedValue({
-                data: Buffer.alloc(0),
-                executable: false,
-                lamports: 0,
-                owner: PublicKey.default,
-                rentEpoch: 0
-            }),
-            sendTransaction: jest.fn().mockResolvedValue('mock-signature'),
-            simulateTransaction: jest.fn().mockResolvedValue({
-                context: { slot: 0 },
-                value: {
-                    err: null,
-                    logs: [],
-                    accounts: null,
-                    unitsConsumed: 0,
-                    returnData: null
-                }
-            }),
-            getLatestBlockhash: jest.fn().mockResolvedValue({
-                blockhash: 'mock-blockhash',
-                lastValidBlockHeight: 1000
-            }),
-            getRecentBlockhash: jest.fn().mockResolvedValue({
-                blockhash: 'mock-blockhash',
-                feeCalculator: { lamportsPerSignature: 5000 }
-            }),
-            getBalance: jest.fn().mockResolvedValue(1000000),
-            getProgramAccounts: jest.fn().mockResolvedValue([]),
-            getVersion: jest.fn().mockResolvedValue({
-                'feature-set': 1,
-                'solana-core': '1.18.26'
-            }),
-            getSlot: jest.fn().mockResolvedValue(0),
-            getTokenAccountsByOwner: jest.fn().mockResolvedValue({
-                context: { slot: 0 },
-                value: []
-            })
-        } as unknown as MockedConnection;
+            getAccountInfo: jest.fn<ReturnType<Connection['getAccountInfo']>, Parameters<Connection['getAccountInfo']>>()
+                .mockResolvedValue({
+                    data: Buffer.alloc(0),
+                    executable: false,
+                    lamports: 0,
+                    owner: PublicKey.default,
+                    rentEpoch: 0
+                }),
+            sendTransaction: jest.fn<ReturnType<Connection['sendTransaction']>, Parameters<Connection['sendTransaction']>>()
+                .mockResolvedValue('mock-signature'),
+            simulateTransaction: jest.fn<ReturnType<Connection['simulateTransaction']>, Parameters<Connection['simulateTransaction']>>()
+                .mockResolvedValue({
+                    context: { slot: 0 },
+                    value: {
+                        err: null,
+                        logs: [],
+                        accounts: null,
+                        unitsConsumed: 0,
+                        returnData: null
+                    }
+                }),
+            getLatestBlockhash: jest.fn<ReturnType<Connection['getLatestBlockhash']>, Parameters<Connection['getLatestBlockhash']>>()
+                .mockResolvedValue({
+                    blockhash: 'mock-blockhash',
+                    lastValidBlockHeight: 1000
+                }),
+            getRecentBlockhash: jest.fn<ReturnType<Connection['getRecentBlockhash']>, Parameters<Connection['getRecentBlockhash']>>()
+                .mockResolvedValue({
+                    blockhash: 'mock-blockhash',
+                    feeCalculator: { lamportsPerSignature: 5000 }
+                }),
+            getBalance: jest.fn<ReturnType<Connection['getBalance']>, Parameters<Connection['getBalance']>>()
+                .mockResolvedValue(1000000),
+            getProgramAccounts: jest.fn<ReturnType<Connection['getProgramAccounts']>, Parameters<Connection['getProgramAccounts']>>()
+                .mockResolvedValue([]),
+            getVersion: jest.fn<ReturnType<Connection['getVersion']>, Parameters<Connection['getVersion']>>()
+                .mockResolvedValue({
+                    'feature-set': 1,
+                    'solana-core': '1.18.26'
+                }),
+            getSlot: jest.fn<ReturnType<Connection['getSlot']>, Parameters<Connection['getSlot']>>()
+                .mockResolvedValue(0),
+            getTokenAccountsByOwner: jest.fn<ReturnType<Connection['getTokenAccountsByOwner']>, Parameters<Connection['getTokenAccountsByOwner']>>()
+                .mockResolvedValue({
+                    context: { slot: 0 },
+                    value: []
+                })
+        } as MockedConnection;
 
         wallet = Keypair.generate();
         governanceManager = new GovernanceManager(
@@ -119,7 +120,9 @@ describe('GovernanceManager', () => {
             quorumRequired: 100,
             executionTime: Date.now() + 172800000,
             quorum: 100,
-            status: 'active'
+            status: 'active',
+            executionTime: Date.now() + 172800000,
+            quorum: 100
         };
 
         validateProposalMock = jest.spyOn(governanceManager as any, 'validateProposal')
