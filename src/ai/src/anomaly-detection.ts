@@ -94,7 +94,7 @@ private async buildModel(): Promise<void> {
 }
 
 private preprocessMetrics(metrics: TimeSeriesMetric[]): tf.Tensor2D {
-    return tf.tidy(() => {
+    return tf.tidy((): tf.Tensor2D => {
         const flattenedData = metrics.map(metric => [
         ...metric.instructionFrequency,
         ...metric.executionTime,
