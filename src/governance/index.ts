@@ -6,7 +6,8 @@ import {
     TransactionInstruction 
 } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
-import { GlitchError, ErrorCode } from './errors.js';
+import { GlitchError, ErrorCode } from './errors';
+import type { Commitment, GetAccountInfoConfig } from '@solana/web3.js';
 import { ProposalState, GovernanceConfig, ProposalMetadata } from './types.js';
 
 export class GovernanceManager {
@@ -58,24 +59,47 @@ export class GovernanceManager {
 
         return metadata;
     }
-
     private deserializeProposalData(data: Buffer): ProposalMetadata {
-        // Implement actual deserialization logic here
-        // This is a placeholder implementation
-        return JSON.parse(data.toString());
+        try {
+            const decodedData = JSON.parse(data.toString());
+            if (!this.isValidProposalMetadata(decodedData)) {
+                throw new GlitchError('Invalid proposal data format', ErrorCode.INVALID_PROPOSAL_DATA);
+            }
+            return decodedData;
+        } catch (err) {
+            throw new GlitchError('Failed to deserialize proposal data', ErrorCode.INVALID_PROPOSAL_DATA);
+        }
+    }
+
+    private isValidProposalMetadata(data: any): data is ProposalMetadata {
+        return (
+            data &&
+            typeof data.startTime === 'number' &&
+            typeof data.endTime === 'number' &&
+            typeof data.quorum === 'number' &&
+            data.votes && Array.isArray(data.votes) &&
+            data.voteWeights && 
+            typeof data.voteWeights.yes === 'number' &&
+            typeof data.voteWeights.no === 'number' &&
+            typeof data.voteWeights.abstain === 'number'
+        );
     }
 
     public async createProposalAccount(
         connection: Connection,
         wallet: Keypair,
-        params: { votingPeriod: number }
+        params: { 
+        votingPeriod: number;
+        minStake?: number;
+        quorum?: number;
+        }
     ): Promise<{ proposalAddress: PublicKey; tx: Transaction }> {
         const minPeriod = this.config.minVotingPeriod;
         const maxPeriod = this.config.maxVotingPeriod;
         
         if (params.votingPeriod < minPeriod ||
             params.votingPeriod > maxPeriod) {
-            throw new GlitchError('Invalid voting period', ErrorCode.INSUFFICIENT_VOTING_POWER);
+            throw new GlitchError('Invalid voting period', ErrorCode.INVALID_VOTING_PERIOD);
         }
 
         const proposalAddress = PublicKey.findProgramAddressSync(
@@ -96,8 +120,12 @@ export class GovernanceManager {
         return { proposalAddress, tx };
     }
 
-    async getProposalState(connection: Connection, proposalAddress: PublicKey): Promise<ProposalState> {
-        const account = await connection.getAccountInfo(proposalAddress);
+    async getProposalState(
+    connection: Connection, 
+    proposalAddress: PublicKey,
+    commitment?: GetAccountInfoConfig
+    ): Promise<ProposalState> {
+    const account = await connection.getAccountInfo(proposalAddress, commitment);
         if (!account) {
             throw new GlitchError('Proposal not found', ErrorCode.PROPOSAL_NOT_FOUND);
         }
@@ -110,7 +138,8 @@ export class GovernanceManager {
         wallet: Keypair,
         proposalAddress: PublicKey,
         support: boolean,
-        weight?: number
+        weight?: number,
+        commitment?: Commitment
     ): Promise<Transaction> {
         const metadata = await this.validateProposal(connection, proposalAddress);
 
@@ -143,7 +172,8 @@ export class GovernanceManager {
 
     private async calculateVoteWeight(
         connection: Connection,
-        voter: PublicKey
+        voter: PublicKey,
+        commitment?: Commitment
     ): Promise<number> {
         // Get token account
         const tokenAccounts = await connection.getTokenAccountsByOwner(voter, {
@@ -165,7 +195,8 @@ export class GovernanceManager {
     async executeProposal(
         connection: Connection,
         wallet: Keypair,
-        proposalAddress: PublicKey
+        proposalAddress: PublicKey,
+        config?: {commitment?: Commitment}
     ): Promise<Transaction> {
         const state = await this.getProposalState(connection, proposalAddress);
         if (state !== ProposalState.Succeeded) {

@@ -1,79 +1,96 @@
-import { Connection, PublicKey } from '@solana/web3.js';
-import {
-    SecurityScore,
-    SecurityMetric,
-    ValidationResult,
-    AnalysisResult,
-    SecurityModelConfig,
-    SecurityMetrics,
-    SecurityPattern,
-    RiskLevel,
-    SecurityAnalysis
-} from './types';
+import { PublicKey } from '@solana/web3.js';
 
-const DEFAULT_CONFIG: SecurityModelConfig = {
+export type RiskLevel = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+
+export interface SecurityModelConfig {
+    thresholds: {
+        high: number;
+        medium: number;
+        low: number;
+    };
     weightings: {
-        ownership: 0.25,
-        access: 0.25,
-        arithmetic: 0.2,
-        input: 0.15,
-        state: 0.15
-    },
+        ownership: number;
+        access: number;
+    };
+}
+
+export interface SecurityScore {
+    score: number;
+    weight: number;
+    risk: RiskLevel;
+    }
+
+    export interface SecurityMetrics {
+export interface SecurityMetrics {
+    access: SecurityScore;
+    ownership: SecurityScore;
+}
+
+export interface SecurityPattern {
+    type: string;
+    severity: RiskLevel;
+    description: string;
+    timestamp: number;
+    }
+
+export interface ValidationResult {
+    isValid: boolean;
+    issues: string[];
+}
+
+export interface AnalysisResult {
+    score: number;
+    patterns: SecurityPattern[];
+    suggestions: string[];
+    validation: ValidationResult;
+    timestamp: Date;
+}
+const DEFAULT_CONFIG: SecurityModelConfig = {
     thresholds: {
         high: 0.8,
         medium: 0.6,
         low: 0.4
+    },
+    weightings: {
+        ownership: 0.6,
+        access: 0.4
     }
 };
+
 export class SecurityScoring {
-    private config: SecurityModelConfig;
-    private connection: Connection;
-    private metrics: SecurityMetrics | null = null;
-    private lastAnalyzedProgramId: string | null = null;
+    private readonly config: SecurityModelConfig;
 
-    constructor(
-        connection: Connection,
-        config: Partial<SecurityModelConfig> = {}
-    ) {
-        this.connection = connection;
+    constructor(config: Partial<SecurityModelConfig> = {}) {
         this.config = {
-            ...DEFAULT_CONFIG,
-            ...config
-        };
-    }
-
-    public async analyzeProgram(programId: string): Promise<AnalysisResult> {
-        const metrics = await this.analyzeSecurityMetrics(programId);
-        const score = this.calculateScore(metrics);
-        const validation = await this.validateProgram(programId);
-        const risks = await this.detectRiskPatterns(metrics);
-        const analysis = await this.analyzeSecurity(metrics);
-
-        return {
-            securityScore: score,
-            validation,
-            suggestions: [...this.generateSuggestions(score, validation), ...risks],
-            analysis
-        };
-    }
-
-    public async analyzeSecurity(program: PublicKey): Promise<AnalysisResult> {
-        const metrics = await this.analyzeSecurityMetrics(program.toBase58());
-        const score = this.calculateScore(metrics);
-        const validation = await this.validateProgram(program.toBase58());
-        const risks = await this.detectRiskPatterns(metrics);
-        const analysis = await this.analyzeSecurity(metrics);
-
-        return {
-            score: {
-                overallScore: score.overallScore * 100,
-                timestamp: new Date(),
-                programId: program.toBase58(),
+            thresholds: {
+                ...DEFAULT_CONFIG.thresholds,
+                ...config.thresholds
             },
-            riskLevel: analysis.riskLevel,
-            patterns: risks,
+            weightings: {
+                ...DEFAULT_CONFIG.weightings,
+                ...config.weightings
+            }
         };
     }
+    public async analyzeProgram(programId: string): Promise<AnalysisResult> {
+    const metrics = await this.analyzeSecurityMetrics(programId);
+    const validation = await this.validateProgram(programId);
+    const patterns = await this.detectSecurityPatterns(metrics);
+    const score = this.calculateScore(metrics);
+
+    return {
+        score,
+        patterns,
+        suggestions: this.generateSuggestions(score, validation),
+        validation,
+        timestamp: new Date()
+    };
+    }
+            validation,
+            timestamp: new Date()
+        };
+    }
+
 
     public async detectPatterns(program: PublicKey): Promise<{ patterns: SecurityPattern[]; timestamp: Date }> {
         const metrics = await this.analyzeSecurityMetrics(program.toBase58());
@@ -90,15 +107,15 @@ export class SecurityScoring {
 
         if (metrics.access.score < this.config.thresholds.medium) {
             patterns.push({
-                type: 'accessControl',
-                confidence: 0.8,
+                type: 'ACCESS_CONTROL',
                 severity: 'HIGH',
-                description: 'Access control vulnerabilities detected',
-                indicators: metrics.access.details,
-                timestamp,
-                location: metrics.access.location
+                description: 'Insufficient access controls detected',
+                timestamp
             });
         }
+
+        return patterns;
+    }
 
         if (metrics.arithmetic.score < this.config.thresholds.medium) {
             patterns.push({
@@ -142,57 +159,25 @@ export class SecurityScoring {
         ];
     }
 
-    private calculateScore(metrics: SecurityMetrics): SecurityScore {
-        const metricList = Object.values(metrics);
-        const overallScore = metricList.reduce(
+    private calculateScore(metrics: SecurityMetrics): number {
+        return Object.values(metrics).reduce(
             (acc, metric) => acc + metric.score * metric.weight,
             0
         );
-
-        return {
-            overallScore,
-            metrics: metricList,
-            timestamp: Date.now(),
-            programId: this.lastAnalyzedProgramId!
-        };
     }
 
     private async analyzeSecurityMetrics(programId: string): Promise<SecurityMetrics> {
-        this.lastAnalyzedProgramId = programId;
         return {
-            ownership: {
-                name: 'ownership',
-                score: 0.8,
-                weight: this.config.weightings.ownership,
-                details: ['Proper ownership checks implemented'],
-                risk: 'LOW'
-            },
             access: {
-                name: 'access',
-                score: 0.9,
+                score: 0.8,
                 weight: this.config.weightings.access,
                 details: ['Access control properly implemented'],
                 risk: 'LOW'
             },
-            arithmetic: {
-                name: 'arithmetic',
-                score: 0.85,
-                weight: this.config.weightings.arithmetic,
-                details: ['Safe arithmetic operations verified'],
-                risk: 'LOW'
-            },
-            input: {
-                name: 'input',
-                score: 0.75,
-                weight: this.config.weightings.input,
-                details: ['Input validation checks present'],
-                risk: 'MEDIUM'
-            },
-            state: {
-                name: 'state',
-                score: 0.95,
-                weight: this.config.weightings.state,
-                details: ['State management properly handled'],
+            ownership: {
+                score: 0.9,
+                weight: this.config.weightings.ownership,
+                details: ['Proper ownership checks implemented'],
                 risk: 'LOW'
             }
         };
@@ -217,40 +202,38 @@ export class SecurityScoring {
     }
 
     private async validateProgram(programId: string): Promise<ValidationResult> {
-        // Mock implementation for testing
         return {
-            valid: true,
-            errors: [],
-            warnings: ['Consider implementing additional access controls']
+            isValid: true,
+            issues: []
         };
     }
 
-    private generateSuggestions(
-        score: SecurityScore,
-        validation: ValidationResult
-    ): string[] {
+    private generateSuggestions(score: number, validation: ValidationResult): string[] {
         const suggestions: string[] = [];
 
-        if (score.overallScore < this.config.thresholds.high) {
-            suggestions.push('Critical: Immediate security improvements required');
-        } else if (score.overallScore < this.config.thresholds.medium) {
-            suggestions.push('Warning: Security improvements recommended');
+        if (!validation.isValid) {
+            suggestions.push('Fix validation issues before deployment');
         }
+        if (score < this.config.thresholds.medium) {
+            public async analyzeProgram(programId: string): Promise<AnalysisResult> {
+            const metrics = await this.analyzeSecurityMetrics(programId);
+            const score = this.calculateScore(metrics);
+            const validation = await this.validateProgram(programId);
+            const patterns = await this.detectSecurityPatterns(metrics);
+            const riskLevel = this.determineRiskLevel(patterns);
 
-        return [...suggestions, ...validation.warnings];
+            return {
+                score,
+                riskLevel,
+                patterns,
+                suggestions: this.generateSuggestions(score, validation),
+                validation,
+                timestamp: new Date()
+            };
+            }
+        return suggestions;
     }
-}
 
-    public async analyzeProgram(programId: string): Promise<AnalysisResult>
-    connection: Connection,
-    config: Partial<SecurityModelConfig> = {}
-) {
-    this.connection = connection;
-    this.config = {
-    ...DEFAULT_CONFIG,
-    ...config
-    };
-}
 
 {
     const metrics = await this.analyzeSecurityMetrics(programId);
@@ -267,15 +250,6 @@ export class SecurityScoring {
     };
 }
 
-public async analyzeSecurity(program: PublicKey): Promise<AnalysisResult>
-    config: Partial<SecurityModelConfig> = {}
-) {
-    this.connection = connection;
-    this.config = {
-    ...DEFAULT_CONFIG,
-    ...config
-    };
-}
 
 {
     const metrics = await this.analyzeSecurityMetrics(program.toBase58());
@@ -295,7 +269,33 @@ public async analyzeSecurity(program: PublicKey): Promise<AnalysisResult>
     };
 }
 
-public async detectPatterns(program: PublicKey): Promise<{ patterns: SecurityPattern[]; timestamp: Date }>
+private async detectSecurityPatterns(metrics: SecurityMetrics): Promise<SecurityPattern[]> {
+    const patterns: SecurityPattern[] = [];
+    const timestamp = Date.now();
+
+    if (metrics.access.score < this.config.thresholds.medium) {
+        patterns.push({
+            type: 'ACCESS_CONTROL',
+            severity: 'HIGH',
+            description: 'Insufficient access controls detected',
+            timestamp
+        });
+    }
+
+    return patterns;
+}
+
+if (metrics.access.score < this.config.thresholds.medium) {
+    patterns.push({
+    type: 'ACCESS_CONTROL',
+    severity: 'HIGH',
+    description: 'Insufficient access controls detected',
+    timestamp
+    });
+}
+
+return patterns;
+}
     securityScore: score,
     validation,
     suggestions: [...this.generateSuggestions(score, validation), ...risks],
@@ -312,8 +312,14 @@ public async detectPatterns(program: PublicKey): Promise<{ patterns: SecurityPat
     };
 }
 
-private async detectSecurityPatterns(metrics: SecurityMetrics): Promise<SecurityPattern[]>
+public async detectPatterns(program: PublicKey): Promise<{ patterns: SecurityPattern[]; timestamp: Date }> {
+    const metrics = await this.analyzeSecurityMetrics(program.toBase58());
+    const patterns = await this.detectSecurityPatterns(metrics);
     return {
+        patterns,
+        timestamp: new Date()
+    };
+}
     score: {
         overallScore: score.overallScore * 100,
         timestamp: new Date(),

@@ -5,6 +5,7 @@ export default {
     extensionsToTreatAsEsm: ['.ts'],
     moduleNameMapper: {
         '^(\\.{1,2}/.*)\\.js$': '$1',
+        '^@glitch-gremlin/sdk$': '<rootDir>/../sdk/src/index.ts'
     },
     transform: {
         '^.+\\.(t|j)sx?$': ['ts-jest', {
@@ -16,9 +17,5 @@ export default {
         '<rootDir>/src/**/__tests__/**/*.{js,ts}',
         '<rootDir>/src/**/*.{spec,test}.{js,ts}'
     ],
-    globals: {
-        'ts-jest': {
-            useESM: true
-        }
-    }
+    moduleDirectories: ['node_modules', '../node_modules']
 }

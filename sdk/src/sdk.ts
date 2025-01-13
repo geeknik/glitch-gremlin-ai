@@ -61,7 +61,7 @@ export class GlitchSDK {
     private static instance: GlitchSDK;
     private initialized = false;
 
-    private constructor(config: {
+    public constructor(config: {
         cluster?: string;
         wallet: Keypair;
         programId?: string;
@@ -121,7 +121,12 @@ export class GlitchSDK {
             port: number;
         };
     }): Promise<GlitchSDK> {
+        return new GlitchSDK(config);
+    }
         if (!GlitchSDK.instance) {
+        GlitchSDK.instance = new GlitchSDK(config);
+        await GlitchSDK.instance.initialize(config.redisConfig);
+        }
             GlitchSDK.instance = new GlitchSDK(config);
             await GlitchSDK.instance.initialize(config.redisConfig);
         }
@@ -503,18 +508,17 @@ export class GlitchSDK {
             );
         }
 
-        // Check if stake is already delegated
+        // Check if stake exists and is already delegated
         const stakeInfo = await this.getStakeInfo(stakeId);
+        if (!stakeInfo) {
+            throw new GlitchError('Stake not found', 1015);
+        }
+
         if (stakeInfo.delegate && stakeInfo.delegate.toString() !== delegateAddress) {
             throw new GlitchError(
                 'Stake is already delegated to another address',
                 ErrorCode.STAKE_ALREADY_DELEGATED
             );
-        }
-
-        const stakeInfo = await this.getStakeInfo(stakeId);
-        if (!stakeInfo) {
-            throw new GlitchError('Stake not found', 1015);
         }
 
         // Check if stake is already delegated

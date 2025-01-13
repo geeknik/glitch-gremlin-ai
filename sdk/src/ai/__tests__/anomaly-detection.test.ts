@@ -26,6 +26,8 @@ interface AnomalyDetail {
     confidence?: number;
     correlatedPatterns?: string[];
 }
+import { TimeSeriesMetric } from '../src/types';
+
 describe('AnomalyDetectionModel', () => {
     let model: AnomalyDetectionModel;
     const testModelPath = './test-model';
@@ -38,18 +40,18 @@ describe('AnomalyDetectionModel', () => {
         await model.cleanup();
     });
 
-    const generateNormalMetrics = (count: number): TimeSeriesMetrics[] => {
+    const generateNormalMetrics = (count: number): TimeSeriesMetric[] => {
         return Array.from({ length: count }, (_, i) => ({
-            instructionFrequency: [Math.sin(i * 0.1) + 1],
-            memoryAccess: [Math.cos(i * 0.1) + 1], 
-            accountAccess: [Math.sin(i * 0.05) + 1],
-            stateChanges: [Math.cos(i * 0.05) + 1],
-            pdaValidation: [Math.sin(i * 0.15) + 1],
-            accountDataMatching: [Math.cos(i * 0.15) + 1],
-            cpiSafety: [Math.sin(i * 0.08) + 1],
-            authorityChecks: [Math.cos(i * 0.08) + 1],
+            instructionFrequency: Math.sin(i * 0.1) + 1,
+            memoryAccess: Math.cos(i * 0.1) + 1,
+            accountAccess: Math.sin(i * 0.05) + 1,
+            stateChanges: Math.cos(i * 0.05) + 1,
+            pdaValidation: Math.sin(i * 0.15) + 1,
+            accountDataMatching: Math.cos(i * 0.15) + 1,
+            cpiSafety: Math.sin(i * 0.08) + 1,
+            authorityChecks: Math.cos(i * 0.08) + 1,
             timestamp: Date.now() + i * 1000
-        }));
+        }))
     };
 
     const generateAnomalousMetrics = (count: number): TimeSeriesMetrics[] => {
@@ -136,17 +138,6 @@ describe('AnomalyDetectionModel', () => {
 });
 
 
-describe('AnomalyDetectionModel', () => {
-    const testModelPath = './test-model';
-    let model: AnomalyDetectionModel;
-
-    beforeEach(() => {
-        model = new AnomalyDetectionModel();
-    });
-
-    afterEach(async () => {
-        await model.cleanup();
-    });
 
 
     describe('train', () => {
@@ -260,14 +251,53 @@ describe('AnomalyDetectionModel', () => {
     });
     });
 
-    describe('Security Pattern Detection', () =>
+    describe('Security Pattern Detection', () => {
+        describe('Solana Vulnerability Detection', () => {
     describe('Solana Vulnerability Detection', () => {
         beforeEach(async () => {
             // Train model with normal Solana transaction patterns
             const trainingData = generateNormalMetrics(200);
             await model.train(trainingData);
         });
-    159|
+    it('should detect PDA validation issues', async () => {
+        const testData = generateNormalMetrics(100);
+        testData[50].pdaValidation = 9.5; // Inject PDA validation anomaly
+        const result = await model.detect(testData);
+        
+        expect(result.isAnomaly).toBe(true);
+        expect(result.details.find(d => d.type === 'pdaValidation')).toBeDefined();
+        expect(result.confidence).toBeGreaterThan(0.7);
+    });
+
+    it('should detect account data matching vulnerabilities', async () => {
+        const testData = generateNormalMetrics(100);
+        testData[50].accountDataMatching = 8.5; // Inject account data mismatch
+        const result = await model.detect(testData);
+        
+        expect(result.isAnomaly).toBe(true);
+        expect(result.details.find(d => d.type === 'accountDataMatching')).toBeDefined();
+        expect(result.confidence).toBeGreaterThan(0.6);
+    });
+
+    it('should detect unsafe CPI patterns', async () => {
+        const testData = generateNormalMetrics(100);
+        testData[50].cpiSafety = 7.5; // Inject unsafe CPI pattern
+        const result = await model.detect(testData);
+        
+        expect(result.isAnomaly).toBe(true);
+        expect(result.details.find(d => d.type === 'cpiSafety')).toBeDefined();
+        expect(result.confidence).toBeGreaterThan(0.65);
+    });
+
+    it('should detect authority validation issues', async () => {
+        const testData = generateNormalMetrics(100);
+        testData[50].authorityChecks = 6.5; // Inject authority validation issue
+        const result = await model.detect(testData);
+        
+        expect(result.isAnomaly).toBe(true);
+        expect(result.details.find(d => d.type === 'authorityChecks')).toBeDefined();
+        expect(result.confidence).toBeGreaterThan(0.75);
+    });
     160|        it('should detect PDA validation issues', async () => {
     161|            const testData = generateNormalMetrics(100);
     162|            testData[50].pdaValidation = [9.5]; // Inject PDA validation anomaly

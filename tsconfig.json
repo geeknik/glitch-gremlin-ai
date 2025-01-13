@@ -1,24 +1,36 @@
 {
-  "compilerOptions": {
-    "target": "ES2020",
+"compilerOptions": {
+    "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "node",
+    "allowJs": true,
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
     "baseUrl": ".",
     "paths": {
-      "@glitch-gremlin/sdk": ["./sdk/src/index.ts"]
+    "@glitch-gremlin/sdk": ["./sdk/src/index.ts"],
+    "@glitch-gremlin/*": ["./*/src"]
     },
     "declaration": true,
     "sourceMap": true,
     "composite": true
-  },
-  "references": [
+},
+"references": [
     { "path": "./sdk" },
     { "path": "./cli" }
-  ],
-  "include": ["src"],
-  "exclude": ["node_modules", "**/__tests__/*"]
+],
+"include": [
+    "src/**/*.ts",
+    "src/**/*.js",
+    "src/**/*.json",
+    "src/**/__tests__/**/*.ts"
+],
+"exclude": [
+    "node_modules",
+    "dist"
+]
 }

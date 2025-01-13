@@ -3,6 +3,8 @@ import { ExploitScanner } from './exploit-scanner';
 import { FuzzTester } from './fuzz-tester';
 import { LoadTester } from './load-tester';
 import { ConcurrencyTester } from './concurrency-tester';
+import { AnalysisResult, StaticAnalysisResult, DynamicAnalysisResult, Finding, ChaosTestResult } from './types';
+import { VulnerabilityDetectionModel } from './ml-model';
 import { Logger } from '../utils/logger';
 
 export class GlitchAIEngine {
@@ -11,6 +13,7 @@ export class GlitchAIEngine {
     private loadTester: LoadTester;
     private concurrencyTester: ConcurrencyTester;
     private logger: Logger;
+    private mlModel: VulnerabilityDetectionModel;
 
     constructor() {
         this.mlModel = new VulnerabilityDetectionModel();
@@ -66,7 +69,7 @@ export class GlitchAIEngine {
         }
     }
 
-    private calculateRiskScore(staticAnalysis: any, dynamicAnalysis: any): number {
+    private calculateRiskScore(staticAnalysis: StaticAnalysisResult, dynamicAnalysis: DynamicAnalysisResult): number
         // Weighted scoring based on findings severity
         const staticWeight = 0.4;
         const dynamicWeight = 0.6;
@@ -77,17 +80,27 @@ export class GlitchAIEngine {
         );
     }
 
-    private generateRecommendations(staticAnalysis: any, dynamicAnalysis: any): string[] {
+    private generateRecommendations(staticAnalysis: StaticAnalysisResult, dynamicAnalysis: DynamicAnalysisResult): string[]
         const recommendations: string[] = [];
         
         // Analyze findings and generate specific recommendations
-        if (staticAnalysis.findings.length > 0) {
+        for (const finding of staticAnalysis.findings) {
+            const typedFinding = finding as unknown as Finding;
+            if (typedFinding.recommendation) {
+                recommendations.push(`Fix ${typedFinding.type}: ${typedFinding.recommendation}`);
+            }
+        }
             recommendations.push(
                 ...staticAnalysis.findings.map(f => `Fix ${f.type}: ${f.recommendation}`)
             );
         }
 
-        if (dynamicAnalysis.findings.length > 0) {
+        for (const finding of dynamicAnalysis.findings) {
+            const typedFinding = finding as unknown as Finding;
+            if (typedFinding.mitigation) {
+                recommendations.push(`Address ${typedFinding.type}: ${typedFinding.mitigation}`);
+            }
+        }
             recommendations.push(
                 ...dynamicAnalysis.findings.map(f => `Address ${f.type}: ${f.mitigation}`)
             );
