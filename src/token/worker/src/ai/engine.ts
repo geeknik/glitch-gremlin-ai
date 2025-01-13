@@ -1,18 +1,44 @@
 import { Connection } from '@solana/web3.js';
 import { ExploitScanner } from './exploit-scanner';
 import { VulnerabilityDetectionModel } from './ml-model';
-import { ChaosTestResult } from './types';
+import { ChaosTestResult, Finding, StaticAnalysisResult, DynamicAnalysisResult } from './types';
 
-interface TestType {
-  EXPLOIT: string;
-  FUZZ: string;
-  LOAD: string;
-  CONCURRENCY: string;
+enum TestType {
+  EXPLOIT = 'EXPLOIT',
+  FUZZ = 'FUZZ',
+  LOAD = 'LOAD',
+  CONCURRENCY = 'CONCURRENCY'
 }
 
 interface ChaosParams {
   duration: number;
   intensity: number;
+}
+
+interface Logger {
+  info: (msg: string) => void;
+  error: (msg: string) => void;
+}
+
+class FuzzTester {
+  quickScan(programId: string) {
+    return { findings: [], riskScore: 0 };
+  }
+  runExtendedTest(programId: string, params: ChaosParams) {
+    return { success: true, findings: [], metrics: { totalTransactions: 0, errorRate: 0, avgLatency: 0 } };
+  }
+}
+
+class LoadTester {
+  runLoadTest(programId: string, params: ChaosParams) {
+    return { success: true, findings: [], metrics: { totalTransactions: 0, errorRate: 0, avgLatency: 0 } };
+  }
+}
+
+class ConcurrencyTester {
+  runConcurrencyTest(programId: string, params: ChaosParams) {
+    return { success: true, findings: [], metrics: { totalTransactions: 0, errorRate: 0, avgLatency: 0 } };
+  }
 }
 
 export class GlitchAIEngine {
