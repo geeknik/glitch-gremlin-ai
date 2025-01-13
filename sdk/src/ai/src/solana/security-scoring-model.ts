@@ -113,7 +113,8 @@ export class SecurityScoring {
             patterns: risks,
             suggestions: [...this.generateSuggestions(score, validation), ...risks],
             validation,
-            timestamp: new Date()
+            timestamp: new Date(),
+            programId
         };
     }
 

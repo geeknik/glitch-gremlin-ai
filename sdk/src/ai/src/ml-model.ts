@@ -6,7 +6,7 @@ export interface ModelOutput {
 }
 
 export interface VulnerabilityOutput extends ModelOutput {
-    type: VulnerabilityType;
+    type: string;
     confidence: number;
 }
 
