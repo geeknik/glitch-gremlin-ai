@@ -19,5 +19,9 @@ export default {
     transformIgnorePatterns: [
         'node_modules/(?!(?:@solana|ioredis)/)'
     ],
+    testPathIgnorePatterns: [
+        '/node_modules/',
+        '/dist/'
+    ],
     setupFilesAfterEnv: ['<rootDir>/src/__tests__/setupAfterEnv.ts']
 }

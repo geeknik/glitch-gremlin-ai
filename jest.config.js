@@ -24,8 +24,12 @@ export default {
   },
   testRunner: "jest-circus/runner",
   testMatch: [
-    '<rootDir>/src/**/__tests__/**/*.{js,ts}',
-    '<rootDir>/src/**/*.{spec,test}.{js,ts}'
+    'src/**/__tests__/**/*.{js,ts}',
+    'src/**/*.{spec,test}.{js,ts}'
+  ],
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/dist/'
   ],
   coverageDirectory: 'coverage',
   coverageProvider: 'v8',
@@ -34,7 +38,8 @@ export default {
     'src/**/*.{js,ts}',
     '!src/**/*.d.ts',
     '!src/**/*.test.{js,ts}',
-    '!src/types/**/*'
+    '!src/types/**/*',
+    '!dist/**/*'
   ],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js']
 }
