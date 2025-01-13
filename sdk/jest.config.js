@@ -1,5 +1,4 @@
-/** @type {import('jest').Config} */
-module.exports = {
+export default {
     extensionsToTreatAsEsm: ['.ts', '.tsx'],
     moduleNameMapper: {
         '^@/(.*)$': '<rootDir>/src/$1',
@@ -21,4 +20,4 @@ module.exports = {
         'node_modules/(?!(?:@solana|ioredis)/)'
     ],
     setupFilesAfterEnv: ['<rootDir>/src/__tests__/setupAfterEnv.ts']
-};
+}
