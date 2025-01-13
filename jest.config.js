@@ -3,17 +3,20 @@ module.exports = {
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
-    '^@glitch-gremlin/sdk$': '<rootDir>/../sdk/src'
+    '^@glitch-gremlin/sdk$': '<rootDir>/../sdk/src',
+    '^(\\.{1,2}/.*)\\.js$': '$1' // Add .js extension mapper
   },
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
       tsconfig: 'tsconfig.json',
-      isolatedModules: true,
+      isolatedModules: false, // Changed to false
+      useESM: true,
       diagnostics: {
         ignoreCodes: [1005, 1128, 1109, 1157, 1192, 1198, 7006, 7016, 7031]
       }
     }]
   },
+  extensionsToTreatAsEsm: ['.ts'], // Add ESM support
   transformIgnorePatterns: [
     'node_modules/(?!(@solana|@project-serum|@metaplex|@coral-xyz|@holaplex|@nfteyez)/.*)'
   ],

@@ -80,12 +80,14 @@ const DEFAULT_CONFIG: SecurityModelConfig = {
     }
 };
 
+import { PublicKey } from '@solana/web3.js';
+
 export class SecurityScoring {
     private readonly config: SecurityModelConfig;
     private lastAnalyzedProgramId: string | null = null;
-    private connection: any; // Needs a proper connection object
+    private connection: Connection;
 
-    constructor(config: Partial<SecurityModelConfig> = {}, connection: any) { // Added connection parameter
+    constructor(config: Partial<SecurityModelConfig> = {}, connection: Connection) {
         this.config = {
             thresholds: {
                 ...DEFAULT_CONFIG.thresholds,

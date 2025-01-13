@@ -4,12 +4,18 @@
         "target": "es2020",
         "strict": true,
         "esModuleInterop": true,
-        "skipLibCheck": true,
+        "skipLibCheck": false, // Changed to false to catch type issues
         "forceConsistentCasingInFileNames": true,
         "outDir": "./dist",
         "rootDir": "./src",
-        "moduleResolution": "node",
-        "types": ["jest", "node"]
+        "moduleResolution": "node16", // Updated to node16
+        "types": ["jest", "node"],
+        "paths": {
+            "@/*": ["./src/*"]
+        },
+        "baseUrl": ".",
+        "allowJs": true
     },
-    "include": ["src/**/*"]
+    "include": ["src/**/*"],
+    "exclude": ["node_modules"]
 }

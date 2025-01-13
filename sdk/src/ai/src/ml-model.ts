@@ -10,6 +10,8 @@ export interface VulnerabilityOutput extends ModelOutput {
     confidence: number;
 }
 
+import { VulnerabilityType } from '../types.js';
+
 export class VulnerabilityDetectionModel extends MLModel {
     constructor() {
         super();
@@ -28,7 +30,7 @@ export class VulnerabilityDetectionModel extends MLModel {
     
     private mapIndexToVulnerabilityType(index: number): VulnerabilityType {
         const types = Object.values(VulnerabilityType);
-        return types[index] || VulnerabilityType.Unknown;
+        return types[index] || VulnerabilityType.None;
     }
 }
 

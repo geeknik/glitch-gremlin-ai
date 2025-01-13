@@ -1,7 +1,7 @@
 import IORedis from 'ioredis';
-import { GlitchError } from '../errors';
+import { GlitchError } from '../errors.js';
 import type { Redis as RedisType } from 'ioredis';
-import type { ChaosRequestParams, ChaosResult } from '../types';
+import type { ChaosRequestParams, ChaosResult } from '../types.js';
 
 export class RedisQueueWorker {
     private redis: RedisType;
