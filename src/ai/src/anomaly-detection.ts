@@ -94,28 +94,29 @@ private async buildModel(): Promise<void> {
 }
 
 private preprocessMetrics(metrics: TimeSeriesMetric[]): tf.Tensor2D {
-    const flattenedData = metrics.map(metric => [
-    ...metric.instructionFrequency,
-    ...metric.executionTime,
-    ...metric.memoryUsage,
-    ...metric.cpuUtilization,
-    ...metric.errorRate,
-    ...metric.pdaValidation,
-    ...metric.accountDataMatching,
-    ...metric.cpiSafety,
-    ...metric.authorityChecks
-    ]);
+    return tf.tidy(() => {
+        const flattenedData = metrics.map(metric => [
+        ...metric.instructionFrequency,
+        ...metric.executionTime,
+        ...metric.memoryUsage,
+        ...metric.cpuUtilization,
+        ...metric.errorRate,
+        ...metric.pdaValidation,
+        ...metric.accountDataMatching,
+        ...metric.cpiSafety,
+        ...metric.authorityChecks
+        ]);
 
-    const tensorData = tf.tensor2d(flattenedData);
-    
-    if (!this.meanStd) {
-    const mean = tensorData.mean(0);
-    const std = tensorData.sub(mean).square().mean(0).sqrt(); // Manually calculate std
-    this.meanStd = {
-        mean: Array.from(mean.dataSync()),
-        std: Array.from(std.dataSync())
-    };
-    }
+        const tensorData = tf.tensor2d(flattenedData);
+        
+        if (!this.meanStd) {
+            const moments = tf.moments(tensorData, 0);
+            this.meanStd = {
+                mean: Array.from(moments.mean.dataSync()),
+                std: Array.from(tf.sqrt(moments.variance).dataSync())
+            };
+            tf.dispose([moments.mean, moments.variance]);
+        }
 
     const normalizedData = tensorData.sub(tf.tensor2d([this.meanStd.mean]))
     .div(tf.tensor2d([this.meanStd.std]));
@@ -169,9 +170,10 @@ async detect(metrics: TimeSeriesMetric[]): Promise<AnomalyResult> {
     throw new Error('Model not trained');
     }
 
-    const tensorData = this.preprocessMetrics(metrics);
-    const predictions = this.model.predict(tensorData) as tf.Tensor;
-    const reconstructionErrors = tf.sub(tensorData, predictions).abs().mean(1);
+    return tf.tidy(() => {
+        const tensorData = this.preprocessMetrics(metrics);
+        const predictions = this.model.predict(tensorData);
+        const reconstructionErrors = tf.sub(predictions as tf.Tensor, tensorData).abs().mean(1);
     
     const anomalyScores = reconstructionErrors.div(tf.scalar(this.thresholds.reconstruction));
     const isAnomaly = anomalyScores.greater(tf.scalar(1));
