@@ -69,7 +69,7 @@ export class GlitchAIEngine {
         }
     }
 
-    private calculateRiskScore(staticAnalysis: StaticAnalysisResult, dynamicAnalysis: DynamicAnalysisResult): number
+    private calculateRiskScore(staticAnalysis: StaticAnalysisResult, dynamicAnalysis: DynamicAnalysisResult): number {
         // Weighted scoring based on findings severity
         const staticWeight = 0.4;
         const dynamicWeight = 0.6;
@@ -80,7 +80,7 @@ export class GlitchAIEngine {
         );
     }
 
-    private generateRecommendations(staticAnalysis: StaticAnalysisResult, dynamicAnalysis: DynamicAnalysisResult): string[]
+    private generateRecommendations(staticAnalysis: StaticAnalysisResult, dynamicAnalysis: DynamicAnalysisResult): string[] {
         const recommendations: string[] = [];
         
         // Analyze findings and generate specific recommendations
@@ -90,20 +90,12 @@ export class GlitchAIEngine {
                 recommendations.push(`Fix ${typedFinding.type}: ${typedFinding.recommendation}`);
             }
         }
-            recommendations.push(
-                ...staticAnalysis.findings.map(f => `Fix ${f.type}: ${f.recommendation}`)
-            );
-        }
 
         for (const finding of dynamicAnalysis.findings) {
             const typedFinding = finding as unknown as Finding;
             if (typedFinding.mitigation) {
                 recommendations.push(`Address ${typedFinding.type}: ${typedFinding.mitigation}`);
             }
-        }
-            recommendations.push(
-                ...dynamicAnalysis.findings.map(f => `Address ${f.type}: ${f.mitigation}`)
-            );
         }
 
         return recommendations;
