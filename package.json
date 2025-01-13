@@ -1,41 +1,11 @@
 {
-  "name": "@glitch-gremlin/sdk",
-  "version": "0.1.0",
-  "main": "dist/cjs/index.js",
-  "module": "dist/esm/index.js",
-  "types": "dist/esm/index.d.ts",
+  "name": "glitch-gremlin", // Or whatever your root project's name is
+  "version": "1.0.0",
+  "workspaces": [
+    "sdk"
+  ],
+  "private": true, // Add this if you don't want to publish the root package
   "scripts": {
-    "build": "npm run build:esm && npm run build:cjs",
-    "build:esm": "tsc -p tsconfig.esm.json",
-    "build:cjs": "tsc -p tsconfig.cjs.json",
-    "test": "jest",
-    "test:coverage": "jest --coverage",
-    "prebuild": "node -e \"require('dotenv').config()\"",
-    "prepare": "npm run build"
-  },
-  "devDependencies": {
-    "@types/bn.js": "^6.0.0",
-    "@types/ioredis": "^5.0.1",
-    "@types/jest": "^29.5.14",
-    "@types/node": "^22.10.5",
-    "@types/ws": "^8.5.5",
-    "@typescript-eslint/eslint-plugin": "^6.19.0",
-    "@typescript-eslint/parser": "^6.19.0",
-    "eslint": "^8.56.0",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-jest": "^27.6.0",
-    "eslint-plugin-security": "^1.7.1",
-    "jest": "^29.7.0",
-    "ts-jest": "^29.2.5",
-    "typescript": "^5.7.3"
-  },
-  "dependencies": {
-    "@solana/web3.js": "^1.89.1",
-    "@tensorflow/tfjs-node": "^4.22.0",
-    "bn.js": "^6.0.0",
-    "ioredis": "^5.4.2",
-    "winston": "^3.17.0",
-    "ws": "^8.11.0"
-  },
-  "type": "module"
+    "build": "npm run build --workspace=@glitch-gremlin/sdk"
+  }
 }
