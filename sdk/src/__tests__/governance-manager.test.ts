@@ -22,8 +22,10 @@ import { GovernanceManager } from '../governance.js';
 import { ErrorCode, GlitchError } from '../errors.js';
 
 type MockedConnection = {
-    [K in keyof Connection]: jest.Mock<ReturnType<Connection[K]>, Parameters<Connection[K]>>;
-};
+    [K in keyof Connection]: Connection[K] extends (...args: any) => any 
+        ? jest.Mock<ReturnType<Connection[K]>, Parameters<Connection[K]>>
+        : Connection[K];
+} & Connection;
 interface VoteWeights {
     yes: number;
     no: number;
@@ -44,13 +46,24 @@ interface ProposalData {
     yesVotes: number;
     noVotes: number;
     quorumRequired: number;
+    executionTime: number;
+    quorum: number;
+    status: string;
 }
 
 describe('GovernanceManager', () => {
 
     beforeEach(() => {
-        connection = {
-            getAccountInfo: jest.fn<ReturnType<Connection['getAccountInfo']>, Parameters<Connection['getAccountInfo']>>()
+        const mockConnection: Partial<Connection> = {
+            getAccountInfo: jest.fn<ReturnType<Connection['getAccountInfo']>, Parameters<Connection['getAccountInfo']>>(
+                () => Promise.resolve({
+                    data: Buffer.alloc(0),
+                    executable: false,
+                    lamports: 0,
+                    owner: PublicKey.default,
+                    rentEpoch: 0
+                })
+            )
                 .mockResolvedValue({
                     data: Buffer.alloc(0),
                     executable: false,
@@ -139,7 +152,7 @@ describe('GovernanceManager', () => {
         jest.clearAllMocks();
     });
 // Helper function to create properly structured proposal buffer
-function createProposalBuffer(props: {
+export function createProposalBuffer(props: {
     title: string,
     description: string,
     proposer: PublicKey,
@@ -220,7 +233,7 @@ function createProposalBuffer(props: {
     return buffer;
 }
 
-function debugBuffer(buffer: Buffer): void {
+export function debugBuffer(buffer: Buffer): void {
     console.log('Buffer contents:');
     for (let i = 0; i < buffer.length; i += 32) {
         console.log(buffer.slice(i, i + 32).toString('hex'));
@@ -424,8 +437,10 @@ describe('executeProposal', () => {
     let sendTransactionMock: jest.SpiedFunction<typeof connection.sendTransaction>;
     let proposalAddress: PublicKey;
     let connection: MockConnection;
-    let wallet: Keypair;
-    let governanceManager: GovernanceManager;
+    let wallet: Keypair = Keypair.generate();
+    let governanceManager: GovernanceManager = new GovernanceManager(
+        new PublicKey('GLt5cQeRgVMqnE9DGJQNNrbAfnRQYWqYVNWnJo7WNLZ9')
+    );
     let mockProposalData: ProposalData;
 
     describe('governance tests', () => {
