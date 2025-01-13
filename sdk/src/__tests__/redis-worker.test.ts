@@ -24,10 +24,10 @@ interface MockRedis extends Omit<RedisType, 'quit' | 'disconnect' | 'on' | 'incr
     disconnect: jest.fn().mockImplementation(async (): Promise<void> => {
         redisMock.connected = false;
             on: jest.fn(),
-    incr: jest.fn().mockImplementation(async (key: string): Promise<number> => {
+    incr: jest.fn().mockImplementation(async (key: string): Promise<number> => 1),
 lve();
     }),
-    on: jest.fn()
+    on: jest.fn(),
     incr: jest.fn().mockImplementation(async (key: string): Promise<number> => {
         if (redisMock.connected === false) {
             throw new GlitchError('Connection failed', ErrorCode.CONNECTION_ERROR);

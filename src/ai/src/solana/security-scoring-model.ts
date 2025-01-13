@@ -85,9 +85,9 @@ export class SecurityScoringModel {
             analysis: {
                 score,
                 patterns: await this.detectSecurityPatterns(metrics),
-                timestamp: new Date()
+                timestamp: new Date(),
             },
-            validation,
+            validation: validation,
             suggestions: this.generateSuggestions(score, validation)
         };
     }
