@@ -15,9 +15,13 @@ interface ChaosParams {
   intensity: number;
 }
 
-interface Logger {
-  info: (msg: string) => void;
-  error: (msg: string) => void;
+class Logger {
+  info(msg: string) {
+    console.log(`[INFO] ${msg}`);
+  }
+  error(msg: string) {
+    console.error(`[ERROR] ${msg}`);
+  }
 }
 
 class FuzzTester {

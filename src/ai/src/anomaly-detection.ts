@@ -155,8 +155,8 @@ async train(metrics: TimeSeriesMetric[]): Promise<void> {
     const reconstructionErrors = tf.sub(tensorData, predictions).abs().mean(1);
     const errorsArray = reconstructionErrors.arraySync() as number[];
     const sorted = errorsArray.sort((a: number, b: number) => a - b);
-    const index = Math.floor(sorted.size * this.config.anomalyThreshold);
-    const threshold = sorted.gather([index]); // Manual quantile calculation
+    const index = Math.floor(sorted.length * this.config.anomalyThreshold);
+    const threshold = sorted[index]; // Manual quantile calculation
     
     this.thresholds = {
     reconstruction: threshold.dataSync()[0]
