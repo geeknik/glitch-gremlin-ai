@@ -1,13 +1,13 @@
 {
-"compilerOptions": {
+  "compilerOptions": {
     "target": "ES2020",
-    "module": "ES2020",
-    "moduleResolution": "node",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "esModuleInterop": true,
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "outDir": "./dist/esm",
+    "outDir": "./dist",
     "rootDir": "./src",
     "strict": true,
     "allowJs": true,
@@ -15,12 +15,13 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "types": ["jest", "node"],
+    "composite": true,
+    "types": ["jest", "node", "@types/jest"],
     "paths": {
-    "@/*": ["./src/*"],
-    "@solana/*": ["./node_modules/@solana/*"]
+      "@/*": ["./src/*"],
+      "@solana/*": ["./node_modules/@solana/*"]
     }
-},
-"include": ["src/**/*", "src/__tests__/**/*"],
-"exclude": ["node_modules", "dist"]
+  },
+  "include": ["src/**/*", "src/__tests__/**/*"],
+  "exclude": ["node_modules", "dist"]
 }

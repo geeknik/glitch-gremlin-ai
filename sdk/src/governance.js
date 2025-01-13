@@ -30,7 +30,7 @@ export class GovernanceManager {
 
     async checkQuorum(metadata) {
         const totalVotes = metadata.voteWeights.yes + metadata.voteWeights.no + metadata.voteWeights.abstain;
-        if (totalVotes < metadata.quorum) {
+        if (totalVotes <= metadata.quorum) {
             throw new GlitchError('Proposal has not reached quorum', 2007);
         }
     }
@@ -142,15 +142,34 @@ export class GovernanceManager {
         const tokenAccounts = await connection.getTokenAccountsByOwner(voter, {
             programId: TOKEN_PROGRAM_ID
         });
-        // Sum up all GLITCH token balances
+        
         let totalBalance = 0;
         for (const { account } of tokenAccounts.value) {
             const data = Buffer.from(account.data);
+            
             // Parse SPL token account data
+            // Amount is at offset 64
             const amount = Number(data.readBigUInt64LE(64));
-            totalBalance += amount;
+            
+            // Check delegation data
+            // Delegate is at offset 72 (after amount)
+            const delegateOption = data.readUInt32LE(72);
+            const hasDelegate = delegateOption === 1;
+            
+            // If account has delegate, only count if this voter is the delegate
+            if (hasDelegate) {
+                const delegate = new PublicKey(data.slice(76, 108));
+                if (delegate.equals(voter)) {
+                    totalBalance += amount;
+                }
+            } else {
+                // If no delegate, count owned tokens
+                totalBalance += amount;
+            }
         }
+        
         return totalBalance;
+    }
     }
     async executeProposal(connection, wallet, proposalAddress) {
         const account = await connection.getAccountInfo(proposalAddress);

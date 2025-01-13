@@ -1,5 +1,5 @@
 import { jest, describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from '@jest/globals';
-import { VulnerabilityDetectionModel, VulnerabilityType, generateTrainingData } from '../ai/vulnerability-detection.js';
+import { VulnerabilityDetectionModel, VulnerabilityType, generateTrainingData } from '../ai/src/vulnerability-detection.js';
 import * as tf from '@tensorflow/tfjs-node';
 
 describe('VulnerabilityDetectionModel Tests', () => {
@@ -43,11 +43,11 @@ describe('VulnerabilityDetectionModel Tests', () => {
 
         it('should train on small sample dataset and validate results', async () => {
             const sampleData = generateTrainingData(10);
-            await model.train(sampleData);
+            await model.trainWithData(sampleData);
             
             // Verify model is trained
             const testFeatures = new Array(20).fill(0).map(() => Math.random());
-            const prediction = await model.predict(testFeatures);
+            const prediction = await model.predictVulnerability(testFeatures);
             
             expect(prediction.type).toBeDefined();
             expect(prediction.confidence).toBeGreaterThan(0);
@@ -56,14 +56,14 @@ describe('VulnerabilityDetectionModel Tests', () => {
         });
 
         it('should handle empty training data gracefully', async () => {
-            await expect(model.train([])).rejects.toThrow('Training data cannot be empty');
+            await expect(model.trainWithData([])).rejects.toThrow('Training data cannot be empty');
         });
 
         it('should maintain consistent tensor count after training', async () => {
             const initialTensors = tf.memory().numTensors;
             const sampleData = generateTrainingData(5);
             
-            await model.train(sampleData);
+            await model.trainWithData(sampleData);
             
             // Verify no tensor leaks
             expect(tf.memory().numTensors).toBe(initialTensors);
@@ -74,12 +74,12 @@ describe('VulnerabilityDetectionModel Tests', () => {
         beforeEach(async () => {
             // Train the model with minimal dataset before prediction tests
             const sampleData = generateTrainingData(5);
-            await model.train(sampleData);
+            await model.trainWithData(sampleData);
         });
 
         it('should make predictions with proper confidence scores', async () => {
             const features = new Array(20).fill(0).map(() => Math.random());
-            const prediction = await model.predict(features);
+            const prediction = await model.predictVulnerability(features);
 
             expect(prediction.type).toBeDefined();
             expect(typeof prediction.confidence).toBe('number');
@@ -92,21 +92,21 @@ describe('VulnerabilityDetectionModel Tests', () => {
         it('should handle extreme feature values', async () => {
             // Test with all zeros
             const zeroFeatures = new Array(20).fill(0);
-            const zeroPrediction = await model.predict(zeroFeatures);
+            const zeroPrediction = await model.predictVulnerability(zeroFeatures);
             expect(zeroPrediction.type).toBeDefined();
 
             // Test with all ones
             const oneFeatures = new Array(20).fill(1);
-            const onePrediction = await model.predict(oneFeatures);
+            const onePrediction = await model.predictVulnerability(oneFeatures);
             expect(onePrediction.type).toBeDefined();
         });
 
         it('should provide meaningful details for predictions', async () => {
             const features = new Array(20).fill(0).map((_, i) => i === 0 ? 0.9 : 0.1);
-            const prediction = await model.predict(features);
+            const prediction = await model.predictVulnerability(features);
 
             expect(prediction.details).toBeInstanceOf(Array);
-            expect(prediction.details.some(detail => detail.includes('Recommendations'))).toBe(true);
+            expect(prediction.details.some((detail: string) => detail.includes('Recommendations'))).toBe(true);
             expect(prediction.details.length).toBeGreaterThan(1);
         });
 
@@ -114,14 +114,14 @@ describe('VulnerabilityDetectionModel Tests', () => {
             const initialTensors = tf.memory().numTensors;
             const features = new Array(20).fill(0).map(() => Math.random());
             
-            await model.predict(features);
+            await model.predictVulnerability(features);
             
             expect(tf.memory().numTensors).toBe(initialTensors);
         });
 
         it('should gracefully handle invalid feature dimensions', async () => {
             const invalidFeatures = new Array(10).fill(0); // Wrong size
-            await expect(model.predict(invalidFeatures)).rejects.toThrow();
+            await expect(model.predictVulnerability(invalidFeatures)).rejects.toThrow();
         });
     });
 
@@ -133,7 +133,7 @@ describe('VulnerabilityDetectionModel Tests', () => {
 
             // Train model
             const trainData = generateTrainingData(5);
-            await model.train(trainData);
+            await model.trainWithData(trainData);
 
             // Save model
             await model.save(modelPath);
@@ -143,7 +143,7 @@ describe('VulnerabilityDetectionModel Tests', () => {
 
             // Verify prediction works after load
             const testFeatures = new Array(20).fill(0).map(() => Math.random());
-            const prediction = await model.predict(testFeatures);
+            const prediction = await model.predictVulnerability(testFeatures);
             expect(prediction.type).toBeDefined();
             expect(prediction.confidence).toBeGreaterThan(0);
         });
@@ -151,16 +151,16 @@ describe('VulnerabilityDetectionModel Tests', () => {
         // Test stress scenarios
         it('should handle concurrent operations', async () => {
             const trainData = generateTrainingData(5);
-            await model.train(trainData);
+            await model.trainWithData(trainData);
 
             // Run concurrent predictions
             const promises = Array(10).fill(0).map(async () => {
                 const features = new Array(20).fill(0).map(() => Math.random());
-                return model.predict(features);
+                return model.predictVulnerability(features);
             });
 
             const results = await Promise.all(promises);
-            results.forEach(result => {
+            results.forEach((result: { type: VulnerabilityType; confidence: number }) => {
                 expect(result.type).toBeDefined();
                 expect(result.confidence).toBeGreaterThan(0);
             });
@@ -170,14 +170,14 @@ describe('VulnerabilityDetectionModel Tests', () => {
         it('should recover from errors and maintain state', async () => {
             // Train initial model
             const trainData = generateTrainingData(5);
-            await model.train(trainData);
+            await model.trainWithData(trainData);
 
             // Force an error
-            await expect(model.predict([])).rejects.toThrow('Invalid features array');
+            await expect(model.predictVulnerability([])).rejects.toThrow('Invalid input: expected 20 features');
 
             // Verify model still works
             const validFeatures = new Array(20).fill(0).map(() => Math.random());
-            const prediction = await model.predict(validFeatures);
+            const prediction = await model.predictVulnerability(validFeatures);
             expect(prediction.type).toBeDefined();
         });
 
@@ -187,10 +187,10 @@ describe('VulnerabilityDetectionModel Tests', () => {
 
             // Train and make predictions
             const trainData = generateTrainingData(5);
-            await model.train(trainData);
+            await model.trainWithData(trainData);
             
             const features = new Array(20).fill(0).map(() => Math.random());
-            await model.predict(features);
+            await model.predictVulnerability(features);
 
             // Cleanup
             await model.cleanup();

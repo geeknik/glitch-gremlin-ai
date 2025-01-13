@@ -1,7 +1,18 @@
-import { Fuzzer } from './fuzzer';
+import { Fuzzer } from '../src/fuzzer';
 import { PublicKey } from '@solana/web3.js';
-import { VulnerabilityType } from '../types';
+import { VulnerabilityType } from '../src/types';
 
+interface FuzzInput {
+instruction: number;
+data: Buffer;
+probability?: number; 
+}
+
+interface FuzzResult {
+type: VulnerabilityType | null;
+confidence: number;
+details?: string;
+}
 describe('Fuzzer', () => {
   let fuzzer: Fuzzer;
   const testProgramId = new PublicKey('11111111111111111111111111111111'); // Use valid base58 public key
@@ -18,7 +29,7 @@ describe('Fuzzer', () => {
 
     it('should generate inputs with valid structure', async () => {
       const inputs = await fuzzer.generateFuzzInputs(testProgramId);
-      inputs.forEach(input => {
+    inputs.forEach((input: FuzzInput) => {
         expect(input).toHaveProperty('instruction');
         expect(input).toHaveProperty('data');
         expect(input).toHaveProperty('probability');
@@ -60,28 +71,28 @@ describe('Fuzzer', () => {
 
   describe('analyzeFuzzResult', () => {
     it('should detect arithmetic overflow', async () => {
-      const result = await fuzzer.analyzeFuzzResult(
-        { error: 'arithmetic operation overflow' },
-        { instruction: 0, data: Buffer.alloc(0) }
-      );
+    const result: FuzzResult = await fuzzer.analyzeFuzzResult(
+    { error: 'arithmetic operation overflow' },
+    { instruction: 0, data: Buffer.alloc(0), probability: 1 }
+    );
       expect(result.type).toBe(VulnerabilityType.ArithmeticOverflow);
       expect(result.confidence).toBeGreaterThanOrEqual(0.7);
     });
 
     it('should detect access control issues', async () => {
-      const result = await fuzzer.analyzeFuzzResult(
-        { error: 'unauthorized access attempt' },
-        { instruction: 0, data: Buffer.alloc(0) }
-      );
+    const result: FuzzResult = await fuzzer.analyzeFuzzResult(
+    { error: 'unauthorized access attempt' },  
+    { instruction: 0, data: Buffer.alloc(0), probability: 1 }
+    );
       expect(result.type).toBe(VulnerabilityType.AccessControl);
       expect(result.confidence).toBeGreaterThan(0.7);
     });
 
     it('should return null for no vulnerabilities', async () => {
-      const result = await fuzzer.analyzeFuzzResult(
-        { error: 'generic error' },
-        { instruction: 0, data: Buffer.alloc(0) }
-      );
+    const result: FuzzResult = await fuzzer.analyzeFuzzResult(
+    { error: 'generic error' },
+    { instruction: 0, data: Buffer.alloc(0), probability: 1 }
+    );
       expect(result.type).toBeNull();
       expect(result.confidence).toBe(0);
     });

@@ -1,40 +1,140 @@
 import * as tf from '@tensorflow/tfjs-node';
 import * as fs from 'fs';
-import { AnomalyDetectionModel, TimeSeriesMetrics } from './anomaly-detection';
+import { AnomalyDetectionModel } from '../src/anomaly-detection';
 
-const generateNormalMetrics = (count: number): TimeSeriesMetrics[] => {
-    return Array.from({ length: count }, (_, i) => ({
-        instructionFrequency: [Math.sin(i * 0.1) + 1],
-        memoryAccess: [Math.cos(i * 0.1) + 1],
-        accountAccess: [Math.sin(i * 0.05) + 1],
-        stateChanges: [Math.cos(i * 0.05) + 1],
-        pdaValidation: [Math.sin(i * 0.15) + 1],
-        accountDataMatching: [Math.cos(i * 0.15) + 1],
-        cpiSafety: [Math.sin(i * 0.08) + 1],
-        authorityChecks: [Math.cos(i * 0.08) + 1],
-        timestamp: Date.now() + i * 1000
-    }));
-};
+interface TimeSeriesMetrics {
+    instructionFrequency: number[];
+    memoryAccess: number[];
+    accountAccess: number[];
+    stateChanges: number[];
+    pdaValidation: number[];
+    accountDataMatching: number[];
+    cpiSafety: number[];
+    authorityChecks: number[];
+    timestamp: number;
+}
 
-const generateAnomalousMetrics = (count: number): TimeSeriesMetrics[] => {
-    const metrics = generateNormalMetrics(count);
-    // Inject anomaly in the middle
-    const anomalyIndex = Math.floor(count / 2);
-    metrics[anomalyIndex] = {
-        instructionFrequency: [10], // Spike in instruction frequency
-        memoryAccess: [8], // Unusual memory access
-        accountAccess: [5], // Higher account access
-        stateChanges: [7], // More state changes
-        pdaValidation: [9], // PDA validation failure
-        accountDataMatching: [8], // Account data mismatch
-        cpiSafety: [7], // Unsafe CPI pattern
-        authorityChecks: [6], // Authority validation issues
-        timestamp: Date.now() + anomalyIndex * 1000
+interface AnomalyDetectionResult {
+    isAnomaly: boolean;
+    confidence: number;
+    details: AnomalyDetail[];
+}
+
+interface AnomalyDetail {
+    type: string;
+    score: number;
+    confidence?: number;
+    correlatedPatterns?: string[];
+}
+describe('AnomalyDetectionModel', () => {
+    let model: AnomalyDetectionModel;
+    const testModelPath = './test-model';
+
+    beforeEach(() => {
+        model = new AnomalyDetectionModel();
+    });
+
+    afterEach(async () => {
+        await model.cleanup();
+    });
+
+    const generateNormalMetrics = (count: number): TimeSeriesMetrics[] => {
+        return Array.from({ length: count }, (_, i) => ({
+            instructionFrequency: [Math.sin(i * 0.1) + 1],
+            memoryAccess: [Math.cos(i * 0.1) + 1], 
+            accountAccess: [Math.sin(i * 0.05) + 1],
+            stateChanges: [Math.cos(i * 0.05) + 1],
+            pdaValidation: [Math.sin(i * 0.15) + 1],
+            accountDataMatching: [Math.cos(i * 0.15) + 1],
+            cpiSafety: [Math.sin(i * 0.08) + 1],
+            authorityChecks: [Math.cos(i * 0.08) + 1],
+            timestamp: Date.now() + i * 1000
+        }));
     };
-    return metrics;
-};
 
-export { generateAnomalousMetrics };
+    const generateAnomalousMetrics = (count: number): TimeSeriesMetrics[] => {
+        const metrics = generateNormalMetrics(count);
+        const anomalyIndex = Math.floor(count / 2);
+        metrics[anomalyIndex] = {
+            instructionFrequency: [10],
+            memoryAccess: [8],
+            accountAccess: [5], 
+            stateChanges: [7],
+            pdaValidation: [9],
+            accountDataMatching: [8],
+            cpiSafety: [7],
+            authorityChecks: [6],
+            timestamp: Date.now() + anomalyIndex * 1000
+        };
+        return metrics;
+    };
+
+    describe('initialization', () => {
+        it('should initialize properly', async () => {
+            await expect(model.initialize()).resolves.not.toThrow();
+        });
+    });
+
+    describe('train', () => {
+        it('should train successfully with sufficient data', async () => {
+            const trainingData = generateNormalMetrics(200);
+            await expect(model.train(trainingData)).resolves.not.toThrow();
+        });
+
+        it('should throw error with insufficient data', async () => {
+            const trainingData = generateNormalMetrics(50);
+            await expect(model.train(trainingData)).rejects.toThrow('Insufficient data points');
+        });
+    });
+
+    describe('detect', () => {
+        beforeEach(async () => {
+            await model.train(generateNormalMetrics(200));
+        });
+
+        it('should detect normal behavior', async () => {
+            const normalData = generateNormalMetrics(100);
+            const result = await model.detect(normalData);
+            
+            expect(result.isAnomaly).toBe(false);
+            expect(result.confidence).toBeLessThan(0.5);
+        });
+
+        it('should detect anomalous behavior', async () => {
+            const anomalousData = generateAnomalousMetrics(100);
+            const result = await model.detect(anomalousData);
+            
+            expect(result.isAnomaly).toBe(true);
+            expect(result.confidence).toBeGreaterThan(0.5);
+        });
+    });
+
+    describe('save/load', () => {
+        beforeEach(async () => {
+            await model.train(generateNormalMetrics(200));
+        });
+
+        it('should save and load model correctly', async () => {
+            await model.save(testModelPath);
+            await model.cleanup();
+            await expect(model.load(testModelPath)).resolves.not.toThrow();
+        });
+
+        it('should handle invalid model paths', async () => {
+            await expect(model.load('./nonexistent-path')).rejects.toThrow();
+        });
+    });
+
+    describe('cleanup', () => {
+        it('should cleanup resources properly', async () => {
+            const numTensorsBefore = tf.memory().numTensors;
+            await model.train(generateNormalMetrics(200));
+            await model.cleanup();
+            expect(tf.memory().numTensors).toBeLessThanOrEqual(numTensorsBefore);
+        });
+    });
+});
+
 
 describe('AnomalyDetectionModel', () => {
     const testModelPath = './test-model';
@@ -158,15 +258,15 @@ describe('AnomalyDetectionModel', () => {
             await expect(model.train(incompleteMetrics as any)).rejects.toThrow('Missing required metrics fields');
         });
     });
-    });\n
-    describe('Solana Vulnerability Detection', () => {
+    });
 
-    153|    describe('Solana Vulnerability Detection', () => {
-    154|        beforeEach(async () => {
-    155|            // Train model with normal Solana transaction patterns
-    156|            const trainingData = generateNormalMetrics(200);
-    157|            await model.train(trainingData);
-    158|        });
+    describe('Security Pattern Detection', () =>
+    describe('Solana Vulnerability Detection', () => {
+        beforeEach(async () => {
+            // Train model with normal Solana transaction patterns
+            const trainingData = generateNormalMetrics(200);
+            await model.train(trainingData);
+        });
     159|
     160|        it('should detect PDA validation issues', async () => {
     161|            const testData = generateNormalMetrics(100);

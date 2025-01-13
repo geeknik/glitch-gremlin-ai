@@ -1,5 +1,165 @@
 import * as tf from '@tensorflow/tfjs-node';
 import { EventEmitter } from 'events';
+
+export interface TimeSeriesMetrics {
+    instructionFrequency: number[];
+    memoryAccess: number[];
+    accountAccess: number[];  
+    stateChanges: number[];
+    pdaValidation?: number[];
+    accountDataMatching?: number[];
+    cpiSafety?: number[];
+    authorityChecks?: number[];
+    timestamp: number;
+}
+
+export interface AnomalyDetailsItem {
+    type: string;
+    score: number;
+    threshold: number;
+    confidence?: number;
+    correlatedPatterns?: string[];
+}
+
+export interface AnomalyDetectionResult {
+    isAnomaly: boolean;
+    confidence: number;
+    details: AnomalyDetailsItem[];
+}
+
+export class AnomalyDetectionModel extends EventEmitter {
+    private model: tf.LayersModel | null = null;
+    private isInitialized: boolean = false;
+    private readonly inputWindowSize = 100;
+    private readonly featureSize = 8;
+
+    constructor() {
+        super();
+    }
+
+    public async initialize(): Promise<void> {
+        if (this.isInitialized) {
+            return;
+        }
+
+        this.model = await this.buildModel();
+        this.isInitialized = true;
+    }
+
+    private async buildModel(): Promise<tf.LayersModel> {
+        const model = tf.sequential();
+
+        model.add(tf.layers.dense({
+            units: 64,
+            activation: 'tanh',
+            inputShape: [this.inputWindowSize * this.featureSize],
+            kernelInitializer: 'glorotNormal'
+        }));
+
+        model.add(tf.layers.dropout({rate: 0.2}));
+
+        model.add(tf.layers.dense({
+            units: 32,
+            activation: 'relu'
+        }));
+
+        model.add(tf.layers.dense({
+            units: 16,
+            activation: 'relu' 
+        }));
+
+        model.add(tf.layers.dense({
+            units: 3,
+            activation: 'softmax'
+        }));
+
+        model.compile({
+            optimizer: tf.train.adam(0.001),
+            loss: 'categoricalCrossentropy',
+            metrics: ['accuracy']
+        });
+
+        return model;
+    }
+
+    public async train(data: TimeSeriesMetrics[]): Promise<void> {
+        if (!data || data.length === 0) {
+            throw new Error('Training data cannot be empty');
+        }
+
+        if (!this.model) {
+            await this.initialize();
+        }
+
+        await this.model!.fit(this.preprocessData(data), {
+            epochs: 50,
+            batchSize: 32,
+            callbacks: {
+                onEpochEnd: (epoch, logs) => {
+                    this.emit('epochEnd', { epoch, logs });
+                }
+            }
+        });
+    }
+
+    public async detect(metrics: TimeSeriesMetrics[]): Promise<AnomalyDetectionResult> {
+        if (!this.model) {
+            throw new Error('Model not trained');
+        }
+
+        if (!metrics || metrics.length < this.inputWindowSize) {
+            throw new Error('Insufficient data points');
+        }
+
+        const prediction = await this.model!.predict(this.preprocessData(metrics)) as tf.Tensor;
+        const scores = await this.calculateScores(metrics, prediction);
+        prediction.dispose();
+
+        return this.interpretResults(scores);
+    }
+
+    private preprocessData(data: TimeSeriesMetrics[]): tf.Tensor {
+        // Implementation
+        return tf.tensor([]); // Placeholder
+    }
+
+    private async calculateScores(metrics: TimeSeriesMetrics[], prediction: tf.Tensor): Promise<any> {
+        // Implementation
+        return {}; // Placeholder  
+    }
+
+    private interpretResults(scores: any): AnomalyDetectionResult {
+        // Implementation
+        return {
+            isAnomaly: false,
+            confidence: 0,
+            details: []
+        };
+    }
+
+    public async cleanup(): Promise<void> {
+        if (this.model) {
+            this.model.dispose();
+            this.model = null;
+        }
+        this.isInitialized = false;
+    }
+
+    public async save(path: string): Promise<void> {
+        if (!this.model) {
+            throw new Error('Model not trained');
+        }
+        await this.model.save(`file://${path}`);
+    }
+
+    public async load(path: string): Promise<void> {
+        this.model = await tf.loadLayersModel(`file://${path}/model.json`);
+        this.isInitialized = true;
+    }
+}
+
+import * as tf from '@tensorflow/tfjs-node';
+import { EventEmitter } from 'events';
 import { Logger } from '@/utils/logger';
 
 export interface TimeSeriesMetrics {

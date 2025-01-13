@@ -1,34 +1,24 @@
-/** @type {import('ts-jest').JestConfigWithTsJest} */
-module.exports = {
-  preset: 'ts-jest',
-  testEnvironment: 'node',
-  testMatch: ['**/__tests__/**/*.test.ts'],
-  moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/src/$1',
-    '^@glitch-gremlin/sdk$': '<rootDir>/../sdk/src/index.js'
-  },
-  transform: {
-    '^.+\\.tsx?$': [
-      'ts-jest',
-      {
-        useESM: true,
-        tsconfig: 'tsconfig.json',
-        isolatedModules: true
-      }
-    ]
-  },
-  modulePaths: ['<rootDir>/../sdk/src'],
-  setupFilesAfterEnv: [],
-  globals: {
-    'ts-jest': {
-      useESM: true,
-      diagnostics: {
-        ignoreCodes: [1343]
-      }
+/** @type {import('jest').Config} */
+export default {
+    preset: 'ts-jest',
+    testEnvironment: 'node',
+    extensionsToTreatAsEsm: ['.ts'],
+    moduleNameMapper: {
+        '^(\\.{1,2}/.*)\\.js$': '$1',
+    },
+    transform: {
+        '^.+\\.(t|j)sx?$': ['ts-jest', {
+            useESM: true,
+            tsconfig: 'tsconfig.json'
+        }]
+    },
+    testMatch: [
+        '<rootDir>/src/**/__tests__/**/*.{js,ts}',
+        '<rootDir>/src/**/*.{spec,test}.{js,ts}'
+    ],
+    globals: {
+        'ts-jest': {
+            useESM: true
+        }
     }
-  },
-  transformIgnorePatterns: [
-    'node_modules/(?!(.*\\.mjs$|@solana/web3\\.js))'
-  ],
-  extensionsToTreatAsEsm: ['.ts']
-};
+}
