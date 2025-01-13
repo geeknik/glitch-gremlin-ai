@@ -112,3 +112,4 @@ lib/
 target/
 debug/
 release/
+*.tsbuildinfo

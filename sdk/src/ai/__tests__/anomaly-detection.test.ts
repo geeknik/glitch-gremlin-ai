@@ -54,21 +54,21 @@ describe('AnomalyDetectionModel', () => {
         }))
     };
 
-    const generateAnomalousMetrics = (count: number): TimeSeriesMetrics[] => {
-        const metrics = generateNormalMetrics(count);
-        const anomalyIndex = Math.floor(count / 2);
-        metrics[anomalyIndex] = {
-            instructionFrequency: [10],
-            memoryAccess: [8],
-            accountAccess: [5], 
-            stateChanges: [7],
-            pdaValidation: [9],
-            accountDataMatching: [8],
-            cpiSafety: [7],
-            authorityChecks: [6],
-            timestamp: Date.now() + anomalyIndex * 1000
-        };
-        return metrics;
+    const generateAnomalousMetrics = (count: number): TimeSeriesMetric[] => {
+    const metrics = generateNormalMetrics(count);
+    const anomalyIndex = Math.floor(count / 2);
+    metrics[anomalyIndex] = {
+        instructionFrequency: 10,
+        memoryAccess: 8,
+        accountAccess: 5,
+        stateChanges: 7, 
+        pdaValidation: 9,
+        accountDataMatching: 8,
+        cpiSafety: 7,
+        authorityChecks: 6,
+        timestamp: Date.now() + anomalyIndex * 1000
+    };
+    return metrics;
     };
 
     describe('initialization', () => {
@@ -138,9 +138,7 @@ describe('AnomalyDetectionModel', () => {
 });
 
 
-
-
-    describe('train', () => {
+    // Fix empty lines before describe block
         it('should train successfully with sufficient data', async () => {
             const trainingData = generateNormalMetrics(200);
             await expect(model.train(trainingData)).resolves.not.toThrow();
@@ -252,7 +250,6 @@ describe('AnomalyDetectionModel', () => {
     });
 
     describe('Security Pattern Detection', () => {
-        describe('Solana Vulnerability Detection', () => {
     describe('Solana Vulnerability Detection', () => {
         beforeEach(async () => {
             // Train model with normal Solana transaction patterns
@@ -298,17 +295,6 @@ describe('AnomalyDetectionModel', () => {
         expect(result.details.find(d => d.type === 'authorityChecks')).toBeDefined();
         expect(result.confidence).toBeGreaterThan(0.75);
     });
-    160|        it('should detect PDA validation issues', async () => {
-    161|            const testData = generateNormalMetrics(100);
-    162|            testData[50].pdaValidation = [9.5]; // Inject PDA validation anomaly
-    163|            const result = await model.detect(testData);
-    164|            
-    165|            expect(result.isAnomaly).toBe(true);
-    166|            expect(result.details.find(d => d.type === 'pdaValidation')).toBeDefined();
-    167|            expect(result.confidence).toBeGreaterThan(0.7);
-    168|        });
-    169|
-    170|        it('should detect account data matching vulnerabilities', async () => {
     171|            const testData = generateNormalMetrics(100);
     172|            testData[50].accountDataMatching = [8.5]; // Inject account data mismatch
     173|            const result = await model.detect(testData);
@@ -522,11 +508,13 @@ describe('AnomalyDetectionModel', () => {
             expect(result.isAnomaly).toBe(true);
             expect(result.confidence).toBeGreaterThan(0.7);
         });
+    });
+
     describe('Advanced Attack Pattern Detection', () => {
-        beforeEach(async () => {
-            model = new AnomalyDetectionModel();
-            await model.train(generateNormalMetrics(500));
-        });
+    beforeEach(async () => {
+        model = new AnomalyDetectionModel();
+        await model.train(generateNormalMetrics(500));
+    });
 
         afterEach(async () => {
             await model.cleanup();
@@ -854,3 +842,4 @@ describe('AnomalyDetectionModel', () => {
             });
         });
     });
+}); // Close the final describe block

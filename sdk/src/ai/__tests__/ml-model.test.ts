@@ -27,14 +27,14 @@ describe('VulnerabilityDetectionModel', () => {
         jest.restoreAllMocks();
     });
 
-  describe('buildModel', () => {
-    it('should create a valid model architecture', () => {
-      const builtModel = model['buildModel']();
-      expect(builtModel).toBeInstanceOf(tf.LayersModel);
-      expect(builtModel.inputs.length).toBe(1);
-      expect(builtModel.outputs.length).toBe(1);
-    });
-  });
+describe('buildModel', () => {
+it('should create a valid model architecture', () => {
+    const builtModel = model['buildModel']();
+    expect(builtModel).toBeInstanceOf(tf.LayersModel);
+    expect(builtModel.inputs.length).toBe(1);
+    expect(builtModel.outputs.length).toBe(1);
+});
+});
 
 const testData = [
     {
@@ -48,14 +48,13 @@ const testData = [
 ] as { features: number[]; vulnerabilityType: VulnerabilityType }[];
 
     it('should train without errors', async () => {
-        const trainingData = testData.map(d => ({...d})); // Create copy
-        await expect(model.train(trainingData)).resolves.not.toThrow();
+    const trainingData = testData.map(d => ({...d})); // Create copy
+    await expect(model.train(trainingData)).resolves.not.toThrow();
     });
 
     it('should handle empty training data', async () => {
-      await expect(model.train([])).rejects.toThrow();
+    await expect(model.train([])).rejects.toThrow();
     });
-  });
 
 describe('predict', () => {
     it('should return valid prediction structure', async () => {

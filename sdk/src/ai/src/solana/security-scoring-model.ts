@@ -21,17 +21,22 @@ export interface SecurityScore {
     }
 
     export interface SecurityMetrics {
-export interface SecurityMetrics {
-    access: SecurityScore;
-    ownership: SecurityScore;
-}
+        access: SecurityScore;
+        ownership: SecurityScore;
+        arithmetic?: SecurityScore; 
+        input?: SecurityScore;
+        state?: SecurityScore;
+    }
 
 export interface SecurityPattern {
     type: string;
     severity: RiskLevel;
     description: string;
     timestamp: number;
-    }
+    confidence?: number;
+    indicators?: string[];
+    location?: string;
+}
 
 export interface ValidationResult {
     isValid: boolean;
@@ -59,6 +64,7 @@ const DEFAULT_CONFIG: SecurityModelConfig = {
 
 export class SecurityScoring {
     private readonly config: SecurityModelConfig;
+    private lastAnalyzedProgramId: string | null = null;
 
     constructor(config: Partial<SecurityModelConfig> = {}) {
         this.config = {
@@ -73,18 +79,21 @@ export class SecurityScoring {
         };
     }
     public async analyzeProgram(programId: string): Promise<AnalysisResult> {
-    const metrics = await this.analyzeSecurityMetrics(programId);
-    const validation = await this.validateProgram(programId);
-    const patterns = await this.detectSecurityPatterns(metrics);
-    const score = this.calculateScore(metrics);
+        this.lastAnalyzedProgramId = programId;
+        const metrics = await this.analyzeSecurityMetrics(programId);
+        const validation = await this.validateProgram(programId);
+        const patterns = await this.detectSecurityPatterns(metrics);
+        const score = this.calculateScore(metrics);
+        const riskLevel = this.determineRiskLevel(patterns);
 
-    return {
-        score,
-        patterns,
-        suggestions: this.generateSuggestions(score, validation),
-        validation,
-        timestamp: new Date()
-    };
+        return {
+            score,
+            patterns,
+            riskLevel,
+            suggestions: this.generateSuggestions(score, validation),
+            validation,
+            timestamp: new Date()
+        };
     }
             validation,
             timestamp: new Date()
@@ -110,6 +119,30 @@ export class SecurityScoring {
                 type: 'ACCESS_CONTROL',
                 severity: 'HIGH',
                 description: 'Insufficient access controls detected',
+                confidence: 0.8,
+                indicators: metrics.access.details,
+                timestamp
+            });
+        }
+
+        if (metrics.arithmetic?.score < this.config.thresholds.medium) {
+            patterns.push({
+                type: 'ARITHMETIC',
+                severity: 'MEDIUM', 
+                description: 'Arithmetic operation risks identified',
+                confidence: 0.85,
+                indicators: metrics.arithmetic.details,
+                timestamp
+            });
+        }
+
+        if (metrics.input?.score < this.config.thresholds.medium) {
+            patterns.push({
+                type: 'INPUT_VALIDATION',
+                severity: 'MEDIUM',
+                description: 'Input validation improvements needed',
+                confidence: 0.75,
+                indicators: metrics.input.details,
                 timestamp
             });
         }
@@ -117,22 +150,12 @@ export class SecurityScoring {
         return patterns;
     }
 
-        if (metrics.arithmetic.score < this.config.thresholds.medium) {
-            patterns.push({
-                type: 'arithmetic',
-                confidence: 0.85,
-                severity: 'MEDIUM',
-                description: 'Arithmetic operation risks identified',
-                indicators: metrics.arithmetic.details,
-                timestamp,
-                location: metrics.arithmetic.location
-            });
-        }
-
         return patterns;
     }
 
-    private determineRiskLevel(patterns: SecurityPattern[]): RiskLevel {
+        }
+
+        private determineRiskLevel(patterns: SecurityPattern[]): RiskLevel {
         if (patterns.some(p => p.severity === 'CRITICAL')) return 'CRITICAL';
         if (patterns.some(p => p.severity === 'HIGH')) return 'HIGH';
         if (patterns.some(p => p.severity === 'MEDIUM')) return 'MEDIUM';
@@ -160,10 +183,35 @@ export class SecurityScoring {
     }
 
     private calculateScore(metrics: SecurityMetrics): number {
-        return Object.values(metrics).reduce(
-            (acc, metric) => acc + metric.score * metric.weight,
-            0
-        );
+        let totalScore = 0;
+        let totalWeight = 0;
+        
+        if (metrics.ownership) {
+            totalScore += metrics.ownership.score * metrics.ownership.weight;
+            totalWeight += metrics.ownership.weight;
+        }
+        
+        if (metrics.access) {
+            totalScore += metrics.access.score * metrics.access.weight;  
+            totalWeight += metrics.access.weight;
+        }
+
+        if (metrics.arithmetic) {
+            totalScore += metrics.arithmetic.score * (metrics.arithmetic.weight || 0.5);
+            totalWeight += metrics.arithmetic.weight || 0.5;
+        }
+
+        if (metrics.input) {
+            totalScore += metrics.input.score * (metrics.input.weight || 0.3);
+            totalWeight += metrics.input.weight || 0.3;  
+        }
+
+        if (metrics.state) {
+            totalScore += metrics.state.score * (metrics.state.weight || 0.4);
+            totalWeight += metrics.state.weight || 0.4;
+        }
+
+        return totalWeight > 0 ? totalScore / totalWeight : 0;
     }
 
     private async analyzeSecurityMetrics(programId: string): Promise<SecurityMetrics> {
@@ -202,9 +250,46 @@ export class SecurityScoring {
     }
 
     private async validateProgram(programId: string): Promise<ValidationResult> {
+        const issues: string[] = [];
+        let isValid = true;
+
+        try {
+            // Verify program exists
+            const programInfo = await this.connection.getAccountInfo(new PublicKey(programId));
+            if (!programInfo) {
+                issues.push('Program account not found');
+                isValid = false;
+            } else {
+                // Check if it's an executable account
+                if (!programInfo.executable) {
+                    issues.push('Account is not an executable program');
+                    isValid = false;
+                }
+
+                // Check minimum balance requirement
+                if (programInfo.lamports < 100000) {
+                    issues.push('Program account has insufficient balance');
+                    isValid = false;
+                }
+            }
+
+            // Additional validation checks
+            const metrics = await this.analyzeSecurityMetrics(programId);
+            if (metrics.access.score < this.config.thresholds.high) {
+                issues.push('Access control implementation needs review');
+            }
+            if (metrics.ownership.score < this.config.thresholds.high) {
+                issues.push('Ownership controls need improvement');
+            }
+
+        } catch (error) {
+            issues.push(`Validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            isValid = false;
+        }
+
         return {
-            isValid: true,
-            issues: []
+            isValid,
+            issues
         };
     }
 
@@ -379,18 +464,18 @@ private async analyzeSecurity(metrics: SecurityMetrics): Promise<SecurityAnalysi
     };
 }
 
-private determineRiskLevel(patterns: SecurityPattern[]): RiskLevel
-    if (metrics.access.score < this.config.thresholds.medium) {
-    patterns.push({
-        type: 'accessControl',
-        confidence: 0.8,
-        severity: 'HIGH',
-        description: 'Access control vulnerabilities detected',
-        indicators: metrics.access.details,
-        timestamp,
-        location: metrics.access.location
-    });
-    }
+private determineRiskLevel(patterns: SecurityPattern[]): RiskLevel {
+    const hasCritical = patterns.some(p => p.severity === 'CRITICAL');
+    if (hasCritical) return 'CRITICAL';
+    
+    const hasHigh = patterns.some(p => p.severity === 'HIGH');
+    if (hasHigh) return 'HIGH';
+    
+    const hasMedium = patterns.some(p => p.severity === 'MEDIUM');
+    if (hasMedium) return 'MEDIUM';
+    
+    return 'LOW';
+}
 
     if (metrics.arithmetic.score < this.config.thresholds.medium) {
     patterns.push({
