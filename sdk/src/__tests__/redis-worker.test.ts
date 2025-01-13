@@ -21,18 +21,59 @@ interface MockRedis extends Omit<RedisType, 'quit' | 'disconnect' | 'on' | 'incr
     lpush: jest.MockedFunction<(key: string, value: string) => Promise<number>>;
     rpop: jest.MockedFunction<(key: string) => Promise<string | null>>;
 }
-    disconnect: jest.Mock<Promise<void>>;
-    on: jest.Mock;
-    incr: jest.Mock<Promise<number>>;
-    expire: jest.Mock<Promise<number>>;
-    get: jest.Mock<Promise<string | null>>;
-    set: jest.Mock<Promise<'OK'>>;
-    flushall: jest.Mock<Promise<'OK'>>;
-    hset: jest.Mock<Promise<number>>;
-    hget: jest.Mock<Promise<string | null>>;
-    lpush: jest.Mock<Promise<number>>;
-    rpop: jest.Mock<Promise<string | null>>;
-}
+    disconnect: jest.fn().mockImplementation(async (): Promise<void> => {
+        redisMock.connected = false;
+    }),
+    on: jest.fn(),
+    incr: jest.fn().mockImplementation(async (key: string): Promise<number> => {
+        if (redisMock.connected === false) {
+            throw new GlitchError('Connection failed', ErrorCode.CONNECTION_ERROR);
+        }
+        return 1;
+    }),
+    expire: jest.fn().mockImplementation(async (key: string, seconds: number): Promise<number> => 1),
+    get: jest.fn().mockImplementation(async (key: string): Promise<string | null> => null),
+    set: jest.fn().mockImplementation(async (key: string, value: string): Promise<'OK'> => 'OK'),
+    flushall: jest.fn().mockImplementation(async (): Promise<'OK'> => 'OK'),
+    hset: jest.fn().mockImplementation(async (key: string, field: string, value: string): Promise<number> => {
+        if (typeof value !== 'string') {
+            throw new GlitchError('Invalid JSON', ErrorCode.INVALID_JSON);
+        }
+        return 1;
+    }),
+    hget: jest.fn().mockImplementation(async (key: string, field: string): Promise<string | null> => {
+        if (field === 'bad-result') {
+            throw new GlitchError('Invalid JSON', ErrorCode.INVALID_JSON);
+        }
+        if (field === 'non-existent-id') {
+            return null;
+        }
+        return JSON.stringify({
+            requestId: field,
+            status: 'completed',
+            resultRef: 'ipfs://test',
+            logs: ['Test completed'],
+            metrics: {
+                totalTransactions: 100,
+                errorRate: 0,
+                avgLatency: 100
+            }
+        });
+    }),
+    lpush: jest.fn().mockImplementation(async (key: string, value: string): Promise<number> => {
+        if (value === 'invalid-json') {
+            throw new GlitchError('Invalid JSON', ErrorCode.INVALID_JSON);
+        }
+        redisMock.queue.push(value);
+        return 1;
+    }),
+    rpop: jest.fn().mockImplementation(async (key: string): Promise<string | null> => {
+        if (key === 'empty-queue') {
+            return null;
+        }
+        return redisMock.queue.length > 0 ? redisMock.queue.shift() : null;
+    })
+};
 import { GlitchError } from '../errors.js';
 import { ErrorCode } from '../errors.js';
 // Increase timeout for all tests
