@@ -1,7 +1,6 @@
 import { VulnerabilityDetectionModel, VulnerabilityOutput } from '../src/ml-model';
 import { VulnerabilityType } from '../src/types';
 import * as tf from '@tensorflow/tfjs-node';
-import * as tf from '@tensorflow/tfjs-node';
 
 interface ModelOutput {
     type: VulnerabilityType;

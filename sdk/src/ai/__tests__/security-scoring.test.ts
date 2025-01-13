@@ -9,13 +9,13 @@ describe('SecurityScoringModel', () => {
 
     beforeEach(() => {
         connection = {
-            getAccountInfo: jest.fn().mockResolvedValue({
+            getAccountInfo: jest.fn().mockImplementation(() => Promise.resolve({
                 lamports: 0n,
                 owner: new PublicKey('11111111111111111111111111111111'),
                 executable: false,
                 data: Buffer.from([]),
                 rentEpoch: 0
-            }),
+            })),
             getProgramAccounts: jest.fn().mockResolvedValue([{
                 pubkey: new PublicKey('11111111111111111111111111111111'),
                 account: {
@@ -28,7 +28,7 @@ describe('SecurityScoringModel', () => {
             }]),
         } as Partial<Connection>;
 
-        securityScoring = new SecurityScoring(connection as Connection);
+        securityScoring = new SecurityScoring();
     });
 
     describe('basic functionality', () => {
@@ -41,7 +41,7 @@ describe('SecurityScoringModel', () => {
             const program = new PublicKey('11111111111111111111111111111111');
             
             // Act
-            const result = await securityScoring.analyzeProgram(program);
+            const result = await securityScoring.analyzeProgram(program.toBase58());
             
             // Assert
             expect(result).toBeDefined();

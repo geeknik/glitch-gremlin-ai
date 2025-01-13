@@ -111,7 +111,7 @@ export class GlitchSDK {
         this.governanceManager = new GovernanceManager(this.programId, config.governanceConfig);
     }
 
-    public static async init(config: {
+    public static async create(config: {
         cluster?: string;
         wallet: Keypair;
         programId?: string;
@@ -121,7 +121,9 @@ export class GlitchSDK {
             port: number;
         };
     }): Promise<GlitchSDK> {
-        return new GlitchSDK(config);
+        const instance = new GlitchSDK(config);
+        await instance.initialize(config.redisConfig);
+        return instance;
     }
         if (!GlitchSDK.instance) {
         GlitchSDK.instance = new GlitchSDK(config);
@@ -188,7 +190,7 @@ export class GlitchSDK {
         }
     }
 
-    async createChaosRequest(params: ChaosRequestParams): Promise<{
+    public async createChaosRequest(params: ChaosRequestParams): Promise<{
         requestId: string;
         waitForCompletion: () => Promise<ChaosResult>;
     }> {
