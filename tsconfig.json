@@ -19,7 +19,10 @@
         "baseUrl": ".",
         "allowJs": true,
         "resolveJsonModule": true,
-        "isolatedModules": true
+        "isolatedModules": true,
+        "allowSyntheticDefaultImports": true,
+        "experimentalDecorators": true,
+        "emitDecoratorMetadata": true
     },
     "include": ["src/**/*"],
     "exclude": ["node_modules", "dist"]
