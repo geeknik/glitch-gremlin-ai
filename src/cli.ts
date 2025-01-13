@@ -5,6 +5,13 @@ import { GlitchError } from './errors.js';
 
 interface ProgramOptions {
     targetProgram: string;
+    testType: TestType;
+    duration: number;
+    intensity: number;
+}
+
+interface ProgramOptions {
+    targetProgram: string;
     type: string;
     duration: string;
     intensity: string;

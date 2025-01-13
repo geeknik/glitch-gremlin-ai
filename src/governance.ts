@@ -1,5 +1,5 @@
 import { PublicKey } from '@solana/web3.js';
-import { ProposalState } from './types';
+import { ProposalState } from './types.js';
 
 export interface GovernanceConfig {
     minStakeAmount: number;
