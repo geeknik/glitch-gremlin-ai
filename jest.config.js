@@ -24,12 +24,16 @@ export default {
   },
   testRunner: "jest-circus/runner",
   testMatch: [
-    'src/**/__tests__/**/*.{js,ts}',
-    'src/**/*.{spec,test}.{js,ts}'
+    '**/__tests__/**/*.{js,ts}',
+    '**/*.{spec,test}.{js,ts}'
   ],
   testPathIgnorePatterns: [
     '/node_modules/',
-    '/dist/'
+    '/dist/',
+    '/coverage/'
+  ],
+  modulePathIgnorePatterns: [
+    '<rootDir>/dist/'
   ],
   coverageDirectory: 'coverage',
   coverageProvider: 'v8',

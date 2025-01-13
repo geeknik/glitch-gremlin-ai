@@ -21,7 +21,11 @@ export default {
     ],
     testPathIgnorePatterns: [
         '/node_modules/',
-        '/dist/'
+        '/dist/',
+        '/coverage/'
+    ],
+    modulePathIgnorePatterns: [
+        '<rootDir>/dist/'
     ],
     setupFilesAfterEnv: ['<rootDir>/src/__tests__/setupAfterEnv.ts']
 }
