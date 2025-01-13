@@ -14,26 +14,16 @@ import {
     GetProgramAccountsConfig,
     GetBalanceConfig,
     VersionedTransaction,
-    Message
+    Message,
+    SimulateTransactionConfig
 } from '@solana/web3.js';
 import { ProposalState } from '../types.js';
 import { GovernanceManager } from '../governance.js';
 import { ErrorCode, GlitchError } from '../errors.js';
 
-interface MockedConnection {
-    commitment: Commitment;
-    rpcEndpoint: string;
-    getAccountInfo: MockedFunction<typeof Connection.prototype.getAccountInfo>;
-    sendTransaction: MockedFunction<typeof Connection.prototype.sendTransaction>;
-    simulateTransaction: MockedFunction<typeof Connection.prototype.simulateTransaction>;
-    getLatestBlockhash: MockedFunction<typeof Connection.prototype.getLatestBlockhash>;
-    getRecentBlockhash: MockedFunction<typeof Connection.prototype.getRecentBlockhash>;
-    getBalance: MockedFunction<typeof Connection.prototype.getBalance>;
-    getProgramAccounts: MockedFunction<typeof Connection.prototype.getProgramAccounts>;
-    getVersion: MockedFunction<typeof Connection.prototype.getVersion>;
-    getSlot: MockedFunction<typeof Connection.prototype.getSlot>;
-    getTokenAccountsByOwner: MockedFunction<typeof Connection.prototype.getTokenAccountsByOwner>;
-}
+type MockedConnection = {
+    [K in keyof Connection]: MockedFunction<Connection[K]>;
+};
 interface VoteWeights {
     yes: number;
     no: number;
@@ -61,6 +51,93 @@ describe('GovernanceManager', () => {
     let wallet: Keypair;
     let governanceManager: GovernanceManager;
     let proposalAddress: PublicKey;
+    let mockProposalData: ProposalData;
+    let validateProposalMock: jest.SpiedFunction<typeof governanceManager['validateProposal']>;
+    let getAccountInfoMock: jest.SpiedFunction<typeof connection.getAccountInfo>;
+    let simulateTransactionMock: jest.SpiedFunction<typeof connection.simulateTransaction>;
+    let sendTransactionMock: jest.SpiedFunction<typeof connection.sendTransaction>;
+
+    beforeEach(() => {
+        connection = {
+            commitment: 'confirmed',
+            rpcEndpoint: 'http://localhost:8899',
+            getAccountInfo: jest.fn().mockResolvedValue({
+                data: Buffer.alloc(0),
+                executable: false,
+                lamports: 0,
+                owner: PublicKey.default,
+                rentEpoch: 0
+            }),
+            sendTransaction: jest.fn().mockImplementation(
+                async (transaction: Transaction | VersionedTransaction, signers?: Signer[], options?: SendOptions) => 'mock-signature'
+            ),
+            simulateTransaction: jest.fn().mockImplementation(
+                async (transaction: Transaction | VersionedTransaction, config?: SimulateTransactionConfig) => ({
+                    context: { slot: 0 },
+                    value: {
+                        err: null,
+                        logs: [],
+                        accounts: null,
+                        unitsConsumed: 0,
+                        returnData: null
+                    }
+                })
+            ),
+            getLatestBlockhash: jest.fn().mockResolvedValue({
+                blockhash: 'mock-blockhash',
+                lastValidBlockHeight: 1000
+            }),
+            getRecentBlockhash: jest.fn().mockResolvedValue({
+                blockhash: 'mock-blockhash',
+                feeCalculator: { lamportsPerSignature: 5000 }
+            }),
+            getBalance: jest.fn().mockResolvedValue(1000000),
+            getProgramAccounts: jest.fn().mockResolvedValue([]),
+            getVersion: jest.fn().mockResolvedValue({
+                'feature-set': 1,
+                'solana-core': '1.18.26'
+            }),
+            getSlot: jest.fn().mockResolvedValue(0),
+            getTokenAccountsByOwner: jest.fn().mockResolvedValue({
+                context: { slot: 0 },
+                value: []
+            })
+        } as MockedConnection;
+
+        wallet = Keypair.generate();
+        governanceManager = new GovernanceManager(
+            new PublicKey('GLt5cQeRgVMqnE9DGJQNNrbAfnRQYWqYVNWnJo7WNLZ9')
+        );
+
+        mockProposalData = {
+            state: ProposalState.Active,
+            executed: false,
+            title: "Test Proposal",
+            description: "Test Description",
+            proposer: wallet.publicKey,
+            startTime: Date.now() - 1000,
+            endTime: Date.now() + 86400000,
+            timeLockEnd: Date.now() + 172800000,
+            voteWeights: { yes: 0, no: 0, abstain: 0 },
+            votes: [],
+            yesVotes: 0,
+            noVotes: 0,
+            quorumRequired: 100
+        };
+
+        validateProposalMock = jest.spyOn(governanceManager as any, 'validateProposal')
+            .mockImplementation(() => Promise.resolve(mockProposalData));
+            
+        getAccountInfoMock = jest.spyOn(connection, 'getAccountInfo');
+        simulateTransactionMock = jest.spyOn(connection, 'simulateTransaction');
+        sendTransactionMock = jest.spyOn(connection, 'sendTransaction');
+        
+        proposalAddress = new PublicKey(Keypair.generate().publicKey);
+    });
+
+    afterEach(() => {
+        jest.clearAllMocks();
+    });
 // Helper function to create properly structured proposal buffer
 function createProposalBuffer(props: {
     title: string,
