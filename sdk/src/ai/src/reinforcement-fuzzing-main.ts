@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import winston from 'winston';
-import { WebSocketServer } from 'ws';
+import { Server as WebSocketServer } from 'ws';
 import { RLFuzzingModel } from './reinforcement-fuzzing';
 import { MetricsCollector } from './reinforcement-fuzzing-utils';
 import { DashboardServer } from './dashboard-server';
@@ -28,9 +28,9 @@ transports: [
 });
 
 class FuzzingSystem {
-private model: RLFuzzingModel;
-private dashboardServer: DashboardServer;
-private metricsCollector: MetricsCollector;
+private model!: RLFuzzingModel;
+private dashboardServer!: DashboardServer;
+private metricsCollector!: MetricsCollector;
 private isShuttingDown: boolean = false;
 
 constructor(private config: SystemConfig) {
@@ -51,10 +51,9 @@ async initialize(): Promise<void> {
     logger.info('Initializing fuzzing system...');
 
     // Initialize RL model
-    this.model = new RLFuzzingModel({
-        modelPath: this.config.modelPath,
-        maxConcurrent: this.config.maxConcurrentFuzzing
-    });
+    this.model = new RLFuzzingModel(
+        this.config.maxConcurrentFuzzing
+    );
     await this.model.initialize();
 
     // Setup metrics collection

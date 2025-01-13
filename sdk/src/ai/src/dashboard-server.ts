@@ -1,6 +1,6 @@
 import { Server } from 'socket.io';
 import { createServer } from 'http';
-import { RLMetric, ModelState } from './reinforcement-fuzzing';
+import { RLFuzzingModel } from './reinforcement-fuzzing';
 
 interface DashboardMetrics {
     timestamp: number;

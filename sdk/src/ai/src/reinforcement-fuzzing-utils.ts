@@ -80,7 +80,7 @@ private static encodeMutation(mutation: string): number {
 
 // Visualization Utilities
 export class VisualizationUtils {
-private writer: tf.CallbackWriter;
+private writer: any; // TODO: Replace with proper type once TF types are fixed
 private config: VisualizationConfig;
 
 constructor(config: VisualizationConfig) {
@@ -125,10 +125,10 @@ public static havoc(input: Buffer, mutations: number): Buffer {
     const operation = Math.floor(Math.random() * 3);
     switch (operation) {
         case 0:
-        result = this.bitFlip(result, position);
+        result = Buffer.from(this.bitFlip(result, position));
         break;
         case 1:
-        result = this.arithmetic(result, position);
+        result = Buffer.from(this.arithmetic(result, position));
         break;
         case 2:
         // Add more complex mutations here
