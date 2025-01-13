@@ -4,7 +4,7 @@ module.exports = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@glitch-gremlin/sdk$': '<rootDir>/../sdk/src',
-    '^(\\.{1,2}/.*)\\.js$': '$1' // Add .js extension mapper
+    '^(\\.{1,2}/.*)\\.js$': '$1'
   },
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
@@ -16,7 +16,6 @@ module.exports = {
       }
     }]
   },
-  extensionsToTreatAsEsm: ['.ts'], // Add ESM support
   transformIgnorePatterns: [
     'node_modules/(?!(@solana|@project-serum|@metaplex|@coral-xyz|@holaplex|@nfteyez)/.*)'
   ],
@@ -37,5 +36,10 @@ module.exports = {
     '!src/**/*.test.{js,ts}',
     '!src/types/**/*'
   ],
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js']
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  globals: {
+    'ts-jest': {
+      useESM: false
+    }
+  }
 }

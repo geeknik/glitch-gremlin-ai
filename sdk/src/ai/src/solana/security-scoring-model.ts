@@ -1,4 +1,4 @@
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, Connection } from '@solana/web3.js';
 
 export type RiskLevel = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 
@@ -80,7 +80,6 @@ const DEFAULT_CONFIG: SecurityModelConfig = {
     }
 };
 
-import { PublicKey } from '@solana/web3.js';
 
 export class SecurityScoring {
     private readonly config: SecurityModelConfig;
