@@ -25,7 +25,7 @@ program
 
         const request = await sdk.createChaosRequest({
             targetProgram: options.program,
-            testType: options.type as TestType,
+            testType: options.type as TestType, 
             duration: parseInt(options.duration),
             intensity: parseInt(options.intensity)
         });
