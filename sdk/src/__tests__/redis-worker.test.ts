@@ -5,21 +5,21 @@ import { Redis } from 'ioredis';
 import type { Redis as RedisType } from 'ioredis';
 import type { Callback } from 'ioredis';
 
-interface MockRedis extends Omit<RedisType, 'quit' | 'disconnect' | 'on' | 'incr' | 'expire' | 'get' | 'set' | 'flushall' | 'hset' | 'hget' | 'lpush' | 'rpop'> {
+interface MockRedis extends RedisType {
     queue: string[];
     connected: boolean;
-    quit: jest.MockedFunction<() => Promise<'OK'>>;
-    disconnect: jest.MockedFunction<() => Promise<void>>;
-    on: jest.MockedFunction<(event: string, callback: Callback) => void>;
-    incr: jest.MockedFunction<(key: string) => Promise<number>>;
-    expire: jest.MockedFunction<(key: string, seconds: number) => Promise<number>>;
-    get: jest.MockedFunction<(key: string) => Promise<string | null>>;
-    set: jest.MockedFunction<(key: string, value: string) => Promise<'OK'>>;
-    flushall: jest.MockedFunction<() => Promise<'OK'>>;
-    hset: jest.MockedFunction<(key: string, field: string, value: string) => Promise<number>>;
-    hget: jest.MockedFunction<(key: string, field: string) => Promise<string | null>>;
-    lpush: jest.MockedFunction<(key: string, value: string) => Promise<number>>;
-    rpop: jest.MockedFunction<(key: string) => Promise<string | null>>;
+    quit: jest.Mock<() => Promise<'OK'>>;
+    disconnect: jest.Mock<() => Promise<void>>;
+    on: jest.Mock<(event: string, callback: Callback) => void>;
+    incr: jest.Mock<(key: string) => Promise<number>>;
+    expire: jest.Mock<(key: string, seconds: number) => Promise<number>>;
+    get: jest.Mock<(key: string) => Promise<string | null>>;
+    set: jest.Mock<(key: string, value: string) => Promise<'OK'>>;
+    flushall: jest.Mock<() => Promise<'OK'>>;
+    hset: jest.Mock<(key: string, field: string, value: string) => Promise<number>>;
+    hget: jest.Mock<(key: string, field: string) => Promise<string | null>>;
+    lpush: jest.Mock<(key: string, value: string) => Promise<number>>;
+    rpop: jest.Mock<(key: string) => Promise<string | null>>;
 }
 
 import { GlitchError } from '../errors.js';
@@ -35,31 +35,31 @@ describe('RedisQueueWorker', () => {
         const redisMock: MockRedis = {
             connected: true,
             queue: [] as string[],
-            quit: jest.fn().mockImplementation(async (): Promise<'OK'> => {
+            quit: jest.fn().mockImplementation(async () => {
                 redisMock.connected = false;
                 return 'OK';
             }),
-            disconnect: jest.fn().mockImplementation(async (): Promise<void> => {
+            disconnect: jest.fn().mockImplementation(async () => {
                 redisMock.connected = false;
             }),
             on: jest.fn(),
-            incr: jest.fn().mockImplementation(async (key: string): Promise<number> => {
+            incr: jest.fn().mockImplementation(async (key) => {
                 if (redisMock.connected === false) {
                     throw new GlitchError('Connection failed', ErrorCode.CONNECTION_ERROR);
                 }
                 return 1;
             }),
-            expire: jest.fn().mockImplementation(async (key: string, seconds: number): Promise<number> => 1),
-            get: jest.fn().mockImplementation(async (key: string): Promise<string | null> => null),
-            set: jest.fn().mockImplementation(async (key: string, value: string): Promise<'OK'> => 'OK'),
-            flushall: jest.fn().mockImplementation(async (): Promise<'OK'> => 'OK'),
-            hset: jest.fn().mockImplementation(async (key: string, field: string, value: string): Promise<number> => {
+            expire: jest.fn().mockImplementation(async () => 1),
+            get: jest.fn().mockImplementation(async () => null),
+            set: jest.fn().mockImplementation(async () => 'OK'),
+            flushall: jest.fn().mockImplementation(async () => 'OK'),
+            hset: jest.fn().mockImplementation(async (key, field, value) => {
                 if (typeof value !== 'string') {
                     throw new GlitchError('Invalid JSON', ErrorCode.INVALID_JSON);
                 }
                 return 1;
             }),
-            hget: jest.fn().mockImplementation(async (key: string, field: string): Promise<string | null> => {
+            hget: jest.fn().mockImplementation(async (key, field) => {
                 if (field === 'bad-result') {
                     throw new GlitchError('Invalid JSON', ErrorCode.INVALID_JSON);
                 }
@@ -78,20 +78,20 @@ describe('RedisQueueWorker', () => {
                     }
                 });
             }),
-            lpush: jest.fn().mockImplementation(async (key: string, value: string): Promise<number> => {
+            lpush: jest.fn().mockImplementation(async (key, value) => {
                 if (value === 'invalid-json') {
                     throw new GlitchError('Invalid JSON', ErrorCode.INVALID_JSON);
                 }
                 redisMock.queue.push(value);
                 return 1;
             }),
-            rpop: jest.fn().mockImplementation(async (key: string): Promise<string | null> => {
+            rpop: jest.fn().mockImplementation(async (key) => {
                 if (key === 'empty-queue') {
                     return null;
                 }
                 return redisMock.queue.length > 0 ? redisMock.queue.shift() : null;
             })
-        };
+        } as unknown as MockRedis;
         redis = redisMock;
     });
 
