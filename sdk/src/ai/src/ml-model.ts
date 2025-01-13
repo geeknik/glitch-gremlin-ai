@@ -10,7 +10,7 @@ export interface VulnerabilityOutput extends ModelOutput {
     confidence: number;
 }
 
-import { VulnerabilityType } from '../types.js';
+import { VulnerabilityType } from '../types';
 
 export class VulnerabilityDetectionModel extends MLModel {
     constructor() {

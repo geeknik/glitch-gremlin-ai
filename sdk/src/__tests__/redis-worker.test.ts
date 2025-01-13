@@ -8,18 +8,18 @@ import type { Callback } from 'ioredis';
 interface MockRedis extends RedisType {
     queue: string[];
     connected: boolean;
-    quit: jest.Mock<() => Promise<'OK'>>;
-    disconnect: jest.Mock<() => Promise<void>>;
-    on: jest.Mock<(event: string, callback: Callback) => void>;
-    incr: jest.Mock<(key: string) => Promise<number>>;
-    expire: jest.Mock<(key: string, seconds: number) => Promise<number>>;
-    get: jest.Mock<(key: string) => Promise<string | null>>;
-    set: jest.Mock<(key: string, value: string) => Promise<'OK'>>;
-    flushall: jest.Mock<() => Promise<'OK'>>;
-    hset: jest.Mock<(key: string, field: string, value: string) => Promise<number>>;
-    hget: jest.Mock<(key: string, field: string) => Promise<string | null>>;
-    lpush: jest.Mock<(key: string, value: string) => Promise<number>>;
-    rpop: jest.Mock<(key: string) => Promise<string | null>>;
+    quit: jest.Mock<Promise<'OK'>>;
+    disconnect: jest.Mock<Promise<void>>;
+    on: jest.Mock<RedisType['on']>;
+    incr: jest.Mock<Promise<number>>;
+    expire: jest.Mock<Promise<number>>;
+    get: jest.Mock<Promise<string | null>>;
+    set: jest.Mock<Promise<'OK'>>;
+    flushall: jest.Mock<Promise<'OK'>>;
+    hset: jest.Mock<Promise<number>>;
+    hget: jest.Mock<Promise<string | null>>;
+    lpush: jest.Mock<Promise<number>>;
+    rpop: jest.Mock<Promise<string | null>>;
 }
 
 import { GlitchError } from '../errors.js';

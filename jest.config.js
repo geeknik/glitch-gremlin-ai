@@ -20,6 +20,10 @@ module.exports = {
   transformIgnorePatterns: [
     'node_modules/(?!(@solana|@project-serum|@metaplex|@coral-xyz|@holaplex|@nfteyez)/.*)'
   ],
+  extensionsToTreatAsEsm: ['.ts'],
+  transformIgnorePatterns: [
+    'node_modules/(?!(@solana|@project-serum|@metaplex|@coral-xyz|@holaplex|@nfteyez)/.*)'
+  ],
   testEnvironmentOptions: {
     url: "http://localhost"
   },
