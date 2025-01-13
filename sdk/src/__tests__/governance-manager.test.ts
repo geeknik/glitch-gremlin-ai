@@ -1,26 +1,50 @@
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { GovernanceManager } from '../governance.js';
 import {
-Keypair,
-Connection,
-PublicKey,
-Transaction,
-SimulatedTransactionResponse,
-Version,
-AccountInfo,
-GetAccountInfoConfig,
-Commitment,
-SendOptions,
-Signer,
-SimulateTransactionConfig,
-RpcResponseAndContext,
-GetProgramAccountsResponse,
+    Keypair,
+    Connection,
+    PublicKey,
+    Transaction,
+    SimulatedTransactionResponse,
+    Version,
+    AccountInfo,
+    GetAccountInfoConfig,
+    Commitment,
+    SendOptions,
+    Signer,
+    SimulateTransactionConfig,
+    RpcResponseAndContext,
+    GetProgramAccountsResponse,
 } from '@solana/web3.js';
 import { MockedObject } from 'jest-mock';
 import { ProposalState } from '../types.js';
 import { ErrorCode } from '../errors.js';
 import { GlitchError } from '../errors.js';
 import { TokenEconomics } from '../token-economics.js';
+
+interface VoteWeights {
+    yes: number;
+    no: number;
+    abstain: number;
+}
+
+interface MockProposalData {
+    state: ProposalState;
+    votingPower: number;
+    votes: Array<{voter: PublicKey}>;
+    proposer: string;
+    startTime: number;
+    endTime: number;
+    timeLockEnd: number;
+    quorum: number;
+    quorumRequired: number;
+    executed: boolean;
+    title?: string;
+    description?: string;
+    voteWeights: VoteWeights;
+    yesVotes: number;
+    noVotes: number;
+}
 
 // Debug helper to inspect buffer contents
 function debugBuffer(data: Buffer) {
@@ -118,7 +142,6 @@ jest.setTimeout(30000); // 30 seconds for more reliable CI runs
 // Mock proposal data at top level scope
 
 describe('GovernanceManager', () => {
-    // Define all test variables at the top level of the main describe block
     let validateProposalMock: jest.SpiedFunction<typeof GovernanceManager.prototype.validateProposal>;
     let getAccountInfoMock: jest.SpiedFunction<Connection['getAccountInfo']>;
     let simulateTransactionMock: jest.SpiedFunction<Connection['simulateTransaction']>;
@@ -126,27 +149,7 @@ describe('GovernanceManager', () => {
     let connection: MockedObject<Connection>;
     let wallet: Keypair;
     let proposalAddress: PublicKey;
-    let mockProposalData: {
-        state: ProposalState;
-        votingPower: number;
-        votes: Array<{voter: PublicKey, vote: boolean, weight: number} | any>;
-        proposer: string;
-        startTime: number;
-        endTime: number;
-        timeLockEnd: number;
-        quorum: number;
-        quorumRequired: number;
-        executed: boolean;
-        title?: string;
-        description?: string;
-        yesVotes: number;
-        noVotes: number;
-    };
-            yes: number;
-            no: number;
-            abstain: number;
-        };
-    };
+    let mockProposalData: MockProposalData;
     let validateProposalMock: jest.SpiedFunction<typeof GovernanceManager.prototype.validateProposal>;
     let getAccountInfoMock: jest.SpiedFunction<Connection['getAccountInfo']>;
     let simulateTransactionMock: jest.SpiedFunction<Connection['simulateTransaction']>;
@@ -154,25 +157,15 @@ describe('GovernanceManager', () => {
 
     // Initialize mocks with proper types
     beforeEach(() => {
-        let connection: MockedObject<Connection> = {
+        connection = {
             getAccountInfo: jest.fn(),
-            sendTransaction: jest.fn<Connection['sendTransaction']>(),
-            simulateTransaction: jest.fn<Connection['simulateTransaction']>(),
+            sendTransaction: jest.fn(),
+            simulateTransaction: jest.fn(),
             getVersion: jest.fn(),
             getTokenAccountsByOwner: jest.fn(),
-            getProgramAccounts: jest.fn<Connection['getProgramAccounts']>(),
-                pubkey: new PublicKey("11111111111111111111111111111111"),
-                account: {
-                    data: Buffer.alloc(128),
-                    lamports: 2000000,
-                    owner: new PublicKey('ProgramID'),
-                    executable: false,
-                    rentEpoch: 0
-                }
-            }])),
-            // pubkey: new PublicKey("11111111111111111111111111111111"),
-            // rpcEndpoint: 'http://localhost:8899',
-            };
+            getProgramAccounts: jest.fn(),
+            rpcEndpoint: 'http://localhost:8899'
+        } as MockedObject<Connection>;
             jest.clearAllMocks();
             getRecentBlockhash: jest.fn().mockImplementation(async () => ({
                 blockhash: 'test-blockhash',
