@@ -249,7 +249,16 @@ beforeEach(() => {
         sendTransaction: jest.fn().mockImplementation(
             async (transaction: Transaction | VersionedTransaction, signers?: Signer[], options?: SendOptions) => 'mock-signature'
         ),
-        simulateTransaction: jest.fn().mockImplementation(
+        simulateTransaction: jest.fn().mockImplementation(async () => ({
+            context: { slot: 0 },
+            value: {
+                err: null,
+                logs: [],
+                accounts: null,
+                unitsConsumed: 0,
+                returnData: null
+            }
+        })),
             async (transaction: Transaction | VersionedTransaction, config?: SimulateTransactionConfig) => ({
                 context: { slot: 0 },
                 value: {
@@ -262,6 +271,9 @@ beforeEach(() => {
             })
         ),
         getLatestBlockhash: jest.fn().mockResolvedValue({
+            blockhash: 'mock-blockhash',
+            lastValidBlockHeight: 1000
+        }),
             blockhash: 'mock-blockhash',
             lastValidBlockHeight: 1000
         }),
@@ -336,7 +348,7 @@ afterEach(() => {
             lastValidBlockHeight: 0
         }),
         getBalance: jest.fn().mockResolvedValue(1000000),
-        getProgramAccounts: jest.fn().mockResolvedValue([])
+        getProgramAccounts: jest.fn().mockResolvedValue([]),
     };
             data: Buffer.alloc(0),
             executable: false,

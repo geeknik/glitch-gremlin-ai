@@ -24,17 +24,17 @@ interface MockRedis extends Omit<RedisType, 'quit' | 'disconnect' | 'on' | 'incr
     disconnect: jest.fn().mockImplementation(async (): Promise<void> => {
         redisMock.connected = false;
     }),
-    on: jest.fn(),
+    on: jest.fn();
     incr: jest.fn().mockImplementation(async (key: string): Promise<number> => {
         if (redisMock.connected === false) {
             throw new GlitchError('Connection failed', ErrorCode.CONNECTION_ERROR);
         }
         return 1;
     }),
-    expire: jest.fn().mockImplementation(async (key: string, seconds: number): Promise<number> => 1),
-    get: jest.fn().mockImplementation(async (key: string): Promise<string | null> => null),
-    set: jest.fn().mockImplementation(async (key: string, value: string): Promise<'OK'> => 'OK'),
-    flushall: jest.fn().mockImplementation(async (): Promise<'OK'> => 'OK'),
+    expire: jest.fn().mockImplementation(async (key: string, seconds: number): Promise<number> => 1);
+    get: jest.fn().mockImplementation(async (key: string): Promise<string | null> => null);
+    set: jest.fn().mockImplementation(async (key: string, value: string): Promise<'OK'> => 'OK');
+    flushall: jest.fn().mockImplementation(async (): Promise<'OK'> => 'OK');
     hset: jest.fn().mockImplementation(async (key: string, field: string, value: string): Promise<number> => {
         if (typeof value !== 'string') {
             throw new GlitchError('Invalid JSON', ErrorCode.INVALID_JSON);
