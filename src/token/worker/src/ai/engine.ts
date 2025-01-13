@@ -1,11 +1,19 @@
-import { TestType, ChaosParams } from '../../types';
+import { Connection } from '@solana/web3.js';
 import { ExploitScanner } from './exploit-scanner';
-import { FuzzTester } from './fuzz-tester';
-import { LoadTester } from './load-tester';
-import { ConcurrencyTester } from './concurrency-tester';
-import { AnalysisResult, StaticAnalysisResult, DynamicAnalysisResult, Finding, ChaosTestResult } from './types';
 import { VulnerabilityDetectionModel } from './ml-model';
-import { Logger } from '../utils/logger';
+import { ChaosTestResult } from './types';
+
+interface TestType {
+  EXPLOIT: string;
+  FUZZ: string;
+  LOAD: string;
+  CONCURRENCY: string;
+}
+
+interface ChaosParams {
+  duration: number;
+  intensity: number;
+}
 
 export class GlitchAIEngine {
     private exploitScanner: ExploitScanner;
@@ -15,9 +23,12 @@ export class GlitchAIEngine {
     private logger: Logger;
     private mlModel: VulnerabilityDetectionModel;
 
-    constructor() {
+    constructor(private connection: Connection) {
         this.mlModel = new VulnerabilityDetectionModel();
-        this.exploitScanner = new ExploitScanner();
+        this.exploitScanner = new ExploitScanner(connection, this.mlModel, {
+            info: (msg: string) => console.log(msg),
+            error: (msg: string) => console.error(msg)
+        });
         this.fuzzTester = new FuzzTester();
         this.loadTester = new LoadTester();
         this.concurrencyTester = new ConcurrencyTester();
