@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { GlitchSDK } from './glitch-sdk.js';
 import { TestType } from './types.js';
+import { GlitchError } from './errors.js';
 
 const program = new Command();
 

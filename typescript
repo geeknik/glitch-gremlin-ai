@@ -1,0 +1,17 @@
+export enum TestType {
+    FUZZ = 'FUZZ',
+    LOAD = 'LOAD',
+    EXPLOIT = 'EXPLOIT',
+    CONCURRENCY = 'CONCURRENCY'
+}
+
+export interface MetricsCollector {
+    collect(): Promise<void>;
+    stop(): Promise<void>;
+}
+
+export interface TimeSeriesMetric {
+    timestamp: number;
+    value: number;
+    type: string;
+}
