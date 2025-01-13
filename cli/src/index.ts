@@ -66,12 +66,12 @@ program
         throw new Error('SOLANA_KEYPAIR_PATH environment variable is not set');
       }
 
-      const sdk = new GlitchSDK({
-        cluster: process.env.SOLANA_CLUSTER || 'https://api.testnet.solana.com',
-        wallet: Keypair.fromSecretKey(
-          Buffer.from(JSON.parse(readFileSync(keypairPath, 'utf-8')))
-        )
-      });
+    const sdk = await GlitchSDK.init({
+    cluster: process.env.SOLANA_CLUSTER || 'https://api.testnet.solana.com',
+    wallet: Keypair.fromSecretKey(
+        Buffer.from(JSON.parse(readFileSync(keypairPath, 'utf-8')))
+    )
+    });
 
       const request = await sdk.createChaosRequest({
         targetProgram: options.program,
@@ -109,12 +109,12 @@ governance
   .action(async (options) => {
     const spinner = ora('Creating proposal...').start();
     try {
-      const sdk = new GlitchSDK({
-        cluster: process.env.SOLANA_CLUSTER || 'devnet',
-        wallet: Keypair.fromSecretKey(
-          Buffer.from(JSON.parse(readFileSync(process.env.SOLANA_KEYPAIR_PATH!, 'utf-8')))
-        )
-      });
+    const sdk = await GlitchSDK.init({
+    cluster: process.env.SOLANA_CLUSTER || 'devnet',
+    wallet: Keypair.fromSecretKey(
+        Buffer.from(JSON.parse(readFileSync(process.env.SOLANA_KEYPAIR_PATH!, 'utf-8')))
+    )
+    });
       const proposal = await sdk.createProposal({
         title: options.title,
         description: options.description,
@@ -142,12 +142,12 @@ governance
   .action(async (options) => {
     const spinner = ora('Submitting vote...').start();
     try {
-      const sdk = new GlitchSDK({
-        cluster: process.env.SOLANA_CLUSTER || 'devnet',
-        wallet: Keypair.fromSecretKey(
-          Buffer.from(JSON.parse(readFileSync(process.env.SOLANA_KEYPAIR_PATH!, 'utf-8')))
-        )
-      });
+    const sdk = await GlitchSDK.init({
+    cluster: process.env.SOLANA_CLUSTER || 'devnet',
+    wallet: Keypair.fromSecretKey(
+        Buffer.from(JSON.parse(readFileSync(process.env.SOLANA_KEYPAIR_PATH!, 'utf-8')))
+    )
+    });
       await sdk.vote(options.proposal, options.vote === 'yes');
       spinner.succeed('Vote submitted successfully');
     } catch (error) {
