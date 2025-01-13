@@ -23,7 +23,7 @@ jest.mock('@tensorflow/tfjs-node');
 describe('RLFuzzingModel', () => {
 let model: RLFuzzingModel;
 let mockCompile: jest.SpyInstance<void, [tf.ModelCompileArgs]>;
-let mockPredict: jest.SpyInstance<tf.Tensor | tf.Tensor[], [tf.Tensor | tf.Tensor[], tf.ModelPredictArgs | undefined]>;
+let mockPredict: jest.SpyInstance<tf.Tensor | tf.Tensor[], [tf.Tensor | tf.Tensor[], any]>;
 let mockDispose: jest.SpyInstance<void, []>;
 
 beforeEach(() => {
@@ -36,7 +36,7 @@ beforeEach(() => {
     mockDispose = jest.spyOn(tf.Tensor.prototype, 'dispose');
     
     // Initialize model with test configuration
-    model = new RLFuzzingModel({
+    model = new RLFuzzingModel(10, 5, 32, 1000, 0.95, 0.001);
     stateSize: 10,
     actionSize: 5,
     batchSize: 32,
@@ -56,14 +56,14 @@ afterEach(() => {
 describe('initialization', () => {
     test('should create model with correct configuration', () => {
         expect(model).toBeDefined();
-        expect(model.getStateSize()).toBe(10);
-        expect(model.getActionSize()).toBe(5);
+        expect(model.stateSize).toBe(10);
+        expect(model.actionSize).toBe(5);
         expect(mockCompile).toHaveBeenCalledTimes(1);
     });
 
     test('should throw error with invalid configuration', () => {
     expect(() => {
-        new RLFuzzingModel({
+        new RLFuzzingModel(-1, 5, 32, 1000, 0.95, 0.001);
         stateSize: -1,
         actionSize: 5,
         batchSize: 32,
@@ -86,7 +86,7 @@ describe('action selection', () => {
     });
 
     test('should handle exploration vs exploitation', async () => {
-    model.setEpsilon(1.0); // Force exploration
+    model.epsilon = 1.0; // Force exploration
     const state: FuzzingState = {
         programCounter: 0,
         coverage: Array(10).fill(0),
@@ -107,8 +107,8 @@ describe('memory management', () => {
     const state = tf.zeros([1, 10]);
     const nextState = tf.ones([1, 10]);
     
-    model.addExperience(state, 1, 1.0, nextState, false);
-    expect(model.getMemorySize()).toBe(1);
+    model.remember(state, 1, 1.0, nextState, false);
+    expect(model.memory.length).toBe(1);
     });
 
     test('should respect maximum memory size', () => {
@@ -160,7 +160,7 @@ describe('model persistence', () => {
     const mockLoad = jest.spyOn(tf, 'loadLayersModel')
         .mockRejectedValue(new Error('File not found'));
     
-    await expect(model.load('non-existent-model'))
+    await expect(model.loadModel('non-existent-model'))
         .rejects.toThrow('Failed to load model');
     });
 });

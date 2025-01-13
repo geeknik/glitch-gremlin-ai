@@ -1,10 +1,10 @@
-import { SecurityScoringModel } from '../src/solana/security-scoring-model';
+import { SecurityScoring } from '../src/solana/security-scoring-model';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { SecurityPattern, AnalysisResult } from '../src/solana/types';
 import { jest } from '@jest/globals';
 
 describe('SecurityScoringModel', () => {
-    let securityScoring: SecurityScoringModel;
+    let securityScoring: SecurityScoring;
     let connection: Partial<Connection>;
 
     beforeEach(() => {
@@ -28,7 +28,7 @@ describe('SecurityScoringModel', () => {
             }]),
         } as Partial<Connection>;
 
-        securityScoring = new SecurityScoringModel(connection as Connection);
+        securityScoring = new SecurityScoring(connection as Connection);
     });
 
     describe('basic functionality', () => {
