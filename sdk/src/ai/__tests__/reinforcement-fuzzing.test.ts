@@ -1,3 +1,6 @@
+import * as tf from '@tensorflow/tfjs-node';
+import { RLFuzzingModel } from '../src/reinforcement-fuzzing';
+
 interface RLModelConfig {
     stateSize: number;
     actionSize: number;
@@ -7,15 +10,20 @@ interface RLModelConfig {
     learningRate: number;
 }
 
-import * as tf from '@tensorflow/tfjs-node';
-import { RLFuzzingModel } from '../src/reinforcement-fuzzing';
+interface FuzzingState {
+    programCounter: number;
+    coverage: number[];
+    lastCrash: Date | null;
+    mutationHistory: string[];
+    executionTime: number;
+}
 
 jest.mock('@tensorflow/tfjs-node');
 
 describe('RLFuzzingModel', () => {
 let model: RLFuzzingModel;
 let mockCompile: jest.SpyInstance<void, [tf.ModelCompileArgs]>;
-let mockPredict: jest.SpyInstance<tf.Tensor, [tf.Tensor]>;
+let mockPredict: jest.SpyInstance<tf.Tensor | tf.Tensor[], [tf.Tensor | tf.Tensor[], tf.ModelPredictArgs | undefined]>;
 let mockDispose: jest.SpyInstance<void, []>;
 
 beforeEach(() => {
@@ -24,7 +32,7 @@ beforeEach(() => {
     
     // Mock TensorFlow methods
     mockCompile = jest.spyOn(tf.Sequential.prototype, 'compile');
-    mockPredict = jest.spyOn(tf.Sequential.prototype, 'predict');
+    mockPredict = jest.spyOn(tf.Sequential.prototype, 'predict').mockReturnValue(tf.tensor([0.1, 0.2, 0.3, 0.4, 0.5]));
     mockDispose = jest.spyOn(tf.Tensor.prototype, 'dispose');
     
     // Initialize model with test configuration
@@ -47,10 +55,10 @@ afterEach(() => {
 
 describe('initialization', () => {
     test('should create model with correct configuration', () => {
-    expect(model).toBeDefined();
-    expect(model.stateSize).toBe(10);
-    expect(model.actionSize).toBe(5);
-    expect(mockCompile).toHaveBeenCalledTimes(1);
+        expect(model).toBeDefined();
+        expect(model.getStateSize()).toBe(10);
+        expect(model.getActionSize()).toBe(5);
+        expect(mockCompile).toHaveBeenCalledTimes(1);
     });
 
     test('should throw error with invalid configuration', () => {
@@ -78,8 +86,14 @@ describe('action selection', () => {
     });
 
     test('should handle exploration vs exploitation', async () => {
-    model.epsilon = 1.0; // Force exploration
-    const state = tf.zeros([1, 10]);
+    model.setEpsilon(1.0); // Force exploration
+    const state: FuzzingState = {
+        programCounter: 0,
+        coverage: Array(10).fill(0),
+        lastCrash: null,
+        mutationHistory: [],
+        executionTime: 0
+    };
     const action = await model.selectAction(state);
     
     expect(mockPredict).not.toHaveBeenCalled();
@@ -93,8 +107,8 @@ describe('memory management', () => {
     const state = tf.zeros([1, 10]);
     const nextState = tf.ones([1, 10]);
     
-    model.remember(state, 1, 1.0, nextState, false);
-    expect(model.memorySize).toBe(1);
+    model.addExperience(state, 1, 1.0, nextState, false);
+    expect(model.getMemorySize()).toBe(1);
     });
 
     test('should respect maximum memory size', () => {
@@ -103,7 +117,7 @@ describe('memory management', () => {
         const nextState = tf.ones([1, 10]);
         model.remember(state, 1, 1.0, nextState, false);
     }
-    expect(model.memorySize).toBe(1000);
+    expect(model.getMemorySize()).toBe(1000);
     });
 });
 
@@ -132,14 +146,14 @@ describe('training', () => {
 describe('model persistence', () => {
     test('should save model weights', async () => {
     const mockSave = jest.spyOn(tf.Sequential.prototype, 'save');
-    await model.save('test-model');
+    await model.saveModel('test-model');
     expect(mockSave).toHaveBeenCalled();
     });
 
     test('should load model weights', async () => {
-    const mockLoad = jest.spyOn(tf, 'loadLayersModel');
-    await model.load('test-model');
-    expect(mockLoad).toHaveBeenCalled();
+        const mockLoad = jest.spyOn(tf, 'loadLayersModel');
+        await model.loadModel('test-model');
+        expect(mockLoad).toHaveBeenCalled();
     });
 
     test('should handle loading errors gracefully', async () => {

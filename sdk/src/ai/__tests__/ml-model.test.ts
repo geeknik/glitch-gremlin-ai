@@ -1,5 +1,6 @@
-import { VulnerabilityDetectionModel } from '../src/ml-model';
+import { VulnerabilityDetectionModel, VulnerabilityOutput } from '../src/ml-model';
 import { VulnerabilityType } from '../src/types';
+import * as tf from '@tensorflow/tfjs-node';
 import * as tf from '@tensorflow/tfjs-node';
 
 interface ModelOutput {
@@ -12,7 +13,7 @@ describe('VulnerabilityDetectionModel', () => {
     beforeEach(async () => {
         jest.spyOn(console, 'error').mockImplementation(() => {});
         model = new VulnerabilityDetectionModel();
-        await model.ensureInitialized();
+        await model.train(testData.map(d => d.features), testData.map(d => d.vulnerabilityType));
     });
 
     afterEach(async () => {

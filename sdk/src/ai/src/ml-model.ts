@@ -5,9 +5,36 @@ export interface ModelOutput {
     confidence: number;
 }
 
+export interface VulnerabilityOutput extends ModelOutput {
+    type: VulnerabilityType;
+    confidence: number;
+}
+
+export class VulnerabilityDetectionModel extends MLModel {
+    constructor() {
+        super();
+    }
+    
+    async predict(features: number[]): Promise<VulnerabilityOutput> {
+        const baseOutput = await super.predict(features);
+        const vulnerabilityIndex = baseOutput.prediction.indexOf(Math.max(...baseOutput.prediction));
+        
+        return {
+            prediction: baseOutput.prediction,
+            type: this.mapIndexToVulnerabilityType(vulnerabilityIndex),
+            confidence: baseOutput.confidence
+        };
+    }
+    
+    private mapIndexToVulnerabilityType(index: number): VulnerabilityType {
+        const types = Object.values(VulnerabilityType);
+        return types[index] || VulnerabilityType.Unknown;
+    }
+}
+
 export class MLModel {
-    private model: tf.LayersModel;
-    private isInitialized: boolean = false;
+    protected model: tf.LayersModel;
+    protected isInitialized: boolean = false;
 
     constructor() {
         this.model = this.buildModel();
