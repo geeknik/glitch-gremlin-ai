@@ -150,10 +150,7 @@ describe('GovernanceManager', () => {
     let wallet: Keypair;
     let proposalAddress: PublicKey;
     let mockProposalData: MockProposalData;
-    let validateProposalMock: jest.SpiedFunction<typeof GovernanceManager.prototype.validateProposal>;
-    let getAccountInfoMock: jest.SpiedFunction<Connection['getAccountInfo']>;
-    let simulateTransactionMock: jest.SpiedFunction<Connection['simulateTransaction']>;
-    let sendTransactionMock: jest.SpiedFunction<Connection['sendTransaction']>;
+    let governanceManager: GovernanceManager;
 
     // Initialize mocks with proper types
     beforeEach(() => {
@@ -167,19 +164,19 @@ describe('GovernanceManager', () => {
             rpcEndpoint: 'http://localhost:8899'
         } as MockedObject<Connection>;
             jest.clearAllMocks();
-            getRecentBlockhash: jest.fn().mockImplementation(async () => ({
+            connection.getRecentBlockhash = jest.fn().mockImplementation(async () => ({
                 blockhash: 'test-blockhash',
                 feeCalculator: {
                     lamportsPerSignature: 5000
                 }
-            }))
+            }));
 
-        let wallet: Keypair = Keypair.generate();
-        const governanceManager = new GovernanceManager(
+        wallet = Keypair.generate();
+        governanceManager = new GovernanceManager(
             new PublicKey('GLt5cQeRgVMqnE9DGJQNNrbAfnRQYWqYVNWnJo7WNLZ9')
         );
 
-        let mockProposalData = {
+        mockProposalData = {
             state: ProposalState.Active,
             votingPower: 1000,
             votes: [], 
@@ -218,14 +215,12 @@ describe('GovernanceManager', () => {
         });
         executed: mockProposalData.executed,
         // timeLockEnd: mockProposalData.timeLockEnd;
-        yesVotes: mockProposalData.voteWeights.yes;
-        noVotes: mockProposalData.voteWeights.no;
-        quorumRequired: mockProposalData.quorumRequired;
+            yesVotes: mockProposalData.voteWeights.yes,
+            noVotes: mockProposalData.voteWeights.no,
             quorumRequired: mockProposalData.quorumRequired,
-            // votes: mockProposalData.votes,
-            // startTime: mockProposalData.startTime,
-            // endTime: mockProposalData.endTime
-        };
+            votes: mockProposalData.votes,
+            startTime: mockProposalData.startTime,
+            endTime: mockProposalData.endTime
         // Configure default mock implementations
         (connection.getAccountInfo as jest.MockedFunction<Connection['getAccountInfo']>).mockResolvedValue({
             data: createProposalBuffer({
