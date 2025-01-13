@@ -42,7 +42,7 @@
   },
   "devDependencies": {
     "@opentelemetry/api": "^1.9.0",
-    "@solana/web3.js": "1.89.1",
+    "@solana/web3.js": "1.89.2",
     "@tensorflow/tfjs-node": "^4.22.0",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.10.5",
@@ -68,7 +68,7 @@
 "@ethersproject/abstract-provider": "^5.7.0",
 "@ethersproject/abstract-signer": "^5.7.0",
 "@ethersproject/hash": "^5.7.0",
-"@solana/web3.js": "1.89.1",
+"@solana/web3.js": "1.89.2",
 "@solana/spl-token": "0.3.9",
 "@solana/wallet-adapter-vue": "0.4.3", 
 "@solana/wallet-adapter-wallets": "0.19.25"
