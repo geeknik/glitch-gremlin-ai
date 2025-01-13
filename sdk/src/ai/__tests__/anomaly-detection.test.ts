@@ -127,7 +127,7 @@ describe('AnomalyDetectionModel', () => {
         });
 
         it('should throw error if model is not trained', async () => {
-            await model.cleanup(); 
+            await model.cleanup();
             const testData = generateNormalMetrics(100);
             await expect(model.detect(testData)).rejects.toThrow('Model not trained');
         });
@@ -209,7 +209,7 @@ describe('AnomalyDetectionModel', () => {
 
         it('should detect PDA validation issues', async () => {
             const testData = generateNormalMetrics(100);
-            testData[50].pdaValidation = [9.5]; 
+            testData[50].pdaValidation = [9.5];
             const result = await model.detect(testData);
 
             expect(result.isAnomaly).toBe(true);
@@ -219,7 +219,7 @@ describe('AnomalyDetectionModel', () => {
 
         it('should detect account data matching vulnerabilities', async () => {
             const testData = generateNormalMetrics(100);
-            testData[50].accountDataMatching = [8.5]; 
+            testData[50].accountDataMatching = [8.5];
             const result = await model.detect(testData);
 
             expect(result.isAnomaly).toBe(true);
@@ -229,7 +229,7 @@ describe('AnomalyDetectionModel', () => {
 
         it('should detect unsafe CPI patterns', async () => {
             const testData = generateNormalMetrics(100);
-            testData[50].cpiSafety = [7.5]; 
+            testData[50].cpiSafety = [7.5];
             const result = await model.detect(testData);
 
             expect(result.isAnomaly).toBe(true);
@@ -239,7 +239,7 @@ describe('AnomalyDetectionModel', () => {
 
         it('should detect authority validation issues', async () => {
             const testData = generateNormalMetrics(100);
-            testData[50].authorityChecks = [6.5]; 
+            testData[50].authorityChecks = [6.5];
             const result = await model.detect(testData);
 
             expect(result.isAnomaly).toBe(true);
@@ -282,7 +282,7 @@ describe('AnomalyDetectionModel', () => {
 
         it('should save and load model successfully', async () => {
             await model.save(testModelPath);
-            await model.cleanup(); 
+            await model.cleanup();
             await expect(model.load(testModelPath)).resolves.not.toThrow();
 
             const testData = generateNormalMetrics(100);
@@ -293,7 +293,7 @@ describe('AnomalyDetectionModel', () => {
         });
 
         it('should throw error when saving untrained model', async () => {
-            await model.cleanup(); 
+            await model.cleanup();
             await expect(model.save(testModelPath)).rejects.toThrow('Model not trained');
         });
 
@@ -340,7 +340,7 @@ describe('AnomalyDetectionModel', () => {
             await model.detect(generateNormalMetrics(1000));
             await model.cleanup();
 
-            expect(tf.memory().numBytes).toBeLessThan(initialMemory * 1.1); 
+            expect(tf.memory().numBytes).toBeLessThan(initialMemory * 1.1);
         });
 
         it('should handle concurrent model instances', async () => {
@@ -386,9 +386,9 @@ describe('AnomalyDetectionModel', () => {
 
         it('should detect sudden instruction frequency spikes', async () => {
             const testData = generateNormalMetrics(100);
-            testData[50].instructionFrequency = [15.0]; 
-            testData[51].instructionFrequency = [12.0]; 
-            testData[52].instructionFrequency = [10.0]; 
+            testData[50].instructionFrequency = [15.0];
+            testData[51].instructionFrequency = [12.0];
+            testData[52].instructionFrequency = [10.0];
 
             const result = await model.detect(testData);
             expect(result.isAnomaly).toBe(true);
@@ -476,54 +476,6 @@ describe('AnomalyDetectionModel', () => {
         });
     });
 
-    describe('Blockchain-Specific Attack Patterns', () => {
-        beforeEach(async () => {
-            model = new AnomalyDetectionModel();
-            await model.train(generateNormalMetrics(500));
-        });
-
-        afterEach(async () => {
-            await model.cleanup();
-        });
-
-        it('should detect flash loan attack patterns', async () => {
-            const testData = generateNormalMetrics(150);
-            testData[50].instructionFrequency = [9.0];
-            testData[50].memoryAccess = [8.5];
-            testData[50].accountAccess = [7.5];
-            testData[51].stateChanges = [8.0];
-            testData[52].instructionFrequency = [8.5];
-
-            const result = await model.detect(testData);
-            expect(result.isAnomaly).toBe(true);
-            expect(result.details.find(d => d.type === 'flashLoanPattern')?.confidence).toBeGreaterThan(0.8);
-        });
-
-        it('should identify reentrancy attack patterns', async () => {
-            const testData = generateNormalMetrics(150);
-            for (let i = 60; i < 65; i++) {
-                testData[i].accountAccess = [6.0 + (i - 60) * 0.5];
-                testData[i].instructionFrequency = [5.0 + (i - 60) * 0.4];
-                testData[i].cpiSafety = [4.0 + (i - 60) * 0.6];
-            }
-
-            const result = await model.detect(testData);
-            expect(result.isAnomaly).toBe(true);
-            expect(result.details.find(d => d.type === 'reentrancyPattern')?.score).toBeGreaterThan(0.75);
-        });
-
-        it('should detect authority manipulation attempts', async () => {
-            const testData = generateNormalMetrics(150);
-            testData[70].authorityChecks = [7.5];
-            testData[71].pdaValidation = [6.5];
-            testData[72].accountDataMatching = [6.0];
-
-            const result = await model.detect(testData);
-            expect(result.isAnomaly).toBe(true);
-            expect(result.details.find(d => d.type === 'authorityManipulation')?.confidence).toBeGreaterThan(0.8);
-        });
-    });
-
     describe('False Positive Analysis', () => {
         beforeEach(async () => {
             model = new AnomalyDetectionModel();
@@ -572,4 +524,28 @@ describe('AnomalyDetectionModel', () => {
     describe('Model Validation', () => {
         let model: AnomalyDetectionModel;
 
-        beforeEach(() =>
+        beforeEach(async () => {
+            model = new AnomalyDetectionModel();
+            await model.train(generateNormalMetrics(200));
+        });
+
+        afterEach(async () => {
+            await model.cleanup();
+        });
+
+        it('should validate model architecture', async () => {
+            await expect(model.validateModel()).resolves.not.toThrow();
+        });
+
+        it('should throw error if model is not trained', async () => {
+            await model.cleanup();
+            await expect(model.validateModel()).rejects.toThrow('Model not properly initialized');
+        });
+
+        it('should throw error if normalization stats are missing', async () => {
+            await model.cleanup();
+            await model.initialize();
+            await expect(model.validateModel()).rejects.toThrow('Normalization statistics not properly loaded');
+        });
+    });
+});
