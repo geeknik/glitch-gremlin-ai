@@ -41,7 +41,7 @@ validationSplit: number;
 }
 
 export class AnomalyDetectionModel extends EventEmitter {
-private model: tf.LayersModel;
+private model!: tf.LayersModel; // Add definite assignment assertion
 private readonly config: ModelConfig;
 private isInitialized: boolean = false;
 private thresholds: { [key: string]: number } = {};
@@ -110,7 +110,7 @@ private preprocessMetrics(metrics: TimeSeriesMetric[]): tf.Tensor2D {
     
     if (!this.meanStd) {
     const mean = tensorData.mean(0);
-    const std = tensorData.std(0);
+    const std = tensorData.sub(mean).square().mean(0).sqrt(); // Manually calculate std
     this.meanStd = {
         mean: Array.from(mean.dataSync()),
         std: Array.from(std.dataSync())
@@ -120,7 +120,7 @@ private preprocessMetrics(metrics: TimeSeriesMetric[]): tf.Tensor2D {
     const normalizedData = tensorData.sub(tf.tensor2d([this.meanStd.mean]))
     .div(tf.tensor2d([this.meanStd.std]));
 
-    return normalizedData;
+    return normalizedData as tf.Tensor2D; // Explicit cast
 }
 
 async train(metrics: TimeSeriesMetric[]): Promise<void> {
@@ -153,7 +153,9 @@ async train(metrics: TimeSeriesMetric[]): Promise<void> {
     // Calculate reconstruction error thresholds
     const predictions = this.model.predict(tensorData) as tf.Tensor;
     const reconstructionErrors = tf.sub(tensorData, predictions).abs().mean(1);
-    const threshold = tf.quantile(reconstructionErrors, this.config.anomalyThreshold);
+    const sorted = reconstructionErrors.sort();
+    const index = Math.floor(sorted.size * this.config.anomalyThreshold);
+    const threshold = sorted.gather([index]); // Manual quantile calculation
     
     this.thresholds = {
     reconstruction: threshold.dataSync()[0]
@@ -201,7 +203,7 @@ async detect(metrics: TimeSeriesMetric[]): Promise<AnomalyResult> {
     }
 
     return {
-    isAnomaly: isAnomaly.any().dataSync()[0],
+    isAnomaly: isAnomaly.any().dataSync()[0] === 1, // Convert to boolean
     confidence: anomalyScores.mean().dataSync()[0],
     details,
     timestamp: Date.now()
@@ -256,7 +258,7 @@ async load(modelPath: string): Promise<void> {
     
     this.meanStd = metadata.meanStd;
     this.thresholds = metadata.thresholds;
-    this.config = metadata.config;
+    Object.assign(this.config, metadata.config); // Update config properties
     
     this.isInitialized = true;
     } catch (error) {

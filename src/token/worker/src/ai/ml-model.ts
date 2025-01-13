@@ -2,7 +2,7 @@ import * as tf from '@tensorflow/tfjs-node';
 import { VulnerabilityType, Finding } from '../types';
 import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { Logger } from '../utils/logger';
+// Remove unused Logger import
 
 export interface ModelOutput {
     vulnerabilityType: VulnerabilityType;
