@@ -1,7 +1,7 @@
 import IORedis from 'ioredis';
-import { GlitchError } from '../errors.js';
+import { GlitchError } from '../errors';
 import type { Redis as RedisType } from 'ioredis';
-import type { ChaosRequestParams, ChaosResult } from '../types.js';
+import type { ChaosRequestParams, ChaosResult } from '../types';
 
 export class RedisQueueWorker {
     private redis: RedisType;
@@ -20,7 +20,7 @@ export class RedisQueueWorker {
             },
             enableOfflineQueue: true,
             lazyConnect: true
-        });
+        }) as RedisType;
 
         this.redis.on('error', (err: Error): void => {
             console.error('Redis connection error:', err.message, err.stack);
