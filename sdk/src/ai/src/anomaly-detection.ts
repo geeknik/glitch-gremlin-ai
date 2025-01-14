@@ -29,21 +29,21 @@ export class AnomalyDetectionModel extends EventEmitter {
         if (!this.model) {
             throw new Error('Model not initialized');
         }
-        
+
         try {
             // Convert buffer to float32 array
             const values = new Float32Array(input);
-            
+
             // Create tensor with proper shape
             const tensor = tf.tensor(values, [1, values.length]);
-            
+
             // Normalize data
             const normalized = await this.normalizeData(tensor);
-            
+
             // Make prediction
             const prediction = this.model.predict(normalized) as tf.Tensor;
             const score = prediction.dataSync()[0];
-            
+
             return score;
         } catch (error) {
             this.logger.error(`Prediction failed: ${error}`);
@@ -75,7 +75,7 @@ export class AnomalyDetectionModel extends EventEmitter {
         // Check memory status before initialization
         const memoryInfo = tf.memory();
         this.logger.info(`Memory before init: numTensors=${memoryInfo.numTensors}, numDataBuffers=${memoryInfo.numDataBuffers}`);
-        
+
         if (memoryInfo.numTensors > 1000) {
             this.logger.warn('High number of tensors detected, running garbage collection');
             tf.dispose();
@@ -189,10 +189,10 @@ export class AnomalyDetectionModel extends EventEmitter {
             for (let j = 0; j < this.inputWindowSize; j++) {
                 const metrics = data[i + j];
                 window.push([
-                    metrics.instructionFrequency[0],
-                    metrics.memoryAccess[0],
-                    metrics.accountAccess[0],
-                    metrics.stateChanges[0]
+                    metrics.instructionFrequency[0] || 0, // Provide default value if undefined
+                    metrics.memoryAccess[0] || 0, // Provide default value if undefined
+                    metrics.accountAccess[0] || 0, // Provide default value if undefined
+                    metrics.stateChanges[0] || 0 // Provide default value if undefined
                 ]);
             }
 
@@ -247,7 +247,7 @@ export class AnomalyDetectionModel extends EventEmitter {
     public async detect(data: TimeSeriesMetrics[]): Promise<AnomalyDetectionResult> {
         // Start scope for tensor management
         tf.engine().startScope();
-        
+
         if (!this.model) {
             throw new Error('Model not trained');
         }
@@ -272,7 +272,7 @@ export class AnomalyDetectionModel extends EventEmitter {
             // Create tensors outside tidy to manage their lifecycle
             const windows = this.createWindows(data);
             const normalizedWindows = await this.normalizeData(windows);
-            
+
             try {
                 // Wrap tensor operations in tf.tidy for automatic cleanup
                 const [predictions, scores, results] = tf.tidy(() => {
