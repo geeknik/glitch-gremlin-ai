@@ -18,7 +18,7 @@ import {
 } from './types';
 import { TensorShape } from '@tensorflow/tfjs-core';
 import { Logger } from '../../utils/logger';
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, Transaction, sendAndConfirmTransaction, TransactionInstruction, Connection } from '@solana/web3.js';
 
 interface FuzzingConfig {
     mutationRate: number;
@@ -33,6 +33,7 @@ interface FuzzingCampaignConfig {
     duration: number;
     maxIterations: number;
     programId: PublicKey;
+    connection: Connection; // Add connection for campaign
 }
 
 interface CampaignResult {
@@ -49,6 +50,7 @@ export class Fuzzer {
     private programId: PublicKey | null = null;
     private resourceManager: ResourceManager | null = null;
     private metricsCollector: MetricsCollector | null = null;
+    private connection: Connection | null = null; // Add connection property
 
     constructor(config: Partial<FuzzingConfig> = {}) {
         this.config = {
@@ -61,8 +63,9 @@ export class Fuzzer {
         };
     }
 
-    public async initialize(programId: PublicKey): Promise<void> {
+    public async initialize(programId: PublicKey, connection: Connection): Promise<void> { // Add connection parameter
         this.programId = programId;
+        this.connection = connection; // Initialize connection
         this.logger.info(`Initializing fuzzer for program ${programId.toBase58()}`);
 
         // Initialize anomaly detection model
@@ -79,7 +82,7 @@ export class Fuzzer {
 
 
     public async fuzz(inputs: FuzzInput[]): Promise<FuzzResult[]> {
-        if (!this.programId || !this.anomalyDetectionModel) {
+        if (!this.programId || !this.anomalyDetectionModel || !this.connection) {
             throw new Error('Fuzzer not initialized. Call initialize() first.');
         }
 
@@ -151,30 +154,43 @@ export class Fuzzer {
     }
 
     private async executeFuzzedInput(input: FuzzInput): Promise<FuzzResult> {
-        if (!this.programId || !this.anomalyDetectionModel) {
+        if (!this.programId || !this.anomalyDetectionModel || !this.connection) {
             throw new Error('Fuzzer not initialized.');
         }
 
-        // Placeholder for actual program execution
-        // In a real implementation, this would interact with the Solana program
-        // and analyze the results for vulnerabilities.
-        await new Promise(resolve => setTimeout(resolve, 10)); // Simulate execution delay
+        try {
+            // Construct transaction
+            const transaction = new Transaction().add(
+                new TransactionInstruction({
+                    programId: this.programId,
+                    keys: [], // Replace with actual keys if needed
+                    data: input.data
+                })
+            );
 
-        const anomalyScore = await this.anomalyDetectionModel.predict(input.data);
+            // Send and confirm transaction
+            await sendAndConfirmTransaction(
+                this.connection,
+                transaction,
+                [] // Replace with signers if needed
+            );
 
-        if (anomalyScore > 0.8) {
             return {
-                type: VulnerabilityType.ResourceExhaustion,
-                confidence: anomalyScore,
-                details: `Anomaly detected with score ${anomalyScore}`,
+                type: VulnerabilityType.None,
+                confidence: 0.1,
+                details: '',
             };
-        }
 
-        return {
-            type: VulnerabilityType.None,
-            confidence: 0.1,
-            details: '',
-        };
+        } catch (error) {
+            // Analyze error for potential vulnerabilities
+            const analyzedResult = await this.analyzeFuzzResult(error, input);
+            if (analyzedResult.type !== VulnerabilityType.None) {
+                return analyzedResult;
+            }
+
+            // Re-throw if not a vulnerability
+            throw error;
+        }
     }
 
     private calculateProbability(instruction: number, data: Buffer): number {
@@ -197,7 +213,7 @@ export class Fuzzer {
     public async cleanup(): Promise<void> {
         this.logger.info('Cleaning up resources...');
         if (this.anomalyDetectionModel) {
-            await this.anomalyDetectionModel.dispose();
+            await this.anomalyDetectionModel.cleanup();
             this.anomalyDetectionModel = null;
         }
         // Add other cleanup logic here (e.g., dispose tensors, close connections)
@@ -212,12 +228,34 @@ export class Fuzzer {
 
     public async fuzzWithStrategy(strategy: string, programId: PublicKey): Promise<FuzzingResult> {
         this.logger.info(`Fuzzing with strategy: ${strategy}`);
+
+        const inputs: FuzzInput[] = this.generateFuzzInputs(programId);
+
         // Implement fuzzing logic based on the given strategy
-        // ...
+        switch (strategy) {
+            case 'bitflip':
+                // Implement bitflip mutation
+                break;
+            case 'arithmetic':
+                // Implement arithmetic mutation
+                break;
+            case 'havoc':
+                // Implement havoc mutation
+                break;
+            case 'dictionary':
+                // Implement dictionary-based mutation
+                break;
+            default:
+                throw new Error(`Unknown fuzzing strategy: ${strategy}`);
+        }
+
+        const results = await this.fuzz(inputs);
+        // Analyze results and return a FuzzingResult
+        const severity = results.some(r => r.type !== VulnerabilityType.None) ? 'HIGH' : 'LOW';
         return {
-            type: 'someFuzzingResult',
-            details: ['some detail'],
-            severity: 'LOW',
+            type: strategy,
+            details: results.map(r => r.details || ''),
+            severity,
         };
     }
 
@@ -239,34 +277,89 @@ export class Fuzzer {
     }
 
     public async generateVulnerableInput(vulnerabilityType: VulnerabilityType): Promise<FuzzInput> {
-        // Implement vulnerable input generation logic
-        return { instruction: 0, data: Buffer.from('vulnerable input'), probability: 1, metadata: {}, created: Date.now() };
+        // Implement vulnerable input generation logic based on vulnerability type
+        let data = Buffer.alloc(0);
+        switch (vulnerabilityType) {
+            case VulnerabilityType.ArithmeticOverflow:
+                // Example: create a buffer that might cause overflow
+                data = Buffer.from([0xff, 0xff, 0xff, 0xff]);
+                break;
+            // Add other vulnerability types as needed
+        }
+        return { instruction: 0, data, probability: 1, metadata: {}, created: Date.now() };
     }
 
     public async analyzeFuzzResult(error: any, input: FuzzInput): Promise<FuzzResult> {
         // Implement fuzz result analysis logic
-        if (error && error.message && error.message.includes('overflow')) { // Check for overflow in error message
-            return { type: VulnerabilityType.ArithmeticOverflow, confidence: 0.9, details: 'overflow error' };
+        if (error && error.message) {
+            if (error.message.includes('overflow')) {
+                return { type: VulnerabilityType.ArithmeticOverflow, confidence: 0.9, details: 'overflow error' };
+            } else if (error.message.includes('access denied')) {
+                return { type: VulnerabilityType.AccessControl, confidence: 0.8, details: 'access denied error' };
+            } // Add more checks for other vulnerabilities
         }
         return { type: VulnerabilityType.None, confidence: 0.1, details: '' };
     }
 
     public async startFuzzingCampaign(config: FuzzingCampaignConfig): Promise<CampaignResult> {
-        // Placeholder implementation
+        const startTime = Date.now();
+        let iterations = 0;
+        const crashes = new Set<string>();
+
+        while (Date.now() - startTime < config.duration) {
+            const inputs = this.generateFuzzInputs(config.programId);
+            for (const input of inputs) {
+                try {
+                    await this.executeFuzzedInput(input);
+                } catch (error) {
+                    const result = await this.analyzeFuzzResult(error, input);
+                    if (result.type !== VulnerabilityType.None) {
+                        crashes.add(JSON.stringify(input)); // Store unique crashes
+                    }
+                }
+                iterations++;
+            }
+        }
+
+        const endTime = Date.now();
+        const elapsedSeconds = (endTime - startTime) / 1000;
+        const executionsPerSecond = iterations / elapsedSeconds;
+
         return {
-            coverage: Math.random(),
-            uniqueCrashes: Math.floor(Math.random() * 10),
-            executionsPerSecond: Math.random() * 1000
+            coverage: Math.random(), // Replace with actual coverage calculation
+            uniqueCrashes: crashes.size,
+            executionsPerSecond
         };
     }
 
     public async fuzzWithAnomalyDetection(programId: PublicKey, anomalyDetectionModel: AnomalyDetectionModel): Promise<void> {
-        // Placeholder implementation
         this.logger.info('Fuzzing with anomaly detection...');
         const inputs = this.generateFuzzInputs(programId);
+        const metrics: TimeSeriesMetrics[] = [];
+
         for (const input of inputs) {
             try {
-                await this.executeFuzzedInput(input);
+                const result = await this.executeFuzzedInput(input);
+
+                // Collect metrics after each execution
+                const currentMetrics = {
+                    instructionFrequency: [input.instruction],
+                    memoryAccess: [input.data.length], // Use data length as a proxy for memory access
+                    accountAccess: [0], // Replace with actual account access count
+                    stateChanges: [0], // Replace with actual state changes count
+                    timestamp: Date.now()
+                };
+                metrics.push(currentMetrics);
+
+                // Check for anomalies periodically
+                if (metrics.length >= anomalyDetectionModel['inputWindowSize']) {
+                    const anomalyResult = await anomalyDetectionModel.detect(metrics);
+                    if (anomalyResult.isAnomaly) {
+                        this.logger.warn(`Anomaly detected: ${JSON.stringify(anomalyResult)}`);
+                        // Handle anomaly (e.g., stop fuzzing, adjust parameters)
+                    }
+                }
+
             } catch (error) {
                 await this.analyzeFuzzResult(error, input);
             }
