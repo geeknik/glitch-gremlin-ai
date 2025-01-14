@@ -226,3 +226,36 @@ export class Fuzzer {
         }
         return { type: VulnerabilityType.None, confidence: 0.1, details: '' };
     }
+}
+
+class ResourceManagerImpl implements ResourceManager {
+    isAcquired = false;
+    memoryUsage = 0;
+
+    async acquire(): Promise<void> {
+        this.isAcquired = true;
+    }
+
+    async release(): Promise<void> {
+        this.isAcquired = false;
+    }
+}
+
+class MetricsCollectorImpl implements MetricsCollector {
+    async collect(): Promise<void> {
+        // Implementation for collecting metrics
+    }
+
+    async stop(): Promise<void> {
+        // Implementation for stopping metrics collection
+    }
+
+    async reset(): Promise<void> {
+        // Implementation for resetting metrics
+    }
+
+    async getMetrics(): Promise<{ [key: string]: number }> {
+        // Implementation for retrieving collected metrics
+        return {};
+    }
+}
