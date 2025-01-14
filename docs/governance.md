@@ -138,28 +138,48 @@ const stakingInfo = await worker.getStakingInfo(address)
   - 25% bonus on staking rewards
   - Early access to new features
   - Exclusive governance proposals
-- Higher voting power with longer lockups
-- Rewards from protocol fees
+  - Verified through on-chain SP00GE balance checks
+- Higher voting power with longer lockups:
+  - 1-30 days: 1x
+  - 31-90 days: 1.5x
+  - 91-365 days: 2x
+- Rewards from protocol fees:
+  - Distributed daily
+  - Auto-compounding option
+  - Minimum claim threshold: 100 GREMLINAI
 - Early unstake penalty (50% of staked amount)
-- Delegated staking support
-- Auto-compounding rewards
-- Real-time staking metrics
+- Delegated staking support:
+  - Delegation limits per address
+  - Delegation cooldown period
+  - Delegation fee: 5% of rewards
 - Staking tiers with bonus rewards:
-  - Bronze: 1k-10k GREMLINAI
-  - Silver: 10k-100k GREMLINAI  
-  - Gold: 100k+ GREMLINAI
+  - Bronze: 1k-10k GREMLINAI (5% bonus)
+  - Silver: 10k-100k GREMLINAI (10% bonus)
+  - Gold: 100k+ GREMLINAI (15% bonus)
+  - Tier verification through on-chain checks
 
 ### Treasury Management
 - Multi-sig controlled (3/5 signatures)
 - Funds allocated for:
-  - Governance proposals
-  - Community initiatives
-  - Protocol development
-  - Emergency reserves
-- Transparent allocation tracking
-- Monthly treasury reports
-- Allocation limits per period
-- Comprehensive audit trail
+  - Governance proposals (max 50% per quarter)
+  - Community initiatives (max 20% per quarter)
+  - Protocol development (max 25% per quarter)
+  - Emergency reserves (min 5% always maintained)
+- Allocation limits:
+  - Max single allocation: 10% of treasury
+  - Min allocation size: 1000 GREMLINAI
+  - Cooldown period between allocations: 7 days
+- Emergency pause functionality:
+  - Immediate halt of all treasury operations
+  - Requires 3/5 multisig approval
+  - Maximum pause duration: 7 days
+  - Automatic unpause after duration
+  - Comprehensive logging of pause events
+- Transparent allocation tracking:
+  - On-chain records of all transactions
+  - Monthly treasury reports
+  - Quarterly audits
+  - Public dashboard for real-time tracking
 
 ## Rate Limits
 - 1 proposal per address per day
@@ -171,10 +191,24 @@ const stakingInfo = await worker.getStakingInfo(address)
 
 ## Rewards
 - Proposal creators: 5% of test fees
+  - Distributed upon proposal execution
+  - Minimum threshold: 100 GREMLINAI
 - Voters: Share of 2% fee pool
+  - Distributed proportionally to voting power
+  - Minimum threshold: 50 GREMLINAI
 - Stakers: APY based on lockup duration
+  - 1-30 days: 5% APY
+  - 31-90 days: 7% APY
+  - 91-365 days: 10% APY
+  - SP00GE holders: +25% bonus
 - Delegators: Share of staking rewards
+  - 5% delegation fee deducted
+  - Minimum threshold: 100 GREMLINAI
 - Community contributors: Grants from treasury
+  - Max grant size: 10% of treasury
+  - Min grant size: 1000 GREMLINAI
+  - Requires governance approval
+  - Quarterly grant allocation limit: 20% of treasury
 
 ## Security Best Practices
 1. Use multi-sig for all privileged operations
