@@ -22,11 +22,12 @@ const config = {
     url: "http://localhost"
   },
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js', '<rootDir>/sdk/src/__tests__/setupAfterEnv.ts'],
-  globals: {
-    'ts-jest': {
-      isolatedModules: true
-    }
-  }
+  modulePaths: [
+    "<rootDir>/src",
+    "<rootDir>/../sdk/src",
+    "<rootDir>/../worker/src"
+  ],
+  
 };
 
 export default config;

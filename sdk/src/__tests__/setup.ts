@@ -42,6 +42,7 @@ const mockRedis = {
     on: jest.fn(),
     quit: jest.fn().mockResolvedValue(true),
     disconnect: jest.fn().mockResolvedValue(true),
+    connect: jest.fn().mockResolvedValue(true),
 
     // Pub/sub operations  
     publish: jest.fn().mockResolvedValue(0),
@@ -75,8 +76,8 @@ const mockConnection = {
     }),
 
     // Transaction methods
-    sendTransaction: jest.fn().mockResolvedValue('mock-signature'),
-    simulateTransaction: jest.fn().mockResolvedValue({
+    sendTransaction: jest.fn().mockResolvedValue(Promise.resolve('mock-signature')),
+    simulateTransaction: jest.fn().mockResolvedValue(Promise.resolve({
     context: { slot: 0 },
     value: {
         err: null,
@@ -85,13 +86,13 @@ const mockConnection = {
         unitsConsumed: 0,
         returnData: null
     }
-    }),
+    })),
     confirmTransaction: jest.fn().mockResolvedValue({
     value: { err: null }
     }),
 
     // Query methods
-    getBalance: jest.fn().mockResolvedValue(1000000000),
+    getBalance: jest.fn().mockResolvedValue(Promise.resolve(1000000000)),
     getVersion: jest.fn().mockResolvedValue({ 'solana-core': '1.18.26' }),
     getRecentBlockhash: jest.fn().mockResolvedValue({
     blockhash: 'test-blockhash',
@@ -106,4 +107,3 @@ return {
     Connection: jest.fn().mockImplementation(() => mockConnection)
 };
 });
-

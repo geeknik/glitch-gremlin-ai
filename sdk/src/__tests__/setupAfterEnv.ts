@@ -4,7 +4,7 @@ import { jest, beforeEach } from '@jest/globals';
 jest.setTimeout(30000);
 
 // Use fake timers but allow process.nextTick
-jest.useFakeTimers({ doNotFake: ['nextTick'] });
+jest.useFakeTimers();
 
 // Reset request count and clear mocks before each test
 beforeEach(() => {

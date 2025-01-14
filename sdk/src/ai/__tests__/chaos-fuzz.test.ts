@@ -9,6 +9,7 @@ namespace NodeJS {
 import { AnomalyDetectionModel, TimeSeriesMetrics, AnomalyDetectionResult } from '../src/anomaly-detection';
 import { jest, SpyInstance } from '@jest/globals';
 import { Fuzzer } from '../src/fuzzer';
+import { Logger } from '@/utils/logger';
 
 interface FuzzInput {
     instruction: number;
@@ -215,4 +216,3 @@ describe('Chaos Fuzzing and Anomaly Detection Tests', () => {
         });
     });
 });
-
