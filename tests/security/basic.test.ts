@@ -1,4 +1,4 @@
-import { GlitchSDK } from '@glitch-gremlin/sdk';
+import { GlitchSDK } from '../../sdk/src';
 import { security } from '../../jest.setup';
 
 describe('Security Tests', () => {

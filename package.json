@@ -50,8 +50,8 @@
     "@tensorflow/tfjs-node": "^4.10.0"
   },
   "workspaces": [
-    "sdk",
-    "cli",
-    "demo"
+    "sdk/*",
+    "cli/*",
+    "demo/*"
   ]
 }
