@@ -12,6 +12,10 @@ export class Logger extends EventEmitter {
         console.log(`[${this.name}] INFO: ${message}`);
     }
 
+    debug(message: string): void {
+        console.debug(`[${this.name}] DEBUG: ${message}`);
+    }
+
     error(message: string): void {
         console.error(`[${this.name}] ERROR: ${message}`);
     }
