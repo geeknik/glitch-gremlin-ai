@@ -1,159 +1,54 @@
-import { PublicKey } from '@solana/web3.js';
-
-export interface RedisClient {
-    incr(key: string): Promise<number>;
-    expire(key: string, seconds: number): Promise<number>;
-    get(key: string): Promise<string | null>;
-    set(key: string, value: string): Promise<'OK'>;
-    flushall(): Promise<'OK'>;
-    quit(): Promise<'OK'>;
-    disconnect(): Promise<void>;
-}
-
-export interface MockRedisClient extends RedisClient {
-    queue?: string[];
-    connected?: boolean;
-    incr: jest.Mock<Promise<number>, [string]>;
-    expire: jest.Mock<Promise<number>, [string, number]>;
-    get: jest.Mock<Promise<string | null>, [string]>;
-    set: jest.Mock<Promise<'OK'>, [string, string]>;
-    flushall: jest.Mock<Promise<'OK'>, []>;
-    quit: jest.Mock<Promise<'OK'>, []>;
-    disconnect: jest.Mock<Promise<void>, []>;
-    on: jest.Mock<void, [string, () => void]>;
-    hset: jest.Mock<Promise<number>, [string, string, string]>;
-    hget: jest.Mock<Promise<string | null>, [string, string]>;
-    lpush: jest.Mock<Promise<number>, [string, string]>;
-    rpop: jest.Mock<Promise<string | null>, [string]>;
+export enum TestType {
+    FUZZ = 'FUZZ',
+    LOAD = 'LOAD',
+    EXPLOIT = 'EXPLOIT',
+    CONCURRENCY = 'CONCURRENCY'
 }
 
 export enum VulnerabilityType {
-    Reentrancy = 'reentrancy',
-    ArithmeticOverflow = 'arithmetic-overflow',
-    AccessControl = 'access-control',
-    RaceCondition = 'race-condition',
-    InstructionInjection = 'instruction-injection',
-    AccountConfusion = 'account-confusion',
-    SignerAuthorization = 'signer-authorization',
-    PdaValidation = 'pda-validation',
-    ClockManipulation = 'clock-manipulation',
-    LamportDrain = 'lamport-drain'
-}
-
-
-export interface FuzzTestParams {
-    instructionTypes?: string[];
-    seedRange?: [number, number];
-    maxAccountSize?: number;
-}
-
-export interface LoadTestParams {
-    tps: number;
-    rampUp?: boolean;
-    concurrentUsers?: number;
-}
-
-export interface ExploitTestParams {
-    categories: ('reentrancy' | 'arithmetic' | 'access-control')[];
-    maxDepth?: number;
-}
-
-export interface ChaosRequestParams {
-    targetProgram: string | PublicKey;
-    testType: TestType;
-    duration: number;
-    intensity: number;
-    params?: {
-        fuzz?: FuzzTestParams;
-        load?: LoadTestParams;
-        exploit?: ExploitTestParams;
-    };
+    ArithmeticOverflow = 'ArithmeticOverflow',
+    AccessControl = 'AccessControl',
+    None = 'None',
+    Reentrancy = 'Reentrancy',
+    PDASafety = 'PDASafety',
+    AccountDataValidation = 'AccountDataValidation'
 }
 
 export interface GovernanceConfig {
-    minVotingPeriod: number;
-    maxVotingPeriod: number;
-    minStakeAmount?: number;
-    votingPeriod?: number;
-    quorum?: number;
-    executionDelay?: number;
-    minStakeLockupPeriod?: number;  // Minimum time tokens must be staked
-    maxStakeLockupPeriod?: number;  // Maximum allowed lockup period
+    minStakeAmount: number;
+    minStakeLockupPeriod: number;
+    maxStakeLockupPeriod: number;
 }
 
-export enum ProposalState {
-    Draft = 'draft',
-    Active = 'active',
-    Succeeded = 'succeeded',
-    Defeated = 'defeated',
-    Executed = 'executed',
-    Cancelled = 'cancelled',
-    Queued = 'queued',
-    Expired = 'expired'
-}
-
-export interface VoteWeight {
-    yes: number;
-    no: number;
-    abstain: number;
-}
-
-export interface ProposalVote {
-    voter: PublicKey;
-    vote: boolean;
-    weight: number;
-    timestamp: number;
-}
-
-export interface ProposalMetadata {
-    title: string;
-    description: string;
-    proposer: PublicKey;
-    startTime: number;
-    endTime: number;
-    executionTime: number;
-    voteWeights: VoteWeight;
-    votes: ProposalVote[];
-    quorum: number;
-    executed: boolean;
-}
-
-export interface ProposalMetadata {
-    title: string;
-    description: string;
-    proposer: PublicKey;
-    startTime: number;
-    endTime: number;
-    executionTime: number;
-    voteWeights: VoteWeight;
-    votes: ProposalVote[];
-    quorum: number;
-    executed: boolean;
-}
-
-export interface ProposalParams {
-    title: string;
-    description: string;
-    targetProgram: string | PublicKey;
-    testParams: ChaosRequestParams;
-    stakingAmount: number;
-}
-
-export interface StakeInfo {
-    amount: bigint;
-    lockupPeriod: bigint;
-    startTime: bigint;
-    owner: PublicKey;
+export interface ChaosRequestParams {
+    targetProgram: string;
+    testType: TestType;
+    duration: number;
+    intensity: number;
+    resultRef?: string;
 }
 
 export interface ChaosResult {
     requestId: string;
     status: 'completed' | 'failed';
-    resultRef: string;
-    logs: string[];
+    resultRef?: string;
+    logs?: string[];
     metrics?: {
         totalTransactions: number;
         errorRate: number;
         avgLatency: number;
     };
+}
+
+export interface ProposalParams {
+    title: string;
+    description: string;
+    targetProgram: string;
+    testParams: ChaosRequestParams;
+    stakingAmount: number;
+}
+
+export interface ErrorDetails {
+    timestamp: number;
+    [key: string]: any;
 }

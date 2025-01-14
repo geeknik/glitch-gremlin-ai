@@ -1,4 +1,3 @@
-
 export enum VulnerabilityType {
     ArithmeticOverflow = 'ArithmeticOverflow',
     AccessControl = 'AccessControl',
