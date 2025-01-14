@@ -330,7 +330,9 @@ export class AnomalyDetectionModel extends EventEmitter {
             throw error;
         } finally {
             // Ensure cleanup of input tensors
-            tf.dispose([windows, normalizedWindows]);
+            if (windows) {
+                tf.dispose([windows, normalizedWindows]);
+            }
             // End tensor scope
             tf.engine().endScope();
         }
