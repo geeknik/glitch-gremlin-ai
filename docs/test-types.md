@@ -6,8 +6,13 @@ Glitch Gremlin AI supports several types of chaos testing to help identify diffe
 
 ## Available Test Types
 
-### 1. Fuzz Testing (FUZZ)
-Automatically generates random or semi-random inputs to program instructions to find edge cases and unexpected behaviors.
+### 1. Advanced Fuzz Testing (FUZZ)
+AI-driven fuzz testing that combines:
+- Genetic algorithm for input generation
+- Reinforcement learning for test optimization
+- Coverage-guided exploration
+- Context-aware mutation
+- Smart seed selection
 
 ```typescript
 const request = await sdk.createChaosRequest({
@@ -53,8 +58,37 @@ const request = await sdk.createChaosRequest({
 });
 ```
 
-### 4. Concurrency Testing (CONCURRENCY)
-Tests program behavior under parallel transaction scenarios.
+### 4. Advanced Concurrency Testing (CONCURRENCY)
+Enhanced concurrency testing with:
+- Race condition detection
+- Deadlock prediction
+- Resource contention analysis
+- Transaction ordering simulation
+- Cross-program interaction testing
+
+### 5. State Transition Testing (STATE)
+Analyzes program state changes with:
+- State space exploration
+- Invalid state detection
+- State transition validation
+- State consistency checks
+- State rollback testing
+
+### 6. Economic Attack Testing (ECONOMIC)
+Simulates economic attacks including:
+- Flash loan attacks
+- Price manipulation
+- Fee extraction
+- Token inflation
+- Reward system exploits
+
+### 7. Cross-Program Testing (CROSS)
+Tests interactions between programs:
+- CPI (Cross-Program Invocation) validation
+- Shared account analysis
+- Program dependency testing
+- Privilege escalation detection
+- Data consistency checks
 
 ```typescript
 const request = await sdk.createChaosRequest({

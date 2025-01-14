@@ -17,15 +17,42 @@ Glitch Gremlin uses machine learning to enhance its vulnerability detection capa
 - Instruction sequence modeling
 - Error pattern detection
 
-## Model Architecture
+## Enhanced Model Architecture
 
 ### Core Vulnerability Detection Model
-- Input layer: Dense (256 units, ReLU activation) for processing 50 program features
-- Regularization: Dropout layer (0.3) to prevent overfitting
-- Hidden layers: 
-  - Dense (128 units, ReLU activation)
-  - Dense (64 units, ReLU activation)
-- Output layer: Dense with softmax activation for multi-class vulnerability prediction
+- Input layer: Dense (512 units, Swish activation) for processing 100+ program features
+- Regularization: 
+  - Dropout layer (0.3)
+  - Batch normalization
+  - L2 regularization
+- Hidden layers:
+  - Dense (256 units, GELU activation)
+  - Attention layer for feature importance
+  - Dense (128 units, GELU activation)
+- Output layer: 
+  - Dense with softmax activation for vulnerability classification
+  - Parallel regression head for severity prediction
+
+### New Model Enhancements
+1. Graph Neural Network (GNN) Module
+   - Analyzes program control flow graphs
+   - Detects structural vulnerabilities
+   - Identifies cross-program interactions
+
+2. Transformer-based Sequence Model
+   - Processes instruction sequences
+   - Detects temporal patterns
+   - Predicts execution paths
+
+3. Reinforcement Learning Module
+   - Optimizes test generation
+   - Maximizes vulnerability discovery
+   - Minimizes resource usage
+
+4. Adversarial Robustness Module
+   - Detects and resists adversarial inputs
+   - Improves model reliability
+   - Ensures consistent predictions
 
 ### New Models Added:
 
