@@ -128,7 +128,7 @@ export class GlitchSDK {
         }
         // Check rate limits using Redis
         const now = Date.now();
-        const requestKey = `request:${this.wallet.publicKey.toString()}`;
+        const requestKey = `request:${this.wallet?.publicKey?.toString() || 'anonymous'}`;
         // Check cooldown
         const lastRequest = await this.queueWorker['redis'].get(requestKey);
         if (lastRequest) {
