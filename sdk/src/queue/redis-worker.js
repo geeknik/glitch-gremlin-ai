@@ -3,22 +3,30 @@ export class RedisQueueWorker {
     redis;
     queueKey = 'glitch:chaos:queue';
     resultKey = 'glitch:chaos:results';
-    constructor(redisClient) {
-        this.redis = redisClient || new Redis({
-            host: 'r.glitchgremlin.ai',
-            port: 6379,
-            connectTimeout: 5000,
-            maxRetriesPerRequest: 3,
-            retryStrategy: (times) => {
-                const delay = Math.min(times * 50, 2000);
-                return delay;
-            },
-            enableOfflineQueue: true,
-            lazyConnect: true
-        });
-        this.redis.on('error', (err) => {
-            console.error('Redis connection error:', err);
-        });
+    constructor(config) {
+        if (config instanceof Redis) {
+            this.redis = config;
+        } else {
+            this.redis = new Redis({
+                host: config?.host || 'r.glitchgremlin.ai',
+                port: config?.port || 6379,
+                connectTimeout: 5000,
+                maxRetriesPerRequest: 3,
+                retryStrategy: (times) => {
+                    const delay = Math.min(times * 50, 2000);
+                    return delay;
+                },
+                enableOfflineQueue: true,
+                lazyConnect: true
+            });
+        }
+
+        // Only add event listener if redis client supports it
+        if (typeof this.redis.on === 'function') {
+            this.redis.on('error', (err) => {
+                console.error('Redis connection error:', err);
+            });
+        }
     }
     async enqueueRequest(params) {
         const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
