@@ -54,13 +54,15 @@
     - [ ] Simple exploit detection
     - [ ] Exploit database integration
     - [ ] ML model for novel attacks
-  - [x] Complete governance module
+  - [ ] Complete governance module
     - [x] Staking mechanism
     - [x] Proposal creation/voting
-    - [x] Treasury management
+    - [ ] Treasury management
     - [x] Delegation system
-    - [x] Reward distribution
-    - [x] Edge case handling
+    - [ ] Reward distribution
+    - [ ] Edge case handling
+    - [ ] Community chaos challenges
+    - [ ] Realms integration
 
 ## High Priority
 - [x] Test Coverage
