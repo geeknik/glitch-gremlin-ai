@@ -7,7 +7,7 @@ describe('Security Tests', () => {
       cluster: 'devnet',
       wallet: {} as any,
       redisConfig: {
-        host: 'localhost',
+        host: 'r.glitchgremlin.ai',
         port: 6379
       }
     });
