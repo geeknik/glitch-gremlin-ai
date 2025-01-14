@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   testMatch: ['**/security/**/*.test.ts'],
   setupFilesAfterEnv: ['./jest.setup.js'],
   testEnvironment: 'node',

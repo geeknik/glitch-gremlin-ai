@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   testMatch: ['**/fuzz/**/*.test.ts'],
   setupFilesAfterEnv: ['./jest.setup.js'],
   testEnvironment: 'node',

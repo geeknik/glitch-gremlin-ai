@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   testMatch: ['**/mutation/**/*.test.ts'],
   setupFilesAfterEnv: ['./jest.setup.js'],
   testEnvironment: 'node',
