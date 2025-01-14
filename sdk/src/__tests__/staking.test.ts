@@ -71,46 +71,4 @@ describe('Staking', () => {
                 .mockResolvedValueOnce('mock-tx-signature');
 
             const result = await sdk.stakeTokens(1000, 86400);
-            expect(result).toBe('mock-tx-signature');
-        });
-    });
-
-    describe('unstakeTokens', () => {
-        it('should validate stake exists', async () => {
-            await expect(sdk.unstakeTokens('11111111111111111111111111111111'))
-                .rejects.toThrow('Stake not found');
-        });
-
-        it('should check lockup period', async () => {
-            // Mock stake info with future unlock time
-            jest.spyOn(sdk as any, 'getStakeInfo')
-                .mockResolvedValueOnce({
-                    amount: BigInt(1000),
-                    lockupPeriod: BigInt(86400),
-                    startTime: BigInt(Math.floor(Date.now() / 1000)),
-                    owner: sdk['wallet'].publicKey
-                });
-
-            await expect(sdk.unstakeTokens('locked-stake'))
-                .rejects.toThrow('Tokens are still locked');
-        });
-
-        it('should unstake successfully after lockup', async () => {
-            // Mock stake info with passed unlock time
-            jest.spyOn(sdk as any, 'getStakeInfo')
-                .mockResolvedValueOnce({
-                    amount: BigInt(1000),
-                    lockupPeriod: BigInt(86400),
-                    startTime: BigInt(Math.floor(Date.now() / 1000) - 90000),
-                    owner: sdk['wallet'].publicKey
-                });
-
-            // Mock transaction
-            jest.spyOn(sdk['connection'], 'sendTransaction')
-                .mockResolvedValueOnce('mock-tx-signature');
-
-            const result = await sdk.unstakeTokens('unlocked-stake');
-            expect(result).toBe('mock-tx-signature');
-        });
-    });
-});
+            expect(

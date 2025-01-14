@@ -17,9 +17,9 @@ import {
     Message,
     SimulateTransactionConfig
 } from '@solana/web3.js';
-import { ProposalState } from '../types.js';
-import { GovernanceManager } from '../governance.js';
-import { ErrorCode, GlitchError } from '../errors.js';
+import { ProposalState } from '../types';
+import { GovernanceManager } from '../governance';
+import { ErrorCode, GlitchError } from '../errors';
 
 type MockedConnection = {
     [K in keyof Connection]: Connection[K] extends (...args: any) => any
@@ -143,6 +143,66 @@ describe('GovernanceManager', () => {
         jest.clearAllMocks();
     });
 
-    // ... rest of the file ...
-
+    describe('proposal creation', () => {
+        it('should create a proposal with valid parameters', async () => {
+            const { proposalAddress } = await governanceManager.createProposalAccount(
+                connection,
+                wallet,
+                {
+                    title: "Test Proposal",
+                    description: "Test Description",
+                    targetProgram: "11111111111111111111111111111111",
+                    testParams: {
+                        testType: 'FUZZ',
+                        duration: 300,
+                        intensity: 5,
+                        targetProgram: "11111111111111111111111111111111"
+                    },
+                    stakingAmount: 1000
+                }
+            );
+            expect(proposalAddress).toBeDefined();
+            expect(validateProposalMock).toHaveBeenCalled();
+            expect(simulateTransactionMock).toHaveBeenCalled();
+            expect(sendTransactionMock).toHaveBeenCalled();
+        });
+    });
+    describe('voting', () => {
+        it('should vote on a proposal', async () => {
+            const vote = await governanceManager.voteOnProposal(
+                connection,
+                wallet,
+                proposalAddress,
+                true
+            );
+            expect(vote).toBe('mock-signature');
+            expect(simulateTransactionMock).toHaveBeenCalled();
+            expect(sendTransactionMock).toHaveBeenCalled();
+        });
+    });
+    describe('proposal execution', () => {
+        it('should execute a proposal', async () => {
+            getAccountInfoMock.mockResolvedValueOnce({
+                data: Buffer.from(JSON.stringify({
+                    status: 'active',
+                    endTime: Date.now() - 1000,
+                    executionTime: Date.now() - 1000,
+                    voteWeights: {
+                        yes: 100,
+                        no: 50,
+                        abstain: 0
+                    },
+                    quorum: 100
+                })),
+                executable: false,
+                lamports: 0,
+                owner: PublicKey.default,
+                rentEpoch: 0
+            });
+            const result = await governanceManager.executeProposal(connection, wallet, proposalAddress);
+            expect(result).toBe('mock-signature');
+            expect(simulateTransactionMock).toHaveBeenCalled();
+            expect(sendTransactionMock).toHaveBeenCalled();
+        });
+    });
 });
