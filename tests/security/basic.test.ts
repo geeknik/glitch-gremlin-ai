@@ -3,9 +3,13 @@ import { security } from '../../jest.setup';
 
 describe('Security Tests', () => {
   it('should run basic security scan', async () => {
-    const sdk = new GlitchSDK({
+    const sdk = await GlitchSDK.init({
       cluster: 'devnet',
-      wallet: {} as any
+      wallet: {} as any,
+      redisConfig: {
+        host: 'localhost',
+        port: 6379
+      }
     });
 
     const request = await sdk.createChaosRequest({
