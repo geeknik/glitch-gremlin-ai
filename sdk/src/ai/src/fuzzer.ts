@@ -935,7 +935,4 @@ export class Fuzzer {
         
         // If no runtime errors, analyze the input for potential vulnerabilities
         const vulnerabilities = await this.analyzeVulnerabilities(input);
-        if (vulnerabilities.length > 0) {
-            // Return the highest confidence vulnerability
-            const highest = vulnerabilities.reduce((prev, current) => 
-                (current.confidence > prev
+        if (vulnerabilities.length
