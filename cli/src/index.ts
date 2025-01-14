@@ -20,23 +20,15 @@
 import { readFileSync } from 'fs';
 import { Keypair } from '@solana/web3.js';
 import { Command } from 'commander';
-import { GlitchSDK, TestType, version as sdkVersion } from '@glitch-gremlin/sdk';
+import { GlitchSDK, TestType } from '@glitch-gremlin/sdk';
+import { version } from '../package.json';
 import ora from 'ora';
 import chalk from 'chalk';
 
 const program = new Command();
 
 // Ensure SDK compatibility
-const CLI_VERSION = '0.1.0';
-const REQUIRED_SDK_VERSION = '0.1.0';
-
-if (sdkVersion !== REQUIRED_SDK_VERSION) {
-  console.error(chalk.red(`Error: SDK version mismatch. Required: ${REQUIRED_SDK_VERSION}, Found: ${sdkVersion}`));
-  process.exit(1);
-}
-
-// Ensure SDK compatibility
-if (sdkVersion !== CLI_VERSION) {
+if (version !== '0.1.0') {
   console.error(chalk.red(`Error: SDK version mismatch. Required: ${CLI_VERSION}, Found: ${sdkVersion}`));
   process.exit(1);
 }
