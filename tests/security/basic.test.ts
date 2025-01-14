@@ -10,7 +10,7 @@ describe('Security Tests', () => {
 
     const request = await sdk.createChaosRequest({
       targetProgram: "TestProgram111111111111111111111111111111111",
-      testType: "SECURITY",
+      testType: "EXPLOIT",
       duration: 60,
       intensity: 5
     });
