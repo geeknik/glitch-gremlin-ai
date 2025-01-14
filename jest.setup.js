@@ -5,6 +5,49 @@ const { TextDecoder, TextEncoder } = require('util');
 global.TextDecoder = TextDecoder;
 global.TextEncoder = TextEncoder;
 
+// Security testing utilities
+global.security = {
+  // Mock security metrics collector
+  metrics: {
+    collect: jest.fn().mockResolvedValue({}),
+    stop: jest.fn().mockResolvedValue({})
+  },
+  
+  // Mock vulnerability scanner
+  scanner: {
+    scan: jest.fn().mockImplementation(async (target) => ({
+      vulnerabilities: [],
+      metrics: {
+        executionTime: 0,
+        resourceUsage: {
+          cpu: 0,
+          memory: 0
+        }
+      }
+    }))
+  },
+  
+  // Mock fuzz tester
+  fuzz: {
+    test: jest.fn().mockImplementation(async (target, params) => ({
+      totalExecutions: 0,
+      uniqueCrashes: 0,
+      codeCoverage: 0,
+      newPaths: 0
+    }))
+  },
+  
+  // Mock mutation tester
+  mutation: {
+    test: jest.fn().mockImplementation(async (target, params) => ({
+      totalMutations: 0,
+      killedMutations: 0,
+      survivedMutations: 0,
+      coverage: 0
+    }))
+  }
+};
+
 // Mock Solana packages
 jest.mock('@solana/web3.js', () => ({
   Connection: jest.fn().mockImplementation(() => ({

@@ -5,6 +5,10 @@
   "type": "module",
   "scripts": {
     "test": "jest",
+    "test:security": "jest --config jest.security.config.js",
+    "test:fuzz": "jest --config jest.fuzz.config.js", 
+    "test:mutation": "jest --config jest.mutation.config.js",
+    "test:coverage": "jest --coverage",
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
