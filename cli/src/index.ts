@@ -36,7 +36,7 @@ if (version !== '0.1.0') {
 program
   .name('glitch')
   .description('Glitch Gremlin AI CLI tool')
-  .version(CLI_VERSION);
+  .version(version);
 
 // Test command
 program
