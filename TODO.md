@@ -61,7 +61,13 @@
     - [x] Delegation system
     - [ ] Reward distribution
     - [ ] Edge case handling
-    - [ ] Community chaos challenges
+    - [x] Community chaos challenges
+      - [x] Implement challenge proposal creation
+      - [x] Add crowdfunding mechanism
+      - [x] Implement challenge execution flow
+      - [x] Add results verification
+      - [x] Implement reward distribution
+      - [x] Add leaderboard tracking
     - [ ] Realms integration
 
 ## High Priority
