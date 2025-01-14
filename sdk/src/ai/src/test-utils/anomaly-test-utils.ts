@@ -1,36 +1,25 @@
-import { TimeSeriesMetric } from '../types';
+import { TimeSeriesMetrics } from '../anomaly-detection';
 
-/**
-* Generates synthetic time series metrics with anomalies for testing
-* @param count Number of metrics to generate
-* @returns Array of TimeSeriesMetrics with synthetic anomalous data
-*/
-export function generateAnomalousMetrics(count: number): TimeSeriesMetric[] {
-    const metrics: TimeSeriesMetric[] = [];
-    const baseFrequency = 0.1;
-    const now = Date.now();
-    
-    for (let i = 0; i < count; i++) {
-        const timestamp = now - (count - i) * 60000; // One minute intervals
-        
-        // Generate base sine wave pattern
-        let value = Math.sin(i * baseFrequency) * 50 + 100;
-        
-        // Randomly inject anomalies (20% chance)
-        if (Math.random() < 0.2) {
-            // Add sudden spikes or drops
-            value *= Math.random() < 0.5 ? 2.5 : 0.3;
-        }
-        
-        // Add some random noise
-        value += (Math.random() - 0.5) * 10;
-        
+export function generateAnomalousMetrics(numPoints: number): TimeSeriesMetrics[] {
+    const metrics: TimeSeriesMetrics[] = [];
+
+    for (let i = 0; i < numPoints; i++) {
         metrics.push({
-            timestamp,
-            value: Math.max(0, value) // Ensure non-negative values
+            instructionFrequency: [Math.random() * 100], // Ensure array has at least one element
+            memoryAccess: [Math.random() * 100], // Ensure array has at least one element
+            accountAccess: [Math.random() * 100], // Ensure array has at least one element
+            stateChanges: [Math.random() * 100], // Ensure array has at least one element
+            timestamp: Date.now() + i * 1000
         });
+
+        if (i > numPoints / 2) {
+            // Introduce anomaly
+            metrics[i].instructionFrequency = [metrics[i].instructionFrequency[0] * 2];
+            metrics[i].memoryAccess = [metrics[i].memoryAccess[0] * 2];
+            metrics[i].accountAccess = [metrics[i].accountAccess[0] * 2];
+            metrics[i].stateChanges = [metrics[i].stateChanges[0] * 2];
+        }
     }
-    
+
     return metrics;
 }
-

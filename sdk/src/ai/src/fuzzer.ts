@@ -29,6 +29,18 @@ interface FuzzingConfig {
     metricsCollector?: MetricsCollector | null;
 }
 
+interface FuzzingCampaignConfig {
+    duration: number;
+    maxIterations: number;
+    programId: PublicKey;
+}
+
+interface CampaignResult {
+    coverage: number;
+    uniqueCrashes: number;
+    executionsPerSecond: number;
+}
+
 
 export class Fuzzer {
     private config: FuzzingConfig;
@@ -96,6 +108,20 @@ export class Fuzzer {
         return results;
     }
 
+    public generateFuzzInputs(programId: PublicKey): FuzzInput[] {
+        const inputs: FuzzInput[] = [];
+        for (let i = 0; i < 1000; i++) {
+            inputs.push({
+                instruction: Math.floor(Math.random() * 256),
+                data: Buffer.alloc(Math.floor(Math.random() * 1000)),
+                probability: Math.random(),
+                metadata: {},
+                created: Date.now()
+            });
+        }
+        return inputs;
+    }
+
     private generateFuzzedInputs(input: FuzzInput): FuzzInput[] {
         const fuzzedInputs: FuzzInput[] = [];
 
@@ -114,14 +140,12 @@ export class Fuzzer {
     }
 
     private mutateData(data: Buffer): Buffer {
-        const mutatedData = Buffer.alloc(data.length);
-        data.copy(mutatedData);
+        const mutatedData = Buffer.from(data); // Create a copy
 
-        for (let i = 0; i < data.length; i++) {
-            if (Math.random() < this.config.mutationRate) {
-                mutatedData[i] = Math.floor(Math.random() * 256);
-            }
-        }
+        // Ensure at least one byte is mutated
+        const mutationIndex = Math.floor(Math.random() * data.length);
+        mutatedData[mutationIndex] = Math.floor(Math.random() * 256);
+
 
         return mutatedData;
     }
@@ -221,10 +245,32 @@ export class Fuzzer {
 
     public async analyzeFuzzResult(error: any, input: FuzzInput): Promise<FuzzResult> {
         // Implement fuzz result analysis logic
-        if (error === 'overflow') {
+        if (error && error.message && error.message.includes('overflow')) { // Check for overflow in error message
             return { type: VulnerabilityType.ArithmeticOverflow, confidence: 0.9, details: 'overflow error' };
         }
         return { type: VulnerabilityType.None, confidence: 0.1, details: '' };
+    }
+
+    public async startFuzzingCampaign(config: FuzzingCampaignConfig): Promise<CampaignResult> {
+        // Placeholder implementation
+        return {
+            coverage: Math.random(),
+            uniqueCrashes: Math.floor(Math.random() * 10),
+            executionsPerSecond: Math.random() * 1000
+        };
+    }
+
+    public async fuzzWithAnomalyDetection(programId: PublicKey, anomalyDetectionModel: AnomalyDetectionModel): Promise<void> {
+        // Placeholder implementation
+        this.logger.info('Fuzzing with anomaly detection...');
+        const inputs = this.generateFuzzInputs(programId);
+        for (const input of inputs) {
+            try {
+                await this.executeFuzzedInput(input);
+            } catch (error) {
+                await this.analyzeFuzzResult(error, input);
+            }
+        }
     }
 }
 
