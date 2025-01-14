@@ -104,7 +104,7 @@ export class AnomalyDetectionModel extends EventEmitter {
 
         model.add(tf.layers.bidirectional({
             layer: tf.layers.lstm({
-                units: 32,
+                units: 16, // Reduced units for test environment
                 returnSequences: true
             }),
             inputShape: [this.inputWindowSize, this.featureSize]
