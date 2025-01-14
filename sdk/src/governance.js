@@ -170,8 +170,7 @@ export class GovernanceManager {
         
         return totalBalance;
     }
-    };
-
+    
     async executeProposal(connection, wallet, proposalAddress) {
         const account = await connection.getAccountInfo(proposalAddress);
         if (!account) {
