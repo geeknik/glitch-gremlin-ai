@@ -1,8 +1,8 @@
 {
     "compilerOptions": {
         "target": "ES2020",
-        "module": "NodeNext",
-        "moduleResolution": "NodeNext",
+        "module": "CommonJS",
+        "moduleResolution": "node",
         "strict": true,
         "esModuleInterop": true,
         "skipLibCheck": true,
@@ -14,7 +14,8 @@
         "sourceMap": true,
         "types": ["jest", "node"],
         "paths": {
-            "@/*": ["./src/*"]
+            "@/*": ["./src/*"],
+            "@glitch-gremlin/sdk": ["../sdk/src"]
         },
         "baseUrl": ".",
         "allowJs": true,
@@ -24,6 +25,6 @@
         "experimentalDecorators": true,
         "emitDecoratorMetadata": true
     },
-    "include": ["src/**/*"],
+    "include": ["src/**/*", "__tests__/**/*"],
     "exclude": ["node_modules", "dist"]
 }
