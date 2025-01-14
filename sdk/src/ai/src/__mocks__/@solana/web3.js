@@ -20,13 +20,21 @@ toBytes() {
 }
 }
 
-class Transaction {
-constructor(options = {}) {
-    this.signatures = [];
-    this.instructions = [];
-    this.recentBlockhash = options.recentBlockhash || 'mock-blockhash';
-    this.feePayer = options.feePayer;
+class TransactionInstruction {
+    constructor(config) {
+        this.keys = config.keys || [];
+        this.programId = config.programId;
+        this.data = config.data || Buffer.from([]);
+    }
 }
+
+class Transaction {
+    constructor(options = {}) {
+        this.signatures = [];
+        this.instructions = [];
+        this.recentBlockhash = options.recentBlockhash || 'mock-blockhash';
+        this.feePayer = options.feePayer;
+    }
 
 add(...instructions) {
     this.instructions.push(...instructions);
@@ -81,10 +89,11 @@ async getRecentBlockhash() {
 }
 
 module.exports = {
-PublicKey,
-Transaction,
-Connection,
-SystemProgram: {
+    PublicKey,
+    Transaction,
+    TransactionInstruction,
+    Connection,
+    SystemProgram: {
     programId: new PublicKey('11111111111111111111111111111111'),
     createAccount: () => ({
     programId: new PublicKey('11111111111111111111111111111111'),
