@@ -272,7 +272,6 @@ export class AnomalyDetectionModel extends EventEmitter {
                 throw new Error('Invalid input data');
             }
 
-        try {
             // Check heap before processing
             if (global.gc) {
                 try {
@@ -294,48 +293,46 @@ export class AnomalyDetectionModel extends EventEmitter {
             const normalizedWindows = await this.normalizeData(windows);
             this.logger.info('Normalization completed successfully.');
 
-            try {
-                // Wrap tensor operations in tf.tidy for automatic cleanup
-                this.logger.info('Starting prediction...');
-                let isAnomaly: tf.Tensor;
-                let confidence: tf.Tensor;
+            // Wrap tensor operations in tf.tidy for automatic cleanup
+            this.logger.info('Starting prediction...');
+            let isAnomaly: tf.Tensor;
+            let confidence: tf.Tensor;
+                
+            const result = tf.tidy(() => {
+                const predictions = this.model!.predict(normalizedWindows) as tf.Tensor;
+                if (!predictions || !predictions.shape || predictions.shape.length < 1) {
+                    throw new Error('Invalid prediction tensor');
+                }
+
+                // Ensure shapes match before operations
+                const reshapedPredictions = predictions.reshape([normalizedWindows.shape[0], normalizedWindows.shape[1], normalizedWindows.shape[2]]);
                     
-                const result = tf.tidy(() => {
-                    const predictions = this.model!.predict(normalizedWindows) as tf.Tensor;
-                    if (!predictions || !predictions.shape || predictions.shape.length < 1) {
-                        throw new Error('Invalid prediction tensor');
-                    }
+                const anomalyScores = reshapedPredictions.sub(normalizedWindows).abs().mean(2);
+                isAnomaly = anomalyScores.greater(tf.scalar(0.5));
+                confidence = anomalyScores.sigmoid();
 
-                    // Ensure shapes match before operations
-                    const reshapedPredictions = predictions.reshape([normalizedWindows.shape[0], normalizedWindows.shape[1], normalizedWindows.shape[2]]);
-                        
-                    const anomalyScores = reshapedPredictions.sub(normalizedWindows).abs().mean(2);
-                    isAnomaly = anomalyScores.greater(tf.scalar(0.5));
-                    confidence = anomalyScores.sigmoid();
+                const details = this.extractDetails(anomalyScores, normalizedWindows);
+                    
+                return {
+                    isAnomaly: isAnomaly.dataSync()[0] > 0,
+                    confidence: confidence.dataSync()[0],
+                    details
+                };
+            });
+            this.logger.info('Prediction completed successfully.');
 
-                    const details = this.extractDetails(anomalyScores, normalizedWindows);
-                        
-                    return {
-                        isAnomaly: isAnomaly.dataSync()[0] > 0,
-                        confidence: confidence.dataSync()[0],
-                        details
-                    };
-                });
-                this.logger.info('Prediction completed successfully.');
-
-                // Clean up tensors
-                tf.dispose([predictions, anomalyScores, isAnomaly, confidence]);
-                return result;
-            } finally {
-                // Ensure cleanup of input tensors
-                tf.dispose([windows, normalizedWindows]);
-                // End tensor scope
-                tf.engine().endScope();
-            }
+            // Clean up tensors
+            tf.dispose([predictions, anomalyScores, isAnomaly, confidence]);
+            return result;
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             this.logger.error(`Detection failed: ${errorMessage}`);
             throw error;
+        } finally {
+            // Ensure cleanup of input tensors
+            tf.dispose([windows, normalizedWindows]);
+            // End tensor scope
+            tf.engine().endScope();
         }
     }
 
