@@ -44,9 +44,6 @@ export class AnomalyDetectionModel extends EventEmitter {
             const prediction = this.model.predict(normalized) as tf.Tensor;
             const score = prediction.dataSync()[0];
             
-            // Clean up tensors
-            tf.dispose([tensor, normalized, prediction]);
-            
             return score;
         } catch (error) {
             this.logger.error(`Prediction failed: ${error}`);
@@ -56,7 +53,7 @@ export class AnomalyDetectionModel extends EventEmitter {
     private model: tf.LayersModel | null = null;
     private logger: Logger;
     private initialized: boolean = false;
-    private readonly inputWindowSize = 100;
+    private readonly inputWindowSize = 50;
     private readonly outputWindowSize = 1;
     private readonly featureSize = 4;
     private normalizedStats: {
@@ -73,6 +70,15 @@ export class AnomalyDetectionModel extends EventEmitter {
         if (this.initialized) {
             await this.cleanup();
             this.initialized = false;
+        }
+
+        // Check memory status before initialization
+        const memoryInfo = tf.memory();
+        this.logger.info(`Memory before init: numTensors=${memoryInfo.numTensors}, numDataBuffers=${memoryInfo.numDataBuffers}`);
+        
+        if (memoryInfo.numTensors > 1000) {
+            this.logger.warn('High number of tensors detected, running garbage collection');
+            tf.dispose();
         }
 
         try {
@@ -96,7 +102,7 @@ export class AnomalyDetectionModel extends EventEmitter {
 
         model.add(tf.layers.bidirectional({
             layer: tf.layers.lstm({
-                units: 64,
+                units: 32,
                 returnSequences: true
             }),
             inputShape: [this.inputWindowSize, this.featureSize]
@@ -134,23 +140,44 @@ export class AnomalyDetectionModel extends EventEmitter {
     }
 
     private async normalizeData(data: tf.Tensor): Promise<tf.Tensor> {
-        return tf.tidy(() => {
-            // Ensure we have valid stats for normalization
-            if (!this.normalizedStats.mean || !this.normalizedStats.std) {
-                const moments = tf.moments(data);
-                this.normalizedStats.mean = moments.mean;
-                this.normalizedStats.std = moments.variance.sqrt();
-                moments.dispose();
-            }
+        try {
+            this.logger.info(`Memory before normalization: ${JSON.stringify(tf.memory())}`);
+            return tf.tidy(() => {
+                // Ensure we have valid stats for normalization
+                if (!this.normalizedStats.mean || !this.normalizedStats.std) {
+                    const moments = tf.moments(data, 0);
+                    this.normalizedStats.mean = moments.mean;
+                    this.normalizedStats.std = moments.variance.sqrt();
+                    // Dispose variance tensor after sqrt
+                    moments.variance.dispose();
+                }
 
-            // Add small epsilon to avoid division by zero
-            const epsilon = tf.scalar(1e-8);
-            
-            // Normalize the data
-            return data
-                .sub(this.normalizedStats.mean)
-                .div(this.normalizedStats.std.add(epsilon));
-        });
+                // Add small epsilon to avoid division by zero
+                const epsilon = tf.scalar(1e-8);
+
+                // Validate tensor shape
+                if (!data || !data.shape || data.shape.length < 1) {
+                    throw new Error('Invalid tensor shape for normalization');
+                }
+
+                // Normalize the data with error checking
+                // Ensure tensors are valid before operations
+                if (!this.normalizedStats.mean || !this.normalizedStats.std) {
+                    throw new Error('Normalization stats not initialized');
+                }
+
+                // Normalize the data with error checking
+                const normalizedData = tf.tidy(() => {
+                    const centered = data.sub(this.normalizedStats.mean!);
+                    const scaleFactor = this.normalizedStats.std!.add(epsilon);
+                    return centered.div(scaleFactor);
+                });
+                return normalizedData;
+            });
+        } catch (error) {
+            this.logger.error(`Normalization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            throw error;
+        }
     }
 
     private createWindows(data: TimeSeriesMetrics[]): tf.Tensor3D {
@@ -218,6 +245,9 @@ export class AnomalyDetectionModel extends EventEmitter {
 
 
     public async detect(data: TimeSeriesMetrics[]): Promise<AnomalyDetectionResult> {
+        // Start scope for tensor management
+        tf.engine().startScope();
+        
         if (!this.model) {
             throw new Error('Model not trained');
         }
@@ -244,11 +274,21 @@ export class AnomalyDetectionModel extends EventEmitter {
             const normalizedWindows = await this.normalizeData(windows);
             
             try {
-                const predictions = this.model.predict(normalizedWindows) as tf.Tensor;
-                const anomalyScores = predictions.sub(normalizedWindows).abs().mean(2);
-                const isAnomaly = anomalyScores.greater(tf.scalar(0.5));
-                const confidence = anomalyScores.sigmoid();
-                const details = this.extractDetails(anomalyScores, normalizedWindows);
+                // Wrap tensor operations in tf.tidy for automatic cleanup
+                const [predictions, scores, results] = tf.tidy(() => {
+                    const predictions = this.model!.predict(normalizedWindows) as tf.Tensor;
+                    if (!predictions || !predictions.shape || predictions.shape.length < 1) {
+                        throw new Error('Invalid prediction tensor');
+                    }
+
+                    const anomalyScores = predictions.sub(normalizedWindows).abs().mean(2);
+                    const isAnomaly = anomalyScores.greater(tf.scalar(0.5));
+                    const confidence = anomalyScores.sigmoid();
+
+                    return [predictions, anomalyScores, { isAnomaly, confidence }];
+                });
+
+                const details = this.extractDetails(scores, normalizedWindows);
 
                 const result = {
                     isAnomaly: isAnomaly.dataSync()[0] > 0,
@@ -262,6 +302,8 @@ export class AnomalyDetectionModel extends EventEmitter {
             } finally {
                 // Ensure cleanup of input tensors
                 tf.dispose([windows, normalizedWindows]);
+                // End tensor scope
+                tf.engine().endScope();
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
