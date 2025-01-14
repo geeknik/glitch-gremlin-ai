@@ -47,11 +47,13 @@
   - [ ] Prepare educational content
   - [ ] Plan initial chaos campaigns
 
-- [x] Core Platform Features
-  - [x] Finalize AI engine MVP
+- [ ] Core Platform Features
+  - [ ] Finalize AI engine MVP
     - [x] Basic fuzz testing
     - [x] Load testing implementation
-    - [x] Simple exploit detection
+    - [ ] Simple exploit detection
+    - [ ] Exploit database integration
+    - [ ] ML model for novel attacks
   - [x] Complete governance module
     - [x] Staking mechanism
     - [x] Proposal creation/voting

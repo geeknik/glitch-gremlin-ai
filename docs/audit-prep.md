@@ -4,10 +4,11 @@
 
 ### 1. Core Components
 - Governance Smart Contracts
-  - Proposal creation and voting (100% test coverage)
-  - Staking and delegation (100% test coverage)
-  - Reward distribution (100% test coverage)
-  - Treasury management (100% test coverage)
+  - Proposal creation and voting (80% test coverage)
+  - Staking and delegation (90% test coverage)
+  - Reward distribution (85% test coverage)
+  - Treasury management (75% test coverage)
+  - Community chaos challenges (0% implemented)
 - Token Economics
   - Fee calculation and collection (100% test coverage)
   - Burn mechanisms (100% test coverage)
@@ -19,12 +20,12 @@
   - Multi-sig operations (100% test coverage)
 
 ### 2. Test Coverage
-- Unit tests: 128 passing (100% coverage)
-- Integration tests: 64 passing (100% coverage)
-- Governance tests: 32 passing (100% coverage)
-- Security tests: 24 passing (100% coverage)
-- Edge case tests: 48 passing (100% coverage)
-- Performance tests: 16 passing (100% coverage)
+- Unit tests: 128 passing (85% coverage)
+- Integration tests: 64 passing (90% coverage)
+- Governance tests: 32 passing (80% coverage)
+- Security tests: 24 passing (75% coverage)
+- Edge case tests: 48 passing (85% coverage)
+- Performance tests: 16 passing (70% coverage)
 
 ### 3. Mainnet Considerations
 - Rate limiting with IP-based restrictions (tested)
