@@ -1,11 +1,11 @@
 import { PublicKey } from '@solana/web3.js';
-import { VulnerabilityType } from './types.js';
-import { Logger } from '../../utils/logger.js';
-import { ValidationResult } from '../../utils/validation.js';
+import { VulnerabilityType } from './types';
+import { Logger } from '../../utils/logger';
+import { ValidationResult } from '../../utils/validation';
 import { TensorShape } from '@tensorflow/tfjs-core';
 import { createHash } from 'crypto';
 
-export class ValidationError extends Error {
+export class ValidationError extends Error
     constructor(message: string) {
         super(message);
         this.name = 'ValidationError';
@@ -37,11 +37,12 @@ interface FuzzConfig {
     maxIterations?: number;
     timeoutMs?: number; 
     memoryLimitMb?: number;
-    strategies?: string[];
+    strategies?: Strategy[];
     cleanup?: boolean;
     validateShapes?: boolean;
     collectMetrics?: boolean;
-}
+    targetCoverage?: number;
+    };
 
 interface FuzzResult {
     type: VulnerabilityType | null;
@@ -69,82 +70,78 @@ interface AnomalyDetectionModel {
     validateInput(input: Buffer): ValidationResult; 
     getInputShape(): TensorShape;
 }
+// Campaign state interface
+interface CampaignState {
+    id: string;
+    startTime: Date;
+    endTime?: Date;
+    status: 'running' | 'completed' | 'failed' | 'paused';
+    currentIteration: number;
+    totalIterations: number;
+    crashes: Set<string>;
+    coverage: {
+        current: number;
+        target: number;
+    };
+    resourceUsage: {
+        peakMemory: number;
+        averageMemory: number;
+        memoryReadings: number[];
+    };
+    anomalies: Array<{
+        type: string;
+        timestamp: Date;
+        details: string;
+    }>;
+}
 
 export class Fuzzer {
-    private readonly metrics: FuzzMetrics = {
-        executionTime: 0,
-        memoryUsage: 0,
-        successfulMutations: 0,
-        failedMutations: 0,
-        uniqueCrashes: 0,
-        coverage: 0
-    };
-
-    private readonly SUPPORTED_STRATEGIES = [
+    // Static class constants
+    private static readonly MAX_UINT64 = BigInt('18446744073709551615');
+    private static readonly SUPPORTED_STRATEGIES: ReadonlyArray<Strategy> = [
         'bitflip',
         'arithmetic', 
         'havoc',
-        'dictionary'
-    ] as const;
-
-    private readonly DEFAULT_CONFIG: Required<FuzzConfig> = {
-        maxIterations: 2000,
-        timeoutMs: 30000,
-        memoryLimitMb: 1024,
-        strategies: ['bitflip', 'arithmetic', 'havoc'],
-        cleanup: true,
-        validateShapes: true,
-        collectMetrics: true
-    };
-
-    private readonly MAX_UINT64 = BigInt('18446744073709551615');
-
-    private readonly DICTIONARY = [
-        Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]),
-        Buffer.from([0x00, 0x00, 0x00, 0x00]), 
-        Buffer.from([0x7F, 0xFF, 0xFF, 0xFF]),
-        Buffer.from([0x80, 0x00, 0x00, 0x00]),
-        Buffer.from([0x00, 0x00, 0x00, 0x01])
+        'dictionary',
+        'genetic'
     ];
 
-    private readonly MAX_UINT64 = BigInt('18446744073709551615');
-    private readonly metrics: FuzzMetrics = {
-        executionTime: 0,
-        memoryUsage: 0,
-        successfulMutations: 0,
-        failedMutations: 0,
-        uniqueCrashes: 0,
-        coverage: 0
-    };
-
-    private readonly SUPPORTED_STRATEGIES = [
-        'bitflip',
-        'arithmetic',
-        'havoc',
-        'dictionary'  
-    ] as const;
-
-    private readonly DEFAULT_CONFIG: Required<FuzzConfig> = {
+    private static readonly DEFAULT_CONFIG: Required<FuzzConfig> = {
         maxIterations: 2000,
         timeoutMs: 30000,
         memoryLimitMb: 1024,
         strategies: ['bitflip', 'arithmetic', 'havoc'],
         cleanup: true,
         validateShapes: true,
-        collectMetrics: true
+        collectMetrics: true,
+        targetCoverage: 80
     };
 
-    private port: number;
-    private metricsCollector: any;
-    private maxIterations: number = 2000;
-    private cleanupHandlers: Array<() => Promise<void>> = [];
-    private logger: Logger;
-    private cache: FuzzCache = {
-        inputs: new Map(),
-        results: new Map(),
-        crashes: new Set()
+    // Instance properties
+    private readonly port: number;
+    private readonly metricsCollector: any;
+    private readonly logger: Logger;
+    private readonly coverage: Set<string>;
+    private readonly interestingInputs: Set<string>;
+    private readonly cache: {
+        inputs: Map<string, FuzzInput>;
+        results: Map<string, FuzzResult>;
+        crashes: Set<string>;
     };
+
+    private maxIterations: number;
+    private cleanupHandlers: Array<() => Promise<void>>;
+    private metrics: FuzzMetrics;
+    private resourceTracker: {
+        activeOperations: number;
+        memoryUsage: number;
+        startTime: number;
+    };
+    private campaignState: CampaignState;
     private progressCallback?: (progress: CampaignProgress) => void;
+    private campaignState: CampaignState;
+    private readonly coverage: Set<string>;
+    private readonly interestingInputs: Set<string>;
 
     constructor(config: { 
         port: number; 
@@ -167,6 +164,26 @@ export class Fuzzer {
             failedMutations: 0,
             uniqueCrashes: 0,
             coverage: 0
+        };
+        this.coverage = new Set();
+        this.interestingInputs = new Set();
+        this.campaignState = {
+            id: '',
+            startTime: new Date(),
+            status: 'running',
+            currentIteration: 0,
+            totalIterations: 0,
+            crashes: new Set(),
+            coverage: {
+                current: 0,
+                target: 80
+            },
+            resourceUsage: {
+                peakMemory: 0,
+                averageMemory: 0,
+                memoryReadings: []
+            },
+            anomalies: []
         };
     }
 
@@ -311,24 +328,49 @@ export class Fuzzer {
             }
         });
     }
-        // Input validation
-        if (!programId) {
-            throw new ValidationError('Program ID is required');
+        async generateBaseInput(): Promise<FuzzInput> {
+            return this.withErrorHandling('generateBaseInput', async () => {
+                const instructionGenerators = [
+                    () => Math.floor(Math.random() * 256),
+                    () => 0xFF,
+                    () => 0x00,
+                    () => 0xF0,
+                    () => {
+                        // Generate based on previous crashes
+                        if (this.cache.crashes.size > 0) {
+                            const crashedInputs = Array.from(this.cache.crashes);
+                            const selected = crashedInputs[Math.floor(Math.random() * crashedInputs.length)];
+                            const input = this.cache.inputs.get(selected);
+                            return input ? input.instruction : Math.floor(Math.random() * 256);
+                        }
+                        return Math.floor(Math.random() * 256);
+                    }
+                ];
+
+                const dataGenerators = [
+                    () => Buffer.alloc(32),
+                    () => Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]),
+                    () => Buffer.from([0x00, 0x00, 0x00, 0x00]),
+                    () => {
+                        const size = Math.floor(Math.random() * 1024) + 1;
+                        return Buffer.alloc(size).map(() => Math.floor(Math.random() * 256));
+                    }
+                ];
+
+                const instruction = instructionGenerators[Math.floor(Math.random() * instructionGenerators.length)]();
+                const data = dataGenerators[Math.floor(Math.random() * dataGenerators.length)]();
+
+                return {
+                    instruction,
+                    data,
+                    created: new Date(),
+                    metadata: {
+                        generator: 'base',
+                        iteration: this.metrics.successfulMutations + this.metrics.failedMutations
+                    }
+                };
+            });
         }
-        
-        const finalConfig: FuzzConfig = {
-            maxIterations: config?.maxIterations ?? this.maxIterations,
-            timeoutMs: config?.timeoutMs ?? 30000,
-            memoryLimitMb: config?.memoryLimitMb ?? 1024,
-            strategies: config?.strategies ?? ['bitflip', 'arithmetic', 'havoc'],
-            cleanup: config?.cleanup ?? true,
-            validateShapes: config?.validateShapes ?? true,
-            collectMetrics: config?.collectMetrics ?? true
-        };
-        
-        try {
-            const inputs: FuzzInput[] = [];
-            const startTime = Date.now();
             
             // Memory monitoring
             if (process.memoryUsage().heapUsed > finalConfig.memoryLimitMb * 1024 * 1024) {
@@ -565,6 +607,60 @@ export class Fuzzer {
     }
 
     async startFuzzingCampaign(config: FuzzingCampaignConfig): Promise<CampaignResult> {
+        return await this.withErrorHandling('startFuzzingCampaign', async () => {
+            const startTime = Date.now();
+            let executions = 0;
+            let crashes = 0;
+
+            try {
+                const iterations = Math.min(
+                    config.maxIterations ?? this.maxIterations,
+                    Fuzzer.DEFAULT_CONFIG.maxIterations
+                );
+
+                for (let i = 0; i < iterations; i++) {
+                    this.checkResourceLimits();
+                    
+                    await this.withResourceTracking('fuzzIteration', async () => {
+                        executions++;
+                        
+                        const result = await this.fuzzWithStrategy(
+                            config.strategies?.[0] ?? 'havoc',
+                            config.programId
+                        );
+
+                        if (result.type !== null) {
+                            crashes++;
+                            await this.reportCrash(result);
+                        }
+
+                        if (i % 10 === 0) {
+                            await this.reportProgress({
+                                currentIteration: i,
+                                totalIterations: iterations,
+                                uniqueCrashes: crashes,
+                                coverage: (executions / iterations) * 100,
+                                elapsedTime: (Date.now() - startTime) / 1000
+                            });
+                        }
+                    });
+                }
+
+                const duration = (Date.now() - startTime) / 1000;
+                this.metrics.executionTime = duration;
+
+                return {
+                    coverage: (executions / iterations) * 100,
+                    uniqueCrashes: crashes,
+                    executionsPerSecond: executions / duration
+                };
+            } finally {
+                await this.cleanup();
+            }
+        });
+    }
+
+    async generateEdgeCases(): Promise<Array<{type: string, value: Buffer}>> {
         const startTime = Date.now();
         let crashes = 0;
         let executions = 0;
@@ -602,7 +698,57 @@ export class Fuzzer {
         }
     }
 
-    private async analyzeVulnerabilities(input: FuzzInput): Promise<Array<{
+    private async analyzeVulnerabilities(input: MutationResult): Promise<Array<{
+        type: VulnerabilityType;
+        confidence: number;
+        details?: string;
+    }>> {
+        return this.withErrorHandling('analyzeVulnerabilities', async () => {
+            if (!input.success || !input.mutated) {
+                return [];
+            }
+
+            const vulnerabilities: Array<{
+                type: VulnerabilityType;
+                confidence: number;
+                details?: string;
+            }> = [];
+
+            // Check for resource exhaustion
+            if (input.mutated.data.length > 1000) {
+                vulnerabilities.push({
+                    type: VulnerabilityType.ResourceExhaustion,
+                    confidence: 0.8,
+                    details: `Large input size detected: ${input.mutated.data.length} bytes`
+                });
+            }
+
+            // Check for arithmetic overflow
+            if (input.mutated.data.length >= 8) {
+                for (let i = 0; i <= input.mutated.data.length - 8; i++) {
+                    const value = input.mutated.data.readBigUInt64LE(i);
+                    if (value === Fuzzer.MAX_UINT64) {
+                        vulnerabilities.push({
+                            type: VulnerabilityType.ArithmeticOverflow,
+                            confidence: 0.9,
+                            details: `Potential integer overflow at offset ${i}`
+                        });
+                    }
+                }
+            }
+
+            // Check for access control issues
+            if (input.mutated.instruction > 0xF0) {
+                vulnerabilities.push({
+                    type: VulnerabilityType.AccessControl,
+                    confidence: 0.7,
+                    details: `Privileged instruction detected: 0x${input.mutated.instruction.toString(16)}`
+                });
+            }
+
+            return vulnerabilities;
+        });
+    }
         type: VulnerabilityType;
         confidence: number;
         details?: string;
@@ -651,7 +797,66 @@ export class Fuzzer {
         return vulnerabilities;
     }
 
-    async analyzeFuzzResult(result: { error?: string }, input: FuzzInput): Promise<{
+    async analyzeFuzzResult(result: { error?: string }, input: FuzzInput): Promise<FuzzResult> {
+        return this.withErrorHandling('analyzeFuzzResult', async () => {
+            // Check for runtime errors
+            if (result.error) {
+                if (result.error.includes('overflow')) {
+                    return {
+                        type: VulnerabilityType.ArithmeticOverflow,
+                        confidence: 0.95,
+                        details: `Runtime overflow detected: ${result.error}`
+                    };
+                }
+                if (result.error.includes('unauthorized')) {
+                    return {
+                        type: VulnerabilityType.AccessControl,
+                        confidence: 0.9,
+                        details: `Access control violation: ${result.error}`
+                    };
+                }
+                if (result.error.includes('out of memory') || result.error.includes('timeout')) {
+                    return {
+                        type: VulnerabilityType.ResourceExhaustion,
+                        confidence: 0.85,
+                        details: `Resource exhaustion detected: ${result.error}`
+                    };
+                }
+            }
+
+            // Analyze input for potential vulnerabilities
+            const mutationResult: MutationResult = {
+                success: true,
+                mutated: input
+            };
+            const vulnerabilities = await this.analyzeVulnerabilities(mutationResult);
+
+            if (vulnerabilities.length > 0) {
+                // Return the highest confidence vulnerability
+                const highest = vulnerabilities.reduce((prev, current) =>
+                    current.confidence > prev.confidence ? current : prev
+                );
+
+                await this.cacheResult(input, {
+                    type: highest.type,
+                    confidence: highest.confidence,
+                    details: highest.details
+                });
+
+                return {
+                    type: highest.type,
+                    confidence: highest.confidence,
+                    details: highest.details
+                };
+            }
+
+            return {
+                type: null,
+                confidence: 0.1,
+                details: 'No vulnerabilities detected'
+            };
+        });
+    }
         type: VulnerabilityType | null;
         confidence: number;
         details?: string;
