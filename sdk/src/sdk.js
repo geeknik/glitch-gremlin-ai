@@ -78,8 +78,8 @@ export class GlitchSDK {
             host: redisConfig.host,
             port: redisConfig.port
         } : undefined);
-        // Verify connection
-        await this.connection.getVersion();
+        // Verify connection by getting recent blockhash
+        await this.connection.getRecentBlockhash();
         this.initialized = true;
     }
     async checkRateLimit() {
