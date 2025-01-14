@@ -1,4 +1,5 @@
-import { Connection, PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js';
+import { Connection, PublicKey, Transaction } from '@solana/web3.js';
+import { TransactionInstruction } from '@solana/web3.js';
 import { TokenEconomics } from './token-economics';
 import { TestType } from './types';
 import { GovernanceManager } from './governance';
