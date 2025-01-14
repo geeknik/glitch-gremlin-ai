@@ -27,7 +27,28 @@ This security policy applies to:
 - The Glitch Gremlin AI CLI tools
 - The Glitch Gremlin AI off-chain services
 
-## Security Best Practices
+## Security Testing Best Practices
+
+### 1. Test Coverage
+- 100% coverage of all privileged operations
+- Comprehensive edge case testing
+- Fuzz testing for all public methods
+- Property-based testing for core logic
+- Mutation testing to verify test effectiveness
+
+### 2. Testing Methodology
+- Use deterministic tests for core functionality
+- Implement property-based testing for invariants
+- Run fuzz tests with maximum coverage
+- Perform mutation testing to verify test quality
+- Include integration tests with real-world scenarios
+
+### 3. Continuous Testing
+- Run security tests in CI/CD pipeline
+- Perform nightly fuzz testing
+- Weekly mutation testing runs
+- Monthly security audit simulations
+- Quarterly penetration testing
 
 ### Deployment Security
 - Use multisig for all privileged operations
