@@ -12,28 +12,6 @@ export interface VulnerabilityOutput extends ModelOutput {
 
 import { VulnerabilityType } from '../types';
 
-export class VulnerabilityDetectionModel extends MLModel {
-    constructor() {
-        super();
-    }
-    
-    async predict(features: number[]): Promise<VulnerabilityOutput> {
-        const baseOutput = await super.predict(features);
-        const vulnerabilityIndex = baseOutput.prediction.indexOf(Math.max(...baseOutput.prediction));
-        
-        return {
-            prediction: baseOutput.prediction,
-            type: this.mapIndexToVulnerabilityType(vulnerabilityIndex),
-            confidence: baseOutput.confidence
-        };
-    }
-    
-    private mapIndexToVulnerabilityType(index: number): VulnerabilityType {
-        const types = Object.values(VulnerabilityType);
-        return types[index] || VulnerabilityType.None;
-    }
-}
-
 export class MLModel {
     protected model: tf.LayersModel;
     protected isInitialized: boolean = false;
