@@ -2,7 +2,6 @@ import * as tf from '@tensorflow/tfjs-node';
 import {
     FuzzInput,
     FuzzResult,
-    AnomalyDetectionModel,
     VulnerabilityType,
     ValidationResult,
     SecurityMetrics,
@@ -16,6 +15,7 @@ import {
     SecurityScore,
     FuzzingResult,
 } from './types';
+import { AnomalyDetectionModel } from './anomaly-detection';
 import { TensorShape } from '@tensorflow/tfjs-core';
 import { Logger } from '../../utils/logger';
 import { PublicKey, Transaction, sendAndConfirmTransaction, TransactionInstruction, Connection } from '@solana/web3.js';
@@ -67,9 +67,11 @@ export class Fuzzer {
         this.programId = programId;
         this.connection = connection; // Initialize connection
         this.logger.info(`Initializing fuzzer for program ${programId.toBase58()}`);
+        this.logger.debug(`AnomalyDetectionModel: ${AnomalyDetectionModel}`);
 
         // Initialize anomaly detection model
         this.anomalyDetectionModel = new AnomalyDetectionModel();
+        this.logger.debug(`AnomalyDetectionModel instance: ${this.anomalyDetectionModel}`);
         await this.anomalyDetectionModel.initialize();
 
         // Initialize resource manager and metrics collector
