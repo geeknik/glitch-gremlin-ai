@@ -1,5 +1,5 @@
 export default {
-  testMatch: ['**/security/**/*.test.ts'],
+  testMatch: ['<rootDir>/tests/security/**/*.test.ts'],
   setupFilesAfterEnv: ['./jest.setup.js'],
   testEnvironment: 'node',
   verbose: true,

@@ -1,5 +1,5 @@
 export default {
-  testMatch: ['**/fuzz/**/*.test.ts'],
+  testMatch: ['<rootDir>/tests/fuzz/**/*.test.ts'],
   setupFilesAfterEnv: ['./jest.setup.js'],
   testEnvironment: 'node',
   verbose: true,
