@@ -98,6 +98,56 @@ interface VulnerabilityFinding {
    - Results are verified and scored
    - Rewards distributed automatically
 
+## Community Chaos Challenges
+
+### Challenge Structure
+```typescript
+interface ChaosChallenge {
+  id: string;
+  title: string;
+  description: string;
+  targetProgram: string;
+  testType: TestType;
+  duration: number;
+  intensity: number;
+  budget: number;
+  creator: string;
+  status: 'pending' | 'active' | 'completed';
+  startTime: number;
+  endTime: number;
+  participants: string[];
+  results: ChaosChallengeResult[];
+}
+
+interface ChaosChallengeResult {
+  participant: string;
+  score: number;
+  findings: VulnerabilityFinding[];
+  rewards: number;
+}
+
+interface VulnerabilityFinding {
+  type: VulnerabilityType;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  description: string;
+  location: string;
+}
+```
+
+### Challenge Lifecycle
+1. Proposal Creation
+   - Minimum stake: 5000 GREMLINAI
+   - Must specify target program and test parameters
+   - Budget must be crowdfunded within 7 days
+2. Voting Period
+   - Duration: 3 days
+   - Quorum: 15% of circulating supply
+3. Execution
+   - Challenge runs for specified duration
+   - Participants submit findings
+   - Results are verified and scored
+   - Rewards distributed automatically
+
 ## Governance Lifecycle
 
 ### 1. Proposal Creation

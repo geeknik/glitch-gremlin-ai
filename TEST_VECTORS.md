@@ -42,6 +42,16 @@
 - Challenge expiration handling
 - Invalid result submissions
 
+### 3.3 Community Chaos Challenges
+- Valid challenge creation
+- Crowdfunding success/failure
+- Challenge execution flow
+- Results submission and verification
+- Reward distribution
+- Leaderboard updates
+- Challenge expiration handling
+- Invalid result submissions
+
 ### 3.1 Valid Governance Operations
 - Proposal creation with sufficient stake
 - Voting with valid tokens
