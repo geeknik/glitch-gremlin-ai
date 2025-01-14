@@ -45,4 +45,6 @@ describe('RedisQueueWorker', () => {
         const retrieved = await worker.getResult(requestId);
         expect(retrieved).toEqual(result);
     });
-});
+    it('should expire results after TTL', async () => {
+        jest.useFakeTimers();
+        const requestId =

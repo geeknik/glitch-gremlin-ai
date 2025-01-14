@@ -5,11 +5,12 @@ const config = {
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
-    '^@glitch-gremlin/sdk$': '<rootDir>/../sdk/src'
+    '^@glitch-gremlin/sdk$': '<rootDir>/../sdk/src',
+    '^@glitch-gremlin/sdk/(.*)$': '<rootDir>/../sdk/src/$1'
   },
   transform: {
     '^.+\\.(ts|tsx)$': ['ts-jest', {
-      tsconfig: 'tsconfig.json',
+      tsconfig: 'tsconfig.test.json',
       useESM: false
     }],
     '^.+\\.jsx?$': 'babel-jest'
@@ -20,7 +21,7 @@ const config = {
   testEnvironmentOptions: {
     url: "http://localhost"
   },
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js', '<rootDir>/sdk/src/__tests__/setupAfterEnv.ts'],
   globals: {
     'ts-jest': {
       isolatedModules: true
