@@ -30,13 +30,28 @@ export class AnomalyDetectionModel extends EventEmitter {
             throw new Error('Model not initialized');
         }
         
-        const tensor = tf.tensor([Array.from(input)]);
-        const normalized = this.normalizeData(tensor);
-        const prediction = this.model.predict(normalized) as tf.Tensor;
-        const score = prediction.dataSync()[0];
-        
-        tf.dispose([tensor, normalized, prediction]);
-        return score;
+        try {
+            // Convert buffer to float32 array
+            const values = new Float32Array(input);
+            
+            // Create tensor with proper shape
+            const tensor = tf.tensor(values, [1, values.length]);
+            
+            // Normalize data
+            const normalized = await this.normalizeData(tensor);
+            
+            // Make prediction
+            const prediction = this.model.predict(normalized) as tf.Tensor;
+            const score = prediction.dataSync()[0];
+            
+            // Clean up tensors
+            tf.dispose([tensor, normalized, prediction]);
+            
+            return score;
+        } catch (error) {
+            this.logger.error(`Prediction failed: ${error}`);
+            throw error;
+        }
     }
     private model: tf.LayersModel | null = null;
     private logger: Logger;
@@ -118,29 +133,23 @@ export class AnomalyDetectionModel extends EventEmitter {
         return model;
     }
 
-    private async normalizeData(data: tf.Tensor3D): Promise<tf.Tensor3D> {
+    private async normalizeData(data: tf.Tensor): Promise<tf.Tensor> {
         return tf.tidy(() => {
-            const reshapedData = data.reshape([
-                data.shape[0] * data.shape[1],
-                data.shape[2]
-            ]);
-
+            // Ensure we have valid stats for normalization
             if (!this.normalizedStats.mean || !this.normalizedStats.std) {
-                const moments = tf.moments(reshapedData, 0);
-                this.normalizedStats.mean = moments.mean as tf.Tensor1D;
-                this.normalizedStats.std = moments.variance.sqrt() as tf.Tensor1D;
+                const moments = tf.moments(data);
+                this.normalizedStats.mean = moments.mean;
+                this.normalizedStats.std = moments.variance.sqrt();
                 moments.dispose();
             }
 
-            const normalizedData = reshapedData
+            // Add small epsilon to avoid division by zero
+            const epsilon = tf.scalar(1e-8);
+            
+            // Normalize the data
+            return data
                 .sub(this.normalizedStats.mean)
-                .div(this.normalizedStats.std.add(tf.scalar(1e-8)));
-
-            return normalizedData.reshape([
-                data.shape[0],
-                data.shape[1],
-                data.shape[2]
-            ]) as tf.Tensor3D;
+                .div(this.normalizedStats.std.add(epsilon));
         });
     }
 
