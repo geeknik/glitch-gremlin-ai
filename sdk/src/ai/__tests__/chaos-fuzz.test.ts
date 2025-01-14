@@ -1,9 +1,12 @@
+import '@tensorflow/tfjs-node';  // Must be first import
+import * as tf from '@tensorflow/tfjs';  // Import core TensorFlow.js
+
 declare global {
-namespace NodeJS {
-    interface Global {
-    gc?: () => void;
+    namespace NodeJS {
+        interface Global {
+            gc?: () => void;
+        }
     }
-}
 }
 
 import { AnomalyDetectionModel, TimeSeriesMetrics, AnomalyDetectionResult } from '../src/anomaly-detection';
@@ -42,13 +45,30 @@ interface AnomalyDetails {
 }
 import { PublicKey } from '@solana/web3.js';
 import { VulnerabilityType } from '../src/types';
-import * as tf from '@tensorflow/tfjs-node';
 import { generateAnomalousMetrics } from '../src/test-utils/anomaly-test-utils';
 describe('Chaos Fuzzing and Anomaly Detection Tests', () => {
     let anomalyModel: AnomalyDetectionModel;
     let fuzzer: Fuzzer;
     let mockMetrics: TimeSeriesMetrics[];
     const testProgramId = new PublicKey('11111111111111111111111111111111');
+
+    beforeAll(async () => {
+        // Set up Jest fake timers
+        jest.useFakeTimers();
+        // TensorFlow.js Node backend is automatically registered by the import
+    });
+
+    afterAll(async () => {
+        try {
+            // Clean up any tensors
+            tf.disposeVariables();
+        } catch (error) {
+            console.warn('Error during TensorFlow cleanup:', error);
+        }
+        
+        // Restore real timers
+        jest.useRealTimers();
+    });
 
     beforeEach(async () => {
         anomalyModel = new AnomalyDetectionModel();
@@ -58,9 +78,8 @@ describe('Chaos Fuzzing and Anomaly Detection Tests', () => {
     });
 
     afterEach(async () => {
-        await tf.dispose(); // Clean up tensorflow memory
         if (anomalyModel) {
-            await anomalyModel.dispose();
+            await anomalyModel.cleanup();
         }
     });
 

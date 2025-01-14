@@ -1,6 +1,7 @@
-import * as tf from '@tensorflow/tfjs-node';
+import * as tf from '@tensorflow/tfjs';
+import '@tensorflow/tfjs-node';
 import { EventEmitter } from 'events';
-import { Logger } from '@/utils/logger';
+import { Logger } from '../../utils/logger';
 
 export interface TimeSeriesMetrics {
     instructionFrequency: number[];
@@ -20,6 +21,9 @@ export interface AnomalyDetectionResult {
     }[];
 }
 
+const logger = new Logger('anomaly-detection');
+export { logger };
+
 export class AnomalyDetectionModel extends EventEmitter {
     private model: tf.LayersModel | null = null;
     private logger: Logger;
@@ -34,22 +38,24 @@ export class AnomalyDetectionModel extends EventEmitter {
 
     constructor() {
         super();
-        this.logger = new Logger('AnomalyDetection');
+        this.logger = logger;
     }
 
     public async initialize(): Promise<void> {
         if (this.initialized) {
-            throw new Error('Model is already initialized');
+            await this.cleanup();
+            this.initialized = false;
         }
 
         try {
+            await tf.ready();
             this.model = this.buildModel();
             this.initialized = true;
             this.logger.info('Model initialized successfully');
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             this.logger.error(`Initialization failed: ${errorMessage}`);
-            throw new Error(`Initialization failed: ${errorMessage}`);
+            throw error;
         }
     }
 
@@ -198,10 +204,25 @@ export class AnomalyDetectionModel extends EventEmitter {
         }
 
         try {
-            return tf.tidy(() => {
-                const windows = this.createWindows(data);
-                const normalizedWindows = this.normalizeData(windows);
-                const predictions = this.model!.predict(normalizedWindows) as tf.Tensor;
+            // Check heap before processing
+            if (global.gc) {
+                try {
+                    await global.gc();
+                } catch (error) {
+                    if (error instanceof Error && error.message.includes('Heap limit')) {
+                        this.logger.error('Heap limit reached');
+                        throw new Error('Heap limit reached');
+                    }
+                    throw error;
+                }
+            }
+
+            // Create tensors outside tidy to manage their lifecycle
+            const windows = this.createWindows(data);
+            const normalizedWindows = await this.normalizeData(windows);
+            
+            try {
+                const predictions = this.model.predict(normalizedWindows) as tf.Tensor;
                 const anomalyScores = predictions.sub(normalizedWindows).abs().mean(2);
                 const isAnomaly = anomalyScores.greater(tf.scalar(0.5));
                 const confidence = anomalyScores.sigmoid();
@@ -213,18 +234,17 @@ export class AnomalyDetectionModel extends EventEmitter {
                     details
                 };
 
-                predictions.dispose();
-                anomalyScores.dispose();
-                isAnomaly.dispose();
-                confidence.dispose();
-                normalizedWindows.dispose();
-                windows.dispose();
+                // Clean up tensors
+                tf.dispose([predictions, anomalyScores, isAnomaly, confidence]);
                 return result;
-            });
+            } finally {
+                // Ensure cleanup of input tensors
+                tf.dispose([windows, normalizedWindows]);
+            }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             this.logger.error(`Detection failed: ${errorMessage}`);
-            throw new Error(`Detection failed: ${errorMessage}`);
+            throw error;
         }
     }
 
