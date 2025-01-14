@@ -28,7 +28,7 @@ describe('SecurityScoringModel', () => {
             }]),
         } as Partial<Connection>;
 
-        securityScoring = new SecurityScoring();
+        securityScoring = new SecurityScoring({}, connection as Connection);
     });
 
     describe('basic functionality', () => {
@@ -55,7 +55,7 @@ describe('SecurityScoringModel', () => {
 
         it('should identify vulnerabilities', async () => {
             const program = new PublicKey('11111111111111111111111111111111');
-            const analysis = await securityScoring.identifyVulnerabilities(program);
+            const analysis = await securityScoring['identifyVulnerabilities'](program);
             
             expect(analysis).toBeDefined();
             expect(analysis.patterns).toBeDefined();

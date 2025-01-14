@@ -11,7 +11,13 @@
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "allowJs": true,
-    "checkJs": false
+    "checkJs": false,
+    "baseUrl": ".",
+    "paths": {
+        "@/*": ["./src/*"],
+        "@glitch-gremlin/sdk": ["../sdk/src"],
+        "@glitch-gremlin/sdk/*": ["../sdk/src/*"]
+    }
 },
 "include": [
     "src/**/*",
@@ -19,4 +25,3 @@
     "jest.setup.js"
 ]
 }
-

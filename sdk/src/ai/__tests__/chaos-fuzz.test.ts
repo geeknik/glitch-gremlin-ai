@@ -53,7 +53,7 @@ describe('Chaos Fuzzing and Anomaly Detection Tests', () => {
     beforeEach(async () => {
         anomalyModel = new AnomalyDetectionModel();
         await anomalyModel.initialize(); // Initialize the model
-        fuzzer = new Fuzzer();
+        fuzzer = new Fuzzer({ port: 9464, metricsCollector: null });
         mockMetrics = generateAnomalousMetrics(100);
     });
 

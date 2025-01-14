@@ -26,9 +26,6 @@ describe('VulnerabilityDetectionModel', () => {
         jest.restoreAllMocks();
     });
 
-describe('buildModel', () => {
-});
-
 const testData = [
     {
         features: Array.from({length: 20}, () => Math.random()),
