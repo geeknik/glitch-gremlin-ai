@@ -1,27 +1,51 @@
 {
-"extends": "./tsconfig.json",
-"compilerOptions": {
-    "types": ["jest", "node"],
-    "esModuleInterop": true,
-    "isolatedModules": true,
-    "strict": true,
-    "noEmit": true,
-    "jsx": "react",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "es2020",
     "module": "ESNext",
     "moduleResolution": "node",
-    "resolveJsonModule": true,
-    "allowJs": true,
-    "checkJs": false,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "jsx": "react",
+    "noEmit": true,
     "baseUrl": ".",
     "paths": {
-        "@/*": ["./src/*"],
-        "@glitch-gremlin/sdk": ["../sdk/src"],
-        "@glitch-gremlin/sdk/*": ["../sdk/src/*"]
-    }
-},
-"include": [
+      "@/*": ["./src/*"],
+      "@glitch-gremlin/sdk": ["./sdk/src"],
+      "@glitch-gremlin/sdk/*": ["./sdk/src/*"],
+      "@test/*": ["./tests/*"],
+      "@mocks/*": ["./tests/mocks/*"],
+      "@utils/*": ["./tests/utils/*"]
+    },
+    "types": [
+      "jest",
+      "node",
+      "@types/jest"
+    ],
+    "typeRoots": [
+      "./node_modules/@types",
+      "./src/types"
+    ],
+    "resolveJsonModule": true,
+    "allowJs": true,
+    "checkJs": false
+  },
+  "include": [
     "src/**/*",
-    "__tests__/**/*",
-    "jest.setup.js"
-]
+    "tests/**/*",
+    "__tests__/**/*", 
+    "jest.setup.ts",
+    "src/types/**/*",
+    "sdk/**/*",
+    "worker/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "coverage"
+  ]
 }

@@ -1,11 +1,12 @@
 {
-  "compilerOptions": {
+"compilerOptions": {
     "module": "ESNext",
     "target": "ES2020",
     "moduleResolution": "node",
     "outDir": "./dist",
     "rootDir": "./src",
-    "strict": true,
+    "resolveJsonModule": true,
+    "strict": true
     "esModuleInterop": true,
     "skipLibCheck": true,
     "baseUrl": ".",
@@ -16,7 +17,7 @@
     "declaration": true,
     "sourceMap": true
   },
-  "include": ["src/**/*.ts"],
+"include": ["src/**/*.ts", "package.json"],
   "exclude": ["node_modules", "dist"],
   "references": [
     { "path": "../sdk" }

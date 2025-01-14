@@ -3,7 +3,7 @@ import { GlitchSDK, TestType } from '../index.js';
 import { Keypair, Connection, PublicKey, Commitment } from '@solana/web3.js';
 import { Redis } from 'ioredis';
 import { GlitchError, ErrorCode } from '../errors.js';
-import type { MockRedisClient } from '../types';
+import type { MockRedisClient } from '../types.js';
 import { SimulatedTransactionResponse } from '@solana/web3.js';
 import type { MockedObject } from 'jest-mock';
 
@@ -68,12 +68,18 @@ describe('GlitchSDK', () => {
 
         jest.spyOn(Connection.prototype, 'getVersion').mockResolvedValue({ 'solana-core': '1.7.0' });
         
+        // Mock the GlitchSDK constructor to bypass Helius API key requirement
+        jest.spyOn(GlitchSDK.prototype as any, 'initialize').mockResolvedValue(undefined);
+        
         const createSpy = jest.spyOn(GlitchSDK, 'create');
         sdk = await GlitchSDK.create({
-            endpoint: "http://localhost:8899",
-            keypair: Keypair.generate(),
-            redisUrl: "redis://localhost:6379",
-            redis: mockRedisClient,
+            cluster: "http://localhost:8899",
+            wallet: Keypair.generate(),
+            redisConfig: {
+                host: "localhost",
+                port: 6379
+            },
+            heliusApiKey: 'mock-api-key'
         });
     });
 
@@ -82,8 +88,8 @@ describe('GlitchSDK', () => {
             if (sdk?.['queueWorker']?.close) {
                 await sdk['queueWorker'].close();
             }
-            if (sdk?.['connection']?.disconnect) {
-                await sdk['connection'].disconnect();
+            if (sdk?.['connection']) {
+                // Clean up any connection resources if needed
             }
             mockRequestCount.value = 0;
             await mockRedisClient.flushall();
@@ -98,8 +104,8 @@ describe('GlitchSDK', () => {
     afterAll(async () => {
         try {
             if (sdk) {
-                if (sdk['connection']?.disconnect) {
-                    await sdk['connection'].disconnect();
+                if (sdk['connection']) {
+                    // Clean up any connection resources if needed
                 }
                 if (sdk['queueWorker']?.close) {
                     await sdk['queueWorker'].close();

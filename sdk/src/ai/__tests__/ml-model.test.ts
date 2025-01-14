@@ -1,29 +1,41 @@
-import { VulnerabilityDetectionModel, VulnerabilityOutput } from '../src/ml-model';
-import { VulnerabilityType } from '../src/types';
 import * as tf from '@tensorflow/tfjs-node';
+import { VulnerabilityDetectionModel } from '../src/ml-model';
+import { VulnerabilityType } from '../../types';
 
 interface ModelOutput {
     type: VulnerabilityType;
     confidence: number;
 }
+
+jest.mock('@tensorflow/tfjs-node', () => ({
+    ready: jest.fn().mockResolvedValue(undefined),
+    setBackend: jest.fn().mockResolvedValue(undefined),
+    disposeVariables: jest.fn(),
+    sequential: jest.fn().mockReturnValue({
+        add: jest.fn(),
+        compile: jest.fn(),
+        fit: jest.fn().mockResolvedValue({}),
+        predict: jest.fn()
+    }),
+    tensor2d: jest.fn(),
+    tensor1d: jest.fn(),
+    oneHot: jest.fn(),
+    dispose: jest.fn()
+}));
 describe('VulnerabilityDetectionModel', () => {
     let model: VulnerabilityDetectionModel;
     
     beforeEach(async () => {
-        jest.spyOn(console, 'error').mockImplementation(() => {});
+        await tf.ready();
         model = new VulnerabilityDetectionModel();
-        await model.train(testData.map(d => d.features), testData.map(d => Object.values(VulnerabilityType).indexOf(d.vulnerabilityType)));
+        await tf.setBackend('cpu');
+        jest.clearAllMocks();
     });
 
     afterEach(async () => {
-        try {
-            if (model) {
-                await model.cleanup();
-            }
-        } catch (err) {
-            console.error('Error during cleanup:', err);
-        }
-        jest.restoreAllMocks();
+        await model?.cleanup();
+        tf.disposeVariables();
+        jest.clearAllMocks();
     });
 
 const testData = [

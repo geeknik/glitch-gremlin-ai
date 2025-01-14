@@ -1,51 +1,47 @@
 #!/usr/bin/env node
-/**
- * Glitch Gremlin AI Command Line Interface
- * 
- * This CLI tool provides easy access to Glitch Gremlin's chaos testing features.
- * It requires the following environment variables:
- * - SOLANA_KEYPAIR_PATH: Path to your Solana keypair file
- * - SOLANA_CLUSTER: (Optional) Solana cluster to use (defaults to 'devnet')
- * 
- * @example
- * ```bash
- * # Run a basic fuzz test
- * glitch test -p <program> -t FUZZ -d 300 -i 5
- * 
- * # View test results
- * glitch test results <test-id>
- * ```
- */
 
 import { readFileSync } from 'fs';
 import { Keypair } from '@solana/web3.js';
 import { Command } from 'commander';
 import { GlitchSDK, TestType } from '@glitch-gremlin/sdk';
-import { version } from '../package.json';
 import ora from 'ora';
 import chalk from 'chalk';
+import { fileURLToPath } from 'url';
+import { join, dirname } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Load version from package.json
+const pkgJson = JSON.parse(
+    readFileSync(join(__dirname, '../../package.json'), 'utf8')
+);
+const version = pkgJson.version;
 
 const program = new Command();
 
 // Ensure SDK compatibility
-if (version !== '0.1.0') {
-  console.error(chalk.red(`Error: SDK version mismatch. Required: ${CLI_VERSION}, Found: ${sdkVersion}`));
-  process.exit(1);
+const sdkVersion = require('@glitch-gremlin/sdk/package.json').version;
+if (version !== sdkVersion) {
+console.error(chalk.red(`Error: Version mismatch. CLI: ${version}, SDK: ${sdkVersion}`));
+process.exit(1);
 }
 
 program
   .name('glitch')
   .description('Glitch Gremlin AI CLI tool')
-  .version(version);
+.version(version, '-v, --version');
 
 // Test command
 program
   .command('test')
   .description('Manage chaos tests')
   .option('-p, --program <address>', 'Target program address')
-  .option('-t, --type <type>', 'Test type (FUZZ, LOAD, EXPLOIT, CONCURRENCY)')
-  .option('-d, --duration <seconds>', 'Test duration in seconds', '300')
-  .option('-i, --intensity <level>', 'Test intensity (1-10)', '5')
+.option('-t, --type <type>', 'Test type (FUZZ, LOAD, EXPLOIT, CONCURRENCY)')
+.option('-d, --duration <seconds>', 'Test duration in seconds', '300')
+.option('-i, --intensity <level>', 'Test intensity (1-10)', '5')
+.addOption(new Option('-t, --type <type>').choices(['FUZZ', 'LOAD', 'EXPLOIT', 'CONCURRENCY']))
+.addOption(new Option('-i, --intensity <level>').argParser(parseInt).choices([1,2,3,4,5,6,7,8,9,10]))
   .option('--fuzz-seed-range <range>', 'Seed range for fuzz testing (min,max)')
   .option('--load-tps <tps>', 'Transactions per second for load testing')
   .option('--exploit-categories <cats>', 'Exploit categories to test (comma-separated)')
@@ -58,6 +54,18 @@ program
         throw new Error('SOLANA_KEYPAIR_PATH environment variable is not set');
       }
 
+    // Validate program address
+    if (!options.program || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(options.program)) {
+    throw new Error('Invalid program address format');
+    }
+
+    // Validate duration
+    const duration = parseInt(options.duration);
+    if (isNaN(duration) || duration < 60 || duration > 3600) {
+    throw new Error('Duration must be between 60 and 3600 seconds');
+    }
+
+    // Initialize SDK
     const sdk = await GlitchSDK.init({
     cluster: process.env.SOLANA_CLUSTER || 'https://api.testnet.solana.com',
     wallet: Keypair.fromSecretKey(
@@ -81,8 +89,24 @@ program
       console.log(chalk.green('\nResults:'));
       console.log(JSON.stringify(results, null, 2));
     } catch (error) {
-      spinner.fail(chalk.red(`Error: ${(error as Error).message}`));
-      process.exit(1);
+    if (error instanceof Error) {
+        switch(error.name) {
+        case 'ValidationError':
+            spinner.fail(chalk.red(`Parameter validation failed: ${error.message}`));
+            break;
+        case 'ConnectionError':
+            spinner.fail(chalk.red(`Network error: ${error.message}`));
+            break;
+        case 'RateLimitError':
+            spinner.fail(chalk.red(`Rate limit exceeded: ${error.message}`));
+            break;
+        default:
+            spinner.fail(chalk.red(`Error: ${error.message}`));
+        }
+    } else {
+        spinner.fail(chalk.red('An unknown error occurred'));
+    }
+    process.exit(1);
     }
   });
 

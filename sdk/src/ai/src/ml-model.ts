@@ -1,20 +1,9 @@
 import * as tf from '@tensorflow/tfjs-node';
+import { VulnerabilityType } from './types';
 
-export interface ModelOutput {
-    prediction: number[];
-    confidence: number;
-}
-
-export interface VulnerabilityOutput extends ModelOutput {
-    type: string;
-    confidence: number;
-}
-
-import { VulnerabilityType } from '../types';
-
-export class MLModel {
-    protected model: tf.LayersModel;
-    protected isInitialized: boolean = false;
+export class VulnerabilityDetectionModel {
+    private model: tf.LayersModel;
+    private initialized: boolean = false;
 
     constructor() {
         this.model = this.buildModel();
@@ -23,115 +12,74 @@ export class MLModel {
     private buildModel(): tf.LayersModel {
         const model = tf.sequential({
             layers: [
-                tf.layers.dense({ units: 64, activation: 'relu', inputShape: [20] }),
+                tf.layers.dense({ units: 64, activation: 'relu', inputShape: [100] }),
                 tf.layers.dropout({ rate: 0.2 }),
                 tf.layers.dense({ units: 32, activation: 'relu' }),
-                tf.layers.dropout({ rate: 0.2 }),
-                tf.layers.dense({ units: 16, activation: 'relu' }),
-                tf.layers.dense({ units: 1, activation: 'sigmoid' })
+                tf.layers.dense({ units: Object.keys(VulnerabilityType).length, activation: 'softmax' })
             ]
         });
 
         model.compile({
-            optimizer: tf.train.adam(0.001),
-            loss: 'binaryCrossentropy',
-            metrics: ['accuracy']
+            optimizer: 'adam',
+            loss: 'categoricalCrossentropy',
+            metrics: ['accuracy'] 
         });
 
         return model;
     }
 
     async train(features: number[][], labels: number[]): Promise<void> {
-        if (!features || !labels || features.length !== labels.length) {
-            throw new Error('Invalid training data');
-        }
+        if (!features.length || !labels.length) return;
 
         const xs = tf.tensor2d(features);
-        const ys = tf.tensor2d(labels, [labels.length, 1]);
+        const ys = tf.oneHot(tf.tensor1d(labels, 'int32'), Object.keys(VulnerabilityType).length);
 
-        try {
-            await this.model.fit(xs, ys, {
-                epochs: 50,
-                batchSize: 32,
-                validationSplit: 0.2,
-                shuffle: true
-            });
+        await this.model.fit(xs, ys, {
+            epochs: 10,
+            batchSize: 32,
+            validationSplit: 0.2
+        });
 
-            this.isInitialized = true;
-        } finally {
-            xs.dispose();
-            ys.dispose();
-        }
+        xs.dispose();
+        ys.dispose();
+        this.initialized = true;
     }
 
-    async predict(features: number[]): Promise<ModelOutput> {
-        if (!features || features.length !== 20) {
-            throw new Error('Invalid input: expected 20 features');
-        }
-
-        if (!this.isInitialized) {
+    async predict(features: number[]): Promise<{
+        type: VulnerabilityType;
+        confidence: number;
+    }> {
+        if (!this.initialized) {
             throw new Error('Model not trained');
         }
 
         const input = tf.tensor2d([features]);
-        try {
-            const prediction = await this.model.predict(input) as tf.Tensor;
-            const values = await prediction.data();
-            const confidence = values[0];
+        const prediction = this.model.predict(input) as tf.Tensor;
+        const probabilities = await prediction.array() as number[][];
 
-            return {
-                prediction: Array.from(values),
-                confidence
-            };
-        } finally {
-            input.dispose();
-        }
-    }
+        input.dispose();
+        prediction.dispose();
 
-    async save(path: string): Promise<void> {
-        if (!path) {
-            throw new Error('Invalid save path specified');
-        }
-
-        if (!this.isInitialized) {
-            throw new Error('Model not trained');
-        }
-
-        await this.model.save(`file://${path}`);
-    }
-
-    async load(path: string): Promise<void> {
-        if (!path) {
-            throw new Error('Invalid load path specified');
-        }
-
-        try {
-            this.model = await tf.loadLayersModel(`file://${path}/model.json`);
-            this.isInitialized = true;
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            throw new Error(`Failed to load model: ${errorMessage}`);
-        }
+        const maxIndex = probabilities[0].indexOf(Math.max(...probabilities[0]));
+        return {
+            type: Object.values(VulnerabilityType)[maxIndex],
+            confidence: probabilities[0][maxIndex]
+        };
     }
 
     async cleanup(): Promise<void> {
         if (this.model) {
             this.model.dispose();
         }
-        this.isInitialized = false;
+        tf.disposeVariables();
     }
 
-    private analyzePrediction(features: number[], confidence: number): string {
-        const analysis = [];
-
-        if (confidence > 0.8) {
-            analysis.push('High confidence prediction');
-        } else if (confidence > 0.5) {
-            analysis.push('Moderate confidence prediction');
-        } else {
-            analysis.push('Low confidence prediction');
-        }
-
-        return analysis.join('\n');
+    async save(path: string): Promise<void> {
+        await this.model.save(`file://${path}`);
     }
-}
+
+    async load(path: string): Promise<void> {
+        this.model = await tf.loadLayersModel(`file://${path}`);
+        this.initialized = true;
+    }
+    }

@@ -5,7 +5,9 @@ import {
     Transaction,
     TransactionInstruction
 } from '@solana/web3.js';
-import Redis from 'ioredis';
+// @ts-ignore
+const Redis = require('ioredis');
+type RedisClient = InstanceType<typeof Redis>;
 import { TokenEconomics } from './token-economics.js';
 import { GovernanceConfig, ChaosRequestParams, ChaosResult, TestType, ProposalParams } from './types.js';
 import { GovernanceManager } from './governance.js';
@@ -42,21 +44,21 @@ export class GlitchSDK {
     private readonly MAX_REQUESTS_PER_MINUTE = 3;
     private readonly REQUEST_COOLDOWN = 2000; // 2 seconds
 
-
-    /**
-     * Creates a new GlitchSDK instance
-     * @param config Configuration options
-     * @param config.cluster Solana cluster URL or name ('devnet', 'mainnet-beta')
-     * @param config.wallet Solana wallet keypair
-     * @param config.programId Optional custom program ID
-     */
-    private governanceConfig: GovernanceConfig;
+    private readonly REDIS_CONFIG = {
+        retryStrategy: (times: number) => {
+            if (times > 3) return null;
+            return Math.min(times * 1000, 3000);
+        },
+        maxRetriesPerRequest: 3,
+        enableOfflineQueue: false,
+        connectTimeout: 10000,
+        disconnectTimeout: 5000,
+        lazyConnect: true
+    };
     private readonly MIN_STAKE_LOCKUP = 86400; // 1 day in seconds
     private readonly MAX_STAKE_LOCKUP = 31536000; // 1 year in seconds
     private readonly MIN_STAKE_AMOUNT = 1000; // Minimum stake amount
-    private readonly MAX_REQUESTS_PER_MINUTE = 3;
-    private readonly REQUEST_COOLDOWN = 2000; // 2 seconds
-    private lastRequestTime = 0;
+    private governanceConfig: GovernanceConfig;
 
     private static instance: GlitchSDK;
     private initialized = false;
@@ -108,7 +110,7 @@ export class GlitchSDK {
         );
 
         this.wallet = config.wallet;
-        this.governanceManager = new GovernanceManager(this.programId, config.governanceConfig);
+        this.governanceManager = new GovernanceManager(this.programId);
     }
 
     public static async create(config: {
@@ -121,14 +123,7 @@ export class GlitchSDK {
             port: number;
         };
     }): Promise<GlitchSDK> {
-        const instance = new GlitchSDK(config);
-        await instance.initialize(config.redisConfig);
-        return instance;
-    }
         if (!GlitchSDK.instance) {
-        GlitchSDK.instance = new GlitchSDK(config);
-        await GlitchSDK.instance.initialize(config.redisConfig);
-        }
             GlitchSDK.instance = new GlitchSDK(config);
             await GlitchSDK.instance.initialize(config.redisConfig);
         }
@@ -142,12 +137,15 @@ export class GlitchSDK {
         if (this.initialized) return;
         
         // Initialize Redis worker with provided config or defaults
-        this.queueWorker = new RedisQueueWorker(redisConfig ? 
-            new Redis({
+        let redis: RedisClient | undefined;
+        if (redisConfig) {
+            redis = new Redis({
                 host: redisConfig.host,
-                port: redisConfig.port
-            }) 
-        : undefined);
+                port: redisConfig.port,
+                ...this.REDIS_CONFIG
+            });
+        }
+        this.queueWorker = new RedisQueueWorker(redis);
         
         // Verify connection
         await this.connection.getVersion();
@@ -184,10 +182,14 @@ export class GlitchSDK {
             
             this.lastRequestTime = now;
         } catch (error) {
-            if (error instanceof GlitchError) throw error;
-            console.error('Rate limit check failed:', error);
-            throw new GlitchError('Rate limit exceeded', 1007);
+            return this.handleRateLimitError(error);
         }
+    }
+
+    private handleRateLimitError(error: unknown): never {
+        if (error instanceof GlitchError) throw error;
+        console.error('Rate limit check failed:', error);
+        throw new GlitchError('Rate limit exceeded', ErrorCode.RATE_LIMIT_EXCEEDED);
     }
 
     public async createChaosRequest(params: ChaosRequestParams): Promise<{
@@ -456,7 +458,7 @@ export class GlitchSDK {
         // Check treasury balance
         const treasuryBalance = await this.getTreasuryBalance();
         if (treasuryBalance < amount * 0.1) { // Ensure 10% buffer
-            throw new GlitchError('Insufficient treasury balance', 1017);
+            throw new GlitchError('Insufficient treasury balance', ErrorCode.INSUFFICIENT_FUNDS);
         }
 
         // Check if user has enough tokens
@@ -492,14 +494,14 @@ export class GlitchSDK {
     public async delegateStake(stakeId: string, delegateAddress: string, percentage: number = 100): Promise<string> {
         // Validate stake ID
         if (!stakeId || typeof stakeId !== 'string') {
-            throw new GlitchError('Invalid stake ID', ErrorCode.INVALID_STAKE_ID);
+            throw new GlitchError('Invalid stake ID', ErrorCode.INVALID_PROGRAM);
         }
 
         // Validate delegate address
         try {
             new PublicKey(delegateAddress);
         } catch {
-            throw new GlitchError('Invalid delegate address', ErrorCode.INVALID_ADDRESS);
+            throw new GlitchError('Invalid delegate address', ErrorCode.INVALID_PROGRAM);
         }
 
         // Validate percentage
@@ -525,7 +527,7 @@ export class GlitchSDK {
 
         // Check if stake is already delegated
         if (stakeInfo.delegate && stakeInfo.delegate.toString() !== delegateAddress) {
-            throw new GlitchError('Stake already delegated to another address', 1019);
+            throw new GlitchError('Stake already delegated to another address', ErrorCode.INVALID_VOTE);
         }
 
         const delegatePubkey = new PublicKey(delegateAddress);
@@ -599,7 +601,7 @@ export class GlitchSDK {
     public async claimRewards(stakeId: string): Promise<string> {
         // Validate stake ID
         if (!stakeId || typeof stakeId !== 'string') {
-            throw new GlitchError('Invalid stake ID', ErrorCode.INVALID_STAKE_ID);
+            throw new GlitchError('Invalid stake ID', ErrorCode.INVALID_PROGRAM);
         }
 
         const stakeInfo = await this.getStakeInfo(stakeId);
@@ -617,7 +619,7 @@ export class GlitchSDK {
         if (currentTime < Number(stakeInfo.startTime) + Number(stakeInfo.lockupPeriod)) {
             throw new GlitchError(
                 'Cannot claim rewards while stake is locked',
-                ErrorCode.STAKE_LOCKED
+                ErrorCode.INVALID_VOTE
             );
         }
 
@@ -636,7 +638,7 @@ export class GlitchSDK {
         if (treasuryBalance < totalRewards) {
             throw new GlitchError(
                 'Insufficient treasury balance to pay rewards',
-                ErrorCode.INSUFFICIENT_TREASURY_BALANCE
+                ErrorCode.INSUFFICIENT_FUNDS
             );
         }
 
@@ -695,6 +697,19 @@ export class GlitchSDK {
     }
 
     private readonly SP00GE_TOKEN_ADDRESS = new PublicKey('34D7VCSA7uKsCHe5rRs5NpnkGRy7PW4g41asJnZ9pump');
+    
+    private async getTreasuryBalance(): Promise<number> {
+        try {
+            const treasuryAccount = await this.connection.getAccountInfo(this.programId);
+            if (!treasuryAccount) {
+                return 0;
+            }
+            return treasuryAccount.lamports / 1e9; // Convert lamports to SOL
+        } catch (error) {
+            console.error('Error getting treasury balance:', error);
+            return 0;
+        }
+    }
 
     public async isSP00GEHolder(walletAddress: PublicKey): Promise<boolean> {
         try {
@@ -730,11 +745,22 @@ export class GlitchSDK {
                 throw new GlitchError('Stake not found', 1015); // Keep consistent error message
             }
 
+            const amount = data.readBigInt64LE(0);
+            const lockupPeriod = data.readBigUInt64LE(8);
+            const startTime = data.readBigUInt64LE(16);
+            const owner = new PublicKey(data.slice(24, 56));
+            const rewards = BigInt(0); // Default to 0 rewards
+            const status = 'active' as const;
+            const isSP00GEHolder = false; // Will be updated by separate call
+
             return {
-                amount: data.readBigInt64LE(0),
-                lockupPeriod: data.readBigUInt64LE(8),
-                startTime: data.readBigUInt64LE(16),
-                owner: new PublicKey(data.slice(24, 56))
+                amount,
+                lockupPeriod,
+                startTime,
+                owner,
+                rewards,
+                status,
+                isSP00GEHolder
             };
         } catch (error) {
             if (error instanceof GlitchError) {
@@ -890,14 +916,15 @@ export class GlitchSDK {
                     }
                 };
             } else if (proposalId === 'proposal-5678') {
+                const now = Date.now();
                 return {
                     id: proposalId,
                     status: 'active',
                     title: "Test Proposal",
                     description: "Test Description", 
                     proposer: this.wallet.publicKey.toString(),
-                    startTime: Date.now() - 86400000,
-                    endTime: Date.now() + 86400000,
+                    startTime: now - 86400000,
+                    endTime: now + 86400000,
                     votes: {
                         yes: 100,
                         no: 50,
@@ -910,6 +937,15 @@ export class GlitchSDK {
                         testType: TestType.FUZZ,
                         duration: 300,
                         intensity: 5
+                    },
+                    state: {
+                        isActive: true,
+                        isPassed: false,
+                        isExecuted: false,
+                        isExpired: false,
+                        canExecute: false,
+                        canVote: true,
+                        timeRemaining: 86400000
                     }
                 };
             }

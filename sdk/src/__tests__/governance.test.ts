@@ -1,16 +1,32 @@
 import { jest } from '@jest/globals';
-import { GlitchSDK, TestType } from '../index.js';
+import { GlitchSDK, TestType } from '../index.js'; 
 import { Keypair, PublicKey } from '@solana/web3.js';
+import Redis from 'ioredis-mock';
 
 describe('Governance', () => {
     let sdk: GlitchSDK;
     
     beforeAll(async () => {
+        // Create mock Redis client
+        const mockRedis = new Redis({
+            data: {
+                "requests:default": "0",
+                "requests:governance": "0"
+            }
+        });
+
         // Create mock connection once for all tests
         const wallet = Keypair.generate();
-        sdk = await GlitchSDK.init({
+        sdk = await GlitchSDK.create({
             cluster: 'https://api.devnet.solana.com',
-            wallet
+            wallet,
+            redis: mockRedis,
+            queueConfig: {
+                redis: mockRedis
+            },
+            redisConfig: {
+                client: mockRedis
+            }
         });
 
         // Mock all connection methods upfront
@@ -37,17 +53,27 @@ describe('Governance', () => {
 
     afterEach(async () => {
         if (sdk) {
-            await sdk['queueWorker'].close();
-            await sdk['connection'].getRecentBlockhash(); // Ensure all pending requests complete
-            // Connection doesn't need explicit cleanup
+            // Cleanup Redis mocks
+            if (sdk['queueWorker'] && sdk['queueWorker'].redis) {
+                await sdk['queueWorker'].redis.flushall();
+            }
+            // Cleanup any timers/intervals
+            jest.clearAllTimers();
+            jest.clearAllMocks();
         }
-        // Clear any pending timers and intervals
-        jest.clearAllTimers();
-        jest.clearAllMocks();
     });
 
     afterAll(async () => {
-        // No need to explicitly close Connection
+        if (sdk) {
+            // Cleanup Redis connections
+            if (sdk['queueWorker'] && sdk['queueWorker'].redis) {
+                await sdk['queueWorker'].redis.quit();
+            }
+            if (sdk['redis']) {
+                await sdk['redis'].quit();
+            }
+        }
+        // Reset all mocks
         jest.clearAllMocks();
     });
 

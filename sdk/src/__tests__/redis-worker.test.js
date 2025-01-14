@@ -47,4 +47,28 @@ describe('RedisQueueWorker', () => {
     });
     it('should expire results after TTL', async () => {
         jest.useFakeTimers();
-        const requestId =
+        const requestId = 'test-request-id';
+        const result = {
+            requestId,
+            status: 'completed',
+            resultRef: 'ipfs://test',
+            logs: ['Test completed'],
+            metrics: {
+                totalTransactions: 100,
+                errorRate: 0,
+                avgLatency: 100
+            }
+        };
+
+        await worker.storeResult(requestId, result);
+        const initialResult = await worker.getResult(requestId);
+        expect(initialResult).toEqual(result);
+
+        // Advance time past TTL
+        jest.advanceTimersByTime(3600 * 1000); // 1 hour
+
+        const expiredResult = await worker.getResult(requestId);
+        expect(expiredResult).toBeNull();
+
+        jest.useRealTimers();
+    });

@@ -1,43 +1,32 @@
-import { spawn } from 'child_process';
-import { Logger } from '../utils/logger';
+import { spawn, ChildProcess } from 'child_process';
+import { Logger } from '../../utils/logger';
+import { ChaosTestParams } from '../types';
+
+interface TestResult {
+    success: boolean;
+    proof?: string;
+    error?: string;
+}
 
 export class ZkVMExecutor {
     private logger: Logger;
+    private env: NodeJS.ProcessEnv;
 
-    constructor() {
-        this.logger = new Logger();
+    constructor(logger?: Logger, env?: NodeJS.ProcessEnv) {
+        this.logger = logger || console;
+        this.env = env || process.env;
     }
 
-    async executeTest(programId: string, testParams: any): Promise<{
-        success: boolean;
-        results: any;
-        proof: string;
-    }> {
-        this.logger.info('Executing test in zkVM environment');
-
+    async executeTest(program: string, params: ChaosTestParams): Promise<TestResult> {
         try {
-            // Create temporary test program
-            const testProgram = `
-                #![cfg_attr(target_arch = "riscv32", no_std, no_main)]
-                use nexus_rt::write_log;
-
-                #[nexus_rt::main]
-                fn main() {
-                    // Execute chaos test logic
-                    let result = execute_test("${programId}", ${JSON.stringify(testParams)});
-                    write_log(&result);
-                }
-            `;
-
-            // Execute in zkVM
-            const result = await this.runInZkVM(testProgram);
-
-            // Generate proof
+            const result = await this.runInZkVM(program, params);
+            if (!result.success) {
+                throw new Error(result.error || 'zkVM execution failed');
+            }
+            
             const proof = await this.generateProof();
-
             return {
                 success: true,
-                results: result,
                 proof
             };
         } catch (error) {
@@ -46,22 +35,40 @@ export class ZkVMExecutor {
         }
     }
 
-    private async runInZkVM(program: string): Promise<any> {
+    private async runInZkVM(program: string, params: ChaosTestParams): Promise<TestResult> {
         return new Promise((resolve, reject) => {
-            const process = spawn('cargo', ['nexus', 'run'], {
-                env: { ...process.env, NEXUS_PROGRAM: program }
+            const zkProcess = spawn('cargo', ['nexus', 'run'], {
+                env: {
+                    ...this.env,
+                    NEXUS_PROGRAM: program,
+                    NEXUS_PARAMS: JSON.stringify(params)
+                }
             });
 
             let output = '';
-            process.stdout.on('data', (data) => {
-                output += data;
+            
+            zkProcess.stdout?.on('data', (data) => {
+                output += data.toString();
             });
 
-            process.on('close', (code) => {
-                if (code === 0) {
-                    resolve(JSON.parse(output));
-                } else {
-                    reject(new Error(`zkVM execution failed with code ${code}`));
+            zkProcess.on('error', (error) => {
+                reject(new Error(`zkVM process error: ${error.message}`));
+            });
+
+            zkProcess.on('close', (code) => {
+                if (code !== 0) {
+                    reject(new Error('zkVM execution failed'));
+                    return;
+                }
+
+                try {
+                    const result = JSON.parse(output);
+                    resolve({
+                        success: true,
+                        ...result
+                    });
+                } catch (error) {
+                    reject(new Error('Invalid zkVM output'));
                 }
             });
         });
@@ -69,14 +76,20 @@ export class ZkVMExecutor {
 
     private async generateProof(): Promise<string> {
         return new Promise((resolve, reject) => {
-            const process = spawn('cargo', ['nexus', 'prove']);
-            
-            process.on('close', (code) => {
-                if (code === 0) {
-                    resolve('nexus-proof');
-                } else {
+            const proofProcess = spawn('cargo', ['nexus', 'prove'], {
+                env: this.env
+            });
+
+            proofProcess.on('error', (error) => {
+                reject(new Error(`Proof generation error: ${error.message}`));
+            });
+
+            proofProcess.on('close', (code) => {
+                if (code !== 0) {
                     reject(new Error('Proof generation failed'));
+                    return;
                 }
+                resolve('nexus-proof');
             });
         });
     }

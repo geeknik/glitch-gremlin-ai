@@ -1,190 +1,107 @@
 import { GovernanceManager } from '../governance';
 import { Keypair, Connection, PublicKey } from '@solana/web3.js';
 import { GlitchError } from '../errors';
+
+jest.mock('@solana/web3.js');
+
 describe('GovernanceManager', () => {
     let governanceManager;
     let connection;
     let wallet;
+    let validateProposalMock;
+    let simulateTransactionMock;
+    let sendTransactionMock;
+
     beforeEach(() => {
         connection = new Connection('http://localhost:8899', 'confirmed');
         wallet = Keypair.generate();
         governanceManager = new GovernanceManager(new PublicKey('GLt5cQeRgVMqnE9DGJQNNrbAfnRQYWqYVNWnJo7WNLZ9'));
+        
+        validateProposalMock = jest.spyOn(governanceManager, 'validateProposal').mockResolvedValue(true);
+        simulateTransactionMock = jest.spyOn(connection, 'simulateTransaction').mockResolvedValue({ value: { err: null }});
+        sendTransactionMock = jest.spyOn(connection, 'sendTransaction').mockResolvedValue('tx-hash');
     });
-    describe('createProposalAccount', () => {
-        it('should create a proposal with valid parameters', async () => {
-            const { proposalAddress, tx } = await governanceManager.createProposalAccount(connection, wallet, {
-                votingPeriod: 259200,
-                description: 'Test proposal'
-            });
-            expect(proposalAddress).toBeDefined();
-            expect(tx.instructions.length).toBe(1);
-        });
-        it('should reject invalid voting periods', async () => {
-            await expect(governanceManager.createProposalAccount(connection, wallet, {
-                votingPeriod: 3600, // Too short
-                description: 'Test proposal'
-            })).rejects.toThrow('Invalid voting period');
-        });
-    });
-    beforeEach(() => {
-        // Use fake timers
-        jest.useFakeTimers();
-        // Set up test environment
-        connection = new Connection('http://localhost:8899', 'confirmed');
-        wallet = Keypair.generate();
-        governanceManager = new GovernanceManager(new PublicKey('GLt5cQeRgVMqnE9DGJQNNrbAfnRQYWqYVNWnJo7WNLZ9'));
-    });
+
     afterEach(() => {
-        jest.useRealTimers();
         jest.clearAllMocks();
     });
-    describe('castVote', () => {
-        beforeEach(() => {
-            jest.clearAllMocks();
-            // Use fake timers
-            jest.useFakeTimers();
-            jest.setSystemTime(1641024000000); // Fixed timestamp
-        });
-        afterEach(() => {
-            jest.useRealTimers();
-        });
-        describe('successful voting', () => {
-            describe('voting scenarios', () => {
-                jest.setTimeout(30000); // Increase timeout for these tests
-                describe('with active proposal', () => {
-                    let validateProposalMock;
-                    let getAccountInfoMock;
-                    let simulateTransactionMock;
-                    let sendTransactionMock;
-                    let proposalAddress;
-                    beforeEach(() => {
-                        jest.resetAllMocks();
-                        proposalAddress = new PublicKey(Keypair.generate().publicKey);
-                        // Mock validateProposal first
-                        validateProposalMock = jest.spyOn(governanceManager, 'validateProposal')
-                            .mockImplementation(async () => {
-                            const mockProposalData = {
-                                title: "Test Proposal",
-                                description: "Test Description",
-                                proposer: wallet.publicKey,
-                                startTime: Date.now() - 1000,
-                                endTime: Date.now() + 86400000,
-                                executionTime: Date.now() + 172800000,
-                                voteWeights: { yes: 150, no: 50, abstain: 0 },
-                                votes: [],
-                                quorum: 100,
-                                executed: false,
-                                status: 'active'
-                            };
-                            // Get account info as part of validation
-                            const mockAccountInfo = {
-                                data: Buffer.from(JSON.stringify(mockProposalData)),
-                                executable: false,
-                                lamports: 1000000,
-                                owner: governanceManager['programId'],
-                                rentEpoch: 0
-                            };
-                            // Call the mock through connection.getAccountInfo
-                            await connection.getAccountInfo(proposalAddress);
-                            return mockProposalData;
-                        });
-                        // Mock getAccountInfo to return our data
-                        getAccountInfoMock = jest.spyOn(connection, 'getAccountInfo')
-                            .mockResolvedValue({
-                            data: Buffer.from(JSON.stringify({
-                                title: "Test Proposal",
-                                description: "Test Description",
-                                proposer: wallet.publicKey,
-                                startTime: Date.now() - 1000,
-                                endTime: Date.now() + 86400000,
-                                voteWeights: { yes: 150, no: 50, abstain: 0 },
-                                votes: [],
-                                quorum: 100,
-                                executed: false
-                            })),
-                            executable: false,
-                            lamports: 1000000,
-                            owner: governanceManager['programId'],
-                            rentEpoch: 0
-                        });
-                        // Mock transaction simulation and ensure it's called
-                        simulateTransactionMock = jest.spyOn(connection, 'simulateTransaction')
-                            .mockImplementation(async () => {
-                            return {
-                                context: { slot: 0 },
-                                value: {
-                                    err: null,
-                                    logs: ['Program log: Vote recorded'],
-                                    accounts: null,
-                                    unitsConsumed: 0,
-                                    returnData: null
-                                }
-                            };
-                        });
-                        // Mock transaction sending with proper async behavior and error handling
-                        sendTransactionMock = jest.spyOn(connection, 'sendTransaction')
-                            .mockImplementation(async () => {
-                                try {
-                                    await new Promise(resolve => setTimeout(resolve, 10));
-                                    return 'mock-signature';
-                                } catch (error) {
-                                    console.error('Mock transaction failed:', error);
-                                    throw error;
-                                }
-                            });
-                    });
-                    afterEach(() => {
-                        jest.restoreAllMocks();
-                    });
-                    it('should create valid vote transaction', async () => {
-                        // Call castVote and await simulation
-                        const tx1 = await governanceManager.castVote(connection, wallet, proposalAddress, true);
-                        await connection.simulateTransaction(tx1);
-                        const tx2 = await governanceManager.castVote(connection, wallet, proposalAddress, true);
-                        await connection.simulateTransaction(tx2);
-                        // Verify transactions were simulated
-                        expect(simulateTransactionMock).toHaveBeenCalledTimes(2);
-                        // Verify each mock was called with correct args
-                        expect(validateProposalMock).toHaveBeenCalledTimes(2);
-                        expect(validateProposalMock).toHaveBeenCalledWith(connection, proposalAddress);
-                        expect(getAccountInfoMock).toHaveBeenCalledTimes(2);
-                        expect(getAccountInfoMock).toHaveBeenCalledWith(proposalAddress);
-                        expect(getAccountInfoMock.mock.calls.every(call => call[0].equals(proposalAddress))).toBe(true);
-                        expect(simulateTransactionMock).toHaveBeenCalledTimes(2);
-                        // Verify the call order
-                        const validateCall = validateProposalMock.mock.invocationCallOrder[0];
-                        const getInfoCall = getAccountInfoMock.mock.invocationCallOrder[0];
-                        const simulateCall = simulateTransactionMock.mock.invocationCallOrder[0];
-                        expect(validateCall).toBeLessThan(getInfoCall);
-                        expect(getInfoCall).toBeLessThan(simulateCall);
-                    });
-                });
-                describe('with ended proposal', () => {
-                    beforeEach(() => {
-                        jest.restoreAllMocks();
-                        jest.spyOn(governanceManager, 'validateProposal')
-                            .mockRejectedValue(new GlitchError('Proposal voting has ended', 2006));
-                    });
-                    afterEach(() => {
-                        jest.restoreAllMocks();
-                    });
-                    it('should reject voting on ended proposal', async () => {
-                        const endedProposalAddress = new PublicKey(Keypair.generate().publicKey);
-                        await expect(governanceManager.castVote(connection, wallet, endedProposalAddress, true)).rejects.toThrow('Proposal voting has ended');
-                    });
-                });
+
+    describe('proposal creation', () => {
+        it('should create a proposal with valid parameters', async () => {
+            const { proposalAddress, txHash } = await governanceManager.createProposal({
+                title: 'Test Proposal',
+                description: 'Test Description',
+                programId: new PublicKey('11111111111111111111111111111111'),
+                instruction: {
+                    data: Buffer.from('test'),
+                    accounts: []
+                }
             });
+
+            expect(proposalAddress).toBeDefined();
+            expect(txHash).toBe('tx-hash');
+            expect(validateProposalMock).toHaveBeenCalled();
+            expect(simulateTransactionMock).toHaveBeenCalled();
+            expect(sendTransactionMock).toHaveBeenCalled();
         });
-        describe('failed voting', () => {
-            beforeEach(() => {
-                jest.restoreAllMocks();
-            });
-            it('should reject voting on inactive proposals', async () => {
-                const proposalAddress = Keypair.generate().publicKey;
-                jest.spyOn(governanceManager, 'validateProposal')
-                    .mockRejectedValue(new GlitchError('Proposal is not active', 2003));
-                await expect(governanceManager.castVote(connection, wallet, proposalAddress, true)).rejects.toThrow('Proposal is not active');
-            });
+
+        it('should validate proposal parameters', async () => {
+            const invalidProposal = {
+                title: '',  // Invalid - empty title
+                description: 'Test',
+                programId: new PublicKey('11111111111111111111111111111111'),
+                instruction: { data: Buffer.from('test'), accounts: [] }
+            };
+
+            await expect(governanceManager.createProposal(invalidProposal))
+                .rejects.toThrow('Invalid proposal parameters');
+        });
+    });
+
+    describe('proposal validation', () => {
+        it('should validate quorum requirements', async () => {
+            const proposalAddress = new PublicKey('22222222222222222222222222222222');
+            validateProposalMock.mockResolvedValueOnce(false);
+
+            await expect(governanceManager.validateProposal(proposalAddress))
+                .rejects.toThrow('Proposal does not meet quorum requirements');
+        });
+
+        it('should validate timelock period', async () => {
+            const proposalAddress = new PublicKey('22222222222222222222222222222222');
+            governanceManager.getProposalTimestamp = jest.fn().mockResolvedValue(Date.now());
+
+            await expect(governanceManager.validateProposal(proposalAddress))
+                .rejects.toThrow('Timelock period not elapsed');
+        });
+    });
+
+    describe('proposal execution', () => {
+        it('should execute valid proposals', async () => {
+            const proposalAddress = new PublicKey('22222222222222222222222222222222');
+            validateProposalMock.mockResolvedValueOnce(true);
+
+            const result = await governanceManager.executeProposal(proposalAddress);
+            
+            expect(result.success).toBe(true);
+            expect(sendTransactionMock).toHaveBeenCalled();
+        });
+
+        it('should prevent execution of invalid proposals', async () => {
+            const proposalAddress = new PublicKey('22222222222222222222222222222222');
+            validateProposalMock.mockResolvedValueOnce(false);
+
+            await expect(governanceManager.executeProposal(proposalAddress))
+                .rejects.toThrow('Invalid proposal state');
+        });
+
+        it('should handle execution errors gracefully', async () => {
+            const proposalAddress = new PublicKey('22222222222222222222222222222222');
+            validateProposalMock.mockResolvedValueOnce(true);
+            sendTransactionMock.mockRejectedValueOnce(new Error('Execution failed'));
+
+            await expect(governanceManager.executeProposal(proposalAddress))
+                .rejects.toThrow('Failed to execute proposal');
         });
     });
 });

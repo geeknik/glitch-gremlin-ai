@@ -1,12 +1,13 @@
 import { spawnSync } from 'child_process';
 import { join } from 'path';
+import { version } from '../../package.json';
 
 const CLI_PATH = join(__dirname, '../../dist/index.js');
 
 describe('CLI', () => {
     it('should display version', () => {
         const result = spawnSync('node', [CLI_PATH, '--version']);
-        expect(result.stdout.toString().trim()).toBe('0.1.0');
+        expect(result.stdout.toString().trim()).toBe(version);
     });
 
     it('should validate test parameters', () => {

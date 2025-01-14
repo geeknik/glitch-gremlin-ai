@@ -2,6 +2,16 @@ import { PublicKey, Connection } from '@solana/web3.js';
 
 export type RiskLevel = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 
+export interface SecurityMetric {
+    name: string;
+    score: number;
+    weight: number;
+    details?: string[];
+    risk: RiskLevel;
+    location?: string;
+    timestamp?: number;
+}
+
 export interface SecurityModelConfig {
     thresholds: {
         high: number;
@@ -57,9 +67,10 @@ export interface SecurityAnalysis {
 }
 
 export interface AnalysisResult {
+    programId: string;
     score: SecurityScore;
     riskLevel: RiskLevel;
-    patterns: string[];
+    patterns: SecurityPattern[];
     suggestions: string[];
     validation: ValidationResult;
     timestamp: Date;
@@ -80,11 +91,11 @@ const DEFAULT_CONFIG: SecurityModelConfig = {
     }
 };
 
-
 export class SecurityScoring {
     private readonly config: SecurityModelConfig;
-    private lastAnalyzedProgramId: string | null = null;
+    private lastAnalyzedProgramId: string | null = null; 
     private connection: Connection;
+    private overallScore: number = 0;
 
     constructor(config: Partial<SecurityModelConfig> = {}, connection: Connection) {
         this.config = {
@@ -112,12 +123,11 @@ export class SecurityScoring {
             score,
             riskLevel: analysis.riskLevel,
             patterns: risks,
-            suggestions: [...this.generateSuggestions(score, validation), ...risks],
+            suggestions: this.generateSuggestions(score, validation),
             validation,
             timestamp: new Date(),
             programId
         };
-    }
 
     public async analyzeSecurity(program: PublicKey): Promise<AnalysisResult> {
         const metrics = await this.analyzeSecurityMetrics(program.toBase58());
@@ -135,22 +145,56 @@ export class SecurityScoring {
             score,
             riskLevel: analysis.riskLevel,
             patterns: risks,
-            suggestions: [...this.generateSuggestions(score, validation), ...risks],
+            suggestions: this.generateSuggestions(score, validation), 
+            validation,
+            timestamp: new Date(),
+            programId: program.toBase58()
+        };
+    }
+
+    /**
+    * Analyzes security patterns in a program
+    * @param program The program public key to analyze
+    * @returns Detected security patterns and timestamp
+    */
+    public async detectPatterns(program: PublicKey | string): Promise<SecurityAnalysis> {
+        const programId = typeof program === 'string' ? program : program.toBase58();
+        const metrics = await this.analyzeSecurityMetrics(programId);
+        const patterns = await this.detectSecurityPatterns(metrics);
+        return {
+            patterns,
+            riskLevel: this.determineRiskLevel(patterns),
+            timestamp: new Date(),
+            programId
+        };
+    }
+
+    /**
+    * Identifies potential vulnerabilities in a program
+    * @param program The program to analyze
+    * @returns Analysis result with vulnerabilities and suggestions
+    */
+    public async identifyVulnerabilities(program: PublicKey | string): Promise<AnalysisResult> {
+        const programId = typeof program === 'string' ? program : program.toBase58();
+        const metrics = await this.analyzeSecurityMetrics(programId);
+        const score = this.calculateScore(metrics);
+        const validation = await this.validateProgram(programId);
+        const patterns = await this.detectRiskPatterns(metrics);
+
+        return {
+            score,
+            riskLevel: score.risk,
+            patterns,
+            suggestions: this.generateSuggestions(score, validation),
             validation,
             timestamp: new Date()
         };
     }
 
-    public async detectPatterns(program: PublicKey): Promise<{ patterns: SecurityPattern[]; timestamp: Date }> {
-        const metrics = await this.analyzeSecurityMetrics(program.toBase58());
-        const patterns = await this.detectSecurityPatterns(metrics);
-        return {
-            patterns,
-            timestamp: new Date()
-        };
-    }
-
     private async detectSecurityPatterns(metrics: SecurityMetrics): Promise<SecurityPattern[]> {
+        if (!metrics) {
+            return [];
+        }
         const patterns: SecurityPattern[] = [];
         const timestamp = Date.now();
 
@@ -194,9 +238,14 @@ export class SecurityScoring {
     }
 
     private determineRiskLevel(patterns: SecurityPattern[]): RiskLevel {
-        if (patterns.some(p => p.severity === 'CRITICAL')) return 'CRITICAL';
-        if (patterns.some(p => p.severity === 'HIGH')) return 'HIGH';
-        if (patterns.some(p => p.severity === 'MEDIUM')) return 'MEDIUM';
+        const patternArray = Array.isArray(patterns) ? patterns : [];
+        const hasCritical = patternArray.some(p => p?.severity === 'CRITICAL');
+        const hasHigh = patternArray.some(p => p?.severity === 'HIGH');
+        const hasMedium = patternArray.some(p => p?.severity === 'MEDIUM');
+        
+        if (hasCritical) return 'CRITICAL';
+        if (hasHigh) return 'HIGH';
+        if (hasMedium) return 'MEDIUM';
         return 'LOW';
     }
 
@@ -243,17 +292,21 @@ export class SecurityScoring {
 
     private calculateScore(metrics: SecurityMetrics): SecurityScore {
         const metricList = Object.values(metrics);
-        const overallScore = metricList.reduce(
+        const totalWeight = metricList.reduce((acc, metric) => acc + metric.weight, 0);
+        const weightedScore = metricList.reduce(
             (acc, metric) => acc + metric.score * metric.weight,
             0
-        );
-
+        ) / totalWeight;
+        
+        const details = metricList.flatMap(metric => metric.details || []);
+        const risk = this.determineRiskLevel(this.detectSecurityPatterns(metrics));
+        
         return {
-            overallScore,
-            metrics: metricList,
-            timestamp: Date.now(),
-            programId: this.lastAnalyzedProgramId!,
-            risk: this.determineRiskLevel(this.detectSecurityPatterns(metrics))
+            score: weightedScore,
+            weight: totalWeight,
+            risk,
+            details,
+            location: metricList[0]?.location
         };
     }
 
@@ -298,9 +351,9 @@ export class SecurityScoring {
     private generateSuggestions(score: SecurityScore, validation: ValidationResult): string[] {
         const suggestions: string[] = [];
 
-        if (score.overallScore < this.config.thresholds.high) {
+        if (score.score < this.config.thresholds.high) {
             suggestions.push('Critical: Immediate security improvements required');
-        } else if (score.overallScore < this.config.thresholds.medium) {
+        } else if (score.score < this.config.thresholds.medium) {
             suggestions.push('Warning: Security improvements recommended');
         }
 

@@ -113,3 +113,19 @@ target/
 debug/
 release/
 *.tsbuildinfo
+
+# Turbo
+.turbo/
+
+# TypeScript
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Test files
+*.test.js.snap
+*.test.ts.snap
+
+# Cache directories
+.cache/
+.npm/
+

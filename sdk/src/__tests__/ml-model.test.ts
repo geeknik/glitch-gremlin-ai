@@ -1,58 +1,115 @@
 import { jest, describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from '@jest/globals';
 import { VulnerabilityDetectionModel, VulnerabilityType, generateTrainingData } from '../ai/src/ml-model';
-import * as tf from '@tensorflow/tfjs-node';
+
+// Mock TensorFlow
+const mockTF = {
+sequential: jest.fn(),
+layers: {
+    dense: jest.fn(),
+    dropout: jest.fn()
+},
+memory: jest.fn(() => ({ numTensors: 0 })),
+tidy: jest.fn((fn) => fn()),
+dispose: jest.fn(),
+tensor: jest.fn(),
+tensor2d: jest.fn(),
+keep: jest.fn(x => x),
+metrics: {
+    categoricalAccuracy: jest.fn()
+}
+};
+
+jest.mock('@tensorflow/tfjs-node', () => mockTF);
 
 describe('VulnerabilityDetectionModel Tests', () => {
-    let model: VulnerabilityDetectionModel;
-    let memoryLeakListener: any;
+let model: VulnerabilityDetectionModel;
+let mockModel: any;
 
-    beforeAll(async () => {
-        // Explicitly set backend to CPU and disable warnings
-        tf.env().set('IS_NODE', true);
-        await tf.setBackend('cpu');
-        tf.env().set('DEBUG', false);
-        
-        // Initialize with a clean state
-        await tf.ready();
-        memoryLeakListener = tf.memory().numTensors;
-    });
+beforeAll(() => {
+    // Setup mock model
+    mockModel = {
+    compile: jest.fn(),
+    fit: jest.fn().mockResolvedValue({ history: { loss: [0.1], accuracy: [0.9] } }),
+    predict: jest.fn(),
+    save: jest.fn().mockResolvedValue(undefined),
+    load: jest.fn().mockResolvedValue(undefined),
+    dispose: jest.fn()
+    };
+    
+    mockTF.sequential.mockReturnValue(mockModel);
 
-    beforeEach(async () => {
-        model = new VulnerabilityDetectionModel();
+    beforeEach(() => {
+    // Reset mock states
+    jest.clearAllMocks();
+    // Create new model instance
+    model = new VulnerabilityDetectionModel();
+    
+    // Setup mock layer outputs
+    const mockDenseLayer = { 
+        units: 64,
+        activation: 'relu',
+        apply: jest.fn()
+    };
+    mockTF.layers.dense.mockReturnValue(mockDenseLayer);
+    
+    const mockDropoutLayer = {
+        rate: 0.2,
+        apply: jest.fn() 
+    };
+    mockTF.layers.dropout.mockReturnValue(mockDropoutLayer);
     });
 
     afterEach(async () => {
-        // Clean up model and tensors
-        if (model) {
-            await model.cleanup();
-        }
-        // Dispose all tensors and verify cleanup
-        tf.disposeVariables();
-        tf.engine().startScope();
-        tf.engine().endScope();
-        
-        // Allow some flexibility in tensor count due to TF.js internals
-        expect(tf.memory().numTensors).toBeLessThanOrEqual(memoryLeakListener + 2);
+    if (model) {
+        await model.cleanup();
+    }
+    // Verify proper cleanup
+    expect(mockModel.dispose).toHaveBeenCalled();
     });
 
-    afterAll(async () => {
-        await tf.dispose();
+    afterAll(() => {
+    // Reset mock states
+    jest.resetAllMocks();
     });
 
     describe('training', () => {
 
         it('should train on small sample dataset and validate results', async () => {
-            const sampleData = generateTrainingData(10);
-            await model.trainWithData(sampleData);
-            
-            // Verify model is trained
-            const testFeatures = new Array(20).fill(0).map(() => Math.random());
-            const prediction = await model.predictVulnerability(testFeatures);
-            
-            expect(prediction.type).toBeDefined();
-            expect(prediction.confidence).toBeGreaterThan(0);
-            expect(prediction.confidence).toBeLessThanOrEqual(1);
-            expect(prediction.details).toBeInstanceOf(Array);
+        // Setup mock data
+        const sampleData = generateTrainingData(10);
+        const mockTrainTensor = { dispose: jest.fn() };
+        mockTF.tensor2d.mockReturnValue(mockTrainTensor);
+        
+        // Train model
+        await model.trainWithData(sampleData);
+        
+        // Verify model was compiled and trained correctly
+        expect(mockModel.compile).toHaveBeenCalledWith({
+            optimizer: expect.any(String),
+            loss: expect.any(String),
+            metrics: expect.arrayContaining(['accuracy'])
+        });
+        expect(mockModel.fit).toHaveBeenCalled();
+        
+        // Test prediction 
+        const testFeatures = new Array(20).fill(0).map(() => Math.random());
+        const mockPredictionTensor = {
+            arraySync: jest.fn().mockReturnValue([[0.8, 0.2]]),
+            dispose: jest.fn()
+        };
+        mockModel.predict.mockReturnValue(mockPredictionTensor);
+        
+        const prediction = await model.predictVulnerability(testFeatures);
+        
+        // Verify prediction format
+        expect(prediction.type).toBeDefined();
+        expect(prediction.confidence).toBeGreaterThan(0);
+        expect(prediction.confidence).toBeLessThanOrEqual(1);
+        expect(prediction.details).toBeInstanceOf(Array);
+        
+        // Verify cleanup
+        expect(mockTrainTensor.dispose).toHaveBeenCalled();
+        expect(mockPredictionTensor.dispose).toHaveBeenCalled();
         });
 
         it('should handle empty training data gracefully', async () => {

@@ -1,54 +1,56 @@
+/** Types of chaos engineering tests that can be performed */
 export enum TestType {
+    /** Fuzz testing to find edge cases and crashes */
     FUZZ = 'FUZZ',
+    
+    /** Load testing to verify performance under stress */
     LOAD = 'LOAD',
-    EXPLOIT = 'EXPLOIT',
-    CONCURRENCY = 'CONCURRENCY'
+    
+    /** Security testing to find vulnerabilities */
+    SECURITY = 'SECURITY',
+    
+    /** Network partition testing */
+    NETWORK = 'NETWORK'
 }
 
+/** Vulnerability types that can be detected by the security analysis */
 export enum VulnerabilityType {
-    ArithmeticOverflow = 'ArithmeticOverflow',
-    AccessControl = 'AccessControl',
-    None = 'None',
-    Reentrancy = 'Reentrancy',
-    PDASafety = 'PDASafety',
-    AccountDataValidation = 'AccountDataValidation'
+/** Program crashes or panics due to unhandled errors */
+Crash = 'Crash',
+
+/** Buffer overflow vulnerabilities that can corrupt memory */
+BufferOverflow = 'BufferOverflow',
+
+/** Integer overflow/underflow vulnerabilities */
+ArithmeticOverflow = 'ArithmeticOverflow',
+
+/** Reentrancy vulnerabilities allowing multiple concurrent calls */
+Reentrancy = 'Reentrancy',
+
+/** Access control or authorization bypass vulnerabilities */
+AccessControl = 'AccessControl',
+
+/** General program logic errors and bugs */
+LogicError = 'LogicError'
 }
 
-export interface GovernanceConfig {
-    minStakeAmount: number;
-    minStakeLockupPeriod: number;
-    maxStakeLockupPeriod: number;
-}
+/** States that a governance proposal can be in during its lifecycle */
+export enum ProposalState {
+/** Initial state when proposal is first created but not yet activated */
+Draft = 'Draft',
 
-export interface ChaosRequestParams {
-    targetProgram: string;
-    testType: TestType;
-    duration: number;
-    intensity: number;
-    resultRef?: string;
-}
+/** Proposal is active and accepting votes */
+Active = 'Active',
 
-export interface ChaosResult {
-    requestId: string;
-    status: 'completed' | 'failed';
-    resultRef?: string;
-    logs?: string[];
-    metrics?: {
-        totalTransactions: number;
-        errorRate: number;
-        avgLatency: number;
-    };
-}
+/** Proposal has passed voting and met quorum requirements */
+Succeeded = 'Succeeded',
 
-export interface ProposalParams {
-    title: string;
-    description: string;
-    targetProgram: string;
-    testParams: ChaosRequestParams;
-    stakingAmount: number;
-}
+/** Proposal failed to meet voting threshold or quorum requirements */
+Defeated = 'Defeated',  
 
-export interface ErrorDetails {
-    timestamp: number;
-    [key: string]: any;
+/** Proposal instructions have been executed successfully */
+Executed = 'Executed',
+
+/** Proposal was cancelled before execution */
+Cancelled = 'Cancelled'
 }

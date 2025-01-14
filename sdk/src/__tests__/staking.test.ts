@@ -1,36 +1,68 @@
-import { jest, describe, it, expect, beforeEach } from '@jest/globals';
+import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import Redis from 'ioredis-mock';
 import { GlitchSDK } from '../sdk.js';
-import { Keypair } from '@solana/web3.js';
+import { Keypair, Connection } from '@solana/web3.js';
 import { InsufficientFundsError } from '../errors.js';
+
+jest.mock('ioredis', () => require('ioredis-mock'));
 
 describe('Staking', () => {
     let sdk: GlitchSDK;
+    let mockRedis: Redis;
+    let mockConnection: jest.Mocked<Connection>;
     
     beforeEach(async () => {
+        mockRedis = new Redis();
+        mockConnection = {
+            getBalance: jest.fn(),
+            getRecentBlockhash: jest.fn(),
+            sendTransaction: jest.fn()
+        } as unknown as jest.Mocked<Connection>;
+
         const wallet = Keypair.generate();
-        sdk = await GlitchSDK.init({
+        sdk = await GlitchSDK.create({
             cluster: 'https://api.devnet.solana.com',
             wallet,
             governanceConfig: {
                 minStakeAmount: 100,
                 minStakeLockupPeriod: 86400,
                 maxStakeLockupPeriod: 31536000
-            }
+            },
+            redis: mockRedis,
+            connection: mockConnection
         });
+
+        // Mock rate limit checks to pass by default
+        jest.spyOn(mockRedis, 'get').mockResolvedValue(null);
+        jest.spyOn(mockRedis, 'set').mockResolvedValue('OK');
+        jest.spyOn(mockRedis, 'incr').mockResolvedValue(1);
+    });
+
+    afterEach(async () => {
+        if (mockRedis) {
+            await mockRedis.quit();
+        }
+        jest.clearAllMocks();
     });
 
     describe('stakeTokens', () => {
+        beforeEach(() => {
+            // Mock getBalance to return sufficient balance by default
+            mockConnection.getBalance.mockResolvedValue(2000);
+            mockConnection.getRecentBlockhash.mockResolvedValue({
+                blockhash: 'mock-blockhash',
+                lastValidBlockHeight: 1000
+            });
+        });
+
         it('should handle transaction failures', async () => {
-            // Mock sufficient balance to pass the initial check
-            jest.spyOn(sdk['connection'], 'getBalance')
-                .mockResolvedValueOnce(2000);
-            
-            // Mock the transaction failure
-            jest.spyOn(sdk['connection'], 'sendTransaction')
-                .mockRejectedValueOnce(new Error('Transaction failed'));
+            mockConnection.sendTransaction.mockRejectedValueOnce(
+                new Error('Transaction failed')
+            );
 
             await expect(sdk.stakeTokens(1000, 86400))
                 .rejects.toThrow('Transaction failed');
+        });
         });
 
         it('should validate maximum stake amount', async () => {

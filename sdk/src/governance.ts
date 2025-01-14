@@ -1,5 +1,5 @@
 import { Connection, Keypair, PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js';
-import { ProposalState } from './types';
+import { ProposalState } from './types.js';
 
 interface ProposalStateData {
     title: string;

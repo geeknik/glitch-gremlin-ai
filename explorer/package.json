@@ -1,8 +1,14 @@
 {
-  "name": "glitch-gremlin-explorer",
-  "version": "1.0.0",
-  "description": "Blockchain explorer for Glitch Gremlin AI",
-  "scripts": {
+"name": "glitch-gremlin-explorer",
+"version": "0.1.0",
+"description": "Blockchain explorer for Glitch Gremlin AI", 
+"type": "module",
+"private": true,
+"repository": {
+    "type": "git",
+    "url": "https://github.com/geeknik/glitch-gremlin-ai"
+},
+"scripts": {
     "start": "vite",
     "dev": "vite",
     "build": "vite build",

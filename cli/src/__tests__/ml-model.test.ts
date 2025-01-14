@@ -1,5 +1,4 @@
 import { VulnerabilityDetectionModel } from '@glitch-gremlin/sdk';
-import { VulnerabilityType } from '@glitch-gremlin/sdk';
 
 describe('ML Model Integration Tests', () => {
     let model: VulnerabilityDetectionModel;

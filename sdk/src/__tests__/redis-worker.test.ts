@@ -18,8 +18,13 @@ interface MockRedis extends RedisType {
     flushall: jest.Mock<Promise<'OK'>>;
     hset: jest.Mock<Promise<number>>;
     hget: jest.Mock<Promise<string | null>>;
+    hgetall: jest.Mock<Promise<Record<string, string>>>;
     lpush: jest.Mock<Promise<number>>;
     rpop: jest.Mock<Promise<string | null>>;
+    keys: jest.Mock<Promise<string[]>>;
+    del: jest.Mock<Promise<number>>;
+    multi: jest.Mock<any>;
+    exec: jest.Mock<any>;
 }
 
 import { GlitchError } from '../errors.js';
@@ -31,10 +36,27 @@ describe('RedisQueueWorker', () => {
     let worker: RedisQueueWorker;
     let redis: MockRedis;
 
+    import { RateLimitConfig } from '../types.js';
+
     beforeAll(() => {
         const redisMock: MockRedis = {
             connected: true,
             queue: [] as string[],
+            rateLimits: new Map<string, RateLimitConfig>(),
+            exec: jest.fn().mockImplementation(async function(this: MockRedis) {
+                return this.execCommands || [];
+            }),
+            execCommands: [] as any[],
+            del: jest.fn().mockImplementation(async (...keys: string[]) => {
+                return keys.length;
+            }),
+            hgetall: jest.fn().mockImplementation(async (key: string) => {
+                return {
+                    total: '10',
+                    active: '5'
+                };
+            }),
+            multi: jest.fn().mockReturnThis(),
             quit: jest.fn().mockImplementation(async () => {
                 redisMock.connected = false;
                 return 'OK';
@@ -96,18 +118,62 @@ describe('RedisQueueWorker', () => {
     });
 
     beforeEach(() => {
+        jest.useFakeTimers();
+        redis.queue = [];
+        redis.execCommands = [];
+        redis.rateLimits.clear();
         worker = new RedisQueueWorker(redis);
     });
 
     afterEach(async () => {
+        jest.useRealTimers();
+        redis.queue = [];
+        redis.execCommands = [];
+        redis.rateLimits.clear();
+        
         try {
             await worker.close();
             await redis.flushall();
-            await redis.quit();
-            await redis.disconnect();
         } catch (error) {
             console.error('Error in test cleanup:', error);
         }
+    });
+
+    describe('rate limiting', () => {
+        it('should enforce rate limits per request type', async () => {
+            const requestType = 'TEST';
+            const config: RateLimitConfig = {
+                maxRequests: 2,
+                interval: 1000  // 1 second
+            };
+
+            redis.get.mockImplementation(async (key: string) => {
+                if (key.includes('ratelimit')) {
+                    return '1';  // Current count
+                }
+                return null;
+            });
+
+            // First request should succeed
+            await expect(worker.checkRateLimit(requestType)).resolves.toBe(true);
+            
+            // Second request hits limit
+            redis.get.mockResolvedValueOnce('2');
+            await expect(worker.checkRateLimit(requestType)).resolves.toBe(false);
+        });
+
+        it('should reset rate limit after interval', async () => {
+            const requestType = 'TEST';
+            
+            redis.get.mockResolvedValueOnce('1');
+            await worker.checkRateLimit(requestType);
+
+            // Advance timer past rate limit interval
+            jest.advanceTimersByTime(1100);
+
+            redis.get.mockResolvedValueOnce(null);  // Counter expired
+            await expect(worker.checkRateLimit(requestType)).resolves.toBe(true);
+        });
     });
 
     describe('queue operations', () => {
@@ -149,6 +215,27 @@ describe('RedisQueueWorker', () => {
 
             expect(first?.params).toEqual(params1);
             expect(second?.params).toEqual(params2);
+        });
+    });
+
+    describe('queue lifecycle', () => {
+        it('should handle queue worker startup and shutdown', async () => {
+            const worker = new RedisQueueWorker(redis);
+            await expect(worker.initialize()).resolves.not.toThrow();
+            
+            expect(redis.on).toHaveBeenCalledWith('error', expect.any(Function));
+            expect(redis.on).toHaveBeenCalledWith('connect', expect.any(Function));
+            
+            await expect(worker.close()).resolves.not.toThrow();
+            expect(redis.quit).toHaveBeenCalled();
+            expect(redis.disconnect).toHaveBeenCalled();
+        });
+
+        it('should handle redis connection failures gracefully', async () => {
+            redis.connected = false;
+            const worker = new RedisQueueWorker(redis);
+            
+            await expect(worker.initialize()).rejects.toThrow('Redis connection failed');
         });
     });
 
