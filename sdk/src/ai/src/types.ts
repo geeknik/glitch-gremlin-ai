@@ -1,9 +1,3 @@
-export enum TestType {
-    FUZZ = 'FUZZ',
-    LOAD = 'LOAD',
-    EXPLOIT = 'EXPLOIT',
-    CONCURRENCY = 'CONCURRENCY'
-}
 
 export enum VulnerabilityType {
     ArithmeticOverflow = 'ArithmeticOverflow',

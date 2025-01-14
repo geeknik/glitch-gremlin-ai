@@ -62,6 +62,24 @@ export interface ErrorDetails {
     context?: Record<string, unknown>;
 }
 
+export class InvalidArgumentError extends GlitchError {
+    constructor(details?: Partial<ErrorDetails>) {
+        super('Invalid argument provided', ErrorCode.INVALID_ARGUMENT, details);
+    }
+}
+
+export class RateLimitExceededError extends GlitchError {
+    constructor(details?: Partial<ErrorDetails>) {
+        super('Rate limit exceeded', ErrorCode.RATE_LIMIT_EXCEEDED, details);
+    }
+}
+
+export class InvalidStateError extends GlitchError {
+    constructor(details?: Partial<ErrorDetails>) {
+        super('Invalid system state', ErrorCode.INVALID_STATE, details);
+    }
+}
+
 export class GlitchError extends Error {
     public readonly code: ErrorCode;
     public readonly details: ErrorDetails;

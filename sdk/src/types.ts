@@ -40,12 +40,6 @@ export enum VulnerabilityType {
     LamportDrain = 'lamport-drain'
 }
 
-export enum TestType {
-    FUZZ = 'FUZZ',
-    LOAD = 'LOAD',
-    EXPLOIT = 'EXPLOIT',
-    CONCURRENCY = 'CONCURRENCY'
-}
 
 export interface FuzzTestParams {
     instructionTypes?: string[];
