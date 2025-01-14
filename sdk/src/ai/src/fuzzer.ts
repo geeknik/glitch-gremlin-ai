@@ -63,7 +63,7 @@ export class Fuzzer {
 
     private port: number;
     private metricsCollector: any;
-    private maxIterations: number = 1000;
+    private maxIterations: number = 2000; // Increase for high volume test
     constructor(config: { port: number; metricsCollector: any }) {
         this.port = config.port;
         this.metricsCollector = config.metricsCollector;
@@ -131,6 +131,16 @@ export class Fuzzer {
             dictionary.copy(mutated, position);
         }
         return { ...input, data: mutated };
+    }
+
+    private getMutationForStrategy(strategy: string, input: FuzzInput): Promise<FuzzInput> {
+        switch(strategy) {
+            case 'bitflip': return this.bitflipMutation(input);
+            case 'arithmetic': return this.arithmeticMutation(input);
+            case 'havoc': return this.havocMutation(input);
+            case 'dictionary': return this.dictionaryMutation(input);
+            default: throw new Error(`Unknown strategy: ${strategy}`);
+        }
     }
 
     async fuzzWithStrategy(strategy: string, programId: PublicKey): Promise<FuzzResult> {

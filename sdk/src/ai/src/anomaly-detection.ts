@@ -25,6 +25,19 @@ const logger = new Logger('anomaly-detection');
 export { logger };
 
 export class AnomalyDetectionModel extends EventEmitter {
+    async predict(input: Buffer): Promise<number> {
+        if (!this.model) {
+            throw new Error('Model not initialized');
+        }
+        
+        const tensor = tf.tensor([Array.from(input)]);
+        const normalized = this.normalizeData(tensor);
+        const prediction = this.model.predict(normalized) as tf.Tensor;
+        const score = prediction.dataSync()[0];
+        
+        tf.dispose([tensor, normalized, prediction]);
+        return score;
+    }
     private model: tf.LayersModel | null = null;
     private logger: Logger;
     private initialized: boolean = false;

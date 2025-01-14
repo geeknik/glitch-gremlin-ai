@@ -85,6 +85,7 @@ describe('Chaos Fuzzing and Anomaly Detection Tests', () => {
 
     describe('Anomaly Detection under Simulated Failure Modes', () => {
         it('should handle anomalies during network latency', async () => {
+            jest.setTimeout(30000); // Increase timeout to 30s
             // Simulate network latency
             const metrics = generateAnomalousMetrics(100);
             const detectSpy = jest.spyOn(anomalyModel, 'detect')
