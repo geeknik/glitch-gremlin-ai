@@ -259,12 +259,18 @@ export class AnomalyDetectionModel extends EventEmitter {
         // Start scope for tensor management
         tf.engine().startScope();
 
-        if (!this.model) {
-            throw new Error('Model not trained');
-        }
-        if (data.length < this.inputWindowSize) {
-            throw new Error(`Insufficient data points. Minimum required: ${this.inputWindowSize}`);
-        }
+        try {
+            if (!this.model) {
+                throw new Error('Model not trained');
+            }
+            if (data.length < this.inputWindowSize) {
+                throw new Error(`Insufficient data points. Minimum required: ${this.inputWindowSize}`);
+            }
+
+            // Validate input data
+            if (!data || !Array.isArray(data)) {
+                throw new Error('Invalid input data');
+            }
 
         try {
             // Check heap before processing
