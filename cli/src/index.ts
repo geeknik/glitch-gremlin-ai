@@ -66,8 +66,8 @@ program
     }
 
     // Initialize SDK
-    const sdk = await GlitchSDK.init({
-        cluster: process.env.SOLANA_CLUSTER || 'https://api.testnet.solana.com',
+    const sdk = new GlitchSDK({
+        cluster: process.env.SOLANA_CLUSTER || 'devnet',
         wallet: Keypair.fromSecretKey(
             Buffer.from(JSON.parse(readFileSync(keypairPath, 'utf-8')))
         )
@@ -125,7 +125,7 @@ governance
   .action(async (options) => {
     const spinner = ora('Creating proposal...').start();
     try {
-    const sdk = await GlitchSDK.init({
+    const sdk = new GlitchSDK({
         cluster: process.env.SOLANA_CLUSTER || 'devnet',
         wallet: Keypair.fromSecretKey(
             Buffer.from(JSON.parse(readFileSync(process.env.SOLANA_KEYPAIR_PATH!, 'utf-8')))
@@ -158,7 +158,7 @@ governance
   .action(async (options) => {
     const spinner = ora('Submitting vote...').start();
     try {
-    const sdk = await GlitchSDK.init({
+    const sdk = new GlitchSDK({
         cluster: process.env.SOLANA_CLUSTER || 'devnet',
         wallet: Keypair.fromSecretKey(
             Buffer.from(JSON.parse(readFileSync(process.env.SOLANA_KEYPAIR_PATH!, 'utf-8')))
