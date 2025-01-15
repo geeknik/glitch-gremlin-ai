@@ -373,7 +373,7 @@ export class Fuzzer {
                         executionTime: [Date.now() - input.created]
                     }
                 };
-                const anomalyResult = await anomalyDetectionModel.detectAnomalies(currentMetrics);
+                const anomalyResult = await anomalyDetectionModel.detectAnomalies([currentMetrics]); // Wrap in array
                 if (anomalyResult.confidence > anomalyDetectionModel.getConfig().anomalyThreshold) {
                     this.logger.warn(`Anomaly detected: ${JSON.stringify(anomalyResult)}`);
                     // Handle anomaly (e.g., stop fuzzing, adjust parameters)
