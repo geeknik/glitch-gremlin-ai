@@ -24,14 +24,14 @@ import { GlitchError, InsufficientFundsError, InvalidProgramError, ErrorCode } f
 /**
  * GlitchSDK provides the main interface for interacting with the Glitch Gremlin AI platform.
  * It handles chaos test requests, result monitoring, and governance interactions.
- * 
+ *
  * @example
  * ```typescript
  * const sdk = new GlitchSDK({
  *   cluster: 'devnet',
  *   wallet: myKeypair
  * });
- * 
+ *
  * const request = await sdk.createChaosRequest({
  *   targetProgram: "Your program ID",
  *   testType: TestType.FUZZ,
@@ -89,19 +89,19 @@ export class GlitchSDK {
             quorum: 10,
             executionDelay: 86400
         };
-        
+
         this.governanceConfig = {
             ...defaultConfig,
             ...config.governanceConfig
         };
-        
+
         // Validate and set cluster URL
         const heliusApiKey = config.heliusApiKey || process.env.VITE_HELIUS_API_KEY || process.env.HELIUS_API_KEY;
         if (!heliusApiKey) {
             throw new Error('Helius API key is required. Please set VITE_HELIUS_API_KEY or HELIUS_API_KEY in environment variables');
         }
-        
-        const clusterUrl = config.cluster || 
+
+        const clusterUrl = config.cluster ||
             `https://mainnet.helius-rpc.com/?api-key=${heliusApiKey}`;
         this.connection = new Connection(clusterUrl, {
             commitment: 'confirmed',
@@ -110,7 +110,7 @@ export class GlitchSDK {
                 'Content-Type': 'application/json'
             }
         });
-        
+
         // Use an obfuscated program ID if not specified
         this.programId = new PublicKey(
             config.programId || process.env.PROGRAM_ID || 'GLt5cQeRgVMqnE9DGJQNNrbAfnRQYWqYVNWnJo7WNLZ9'
@@ -139,7 +139,7 @@ export class GlitchSDK {
 
     private async initialize(redisConfig?: RedisConfig): Promise<void> {
         if (this.initialized) return;
-        
+
         // Initialize Redis worker with provided config or default localhost config
         let redis: RedisClient | undefined;
         try {
@@ -154,12 +154,12 @@ export class GlitchSDK {
 
             // Test Redis connection
             await redis.ping();
-            
+
             this.queueWorker = new RedisQueueWorker(redis);
-            
+
             // Verify Solana connection
             await this.connection.getVersion();
-            
+
             this.initialized = true;
         } catch (error) {
             if (redis) {
@@ -175,7 +175,7 @@ export class GlitchSDK {
     private async checkRateLimit(): Promise<void> {
         const now = Date.now();
         const timeSinceLastRequest = now - this.lastRequestTime;
-        
+
         if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
             const waitTime = this.MIN_REQUEST_INTERVAL - timeSinceLastRequest;
             console.warn(`Rate limit warning: Must wait ${waitTime}ms before next request`);
@@ -185,21 +185,21 @@ export class GlitchSDK {
         // Check global rate limit counter
         const currentMinute = Math.floor(now / 60000);
         const requestKey = `requests:${currentMinute}`;
-        
+
         try {
             const client = await this.queueWorker.getRawClient();
             const requestCount = await client.incr(requestKey);
             await client.expire(requestKey, 60);
-        
+
             if (requestCount > 3) { // Lower limit for testing
                 throw new GlitchError('Rate limit exceeded', 1007);
             }
-        
+
             // Add delay to ensure rate limit is enforced in tests
             if (process.env.NODE_ENV === 'test') {
                 await new Promise(resolve => setTimeout(resolve, 10)); // Reduce delay
             }
-            
+
             this.lastRequestTime = now;
         } catch (error) {
             return this.handleRateLimitError(error);
@@ -233,7 +233,7 @@ export class GlitchSDK {
         // Check rate limits using Redis
         const now = Date.now();
         const requestKey = `request:${this.wallet.publicKey.toString()}`;
-        
+
         // Check cooldown
         const client = await this.queueWorker.getRawClient();
         const lastRequest = await client.get(requestKey);
@@ -243,7 +243,7 @@ export class GlitchSDK {
                 throw new GlitchError('Rate limit exceeded', 1007);
             }
         }
-        
+
         // Update last request time
         await client.set(requestKey, now.toString());
 
@@ -304,11 +304,11 @@ export class GlitchSDK {
                         }
                     };
                 }
-                
+
                 // Default completion response for other test types
                 return {
                     requestId,
-                    status: 'completed', 
+                    status: 'completed',
                     resultRef: 'ipfs://QmHash',
                     logs: ['Test completed successfully'],
                     metrics: {
@@ -402,7 +402,7 @@ export class GlitchSDK {
         });
 
         const transaction = new Transaction().add(instruction);
-        
+
         const balance = await this.connection.getBalance(this.wallet.publicKey);
         if (balance < params.stakingAmount) {
             throw new GlitchError('Insufficient stake amount', 1008);
@@ -411,7 +411,7 @@ export class GlitchSDK {
         try {
             // Simulate the transaction first
             await this.connection.simulateTransaction(transaction, [this.wallet]);
-            
+
             // If simulation succeeds, send the actual transaction
             const signature = await this.connection.sendTransaction(transaction, [this.wallet]);
 
@@ -484,15 +484,15 @@ export class GlitchSDK {
     public async stakeTokens(amount: number, lockupPeriod: number, delegateAddress?: string): Promise<string> {
         // Check rate limit first
         await this.checkRateLimit();
-        
+
         // Validate stake amount
         if (typeof amount !== 'number' || isNaN(amount) || amount <= 0) {
             throw new GlitchError('Invalid stake amount', ErrorCode.INVALID_AMOUNT);
         }
-        
+
         if (amount < this.MIN_STAKE_AMOUNT) {
             throw new GlitchError(
-                `Minimum stake amount is ${this.MIN_STAKE_AMOUNT}`, 
+                `Minimum stake amount is ${this.MIN_STAKE_AMOUNT}`,
                 ErrorCode.STAKE_TOO_LOW
             );
         }
@@ -592,7 +592,7 @@ export class GlitchSDK {
         }
 
         const delegatePubkey = new PublicKey(delegateAddress);
-        
+
         const instruction = new TransactionInstruction({
             keys: [
                 { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
@@ -688,8 +688,8 @@ export class GlitchSDK {
         const stakingTier = this.getStakingTier(stakeInfo.amount);
         const baseRewards = await this.calculateBaseRewards(stakeId);
         const bonusRewards = await this.calculateBonusRewards(
-            baseRewards, 
-            stakingTier, 
+            baseRewards,
+            stakingTier,
             stakeInfo.owner
         );
         const totalRewards = baseRewards + bonusRewards;
@@ -729,10 +729,10 @@ export class GlitchSDK {
     private async calculateBaseRewards(stakeId: string): Promise<number> {
         const stakeInfo = await this.getStakeInfo(stakeId);
         if (!stakeInfo) return 0;
-        
+
         const currentTime = Date.now() / 1000;
         const stakingDuration = currentTime - Number(stakeInfo.startTime);
-        
+
         // Base reward rate: 0.1% per day
         const baseRate = 0.001;
         return Number(stakeInfo.amount) * baseRate * (stakingDuration / 86400);
@@ -740,7 +740,7 @@ export class GlitchSDK {
 
     private async calculateBonusRewards(baseRewards: number, tier: string, walletAddress: PublicKey): Promise<number> {
         let bonus = 0;
-        
+
         // Tier bonuses
         switch(tier) {
             case 'bronze': bonus += baseRewards * 0.1; break;
@@ -758,7 +758,7 @@ export class GlitchSDK {
     }
 
     private readonly SP00GE_TOKEN_ADDRESS = new PublicKey('34D7VCSA7uKsCHe5rRs5NpnkGRy7PW4g41asJnZ9pump');
-    
+
     private async getTreasuryBalance(): Promise<number> {
         try {
             const treasuryAccount = await this.connection.getAccountInfo(this.programId);
@@ -837,7 +837,7 @@ export class GlitchSDK {
         results?: ChaosResult;
     }> {
         const proposal = await this.getProposalStatus(proposalId);
-        
+
         if (proposal.status !== 'active') {
             throw new GlitchError('Proposal not passed', 1009);
         }
@@ -872,10 +872,10 @@ export class GlitchSDK {
         });
 
         const transaction = new Transaction().add(instruction);
-        
+
         // Simulate transaction first
         await this.connection.simulateTransaction(transaction, [this.wallet]);
-        
+
         // If simulation succeeds, send the actual transaction
         const signature = await this.connection.sendTransaction(transaction, [this.wallet]);
         return {
@@ -982,7 +982,7 @@ export class GlitchSDK {
                     id: proposalId,
                     status: 'active',
                     title: "Test Proposal",
-                    description: "Test Description", 
+                    description: "Test Description",
                     proposer: this.wallet.publicKey.toString(),
                     startTime: now - 86400000,
                     endTime: now + 86400000,
