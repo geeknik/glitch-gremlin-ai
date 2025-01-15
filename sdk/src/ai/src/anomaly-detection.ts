@@ -114,6 +114,7 @@ export class AnomalyDetector extends EventEmitter {
         'instructionFrequency', 'executionTime', 'memoryUsage', 'cpuUtilization',
         'errorRate', 'pdaValidation', 'accountDataMatching', 'cpiSafety', 'authorityChecks'
     ] as const;
+    private isInitialized = false;
 
     constructor(config: Partial<ModelConfig>) {
         super();
@@ -370,48 +371,52 @@ const squaredDiffs = values.map(v => Math.pow(v - mean, 2));
 return this.calculateMean(squaredDiffs);
 }
 
-    return tf.tidy(() => {
+    public async detect(metrics: TimeSeriesMetric[]): Promise<AnomalyResult> {
+        if (!this.isInitialized) {
+            throw new Error('Model not trained');
+        }
+
         const tensorData = this.preprocessMetrics(metrics);
-        const predictions = this.model.predict(tensorData);
-        const reconstructionErrors = tf.sub(predictions as tf.Tensor, tensorData).abs().mean(1);
-    
-    const anomalyScores = reconstructionErrors.div(tf.scalar(this.thresholds.reconstruction));
-    const isAnomaly = anomalyScores.greater(tf.scalar(1));
+        const predictions = this.models.autoencoder.predict(tensorData) as tf.Tensor;
+        const reconstructionErrors = tf.sub(predictions, tensorData).abs().mean(1);
+        
+        const anomalyScores = reconstructionErrors.div(tf.scalar(this.config.anomalyThreshold));
+        const isAnomaly = anomalyScores.greater(tf.scalar(1));
 
-    const details: AnomalyDetailsItem[] = [];
-    const metricNames = [
-    'instructionFrequency',
-    'executionTime',
-    'memoryUsage',
-    'cpuUtilization',
-    'errorRate',
-    'pdaValidation',
-    'accountDataMatching',
-    'cpiSafety',
-    'authorityChecks'
-    ];
+        const details: AnomalyDetailsItem[] = [];
+        for (let i = 0; i < this.metrics.length; i++) {
+            const metricScore = anomalyScores.slice([0, i * 4], [-1, 4]).mean();
+            const score = metricScore.dataSync()[0];
+            
+            if (score > 0.8) {
+                details.push({
+                    type: this.metrics[i],
+                    score,
+                    threshold: this.config.anomalyThreshold,
+                    correlatedPatterns: this.findCorrelatedPatterns(this.metrics[i], metrics)
+                });
+            }
+        }
 
-    // Analyze individual metrics
-    for (let i = 0; i < metricNames.length; i++) {
-    const metricScore = anomalyScores.slice([0, i * 4], [-1, 4]).mean();
-    const score = metricScore.dataSync()[0];
-    
-    if (score > 0.8) {  // Threshold for individual metrics
-        details.push({
-        type: metricNames[i],
-        score,
-        threshold: this.thresholds.reconstruction,
-        correlatedPatterns: this.findCorrelatedPatterns(metricNames[i], metrics)
-        });
-    }
+        return {
+            isAnomaly: isAnomaly.any().dataSync()[0] === 1,
+            confidence: anomalyScores.mean().dataSync()[0],
+            details,
+            timestamp: Date.now()
+        };
     }
 
-    return {
-    isAnomaly: isAnomaly.any().dataSync()[0] === 1, // Convert to boolean
-    confidence: anomalyScores.mean().dataSync()[0],
-    details,
-    timestamp: Date.now()
-    };
+    public async cleanup(): Promise<void> {
+        if (this.models) {
+            if (this.models.autoencoder) {
+                this.models.autoencoder.dispose();
+            }
+            if (this.models.lstm) {
+                this.models.lstm.dispose();
+            }
+        }
+        this.isInitialized = false;
+    }
 }
 
 private findCorrelatedPatterns(metricType: string, metrics: TimeSeriesMetric[]): string[] {
