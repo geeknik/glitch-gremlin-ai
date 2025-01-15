@@ -1,5 +1,5 @@
 import { GlitchSDK } from '@glitch-gremlin/sdk';
-import { TestType } from '../../sdk/src/token-economics';
+import { TestType } from '../../src/token/worker/src/ai/engine';
 import { GlitchError } from '../../sdk/src/errors';
 import { jest } from '@jest/globals';
 
@@ -58,7 +58,7 @@ describe('Mutation Testing', () => {
         it('should execute mutation test with correct parameters', async () => {
             const mutationParams = {
                 targetProgram: TEST_PROGRAM,
-                testType: TestType.MUTATION,
+                testType: "MUTATION",
                 duration: 60,
                 intensity: 5
             };
@@ -85,7 +85,7 @@ describe('Mutation Testing', () => {
 
             const mutationParams = {
                 targetProgram: TEST_PROGRAM,
-                testType: TestType.MUTATION,
+                testType: "MUTATION",
                 duration: 60,
                 intensity: 5
             };
@@ -152,8 +152,6 @@ describe('Mutation Testing', () => {
             }).rejects.toThrow('Test execution timed out');
 
             clearTimeout(timeoutId);
-            
-            clearTimeout(timeout);
         }, DEFAULT_TEST_TIMEOUT);
 
         it('should validate program ID format', async () => {
