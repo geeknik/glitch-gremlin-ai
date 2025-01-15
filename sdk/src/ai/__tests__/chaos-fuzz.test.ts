@@ -1,6 +1,18 @@
-import '@tensorflow/tfjs-node';  // Must be first import
-import * as tf from '@tensorflow/tfjs';  // Import core TensorFlow.js
-import { MemoryInfo } from '@tensorflow/tfjs-core/dist/engine';
+import { jest } from '@jest/globals';
+import '@tensorflow/tfjs-node';  // Must be first TF import
+import * as tf from '@tensorflow/tfjs';
+import type { MemoryInfo } from '@tensorflow/tfjs-core/dist/engine';
+import { PublicKey, Connection } from '@solana/web3.js';
+import { 
+AnomalyDetector, 
+TimeSeriesMetric,
+AnomalyResult,
+ModelConfig 
+} from '../src/anomaly-detection';
+import { Fuzzer } from '../src/fuzzer';
+import { Logger } from '../../utils/logger';
+import { VulnerabilityType } from '../src/types';
+import { generateAnomalousMetrics } from '../src/test-utils/anomaly-test-utils';
 
 declare global {
     namespace NodeJS {
@@ -9,11 +21,6 @@ declare global {
         }
     }
 }
-
-import { AnomalyDetectionModel, TimeSeriesMetrics, AnomalyDetectionResult } from '../src/anomaly-detection';
-import { jest, SpyInstance } from '@jest/globals';
-import { Fuzzer } from '../src/fuzzer';
-import { Logger } from '@/utils/logger';
 
 interface FuzzInput {
     instruction: number;
@@ -49,13 +56,10 @@ interface AnomalyDetails {
     score: number;
     threshold: number;
 }
-import { PublicKey, Connection } from '@solana/web3.js';
-import { VulnerabilityType } from '../src/types';
-import { generateAnomalousMetrics } from '../src/test-utils/anomaly-test-utils';
 describe('Chaos Fuzzing and Anomaly Detection Tests', () => {
-    let anomalyModel: AnomalyDetectionModel;
+    let anomalyModel: AnomalyDetector;
     let fuzzer: Fuzzer;
-    let mockMetrics: TimeSeriesMetrics[];
+    let mockMetrics: TimeSeriesMetric[];
     const testProgramId = new PublicKey('11111111111111111111111111111111');
     let mockConnection: Connection;
 
@@ -90,10 +94,34 @@ describe('Chaos Fuzzing and Anomaly Detection Tests', () => {
         });
 
         tf.engine().startScope();
-        anomalyModel = new AnomalyDetectionModel();
-        await anomalyModel.initialize(); // Initialize the model
+        tf.engine().startScope();
+        inputSize: 40,
+        featureSize: 4, 
+        timeSteps: 10,
+        encoderLayers: [64, 32],
+        decoderLayers: [32, 64],
+        lstmUnits: 64,
+        dropoutRate: 0.1,
+        batchSize: 32,
+        epochs: 50,
+        learningRate: 0.001,
+        validationSplit: 0.2,
+        anomalyThreshold: 0.5,
+        sensitivityLevel: 0.8,
+        adaptiveThresholding: true,
+        featureEngineering: {
+            enableTrending: true,
+            enableSeasonality: true,
+            enableCrossCorrelation: true,
+            windowSize: 10
+        },
+        enableGPU: false,
+        tensorflowMemoryOptimization: true,
+        cacheSize: 1000
+    };
+    anomalyModel = new AnomalyDetector(config);
+        anomalyModel = new AnomalyDetectionModel(config);
         fuzzer = new Fuzzer({ port: 9464, metricsCollector: null });
-        await fuzzer.initialize(testProgramId, mockConnection); // Initialize fuzzer with mock connection
         mockMetrics = generateAnomalousMetrics(50); // Reduced from 100 to 50
     });
 
@@ -137,8 +165,8 @@ describe('Chaos Fuzzing and Anomaly Detection Tests', () => {
         const metrics = generateAnomalousMetrics(100);
 
         const result = await anomalyModel.detect(metrics);
-        expect(result.isAnomaly).toBe(false); // Expect no anomaly with valid metrics
-        expect(result.confidence).toBeLessThanOrEqual(0.5); // Expect low confidence
+        expect(result.isAnomaly).toBe(false); // Check anomaly detection
+        expect(result.confidence).toBeLessThanOrEqual(0.5);
     }, 20000); // Increased timeout to 20s
 
 
@@ -162,9 +190,10 @@ describe('Chaos Fuzzing and Anomaly Detection Tests', () => {
             }
 
             // Attempt detection under memory pressure
-            await expect(async () =>
-                await anomalyModel.detect(metrics)
-            ).rejects.toThrow();
+            await expect(async () => {
+                const result = await anomalyModel.detect(metrics);
+                return result;
+            }).rejects.toThrow();
 
         } finally {
             currentMemory = tf.memory();
