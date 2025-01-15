@@ -22,15 +22,15 @@ export function generateAnomalousMetrics(numPoints: number): TimeSeriesMetric[] 
 
         if (i > numPoints / 2) {
             // Introduce anomaly in all metrics
-            metrics[i].metrics.instructionFrequency = [metrics[i].metrics.instructionFrequency[0] * 2];
-            metrics[i].metrics.executionTime = [metrics[i].metrics.executionTime[0] * 1.5];
-            metrics[i].metrics.memoryUsage = [metrics[i].metrics.memoryUsage[0] * 2];
-            metrics[i].metrics.cpuUtilization = [metrics[i].metrics.cpuUtilization[0] * 1.8];
-            metrics[i].metrics.errorRate = [metrics[i].metrics.errorRate[0] * 3];
-            metrics[i].metrics.pdaValidation = [metrics[i].metrics.pdaValidation[0] * 0.5];
-            metrics[i].metrics.accountDataMatching = [metrics[i].metrics.accountDataMatching[0] * 0.6];
-            metrics[i].metrics.cpiSafety = [metrics[i].metrics.cpiSafety[0] * 0.4];
-            metrics[i].metrics.authorityChecks = [metrics[i].metrics.authorityChecks[0] * 0.3];
+            metrics[i].metrics.instructionFrequency = metrics[i].metrics.instructionFrequency ? [metrics[i].metrics.instructionFrequency[0] * 2] : [0];
+            metrics[i].metrics.executionTime = metrics[i].metrics.executionTime ? [metrics[i].metrics.executionTime[0] * 1.5] : [0];
+            metrics[i].metrics.memoryUsage = metrics[i].metrics.memoryUsage ? [metrics[i].metrics.memoryUsage[0] * 2] : [0];
+            metrics[i].metrics.cpuUtilization = metrics[i].metrics.cpuUtilization ? [metrics[i].metrics.cpuUtilization[0] * 1.8] : [0];
+            metrics[i].metrics.errorRate = metrics[i].metrics.errorRate ? [metrics[i].metrics.errorRate[0] * 3] : [0];
+            metrics[i].metrics.pdaValidation = metrics[i].metrics.pdaValidation ? [metrics[i].metrics.pdaValidation[0] * 0.5] : [0];
+            metrics[i].metrics.accountDataMatching = metrics[i].metrics.accountDataMatching ? [metrics[i].metrics.accountDataMatching[0] * 0.6] : [0];
+            metrics[i].metrics.cpiSafety = metrics[i].metrics.cpiSafety ? [metrics[i].metrics.cpiSafety[0] * 0.4] : [0];
+            metrics[i].metrics.authorityChecks = metrics[i].metrics.authorityChecks ? [metrics[i].metrics.authorityChecks[0] * 0.3] : [0];
         }
     }
 
