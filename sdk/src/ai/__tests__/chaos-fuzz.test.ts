@@ -95,32 +95,34 @@ describe('Chaos Fuzzing and Anomaly Detection Tests', () => {
 
         tf.engine().startScope();
         tf.engine().startScope();
-        inputSize: 40,
-        featureSize: 4, 
-        timeSteps: 10,
-        encoderLayers: [64, 32],
-        decoderLayers: [32, 64],
-        lstmUnits: 64,
-        dropoutRate: 0.1,
-        batchSize: 32,
-        epochs: 50,
-        learningRate: 0.001,
-        validationSplit: 0.2,
-        anomalyThreshold: 0.5,
-        sensitivityLevel: 0.8,
-        adaptiveThresholding: true,
-        featureEngineering: {
-            enableTrending: true,
-            enableSeasonality: true,
-            enableCrossCorrelation: true,
-            windowSize: 10
-        },
-        enableGPU: false,
-        tensorflowMemoryOptimization: true,
-        cacheSize: 1000
-    };
-    anomalyModel = new AnomalyDetector(config);
-        anomalyModel = new AnomalyDetectionModel(config);
+        
+        const config: ModelConfig = {
+            inputSize: 40,
+            featureSize: 4,
+            timeSteps: 10,
+            encoderLayers: [64, 32],
+            decoderLayers: [32, 64],
+            lstmUnits: 64,
+            dropoutRate: 0.1,
+            batchSize: 32,
+            epochs: 50,
+            learningRate: 0.001,
+            validationSplit: 0.2,
+            anomalyThreshold: 0.5,
+            sensitivityLevel: 0.8,
+            adaptiveThresholding: true,
+            featureEngineering: {
+                enableTrending: true,
+                enableSeasonality: true,
+                enableCrossCorrelation: true,
+                windowSize: 10
+            },
+            enableGPU: false,
+            tensorflowMemoryOptimization: true,
+            cacheSize: 1000
+        };
+        
+        anomalyModel = new AnomalyDetector(config);
         fuzzer = new Fuzzer({ port: 9464, metricsCollector: null });
         mockMetrics = generateAnomalousMetrics(50); // Reduced from 100 to 50
     });
