@@ -23,7 +23,8 @@
         "isolatedModules": true,
         "allowSyntheticDefaultImports": true,
         "experimentalDecorators": true,
-        "emitDecoratorMetadata": true
+        "emitDecoratorMetadata": true,
+        "lib": ["es2020", "dom"]
     },
     "include": ["src/**/*", "__tests__/**/*"],
     "exclude": ["node_modules", "dist"]
