@@ -1,4 +1,4 @@
-import { VulnerabilityDetectionModel } from '../../src/ai/ml-model.js';
+import { VulnerabilityDetectionModel } from '@glitch-gremlin/sdk';
 
 describe('ML Model Integration Tests', () => {
     let model: VulnerabilityDetectionModel;
