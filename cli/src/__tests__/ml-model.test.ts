@@ -1,4 +1,4 @@
-import { VulnerabilityDetectionModel } from '../../src/ai/ml-model';
+import { VulnerabilityDetectionModel } from '../../src/ai/ml-model.js';
 
 describe('ML Model Integration Tests', () => {
     let model: VulnerabilityDetectionModel;
