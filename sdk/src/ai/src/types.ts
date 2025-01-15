@@ -9,7 +9,7 @@ export class FuzzerError extends Error {
 export class ValidationError extends FuzzerError {
     constructor(message: string) {
         super(message);
-        this.name = 'ValidationError'; 
+        this.name = 'ValidationError';
     }
 }
 
@@ -98,7 +98,7 @@ export interface Logger {
 
 export interface FuzzContext {
     resourceManager: ResourceManager;
-    metricsCollector: MetricsCollector; 
+    metricsCollector: MetricsCollector;
     config: FuzzConfig;
     logger: Logger;
 }
@@ -134,15 +134,6 @@ export interface FuzzResult {
     type: VulnerabilityType;
     confidence: number;
     details: string;
-}
-age: number;
-    cpuUtilization: number;
-    errorRate: number;
-    pdaValidation: boolean;
-    accountDataMatching: boolean;
-    cpiSafety: boolean;
-    authorityChecks: boolean;
-    instructionFrequency: number;
 }
 
 export interface SecurityMetric {
