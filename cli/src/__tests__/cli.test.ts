@@ -40,6 +40,9 @@ describe('CLI', () => {
             const result = runCLI(['--version']);
             
             // Check if CLI executed successfully
+            if (result.status !== 0) {
+                console.error('CLI Error:', result.stderr);
+            }
             expect(result.status).toBe(0);
             expect(result.stdout).toContain(VERSION);
         });
@@ -65,6 +68,9 @@ describe('CLI', () => {
                 ]);
                 
                 expect(result.status).not.toBe(0);
+                if (!result.stderr.includes('error: required option \'--program\' not specified')) {
+                    console.error('Unexpected error:', result.stderr);
+                }
                 expect(result.stderr).toContain('error: required option \'--program\' not specified');
             });
         });

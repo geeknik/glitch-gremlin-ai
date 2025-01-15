@@ -1,23 +1,15 @@
 import { jest } from '@jest/globals';
 
-// Mock the SDK
-const mockPredict = jest.fn().mockResolvedValue({
-    type: 'BUFFER_OVERFLOW',
-    confidence: 0.85
-});
+import { VulnerabilityDetectionModel } from '@glitch-gremlin/sdk';
 
 jest.mock('@glitch-gremlin/sdk', () => ({
-    VulnerabilityDetectionModel: jest.fn().mockImplementation(() => {
-        return {
-            predict: mockPredict
-        };
-    })
+    VulnerabilityDetectionModel: jest.fn().mockImplementation(() => ({
+        predict: jest.fn().mockResolvedValue({
+            type: 'BUFFER_OVERFLOW',
+            confidence: 0.85
+        })
+    }))
 }));
-
-// Export mock for testing
-export { mockPredict };
-
-import { VulnerabilityDetectionModel } from '@glitch-gremlin/sdk';
 
 describe('ML Model Integration Tests', () => {
     let model: VulnerabilityDetectionModel;
