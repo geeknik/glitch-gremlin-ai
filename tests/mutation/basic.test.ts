@@ -79,9 +79,9 @@ describe('Mutation Testing', () => {
 
         it('should handle mutation test failures gracefully', async () => {
             // Configure mock to simulate failure with a GlitchError
-            global.security.mutation.test.mockRejectedValueOnce(
-                new GlitchError('Test execution failed: Invalid program state')
-            );
+            global.security.mutation.test.mockImplementationOnce(() => {
+                throw new GlitchError('Test execution failed: Invalid program state');
+            });
 
             const mutationParams = {
                 targetProgram: TEST_PROGRAM,
@@ -104,7 +104,7 @@ describe('Mutation Testing', () => {
             await expect(async () => {
                 await sdk.createChaosRequest({
                     targetProgram: TEST_PROGRAM,
-                    testType: TestType.MUTATION,
+                    testType: "MUTATION",
                     duration: 30, // Below minimum
                     intensity: 5
                 });
@@ -113,7 +113,7 @@ describe('Mutation Testing', () => {
             // Test intensity limits
             await expect(sdk.createChaosRequest({
                 targetProgram: TEST_PROGRAM,
-                testType: TestType.MUTATION,
+                testType: "MUTATION",
                 duration: 60,
                 intensity: 11 // Above maximum
             })).rejects.toThrow('Intensity must be between 1 and 10');
@@ -138,7 +138,7 @@ describe('Mutation Testing', () => {
 
             const mutationParams = {
                 targetProgram: TEST_PROGRAM,
-                testType: TestType.MUTATION,
+                testType: "MUTATION",
                 duration: 60,
                 intensity: 5
             };
@@ -158,7 +158,7 @@ describe('Mutation Testing', () => {
             await expect(async () => {
                 await sdk.createChaosRequest({
                     targetProgram: "invalid-program-id",
-                    testType: TestType.MUTATION,
+                    testType: "MUTATION",
                     duration: 60,
                     intensity: 5
                 });
