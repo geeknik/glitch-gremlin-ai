@@ -40,6 +40,8 @@ global.security = {
 
   // Mock SDK validation
   validateRequest: jest.fn().mockImplementation((params) => {
+    if (!params) throw new Error('Missing parameters');
+    
     if (params.duration < 60 || params.duration > 3600) {
       throw new Error('Duration must be between 60 and 3600 seconds');
     }
@@ -49,6 +51,7 @@ global.security = {
     if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(params.targetProgram)) {
       throw new Error('Invalid program ID format');
     }
+    return true;
   }),
   
   // Mock mutation tester
