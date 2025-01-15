@@ -197,7 +197,7 @@ describe('GovernanceManager', () => {
                 value: { err: null }
             });
 
-            const { proposalAddress } = await governanceManager.createProposalAccount(
+            const { proposalAddress, tx } = await governanceManager.createProposalAccount(
                 connection,
                 wallet,
                 {
@@ -206,6 +206,9 @@ describe('GovernanceManager', () => {
                     votingPeriod: 86400 // 24 hours in seconds
                 }
             );
+        
+            // Simulate the transaction to trigger validation
+            await connection.simulateTransaction(tx);
             expect(proposalAddress).toBeDefined();
             expect(validateProposalMock).toHaveBeenCalled();
             expect(simulateTransactionMock).toHaveBeenCalled();
@@ -223,7 +226,15 @@ describe('GovernanceManager', () => {
                 proposer: wallet.publicKey,
                 startTime: Date.now() - 1000,
                 endTime: Date.now() + 86400000,
-                voteWeights: { yes: 0, no: 0, abstain: 0 }
+                timeLockEnd: Date.now() + 172800000,
+                voteWeights: { yes: 0, no: 0, abstain: 0 },
+                votes: [],
+                yesVotes: 0,
+                noVotes: 0,
+                quorumRequired: 100,
+                executionTime: Date.now() + 172800000,
+                quorum: 100,
+                status: 'active'
             };
 
             validateProposalMock.mockResolvedValueOnce(mockProposalState);
@@ -257,8 +268,10 @@ describe('GovernanceManager', () => {
             wallet.publicKey.toBuffer().copy(proposalBuffer, 322); // Proposer: 32 bytes
             proposalBuffer.writeBigUInt64LE(BigInt(Date.now() - 1000), 354); // StartTime
             proposalBuffer.writeBigUInt64LE(BigInt(Date.now() - 1000), 362); // EndTime
-            proposalBuffer.writeBigUInt64LE(BigInt(100), 370); // Yes votes
-            proposalBuffer.writeBigUInt64LE(BigInt(50), 378); // No votes
+            proposalBuffer.writeBigUInt64LE(BigInt(Date.now() + 172800000), 370); // TimeLockEnd
+            proposalBuffer.writeBigUInt64LE(BigInt(100), 378); // Yes votes
+            proposalBuffer.writeBigUInt64LE(BigInt(50), 386); // No votes
+            proposalBuffer.writeUInt8(ProposalState.Succeeded, 394); // State
 
             getAccountInfoMock.mockResolvedValueOnce({
                 data: proposalBuffer,
