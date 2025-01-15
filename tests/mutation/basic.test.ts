@@ -101,13 +101,14 @@ describe('Mutation Testing', () => {
 
         it('should enforce parameter boundaries', async () => {
             // Test duration limits
-            await expect(sdk.createChaosRequest({
+            await expect(
+                sdk.createChaosRequest({
                     targetProgram: TEST_PROGRAM,
                     testType: "MUTATION",
                     duration: 30, // Below minimum
                     intensity: 5
-                });
-            }).rejects.toThrow('Duration must be between 60 and 3600 seconds');
+                })
+            ).rejects.toThrow('Duration must be between 60 and 3600 seconds');
 
             // Test intensity limits
             await expect(sdk.createChaosRequest({
@@ -154,13 +155,14 @@ describe('Mutation Testing', () => {
         }, DEFAULT_TEST_TIMEOUT);
 
         it('should validate program ID format', async () => {
-            await expect(sdk.createChaosRequest({
+            await expect(
+                sdk.createChaosRequest({
                     targetProgram: "invalid-program-id",
                     testType: "MUTATION",
                     duration: 60,
                     intensity: 5
-                });
-            }).rejects.toThrow(/Invalid program ID format/);
+                })
+            ).rejects.toThrow(/Invalid program ID format/);
             
             await expect(sdk.createChaosRequest({
                 targetProgram: "",
