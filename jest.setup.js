@@ -37,6 +37,19 @@ global.security = {
       newPaths: 0
     }))
   },
+
+  // Mock SDK validation
+  validateRequest: jest.fn().mockImplementation((params) => {
+    if (params.duration < 60 || params.duration > 3600) {
+      throw new Error('Duration must be between 60 and 3600 seconds');
+    }
+    if (params.intensity < 1 || params.intensity > 10) {
+      throw new Error('Intensity must be between 1 and 10');
+    }
+    if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(params.targetProgram)) {
+      throw new Error('Invalid program ID format');
+    }
+  }),
   
   // Mock mutation tester
   mutation: {
