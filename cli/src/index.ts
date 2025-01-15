@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { readFileSync } from 'fs';
+import { createRequire } from 'module';
 import { Keypair } from '@solana/web3.js';
 import { Command } from 'commander';
 import { GlitchSDK, TestType } from '@glitch-gremlin/sdk';
@@ -14,13 +15,14 @@ const __dirname = dirname(__filename);
 
 // Load version from package.json
 const pkgJson = JSON.parse(
-    readFileSync(join(__dirname, '../../package.json'), 'utf8')
+    readFileSync(join(__dirname, '../package.json'), 'utf8')
 );
 const version = pkgJson.version;
 
 const program = new Command();
 
 // Ensure SDK compatibility
+const require = createRequire(import.meta.url);
 const sdkVersion = require('@glitch-gremlin/sdk/package.json').version;
 if (version !== sdkVersion) {
 console.error(chalk.red(`Error: Version mismatch. CLI: ${version}, SDK: ${sdkVersion}`));
@@ -36,12 +38,10 @@ program
 program
   .command('test')
   .description('Manage chaos tests')
-  .option('-p, --program <address>', 'Target program address')
-.option('-t, --type <type>', 'Test type (FUZZ, LOAD, EXPLOIT, CONCURRENCY)')
-.option('-d, --duration <seconds>', 'Test duration in seconds', '300')
-.option('-i, --intensity <level>', 'Test intensity (1-10)', '5')
-.addOption(new Option('-t, --type <type>').choices(['FUZZ', 'LOAD', 'EXPLOIT', 'CONCURRENCY']))
-.addOption(new Option('-i, --intensity <level>').argParser(parseInt).choices([1,2,3,4,5,6,7,8,9,10]))
+.option('-p, --program <address>', 'Target program address')
+.option('-t, --type <type>', 'Test type (FUZZ, LOAD, EXPLOIT, CONCURRENCY)', (val: string) => val as TestType)
+.option('-d, --duration <seconds>', 'Test duration in seconds', (val: string) => parseInt(val), 300)
+.option('-i, --intensity <level>', 'Test intensity (1-10)', (val: string) => parseInt(val), 5)
   .option('--fuzz-seed-range <range>', 'Seed range for fuzz testing (min,max)')
   .option('--load-tps <tps>', 'Transactions per second for load testing')
   .option('--exploit-categories <cats>', 'Exploit categories to test (comma-separated)')
@@ -67,10 +67,10 @@ program
 
     // Initialize SDK
     const sdk = await GlitchSDK.init({
-    cluster: process.env.SOLANA_CLUSTER || 'https://api.testnet.solana.com',
-    wallet: Keypair.fromSecretKey(
-        Buffer.from(JSON.parse(readFileSync(keypairPath, 'utf-8')))
-    )
+        cluster: process.env.SOLANA_CLUSTER || 'https://api.testnet.solana.com',
+        wallet: Keypair.fromSecretKey(
+            Buffer.from(JSON.parse(readFileSync(keypairPath, 'utf-8')))
+        )
     });
 
       const request = await sdk.createChaosRequest({
@@ -126,10 +126,10 @@ governance
     const spinner = ora('Creating proposal...').start();
     try {
     const sdk = await GlitchSDK.init({
-    cluster: process.env.SOLANA_CLUSTER || 'devnet',
-    wallet: Keypair.fromSecretKey(
-        Buffer.from(JSON.parse(readFileSync(process.env.SOLANA_KEYPAIR_PATH!, 'utf-8')))
-    )
+        cluster: process.env.SOLANA_CLUSTER || 'devnet',
+        wallet: Keypair.fromSecretKey(
+            Buffer.from(JSON.parse(readFileSync(process.env.SOLANA_KEYPAIR_PATH!, 'utf-8')))
+        )
     });
       const proposal = await sdk.createProposal({
         title: options.title,
@@ -159,10 +159,10 @@ governance
     const spinner = ora('Submitting vote...').start();
     try {
     const sdk = await GlitchSDK.init({
-    cluster: process.env.SOLANA_CLUSTER || 'devnet',
-    wallet: Keypair.fromSecretKey(
-        Buffer.from(JSON.parse(readFileSync(process.env.SOLANA_KEYPAIR_PATH!, 'utf-8')))
-    )
+        cluster: process.env.SOLANA_CLUSTER || 'devnet',
+        wallet: Keypair.fromSecretKey(
+            Buffer.from(JSON.parse(readFileSync(process.env.SOLANA_KEYPAIR_PATH!, 'utf-8')))
+        )
     });
       await sdk.vote(options.proposal, options.vote === 'yes');
       spinner.succeed('Vote submitted successfully');
