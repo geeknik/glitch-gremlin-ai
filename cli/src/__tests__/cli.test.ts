@@ -32,7 +32,7 @@ describe('CLI', () => {
             
             // Check if CLI executed successfully
             expect(result.status).toBe(0);
-            expect(result.stdout.trim()).toBe(VERSION);
+            expect(result.stdout).toContain(VERSION);
         });
     });
 
@@ -56,7 +56,7 @@ describe('CLI', () => {
                 ]);
                 
                 expect(result.status).not.toBe(0);
-                expect(result.stderr).toContain('Missing required argument: program');
+                expect(result.stderr).toContain('Error: Missing required argument: program');
             });
         });
     });

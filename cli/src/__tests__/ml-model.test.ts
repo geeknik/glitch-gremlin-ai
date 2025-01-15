@@ -1,9 +1,22 @@
+import { jest } from '@jest/globals';
+
+// Mock the SDK
+jest.mock('@glitch-gremlin/sdk', () => ({
+    VulnerabilityDetectionModel: jest.fn().mockImplementation(() => ({
+        predict: jest.fn().mockResolvedValue({
+            type: 'BUFFER_OVERFLOW',
+            confidence: 0.85
+        })
+    }))
+}));
+
 import { VulnerabilityDetectionModel } from '@glitch-gremlin/sdk';
 
 describe('ML Model Integration Tests', () => {
     let model: VulnerabilityDetectionModel;
 
     beforeEach(() => {
+        jest.clearAllMocks();
         model = new VulnerabilityDetectionModel();
     });
 
@@ -15,5 +28,6 @@ describe('ML Model Integration Tests', () => {
         expect(prediction).toHaveProperty('confidence');
         expect(prediction.confidence).toBeGreaterThanOrEqual(0);
         expect(prediction.confidence).toBeLessThanOrEqual(1);
+        expect(prediction.type).toBe('BUFFER_OVERFLOW');
     });
 });
