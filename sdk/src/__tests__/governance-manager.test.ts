@@ -47,16 +47,30 @@ class MockConnection extends Connection {
         return 'mock-signature';
     });
 
-    simulateTransaction = jest.fn().mockImplementation(async () => ({
-        context: { slot: 0 },
-        value: {
-            err: null,
-            logs: [],
-            accounts: null,
-            unitsConsumed: 0,
-            returnData: null
-        }
-    }));
+    simulateTransaction = jest.fn().mockImplementation(async (transaction: Transaction | VersionedTransaction) => {
+        // Simulate successful transaction
+        return {
+            context: { slot: 0 },
+            value: {
+                err: null,
+                logs: [],
+                accounts: null,
+                unitsConsumed: 0,
+                returnData: null
+            }
+        };
+    });
+
+    getAccountInfo = jest.fn().mockImplementation(async (publicKey: PublicKey) => {
+        // Return mock proposal account data
+        return {
+            data: Buffer.alloc(392),
+            executable: false,
+            lamports: 1000000,
+            owner: new PublicKey('GLt5cQeRgVMqnE9DGJQNNrbAfnRQYWqYVNWnJo7WNLZ9'),
+            rentEpoch: 0
+        };
+    });
 
     getLatestBlockhash = jest.fn().mockImplementation(async () => ({
         blockhash: 'mock-blockhash',

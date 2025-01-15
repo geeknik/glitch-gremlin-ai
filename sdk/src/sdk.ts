@@ -176,10 +176,10 @@ export class GlitchSDK {
             }
         }
 
-            // Verify Solana connection
-            await this.connection.getVersion();
+        // Verify Solana connection
+        await this.connection.getVersion();
 
-            this.initialized = true;
+        this.initialized = true;
         } catch (error) {
             if (redis) {
                 await redis.disconnect();
