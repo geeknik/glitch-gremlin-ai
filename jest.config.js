@@ -1,65 +1,70 @@
-/** @type {import('jest').Config} */
-const config = {
-preset: 'ts-jest/presets/default-esm',
+export default {
+// Test environment
 testEnvironment: 'node',
-fakeTimers: {
-    enableGlobally: true,
-    now: 1704819600000  // Set a fixed timestamp for reproducibility
-},
-moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node', 'mjs'],
 
-setupFiles: ['dotenv/config'],
+// Root directory
+rootDir: '.',
 
-
-transform: {
-'^.+\\.(ts|tsx)$': [
-    'ts-jest',
-    {
-    useESM: true,
-    tsconfig: 'tsconfig.test.json'
-    }
-]
-},
-extensionsToTreatAsEsm: ['.ts', '.tsx', '.mts'],
+// ESM Configuration
+extensionsToTreatAsEsm: ['.ts', '.tsx'],
+moduleFileExtensions: ['ts', 'tsx', 'js', 'mjs', 'cjs', 'json', 'node'],
+moduleDirectories: ['node_modules', 'sdk/src/ai/src/__mocks__'],
 moduleNameMapper: {
-'^(\\.{1,2}/.*)\\.js$': '$1',
-'^(\\.{1,2}/.*)\\.mjs$': '$1',
-'^(\\.{1,2}/.*)\\.cjs$': '$1',
-'^@/(.*)$': '<rootDir>/src/$1',
-'^@glitch-gremlin/sdk$': '<rootDir>/sdk/src',
-'^@glitch-gremlin/sdk/(.*)$': '<rootDir>/sdk/src/$1', 
-'^@utils/(.*)$': '<rootDir>/src/utils/$1',
-'^@tests/(.*)$': '<rootDir>/src/__tests__/$1',
-'^@tensorflow/tfjs-node$': '@tensorflow/tfjs',
-'\\.m?jsx?$': 'babel-jest'
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+    '^(\\.{1,2}/.*)\\.mjs$': '$1',
+    '^(\\.{1,2}/.*)\\.ts$': '$1',
+    '^@tensorflow/(.*)$': '<rootDir>/node_modules/@tensorflow/$1',
+    '^@solana/(.*)$': '<rootDir>/node_modules/@solana/$1'
 },
+
+// Transform configuration
+transform: {
+    '^.+\\.(t|j)sx?$': ['ts-jest', {
+        useESM: true,
+        isolatedModules: true,
+        tsconfig: 'tsconfig.json'
+    }]
+},
+
+// Handle ES modules in node_modules
 transformIgnorePatterns: [
-'node_modules/(?!(@tensorflow|@solana|@project-serum|@metaplex|@coral-xyz|@holaplex|@nfteyez|@jest/globals)/.*)'
-]
-,
-testEnvironmentOptions: {
-    url: "http://localhost",
-    jest: true,
-    env: {
-    NODE_ENV: 'test'
-    }
-},
-
-testTimeout: 10000,
-maxWorkers: '50%',
-
-setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
-modulePaths: [
-    "<rootDir>/src",
-    "<rootDir>/sdk/src",
-    "<rootDir>/worker/src"
+    'node_modules/(?!(@solana|@tensorflow|ioredis|p-timeout|p-retry|p-queue|eventemitter3)/.*)'
 ],
+
+// Test configuration
+testTimeout: 30000,
+setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+
+// Coverage configuration
+collectCoverage: true,
+coverageDirectory: 'coverage',
 collectCoverageFrom: [
     'src/**/*.{js,ts}',
     '!src/**/*.d.ts',
-    '!src/**/__tests__/**'
+    '!src/**/__tests__/**',
+    '!**/node_modules/**',
+    '!**/dist/**',
+    '!**/build/**',
+    '!**/coverage/**'
 ],
-testEnvironment: 'node',
-};
+coverageReporters: ['text', 'lcov'],
 
-export default config;
+// Mock configuration
+modulePathIgnorePatterns: [
+    '<rootDir>/dist/esm/',
+    '<rootDir>/dist/cjs/',
+    '<rootDir>/dist/types/',
+    '<rootDir>/build/'
+],
+// Prevent duplicate mocks
+resetMocks: true,
+restoreMocks: true,
+clearMocks: true,
+
+// Additional settings
+testMatch: [
+    '**/__tests__/**/*.[jt]s?(x)',
+    '**/?(*.)+(spec|test).[jt]s?(x)'
+],
+verbose: true
+};
