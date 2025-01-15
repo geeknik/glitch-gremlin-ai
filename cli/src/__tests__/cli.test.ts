@@ -1,98 +1,63 @@
 import { spawnSync } from 'child_process';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { readFileSync } from 'fs';
 
-// Constants
-const PROJECT_ROOT = process.cwd();
-const CLI_ROOT = join(PROJECT_ROOT, 'cli');
-const CLI_PATH = join(CLI_ROOT, 'dist/index.js');
-const CLI_PACKAGE_JSON = join(PROJECT_ROOT, 'package.json');
+// Helper function to resolve paths from test root
+const fromRoot = (...paths: string[]) => resolve(__dirname, '../..', ...paths);
 
-// Read CLI package.json for version
-const cliPackageJson = JSON.parse(
-readFileSync(CLI_PACKAGE_JSON, 'utf8')
-);
-const version = cliPackageJson.version;
+// Constants 
+const CLI_PATH = fromRoot('dist/index.js');
+const PACKAGE_JSON = fromRoot('package.json');
+
+// Helper to execute CLI commands
+const runCLI = (args: string[] = []) => spawnSync('node', [
+    '--experimental-vm-modules',
+    '--no-warnings',
+    CLI_PATH,
+    ...args
+], {
+    env: { ...process.env },
+    encoding: 'utf8',
+    stdio: 'pipe'
+});
+
+// Read package.json for version
+const pkg = JSON.parse(readFileSync(PACKAGE_JSON, 'utf8'));
+const VERSION = pkg.version;
 
 describe('CLI', () => {
-beforeAll(() => {
-    // Debug logging for test setup
-    console.log('Test Setup:');
-    console.log('CLI Path:', CLI_PATH);
-    console.log('Package Version:', version);
-});
-
-describe('Version Command', () => {
-    it('should display version', () => {
-    // Execute CLI with --version flag
-    const result = spawnSync('node', ['--experimental-vm-modules', '--no-warnings', CLI_PATH, '--version'], {
-        env: { ...process.env },
-        encoding: 'utf8',
-        stdio: 'pipe'
-    });
-
-    // Enhanced error handling
-    if (result.error) {
-        console.error('Error executing CLI:', result.error);
-        throw result.error;
-    }
-
-    if (result.status !== 0) {
-        console.error('CLI exited with status:', result.status);
-        console.error('stderr:', result.stderr);
-        throw new Error(`CLI failed with status ${result.status}`);
-    }
-
-    // Capture and trim output
-    const stdout = result.stdout.trim();
-
-    // Debug logging
-    console.log('Version Test Results:');
-    console.log('CLI output:', stdout);
-    console.log('Expected:', version);
-    console.log('Output length:', stdout.length);
-    console.log('Expected length:', version.length);
-
-    // Assert version matches
-    expect(stdout).toBe(version);
-    });
-});
-
-describe('Test Command', () => {
-    describe('Parameter Validation', () => {
-    it('should validate test type parameter', () => {
-        const result = spawnSync('node', [
-        '--experimental-vm-modules',
-        '--no-warnings',
-        CLI_PATH,
-        'test',
-        '--program', '11111111111111111111111111111111',
-        '--type', 'INVALID_TYPE'
-        ], {
-        encoding: 'utf8',
-        stdio: 'pipe'
+    describe('Version Command', () => {
+        it('should display version', () => {
+            const result = runCLI(['--version']);
+            
+            // Check if CLI executed successfully
+            expect(result.status).toBe(0);
+            expect(result.stdout.trim()).toBe(VERSION);
         });
-
-        expect(result.stderr).toContain('Error');
-        expect(result.status).not.toBe(0);
     });
 
-    it('should require program address', () => {
-        const result = spawnSync('node', [
-        '--experimental-vm-modules',
-        '--no-warnings',
-        CLI_PATH,
-        'test',
-        '--type', 'FUZZ'
-        ], {
-        env: {}, // Clear environment variables
-        encoding: 'utf8',
-        stdio: 'pipe'
+    describe('Test Command', () => {
+        describe('Parameter Validation', () => {
+            it('should validate test type parameter', () => {
+                const result = runCLI([
+                    'test',
+                    '--program', '11111111111111111111111111111111',
+                    '--type', 'INVALID_TYPE'
+                ]);
+                
+                expect(result.stderr).toContain('Error');
+                expect(result.status).not.toBe(0);
+            });
+
+            it('should require program address', () => {
+                const result = runCLI([
+                    'test',
+                    '--type', 'FUZZ'
+                ]);
+                
+                expect(result.status).not.toBe(0);
+                expect(result.stderr).toContain('Missing required argument: program');
+            });
         });
-
-        expect(result.status).not.toBe(0);
-        expect(result.stderr).toContain('program');
     });
-    });
-});
 });
