@@ -89,17 +89,60 @@ export interface FuzzConfig {
     collectMetrics: boolean;
 }
 
+export interface Logger {
+    debug(message: string, ...args: any[]): void;
+    info(message: string, ...args: any[]): void;
+    warn(message: string, ...args: any[]): void;
+    error(message: string, ...args: any[]): void;
+}
+
 export interface FuzzContext {
     resourceManager: ResourceManager;
-    metricsCollector: MetricsCollector;
+    metricsCollector: MetricsCollector; 
     config: FuzzConfig;
     logger: Logger;
 }
 
 export interface TimeSeriesMetric {
     timestamp: number;
-    value: number;
-    type: string;
+    metrics: {
+        memoryUsage?: number[];
+        cpuUtilization?: number[];
+        errorRate?: number[];
+        pdaValidation?: number[];
+        accountDataMatching?: number[];
+        cpiSafety?: number[];
+        authorityChecks?: number[];
+        instructionFrequency?: number[];
+        executionTime?: number[];
+    };
+    metadata?: {
+        [key: string]: unknown;
+    };
+}
+
+export interface FuzzInput {
+    instruction: number;
+    data: Buffer;
+    probability: number;
+    metadata: Record<string, any>;
+    created: number;
+    type?: string;
+}
+
+export interface FuzzResult {
+    type: VulnerabilityType;
+    confidence: number;
+    details: string;
+}
+age: number;
+    cpuUtilization: number;
+    errorRate: number;
+    pdaValidation: boolean;
+    accountDataMatching: boolean;
+    cpiSafety: boolean;
+    authorityChecks: boolean;
+    instructionFrequency: number;
 }
 
 export interface SecurityMetric {
