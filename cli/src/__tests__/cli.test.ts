@@ -14,6 +14,7 @@ const runCLI = (args: string[] = []) => spawnSync('node', [
     '--experimental-vm-modules',
     '--no-warnings',
     '--es-module-specifier-resolution=node',
+    '--experimental-json-modules',
     CLI_PATH,
     ...args
 ], {
@@ -25,7 +26,8 @@ const runCLI = (args: string[] = []) => spawnSync('node', [
     },
     encoding: 'utf8',
     stdio: 'pipe',
-    shell: false
+    shell: false,
+    windowsHide: true
 });
 
 // Read package.json for version
@@ -63,7 +65,7 @@ describe('CLI', () => {
                 ]);
                 
                 expect(result.status).not.toBe(0);
-                expect(result.stderr).toContain('Missing required argument: program');
+                expect(result.stderr).toContain('error: required option \'--program\' not specified');
             });
         });
     });
