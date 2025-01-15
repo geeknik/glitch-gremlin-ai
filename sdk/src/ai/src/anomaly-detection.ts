@@ -1,380 +1,526 @@
-import '@tensorflow/tfjs-node';
-import * as tf from '@tensorflow/tfjs';
+import * as tf from '@tensorflow/tfjs-node';
 import { EventEmitter } from 'events';
-import { Logger } from '../../utils/logger';
 
-export interface TimeSeriesMetrics {
-    instructionFrequency: number[];
-    memoryAccess: number[];
-    accountAccess: number[];
-    stateChanges: number[];
+export interface TimeSeriesMetric {
     timestamp: number;
+    metrics: {
+        [key: string]: number[];
+    };
+    metadata?: {
+        [key: string]: any;
+    };
 }
 
-export interface AnomalyDetectionResult {
+export interface ModelConfig {
+    inputSize: number;
+    featureSize: number;
+    timeSteps: number;
+    encoderLayers: number[];
+    decoderLayers: number[];
+    lstmUnits: number;
+    dropoutRate: number;
+    batchSize: number;
+    epochs: number;
+    learningRate: number;
+    validationSplit: number;
+    anomalyThreshold: number;
+    sensitivityLevel: number;
+    adaptiveThresholding: boolean;
+    featureEngineering: {
+        enableTrending: boolean;
+        enableSeasonality: boolean;
+        enableCrossCorrelation: boolean;
+        windowSize: number;
+    };
+    enableGPU: boolean;
+    tensorflowMemoryOptimization: boolean;
+    cacheSize: number;
+}
+
+export interface AnomalyResult {
     isAnomaly: boolean;
     confidence: number;
-    details: {
-        category: string;
-        score: number;
+    details: AnomalyDetails;
+    insights: AnomalyInsights;
+    metrics: PerformanceMetrics;
+}
+
+export interface AnomalyDetails {
+    anomalousMetrics: string[];
+    contributingFactors: {
+        metric: string;
+        importance: number;
         threshold: number;
+        currentValue: number;
+    }[];
+    patterns: {
+        type: string;
+        confidence: number;
+        description: string;
     }[];
 }
 
-const logger = new Logger('anomaly-detection');
-export { logger };
+export interface AnomalyInsights {
+    rootCause: {
+        probability: number;
+        factors: string[];
+        evidence: string[];
+    };
+    recommendations: {
+        priority: 'high' | 'medium' | 'low';
+        action: string;
+        impact: string;
+    }[];
+    historicalContext: {
+        similarIncidents: number;
+        frequency: string;
+        lastOccurrence: Date | null;
+    };
+}
 
-export class AnomalyDetectionModel extends EventEmitter {
-    async predict(input: Buffer): Promise<number> {
-        if (!this.model) {
-            throw new Error('Model not initialized');
-        }
+export interface PerformanceMetrics {
+    processingTime: number;
+    memoryUsage: number;
+    modelAccuracy: number;
+    falsePositiveRate: number;
+    falseNegativeRate: number;
+}
 
-        try {
-            // Convert buffer to float32 array
-            const values = new Float32Array(input);
+export interface AnomalyDetailsItem {
+type: string;
+score: number;
+threshold: number;
+correlatedPatterns?: string[];
+}
 
-            // Create tensor with proper shape
-            const tensor = tf.tensor(values, [1, values.length]);
+export interface ModelConfig {
+inputSize: number;
+hiddenLayers?: number[];
+learningRate: number;
+epochs: number;
+anomalyThreshold: number;
+}
 
-            // Normalize data
-            const normalized = await this.normalizeData(tensor);
+export class AnomalyDetector extends EventEmitter {
+    private models: {
+        autoencoder: tf.LayersModel;
+        lstm: tf.LayersModel;
+    };
+    private readonly config: ModelConfig;
+    private readonly featureExtractor: FeatureExtractor;
+    private readonly statisticalAnalyzer: StatisticalAnalyzer;
+    private readonly performanceMonitor: PerformanceMonitor;
+    private readonly metrics = [
+        'instructionFrequency', 'executionTime', 'memoryUsage', 'cpuUtilization',
+        'errorRate', 'pdaValidation', 'accountDataMatching', 'cpiSafety', 'authorityChecks'
+    ] as const;
 
-            // Make prediction
-            const prediction = this.model.predict(normalized) as tf.Tensor;
-            const score = prediction.dataSync()[0];
-
-            return score;
-        } catch (error) {
-            this.logger.error(`Prediction failed: ${error}`);
-            throw error;
-        }
-    }
-    private model: tf.LayersModel | null = null;
-    private logger: Logger;
-    private initialized: boolean = false;
-    private readonly inputWindowSize = 50;
-    private readonly outputWindowSize = 1;
-    private readonly featureSize = 4;
-    private normalizedStats: {
-        mean?: tf.Tensor1D;
-        std?: tf.Tensor1D;
-    } = {};
-
-    constructor() {
+    constructor(config: Partial<ModelConfig>) {
         super();
-        this.logger = logger;
+        this.config = {
+            inputSize: 40,
+            featureSize: 32,
+            timeSteps: 100,
+            encoderLayers: [64, 32],
+            decoderLayers: [32, 64],
+            lstmUnits: 128,
+            dropoutRate: 0.2,
+            batchSize: 32,
+            epochs: 100,
+            learningRate: 0.001,
+            validationSplit: 0.2,
+            anomalyThreshold: 0.95,
+            sensitivityLevel: 0.8,
+            adaptiveThresholding: true,
+            featureEngineering: {
+                enableTrending: true,
+                enableSeasonality: true,
+                enableCrossCorrelation: true,
+                windowSize: 50,
+            },
+            enableGPU: true,
+            tensorflowMemoryOptimization: true,
+            cacheSize: 1000,
+            ...config
+        };
+        this.validateConfig();
+        this.initializeComponents();
     }
 
-    public async initialize(): Promise<void> {
-        if (this.initialized) {
-            await this.cleanup();
-            this.initialized = false;
-        }
-
-        // Check memory status before initialization
-        const memoryInfo = tf.memory();
-        this.logger.info(`Memory before init: numTensors=${memoryInfo.numTensors}, numDataBuffers=${memoryInfo.numDataBuffers}`);
-
-        if (memoryInfo.numTensors > 1000) {
-            this.logger.warn('High number of tensors detected, running garbage collection');
-            tf.dispose();
-        }
-
-        try {
-            await tf.ready();
-            this.logger.info('Starting model building...');
-            this.model = this.buildModel();
-            this.logger.info('Model building completed successfully.');
-            this.initialized = true;
-            this.logger.info('Model initialized successfully');
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            this.logger.error(`Initialization failed: ${errorMessage}`);
-            throw error;
-        }
+    private validateConfig(): void {
+    if (this.config.inputSize <= 0) {
+        throw new Error('Input size must be a positive number');
+    }
+    if (this.config.epochs <= 0) {
+        throw new Error('Epochs must be a positive number');
+    }
+    if (this.config.anomalyThreshold < 0 || this.config.anomalyThreshold > 1) {
+        throw new Error('Anomaly threshold must be between 0 and 1');
+    }
+    }
     }
 
-    private buildModel(): tf.LayersModel {
-        const model = tf.sequential();
+private initializeComponents(): void {
+    this.featureExtractor = new FeatureExtractor(this.config.featureEngineering);
+    this.statisticalAnalyzer = new StatisticalAnalyzer();
+    this.performanceMonitor = new PerformanceMonitor();
+    this.buildModels();
+}
 
-        model.add(tf.layers.inputLayer({
-            inputShape: [this.inputWindowSize, this.featureSize]
-        }));
-
-        model.add(tf.layers.bidirectional({
-            layer: tf.layers.lstm({
-                units: 16, // Reduced units for test environment
-                returnSequences: true
-            }),
-            inputShape: [this.inputWindowSize, this.featureSize]
-        }));
-
-        model.add(tf.layers.dense({
-            units: 32,
-            activation: 'tanh',
-            kernelInitializer: 'glorotUniform' // Use simpler initializer for test environment
-        }));
-
-        model.add(tf.layers.lstm({
-            units: 8, // Reduced units for test environment
-            returnSequences: false
-        }));
-
-        model.add(tf.layers.dense({
-            units: 16,
-            activation: 'relu',
-            kernelInitializer: 'glorotUniform' // Use simpler initializer for test environment
-        }));
-
-        model.add(tf.layers.dropout({ rate: 0.2 }));
-
-        model.add(tf.layers.dense({
-            units: this.outputWindowSize, // Corrected output shape
-            activation: 'linear'
-        }));
-
-        model.compile({
-            optimizer: tf.train.adam(0.001),
-            loss: 'meanSquaredError',
-            metrics: ['accuracy']
+private buildModels(): void {
+    tf.tidy(() => {
+        // Build autoencoder model
+        const autoencoder = this.buildAutoencoder();
+        autoencoder.compile({
+            optimizer: tf.train.adam(this.config.learningRate),
+            loss: 'meanSquaredError'
         });
+        this.models.autoencoder = autoencoder;
 
-        return model;
+        // Build LSTM model
+        const lstm = this.buildLSTM();
+        lstm.compile({
+            optimizer: tf.train.adam(this.config.learningRate),
+            loss: 'meanSquaredError'
+        });
+        this.models.lstm = lstm;
+    });
+}
+    // Hidden layers
+    for (let i = 1; i < this.config.hiddenLayers.length; i++) {
+    model.add(tf.layers.dense({
+        units: this.config.hiddenLayers[i],
+        activation: 'relu'
+    }));
     }
 
-    private async normalizeData(data: tf.Tensor): Promise<tf.Tensor> {
-        try {
-            this.logger.info(`Memory before normalization: ${JSON.stringify(tf.memory())}`);
-            return tf.tidy(() => {
-                // Ensure we have valid stats for normalization
-                if (!this.normalizedStats.mean || !this.normalizedStats.std) {
-                    const moments = tf.moments(data, 0);
-                    this.normalizedStats.mean = moments.mean;
-                    this.normalizedStats.std = moments.variance.sqrt();
-                    // Dispose variance tensor after sqrt
-                    moments.variance.dispose();
-                }
+    // Output layer (reconstruction)
+    model.add(tf.layers.dense({
+    units: this.config.inputDimensions,
+    activation: 'sigmoid'
+    }));
 
-                // Add small epsilon to avoid division by zero
-                const epsilon = tf.scalar(1e-8);
+    model.compile({
+    optimizer: tf.train.adam(0.001),
+    loss: 'meanSquaredError'
+    });
 
-                // Validate tensor shape
-                if (!data || !data.shape || data.shape.length < 1) {
-                    throw new Error('Invalid tensor shape for normalization');
-                }
+    this.model = model;
+    this.isInitialized = true;
+}
 
-                // Normalize the data with error checking
-                // Ensure tensors are valid before operations
-                if (!this.normalizedStats.mean || !this.normalizedStats.std) {
-                    throw new Error('Normalization stats not initialized');
-                }
+private preprocessMetrics(metrics: TimeSeriesMetric[]): tf.Tensor2D {
+    return tf.tidy((): tf.Tensor2D => {
+        const flattenedData = metrics.map(metric => [
+        ...metric.instructionFrequency,
+        ...metric.executionTime,
+        ...metric.memoryUsage,
+        ...metric.cpuUtilization,
+        ...metric.errorRate,
+        ...metric.pdaValidation,
+        ...metric.accountDataMatching,
+        ...metric.cpiSafety,
+        ...metric.authorityChecks
+        ]);
 
-                // Normalize the data with error checking
-                const normalizedData = tf.tidy(() => {
-                    const centered = data.sub(this.normalizedStats.mean!);
-                    const scaleFactor = this.normalizedStats.std!.add(epsilon);
-                    return centered.div(scaleFactor);
-                });
-                return normalizedData;
-            });
-        } catch (error) {
-            this.logger.error(`Normalization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-            throw error;
+        const tensorData = tf.tensor2d(flattenedData);
+        
+        if (!this.meanStd) {
+            const moments = tf.moments(tensorData, 0);
+            this.meanStd = {
+                mean: Array.from(moments.mean.dataSync()),
+                std: Array.from(tf.sqrt(moments.variance).dataSync())
+            };
+            tf.dispose([moments.mean, moments.variance]);
+        }
+
+    const normalizedData = tensorData.sub(tf.tensor2d([this.meanStd.mean]))
+    .div(tf.tensor2d([this.meanStd.std]));
+
+    return normalizedData as tf.Tensor2D; // Explicit cast
+}
+
+public async train(metrics: TimeSeriesMetric[]): Promise<void> {
+this.validateTrainingData(metrics);
+
+const processedData = this.preprocessMetrics(metrics);
+this.model = this.buildModel();
+
+this.model.compile({
+    optimizer: tf.train.adam(this.config.learningRate),
+    loss: 'meanSquaredError'
+});
+
+const tensorData = tf.tensor2d(processedData);
+
+try {
+    await this.model.fit(tensorData, tensorData, {
+    epochs: this.config.epochs,
+    callbacks: {
+        onEpochEnd: (epoch, logs) => {
+        this.emit('trainingProgress', { epoch, logs });
         }
     }
+    });
+} catch (error) {
+    this.emit('trainingError', error);
+    throw error;
+}
+}
 
-    private createWindows(data: TimeSeriesMetrics[]): tf.Tensor3D {
-        const windows: number[][][] = [];
+private validateTrainingData(metrics: TimeSeriesMetric[]): void {
+if (!metrics || metrics.length < 10) {
+    throw new Error('Insufficient training data: At least 10 data points required');
+}
 
-        for (let i = 0; i <= data.length - this.inputWindowSize; i++) {
-            const window: number[][] = [];
+const validMetrics = Object.keys(metrics[0])
+    .filter(key => key !== 'timestamp')
+    .filter(key => Array.isArray(metrics[0][key]));
 
-            for (let j = 0; j < this.inputWindowSize; j++) {
-                const metrics = data[i + j];
-                window.push([
-                    metrics.instructionFrequency[0] || 0, // Provide default value if undefined
-                    metrics.memoryAccess[0] || 0, // Provide default value if undefined
-                    metrics.accountAccess[0] || 0, // Provide default value if undefined
-                    metrics.stateChanges[0] || 0 // Provide default value if undefined
-                ]);
-            }
+if (validMetrics.length === 0) {
+    throw new Error('No valid metrics found for training');
+}
+}
 
-            windows.push(window);
-        }
-
-        return tf.tensor3d(windows);
+    if (!this.isInitialized) {
+    await this.buildModel();
     }
 
-    public async train(data: TimeSeriesMetrics[]): Promise<void> {
-        if (!data) {
-            throw new Error('Training data cannot be null/undefined');
-        }
+    const tensorData = this.preprocessMetrics(metrics);
 
-        if (data.length < this.inputWindowSize) {
-            throw new Error(`Insufficient data points. Minimum required: ${this.inputWindowSize}`);
-        }
+    const trainCallback = {
+    onEpochEnd: (epoch: number, logs?: tf.Logs) => {
+        this.emit('trainingProgress', {
+        epoch,
+        totalEpochs: this.config.epochs,
+        loss: logs?.loss?.toFixed(4)
+        });
+    }
+    };
 
-        try {
-            return tf.tidy(async () => {
-                this.logger.info('Starting window creation...');
-                const windows = this.createWindows(data);
-                this.logger.info('Window creation completed successfully.');
+    await this.model.fit(tensorData, tensorData, {
+    epochs: this.config.epochs,
+    batchSize: this.config.batchSize,
+    validationSplit: this.config.validationSplit,
+    callbacks: trainCallback
+    });
 
-                this.logger.info('Starting normalization...');
-                const normalizedWindows = await this.normalizeData(windows);
-                this.logger.info('Normalization completed successfully.');
+    // Calculate reconstruction error thresholds
+    const predictions = this.model.predict(tensorData) as tf.Tensor;
+    const reconstructionErrors = tf.sub(tensorData, predictions).abs().mean(1);
+    const errorsArray = reconstructionErrors.arraySync() as number[];
+    const sorted = errorsArray.sort((a: number, b: number) => a - b);
+    const index = Math.floor(sorted.length * this.config.anomalyThreshold);
+    const threshold = sorted[index]; // Manual quantile calculation
+    
+    this.thresholds = {
+    reconstruction: threshold
+    };
+}
 
-                const xs = normalizedWindows; // Removed incorrect slice operation
+public async detect(metrics: TimeSeriesMetric[]): Promise<{ 
+isAnomaly: boolean, 
+confidence: number, 
+details: string[] 
+}> {
+if (!this.model) {
+    throw new Error('Model not trained');
+}
 
-                const ys = normalizedWindows.slice([0, 1, 0], [-1, 1, -1]); // Predict next timestep
+const processedData = this.preprocessMetrics(metrics);
+const tensorData = tf.tensor2d(processedData);
 
-                this.logger.info('Starting model fitting...');
-                await this.model!.fit(xs, ys, {
-                    epochs: 10,
-                    batchSize: 32,
-                    callbacks: {
-                        onEpochEnd: (epoch, logs) => {
-                            this.emit('epochEnd', { epoch, logs });
-                        }
-                    }
-                });
-                this.logger.info('Model fitting completed successfully.');
+const prediction = this.model.predict(tensorData) as tf.Tensor;
+const reconstructionError = tf.mean(tf.abs(tf.sub(tensorData, prediction))).dataSync()[0];
 
-                this.logger.info('Model trained successfully');
-                xs.dispose();
-                ys.dispose();
-                normalizedWindows.dispose();
-                windows.dispose();
-            });
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            this.logger.error(`Training failed: ${errorMessage}`);
-            throw new Error(`Training failed: ${errorMessage}`);
-        }
+const isAnomaly = reconstructionError > this.config.anomalyThreshold;
+const confidence = reconstructionError;
+
+const details = this.analyzeAnomalyDetails(metrics, reconstructionError);
+
+return { isAnomaly, confidence, details };
+}
+
+private analyzeAnomalyDetails(metrics: TimeSeriesMetric[], error: number): string[] {
+const details: string[] = [];
+const errorThreshold = this.config.anomalyThreshold;
+
+Object.keys(metrics[0])
+    .filter(key => key !== 'timestamp')
+    .forEach(metric => {
+    const metricValues = metrics.map(m => m[metric]);
+    const meanValue = this.calculateMean(metricValues as number[]);
+    const variance = this.calculateVariance(metricValues as number[]);
+    
+    if (variance > errorThreshold) {
+        details.push(`High variance in ${metric}: possible anomaly source`);
+    }
+    });
+
+return details;
+}
+
+private calculateMean(values: number[]): number {
+return values.reduce((a, b) => a + b, 0) / values.length;
+}
+
+private calculateVariance(values: number[]): number {
+const mean = this.calculateMean(values);
+const squaredDiffs = values.map(v => Math.pow(v - mean, 2));
+return this.calculateMean(squaredDiffs);
+}
+
+    return tf.tidy(() => {
+        const tensorData = this.preprocessMetrics(metrics);
+        const predictions = this.model.predict(tensorData);
+        const reconstructionErrors = tf.sub(predictions as tf.Tensor, tensorData).abs().mean(1);
+    
+    const anomalyScores = reconstructionErrors.div(tf.scalar(this.thresholds.reconstruction));
+    const isAnomaly = anomalyScores.greater(tf.scalar(1));
+
+    const details: AnomalyDetailsItem[] = [];
+    const metricNames = [
+    'instructionFrequency',
+    'executionTime',
+    'memoryUsage',
+    'cpuUtilization',
+    'errorRate',
+    'pdaValidation',
+    'accountDataMatching',
+    'cpiSafety',
+    'authorityChecks'
+    ];
+
+    // Analyze individual metrics
+    for (let i = 0; i < metricNames.length; i++) {
+    const metricScore = anomalyScores.slice([0, i * 4], [-1, 4]).mean();
+    const score = metricScore.dataSync()[0];
+    
+    if (score > 0.8) {  // Threshold for individual metrics
+        details.push({
+        type: metricNames[i],
+        score,
+        threshold: this.thresholds.reconstruction,
+        correlatedPatterns: this.findCorrelatedPatterns(metricNames[i], metrics)
+        });
+    }
     }
 
+    return {
+    isAnomaly: isAnomaly.any().dataSync()[0] === 1, // Convert to boolean
+    confidence: anomalyScores.mean().dataSync()[0],
+    details,
+    timestamp: Date.now()
+    };
+}
 
-    public async detect(data: TimeSeriesMetrics[]): Promise<AnomalyDetectionResult> {
-        // Start scope for tensor management
-        tf.engine().startScope();
+private findCorrelatedPatterns(metricType: string, metrics: TimeSeriesMetric[]): string[] {
+    const correlatedPatterns: string[] = [];
+    const thresholds = {
+    instructionFrequency: 0.8,
+    executionTime: 0.8,
+    memoryUsage: 0.7,
+    cpuUtilization: 0.75,
+    errorRate: 0.9,
+    pdaValidation: 0.85,
+    accountDataMatching: 0.85,
+    cpiSafety: 0.9,
+    authorityChecks: 0.95
+};
 
-        try {
-            if (!this.model) {
-                throw new Error('Model not trained');
-            }
-            if (data.length < this.inputWindowSize) {
-                throw new Error(`Insufficient data points. Minimum required: ${this.inputWindowSize}`);
-            }
+// Analyze correlations between metrics
+type MetricKey = keyof typeof thresholds;
+Object.keys(thresholds).forEach((metric) => {
+    if (metric !== metricType && this.isMetricCorrelated(metrics, metricType as MetricKey, metric as MetricKey)) {
+    correlatedPatterns.push(metric);
+    }
+});
 
-            // Validate input data
-            if (!data || !Array.isArray(data)) {
-                throw new Error('Invalid input data');
-            }
+return correlatedPatterns;
+}
 
-            // Check heap before processing
-            if (global.gc) {
-                try {
-                    await global.gc();
-                } catch (error) {
-                    if (error instanceof Error && error.message.includes('Heap limit')) {
-                        this.logger.error('Heap limit reached');
-                        throw new Error('Heap limit reached');
-                    }
-                    throw error;
-                }
-            }
-
-            this.logger.info('Starting window creation...');
-            const windows = this.createWindows(data);
-            this.logger.info('Window creation completed successfully.');
-
-            this.logger.info('Starting normalization...');
-            const normalizedWindows = await this.normalizeData(windows);
-            this.logger.info('Normalization completed successfully.');
-
-            // Wrap tensor operations in tf.tidy for automatic cleanup
-            this.logger.info('Starting prediction...');
-            let isAnomaly: tf.Tensor;
-            let confidence: tf.Tensor;
-                
-            const result = tf.tidy(() => {
-                const predictions = this.model!.predict(normalizedWindows) as tf.Tensor;
-                if (!predictions || !predictions.shape || predictions.shape.length < 1) {
-                    throw new Error('Invalid prediction tensor');
-                }
-
-                // Ensure shapes match before operations
-                const reshapedPredictions = predictions.reshape([normalizedWindows.shape[0], normalizedWindows.shape[1], normalizedWindows.shape[2]]);
-                    
-                const anomalyScores = reshapedPredictions.sub(normalizedWindows).abs().mean(2);
-                isAnomaly = anomalyScores.greater(tf.scalar(0.5));
-                confidence = anomalyScores.sigmoid();
-
-                const details = this.extractDetails(anomalyScores, normalizedWindows);
-                    
-                return {
-                    isAnomaly: isAnomaly.dataSync()[0] > 0,
-                    confidence: confidence.dataSync()[0],
-                    details
-                };
-            });
-            this.logger.info('Prediction completed successfully.');
-
-            // Clean up tensors
-            tf.dispose([predictions, anomalyScores, isAnomaly, confidence]);
-            return result;
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            this.logger.error(`Detection failed: ${errorMessage}`);
-            throw error;
-        } finally {
-            // Ensure cleanup of input tensors
-            if (windows) {
-                tf.dispose([windows, normalizedWindows]);
-            }
-            // End tensor scope
-            tf.engine().endScope();
-        }
+private isMetricCorrelated(metrics: TimeSeriesMetric[], metric1: keyof TimeSeriesMetric, metric2: keyof TimeSeriesMetric): boolean {
+    if (!metrics.length) {
+        return false;
     }
 
-    private extractDetails(anomalyScores: tf.Tensor1D, normalizedWindows: tf.Tensor3D): { category: string; score: number; threshold: number; }[] {
-        const details: { category: string; score: number; threshold: number; }[] = [];
-        const scores = anomalyScores.dataSync();
-        const threshold = 0.5;
+const values1 = metrics.map(m => (m[metric1] as number[]).reduce((a, b) => a + b, 0) / (m[metric1] as number[]).length);
+const values2 = metrics.map(m => (m[metric2] as number[]).reduce((a, b) => a + b, 0) / (m[metric2] as number[]).length);
 
-        for (let i = 0; i < scores.length; i++) {
-            details.push({
-                category: `Metric ${i + 1}`,
-                score: scores[i],
-                threshold
-            });
-        }
+const correlation = this.calculateCorrelation(values1, values2);
+return Math.abs(correlation) > 0.7;
+}
 
-        return details;
+private calculateCorrelation(x: number[], y: number[]): number {
+const n = x.length;
+const sum1 = x.reduce((a, b) => a + b, 0);
+const sum2 = y.reduce((a, b) => a + b, 0);
+const sum1Sq = x.reduce((a, b) => a + b * b, 0);
+const sum2Sq = y.reduce((a, b) => a + b * b, 0);
+const pSum = x.map((x, i) => x * y[i]).reduce((a, b) => a + b, 0);
+
+const num = pSum - (sum1 * sum2 / n);
+const den = Math.sqrt((sum1Sq - sum1 * sum1 / n) * (sum2Sq - sum2 * sum2 / n));
+
+return den === 0 ? 0 : num / den;
+}
+
+public async save(modelPath: string): Promise<void> {
+    if (!this.isInitialized) {
+    throw new Error('Model not trained');
+}
+
+    if (!modelPath) {
+    throw new Error('Invalid save path specified');
     }
 
-    public async save(path: string): Promise<void> {
-        if (!this.model) {
-            throw new Error('Model not trained');
-        }
-        await this.model.save(`file://${path}/model.json`);
-        this.logger.info(`Model saved to ${path}`);
+    await fs.promises.mkdir(modelPath, { recursive: true });
+    
+    // Save model architecture and weights
+    await this.model.save(`file://${modelPath}`);
+    
+    // Save normalization parameters and thresholds
+    await fs.promises.writeFile(
+    path.join(modelPath, 'metadata.json'),
+    JSON.stringify({
+        meanStd: this.meanStd,
+        thresholds: this.thresholds,
+        config: this.config
+    })
+    );
+}
+
+async load(modelPath: string): Promise<void> {
+    if (!fs.existsSync(modelPath)) {
+    throw new Error('Model file not found');
     }
 
-    public async load(path: string): Promise<void> {
-        if (this.model) {
-            this.model.dispose();
-        }
-        this.model = await tf.loadLayersModel(`file://${path}/model.json`);
-        this.logger.info(`Model loaded from ${path}`);
-    }
-
-    public async cleanup(): Promise<void> {
-        if (this.model) {
-            this.model.dispose();
-            this.model = null;
-            this.logger.info('Model disposed');
-        }
+    try {
+    // Load model architecture and weights
+    this.model = await tf.loadLayersModel(`file://${modelPath}/model.json`);
+    
+    // Load metadata
+    const metadata = JSON.parse(
+        await fs.promises.readFile(path.join(modelPath, 'metadata.json'), 'utf8')
+    );
+    
+    this.meanStd = metadata.meanStd;
+    this.thresholds = metadata.thresholds;
+    Object.assign(this.config, metadata.config); // Update config properties
+    
+    this.isInitialized = true;
+    } catch (error) {
+    throw new Error('Invalid model format');
     }
 }
+
+async cleanup(): Promise<void> {
+    if (this.model) {
+    this.model.dispose();
+    }
+    this.isInitialized = false;
+    this.meanStd = null;
+    this.thresholds = {};
+}
+}
+
