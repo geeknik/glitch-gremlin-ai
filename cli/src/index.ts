@@ -134,7 +134,7 @@ governance
       const proposal = await sdk.createProposal({
         title: options.title,
         description: options.description,
-        programToTest: options.program,
+        targetProgram: options.program,
         stakingAmount: parseInt(options.stake),
         testParams: {
           targetProgram: options.program,
