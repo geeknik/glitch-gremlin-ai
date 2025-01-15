@@ -418,4 +418,18 @@ export class GlitchSDK {
             throw error;
         }
     }
+    async getSecurityInfo(programId) {
+        // Mock security information for demonstration purposes
+        return {
+            programId,
+            vulnerabilities: [
+                { type: 'Reentrancy', severity: 'High', description: 'Potential reentrancy vulnerability detected' },
+                { type: 'Arithmetic Overflow', severity: 'Medium', description: 'Arithmetic overflow detected in critical function' }
+            ],
+            recommendations: [
+                'Review critical functions for reentrancy',
+                'Add input validation for arithmetic operations'
+            ]
+        };
+    }
 }

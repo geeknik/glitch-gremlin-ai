@@ -47,7 +47,7 @@ program
   .option('--exploit-categories <cats>', 'Exploit categories to test (comma-separated)')
   .action(async (options) => {
     const spinner = ora('Creating chaos request...').start();
-    
+
     try {
       const keypairPath = process.env.SOLANA_KEYPAIR_PATH;
       if (!keypairPath) {
@@ -81,10 +81,10 @@ program
       });
 
       spinner.succeed(`Created test request: ${request.requestId}`);
-      
+
       spinner.start('Waiting for test completion...');
       const results = await request.waitForCompletion();
-      
+
       spinner.succeed('Test completed!');
       console.log(chalk.green('\nResults:'));
       console.log(JSON.stringify(results, null, 2));
@@ -167,6 +167,60 @@ governance
       spinner.succeed('Vote submitted successfully');
     } catch (error) {
       spinner.fail(chalk.red(`Error: ${(error as Error).message}`));
+      process.exit(1);
+    }
+  });
+
+// Security command
+program
+  .command('security')
+  .description('Get security information for a Solana contract')
+  .requiredOption('-p, --program <address>', 'Target program address')
+  .action(async (options) => {
+    const spinner = ora('Fetching security information...').start();
+
+    try {
+      const keypairPath = process.env.SOLANA_KEYPAIR_PATH;
+      if (!keypairPath) {
+        throw new Error('SOLANA_KEYPAIR_PATH environment variable is not set');
+      }
+
+      // Validate program address
+      if (!options.program || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(options.program)) {
+        throw new Error('Invalid program address format');
+      }
+
+      // Initialize SDK
+      const sdk = new GlitchSDK({
+        cluster: process.env.SOLANA_CLUSTER || 'devnet',
+        wallet: Keypair.fromSecretKey(
+          Buffer.from(JSON.parse(readFileSync(keypairPath, 'utf-8')))
+        )
+      });
+
+      const securityInfo = await sdk.getSecurityInfo(options.program);
+
+      spinner.succeed('Security information fetched successfully!');
+      console.log(chalk.green('\nSecurity Information:'));
+      console.log(JSON.stringify(securityInfo, null, 2));
+    } catch (error) {
+      if (error instanceof Error) {
+        switch (error.name) {
+          case 'ValidationError':
+            spinner.fail(chalk.red(`Parameter validation failed: ${error.message}`));
+            break;
+          case 'ConnectionError':
+            spinner.fail(chalk.red(`Network error: ${error.message}`));
+            break;
+          case 'RateLimitError':
+            spinner.fail(chalk.red(`Rate limit exceeded: ${error.message}`));
+            break;
+          default:
+            spinner.fail(chalk.red(`Error: ${error.message}`));
+        }
+      } else {
+        spinner.fail(chalk.red('An unknown error occurred'));
+      }
       process.exit(1);
     }
   });

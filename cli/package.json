@@ -2,11 +2,10 @@
 "name": "@glitch-gremlin/cli",
 "version": "0.1.0",
 "type": "module",
-"type": "module",
 "main": "./dist/index.js",
 "bin": {
     "glitch": "./dist/index.js"
-}, 
+},
 "scripts": {
     "build": "npx tsc --project tsconfig.json",
     "clean": "rm -rf dist",
