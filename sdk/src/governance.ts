@@ -51,8 +51,8 @@ export class GovernanceManager {
                 { memcmp: { offset: 32, bytes: wallet.toBase58() } }
             ]
         });
-        
-        return delegateAccounts.reduce((total, account) => 
+
+        return delegateAccounts.reduce((total, account) =>
             total + (account.account.lamports || 0), 0);
     }
 
@@ -63,10 +63,10 @@ export class GovernanceManager {
         // Get direct balance
         const accountInfo = await connection.getAccountInfo(wallet);
         const directBalance = accountInfo ? accountInfo.lamports : 0;
-        
+
         // Get delegated balance
         const delegatedBalance = await this.getDelegatedBalance(connection, wallet);
-        
+
         // Combine direct and delegated voting power
         const totalPower = directBalance + delegatedBalance;
         return Math.max(0, totalPower / 1000000); // Convert to voting units
@@ -88,8 +88,10 @@ export class GovernanceManager {
         const U16_LEN = 2;
 
         // Calculate minimum required buffer size for fixed fields
-        const MIN_BUFFER_SIZE = TITLE_LEN + DESC_LEN + PUBKEY_LEN + (3 * TIMESTAMP_LEN) + 
-                            (3 * U32_LEN) + (2 * U8_LEN) + U16_LEN;
+        const MIN_BUFFER_SIZE = TITLE_LEN + DESC_LEN + PUBKEY_LEN +
+                            (3 * TIMESTAMP_LEN) +
+                            (3 * U32_LEN) +
+                            (2 * U8_LEN) + U16_LEN;
 
         const data = accountInfo.data;
         if (data.length < MIN_BUFFER_SIZE) {
@@ -186,7 +188,7 @@ export class GovernanceManager {
             votes
         };
     }
-    
+
     private async hasVoted(
         connection: Connection,
         proposalAddress: PublicKey,
@@ -196,7 +198,7 @@ export class GovernanceManager {
         const proposalState = await this.getProposalState(connection, proposalAddress);
         return proposalState.votes?.includes(voter) || false;
     }
-    
+
     private async getVoteCount(
         connection: Connection,
         proposalAddress: PublicKey
@@ -214,7 +216,7 @@ export class GovernanceManager {
         proposalAddress: PublicKey
     ): Promise<ProposalData> {
         const proposalState = await this.getProposalState(connection, proposalAddress);
-            
+
             return {
                 title: proposalState.title || '',
                 description: proposalState.description || '',
@@ -233,7 +235,7 @@ export class GovernanceManager {
                 status: proposalState.state,
             };
         }
-        
+
         async castVote(
             connection: Connection,
             wallet: Keypair,
@@ -255,18 +257,18 @@ export class GovernanceManager {
             // Check voting power including delegations
             const votingPower = await this.calculateVoteWeight(connection, wallet.publicKey);
             const minVotingPower = 1; // Minimum voting power required
-            
+
             if (votingPower <= minVotingPower) {
                 throw new Error('Insufficient voting power');
             }
-            
+
             // Validate proposal is still active and not expired
             if (proposalState.endTime < Date.now()) {
                 throw new Error('Proposal voting period has ended');
             }
 
             const transaction = new Transaction();
-            
+
             transaction.add(new TransactionInstruction({
                 keys: [
                     { pubkey: proposalAddress, isSigner: false, isWritable: true },
@@ -275,10 +277,10 @@ export class GovernanceManager {
                 programId: this.programId,
                 data: Buffer.from([vote ? 1 : 0]) // Vote instruction data
             }));
-            
+
             return transaction;
         }
-        
+
         async createProposalAccount(
             connection: Connection,
             wallet: Keypair,
@@ -292,10 +294,10 @@ export class GovernanceManager {
             if (!params.title?.trim() || !params.description?.trim() || !params.votingPeriod || params.votingPeriod <= 0) {
                 throw new Error('Invalid proposal parameters');
             }
-            
-            const proposalAddress = PublicKey.unique();
+
+            const proposalAddress = PublicKey.generate(); // Use the correct method to generate a new public key
             const transaction = new Transaction();
-            
+
             transaction.add(new TransactionInstruction({
                 keys: [
                     { pubkey: proposalAddress, isSigner: false, isWritable: true },
@@ -304,10 +306,10 @@ export class GovernanceManager {
                 programId: this.programId,
                 data: Buffer.from([]) // Create proposal instruction data
             }));
-            
+
             return { proposalAddress, tx: transaction };
         }
-        
+
         async executeProposal(
             connection: Connection,
             wallet: Keypair,
@@ -315,7 +317,7 @@ export class GovernanceManager {
         ): Promise<Transaction> {
             // Get current proposal state
             const proposalState = await this.getProposalState(connection, proposalAddress);
-            
+
             // First check if proposal exists
             if (!proposalState) {
                 throw new Error('Cannot execute: Proposal not found');
@@ -326,7 +328,7 @@ export class GovernanceManager {
                 throw new Error('Cannot execute: Proposal is not in succeeded state');
             }
 
-            // Check if already executed 
+            // Check if already executed
             if (proposalState.executed) {
                 throw new Error('Cannot execute: Proposal has already been executed');
             }
@@ -341,10 +343,10 @@ export class GovernanceManager {
             if (voteCount.yes < proposalState.quorumRequired) {
                 throw new Error(`Cannot execute: Required quorum of ${proposalState.quorumRequired} not reached (current: ${voteCount.yes})`);
             }
-            
+
             // Create transaction
             const transaction = new Transaction();
-            
+
             // Add execute instruction
             transaction.add(new TransactionInstruction({
                 keys: [
@@ -354,8 +356,7 @@ export class GovernanceManager {
                 programId: this.programId,
                 data: Buffer.from([]) // Execution instruction data
             }));
-        
+
         return transaction;
     }
 }
-
