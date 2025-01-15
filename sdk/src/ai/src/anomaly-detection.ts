@@ -417,6 +417,18 @@ return this.calculateMean(squaredDiffs);
         }
         this.isInitialized = false;
     }
+
+    public async cleanup(): Promise<void> {
+        if (this.models) {
+            if (this.models.autoencoder) {
+                this.models.autoencoder.dispose();
+            }
+            if (this.models.lstm) {
+                this.models.lstm.dispose();
+            }
+        }
+        this.isInitialized = false;
+    }
 }
 
 private findCorrelatedPatterns(metricType: string, metrics: TimeSeriesMetric[]): string[] {
