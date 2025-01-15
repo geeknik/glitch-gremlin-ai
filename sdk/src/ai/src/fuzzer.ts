@@ -15,8 +15,7 @@ import {
     SecurityScore,
     FuzzingResult,
 } from './types';
-import { AnomalyDetectionModel } from './anomaly-detection';
-import { TensorShape } from '@tensorflow/tfjs-core';
+import { AnomalyDetector } from './anomaly-detection';
 import { Logger } from '../../utils/logger';
 import { PublicKey, Transaction, sendAndConfirmTransaction, TransactionInstruction, Connection } from '@solana/web3.js';
 
@@ -45,7 +44,7 @@ interface CampaignResult {
 
 export class Fuzzer {
     private config: FuzzingConfig;
-    private anomalyDetectionModel: AnomalyDetectionModel | null = null;
+    private anomalyDetectionModel: AnomalyDetector | null = null;
     private readonly logger = new Logger('Fuzzer');
     private programId: PublicKey | null = null;
     private resourceManager: ResourceManager | null = null;
@@ -67,12 +66,33 @@ export class Fuzzer {
         this.programId = programId;
         this.connection = connection; // Initialize connection
         this.logger.info(`Initializing fuzzer for program ${programId.toBase58()}`);
-        this.logger.debug(`AnomalyDetectionModel: ${AnomalyDetectionModel}`);
-
-        // Initialize anomaly detection model
-        this.anomalyDetectionModel = new AnomalyDetectionModel();
-        this.logger.debug(`AnomalyDetectionModel instance: ${this.anomalyDetectionModel}`);
-        await this.anomalyDetectionModel.initialize();
+        // Initialize anomaly detection model with config
+        this.anomalyDetectionModel = new AnomalyDetector({
+            inputSize: 40,
+            featureSize: 32,
+            timeSteps: 100,
+            encoderLayers: [64, 32],
+            decoderLayers: [32, 64],
+            lstmUnits: 128,
+            dropoutRate: 0.2,
+            batchSize: 32,
+            epochs: 100,
+            learningRate: 0.001,
+            validationSplit: 0.2,
+            anomalyThreshold: 0.95,
+            sensitivityLevel: 0.8,
+            adaptiveThresholding: true,
+            featureEngineering: {
+                enableTrending: true,
+                enableSeasonality: true,
+                enableCrossCorrelation: true,
+                windowSize: 10
+            },
+            enableGPU: true,
+            tensorflowMemoryOptimization: true,
+            cacheSize: 1000
+        });
+        this.logger.debug(`AnomalyDetector instance created`);
 
         // Initialize resource manager and metrics collector
         this.resourceManager = new ResourceManagerImpl();
@@ -102,7 +122,7 @@ export class Fuzzer {
                     results.push({
                         type: VulnerabilityType.UnhandledError,
                         confidence: 0.9,
-                        details: `An unhandled error occurred: ${error.message}`,
+                        details: `An unhandled error occurred: ${error instanceof Error ? error.message : String(error)}`,
                     });
                 }
             }
@@ -291,14 +311,14 @@ export class Fuzzer {
         return { instruction: 0, data, probability: 1, metadata: {}, created: Date.now() };
     }
 
-    public async analyzeFuzzResult(error: any, input: FuzzInput): Promise<FuzzResult> {
-        // Implement fuzz result analysis logic
-        if (error && error.message) {
+    public async analyzeFuzzResult(error: unknown, input: FuzzInput): Promise<FuzzResult> {
+        // Add type guard for error
+        if (error instanceof Error) {
             if (error.message.includes('overflow')) {
                 return { type: VulnerabilityType.ArithmeticOverflow, confidence: 0.9, details: 'overflow error' };
             } else if (error.message.includes('access denied')) {
                 return { type: VulnerabilityType.AccessControl, confidence: 0.8, details: 'access denied error' };
-            } // Add more checks for other vulnerabilities
+            }
         }
         return { type: VulnerabilityType.None, confidence: 0.1, details: '' };
     }
@@ -334,7 +354,7 @@ export class Fuzzer {
         };
     }
 
-    public async fuzzWithAnomalyDetection(programId: PublicKey, anomalyDetectionModel: AnomalyDetectionModel): Promise<void> {
+    public async fuzzWithAnomalyDetection(programId: PublicKey, anomalyDetectionModel: AnomalyDetector): Promise<void> {
         this.logger.info('Fuzzing with anomaly detection...');
         const inputs = this.generateFuzzInputs(programId);
         const metrics: TimeSeriesMetric[] = [];
@@ -345,23 +365,19 @@ export class Fuzzer {
 
                 // Collect metrics after each execution
                 const currentMetrics: TimeSeriesMetric = {
-                    instructionFrequency: input.instruction,
-                    executionTime: Date.now() - input.created,
-                    memoryUsage: input.data.length, // Use data length as proxy for memory usage
-                    cpuUtilization: 0, // Will need actual CPU metrics
-                    errorRate: 0, // Track errors over time
-                    pdaValidation: true, // Set based on PDA checks
-                    accountDataMatching: true, // Set based on account data validation
-                    cpiSafety: true, // Set based on CPI safety checks
-                    authorityChecks: true, // Set based on authority validation
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
+                    metrics: {
+                        memoryUsage: [input.data.length],
+                        cpuUtilization: [process.cpuUsage().user / 1000000],
+                        errorRate: [0],
+                        pdaValidation: [1],
+                        accountDataMatching: [1],
+                        cpiSafety: [1],
+                        authorityChecks: [1],
+                        instructionFrequency: [1],
+                        executionTime: [Date.now() - input.created]
+                    }
                 };
-                metrics.push(currentMetrics);
-
-                // Check for anomalies periodically
-                if (metrics.length >= 10) { // Use a reasonable window size for anomaly detection
-                    const anomalyResult = await anomalyDetectionModel.detect(metrics);
-                    if (anomalyResult.isAnomaly) {
                         this.logger.warn(`Anomaly detected: ${JSON.stringify(anomalyResult)}`);
                         // Handle anomaly (e.g., stop fuzzing, adjust parameters)
                     }
