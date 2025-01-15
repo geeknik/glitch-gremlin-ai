@@ -180,15 +180,6 @@ export class GlitchSDK {
         await this.connection.getVersion();
 
         this.initialized = true;
-        } catch (error) {
-            if (redis) {
-                await redis.disconnect();
-            }
-            if (error instanceof Error) {
-                throw new Error(`Failed to initialize GlitchSDK: ${error.message}`);
-            }
-            throw error;
-        }
     }
 
     private async checkRateLimit(): Promise<void> {
