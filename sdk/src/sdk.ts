@@ -140,22 +140,41 @@ export class GlitchSDK {
     private async initialize(redisConfig?: RedisConfig): Promise<void> {
         if (this.initialized) return;
 
-        // Initialize Redis worker with provided config or default localhost config
-        let redis: RedisClient | undefined;
-        try {
-            redis = new Redis({
-                host: redisConfig?.host ?? '127.0.0.1',
-                port: redisConfig?.port ?? 6379,
-                maxRetriesPerRequest: redisConfig?.maxRetriesPerRequest ?? this.REDIS_CONFIG.maxRetriesPerRequest,
-                connectTimeout: redisConfig?.connectTimeout ?? this.REDIS_CONFIG.connectTimeout,
-                retryStrategy: redisConfig?.retryStrategy ?? this.REDIS_CONFIG.retryStrategy,
-                enableOfflineQueue: false
+        // Use mock Redis in test environment
+        if (process.env.NODE_ENV === 'test') {
+            const { Redis } = require('ioredis-mock');
+            const redis = new Redis({
+                host: 'r.glitchgremlin.ai',
+                port: 6379
             });
-
-            // Test Redis connection
-            await redis.ping();
-
             this.queueWorker = new RedisQueueWorker(redis);
+        } else {
+            // Initialize Redis worker with provided config or default localhost config
+            let redis: RedisClient | undefined;
+            try {
+                redis = new Redis({
+                    host: redisConfig?.host ?? 'r.glitchgremlin.ai',
+                    port: redisConfig?.port ?? 6379,
+                    maxRetriesPerRequest: redisConfig?.maxRetriesPerRequest ?? this.REDIS_CONFIG.maxRetriesPerRequest,
+                    connectTimeout: redisConfig?.connectTimeout ?? this.REDIS_CONFIG.connectTimeout,
+                    retryStrategy: redisConfig?.retryStrategy ?? this.REDIS_CONFIG.retryStrategy,
+                    enableOfflineQueue: false
+                });
+
+                // Test Redis connection
+                await redis.ping();
+
+                this.queueWorker = new RedisQueueWorker(redis);
+            } catch (error) {
+                if (redis) {
+                    await redis.disconnect();
+                }
+                if (error instanceof Error) {
+                    throw new Error(`Failed to initialize GlitchSDK: ${error.message}`);
+                }
+                throw error;
+            }
+        }
 
             // Verify Solana connection
             await this.connection.getVersion();

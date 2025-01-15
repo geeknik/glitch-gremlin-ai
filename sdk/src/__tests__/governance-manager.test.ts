@@ -400,5 +400,4 @@ describe('GovernanceManager', () => {
             ).rejects.toThrow('Cannot execute: Required quorum');
         });
     });
-    });
 });
