@@ -16,7 +16,6 @@ interface ProposalStateData {
     votes: PublicKey[];
     }
 
-
 export interface ProposalData {
     title: string;
     description: string;
@@ -295,7 +294,9 @@ export class GovernanceManager {
                 throw new Error('Invalid proposal parameters');
             }
 
-            const proposalAddress = PublicKey.generate(); // Use the correct method to generate a new public key
+            const proposalKeypair = Keypair.generate();
+            const proposalAddress = proposalKeypair.publicKey;
+
             const transaction = new Transaction();
 
             transaction.add(new TransactionInstruction({
