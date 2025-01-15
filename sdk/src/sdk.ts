@@ -292,6 +292,7 @@ export class GlitchSDK {
                         duration: params.duration,
                         intensity: params.intensity
                     });
+                    return {
                         requestId,
                         status: 'completed',
                         resultRef: results.resultRef || 'ipfs://QmHash',
