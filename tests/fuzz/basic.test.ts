@@ -18,6 +18,6 @@ describe('Fuzz Tests', () => {
     const results = await request.waitForCompletion();
     
     expect(results).toBeDefined();
-    expect(security.fuzz.test).toHaveBeenCalled();
+    expect(global.security.fuzz.test).toHaveBeenCalled();
   });
 });

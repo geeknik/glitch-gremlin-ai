@@ -13,6 +13,7 @@ global.security = {
     stop: jest.fn().mockResolvedValue({})
   },
   
+  
   // Mock vulnerability scanner
   scanner: {
     scan: jest.fn().mockImplementation(async (target) => ({
