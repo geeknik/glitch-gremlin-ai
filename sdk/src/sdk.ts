@@ -7,6 +7,14 @@ import {
 } from '@solana/web3.js';
 // @ts-ignore
 const Redis = require('ioredis');
+interface RedisConfig {
+    host: string;
+    port: number;
+    maxRetriesPerRequest?: number;
+    connectTimeout?: number;
+    retryStrategy?: (times: number) => number | null;
+}
+
 type RedisClient = InstanceType<typeof Redis>;
 import { TokenEconomics } from './token-economics.js';
 import { GovernanceConfig, ChaosRequestParams, ChaosResult, TestType, ProposalParams } from './types.js';
@@ -130,27 +138,39 @@ export class GlitchSDK {
         return GlitchSDK.instance;
     }
 
-    private async initialize(redisConfig?: {
-        host: string;
-        port: number;
-    }): Promise<void> {
+    private async initialize(redisConfig?: RedisConfig): Promise<void> {
         if (this.initialized) return;
         
-        // Initialize Redis worker with provided config or defaults
+        // Initialize Redis worker with provided config or default localhost config
         let redis: RedisClient | undefined;
-        if (redisConfig) {
+        try {
             redis = new Redis({
-                host: redisConfig.host,
-                port: redisConfig.port,
-                ...this.REDIS_CONFIG
+                host: redisConfig?.host ?? '127.0.0.1',
+                port: redisConfig?.port ?? 6379,
+                maxRetriesPerRequest: redisConfig?.maxRetriesPerRequest ?? this.REDIS_CONFIG.maxRetriesPerRequest,
+                connectTimeout: redisConfig?.connectTimeout ?? this.REDIS_CONFIG.connectTimeout,
+                retryStrategy: redisConfig?.retryStrategy ?? this.REDIS_CONFIG.retryStrategy,
+                enableOfflineQueue: false
             });
+
+            // Test Redis connection
+            await redis.ping();
+            
+            this.queueWorker = new RedisQueueWorker(redis);
+            
+            // Verify Solana connection
+            await this.connection.getVersion();
+            
+            this.initialized = true;
+        } catch (error) {
+            if (redis) {
+                await redis.disconnect();
+            }
+            if (error instanceof Error) {
+                throw new Error(`Failed to initialize GlitchSDK: ${error.message}`);
+            }
+            throw error;
         }
-        this.queueWorker = new RedisQueueWorker(redis);
-        
-        // Verify connection
-        await this.connection.getVersion();
-        
-        this.initialized = true;
     }
 
     private async checkRateLimit(): Promise<void> {

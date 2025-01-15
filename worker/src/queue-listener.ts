@@ -11,7 +11,7 @@ export class QueueListener {
 
     private zkVMExecutor?: ZkVMExecutor;
 
-    constructor(redisUrl: string = 'redis://localhost:6379', useZkVM: boolean = false) {
+    constructor(redisUrl: string = 'redis://r.glitchgremlin.ai:6379', useZkVM: boolean = false) {
         this.redis = new Redis(redisUrl);
         this.aiEngine = new GlitchAIEngine();
         this.logger = new Logger();

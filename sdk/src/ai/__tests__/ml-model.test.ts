@@ -1,5 +1,5 @@
 import * as tf from '@tensorflow/tfjs-node';
-import { VulnerabilityDetectionModel } from '../src/ml-model';
+import { VulnerabilityDetectionModel } from '../ml-model';
 import { VulnerabilityType } from '../../types';
 
 interface ModelOutput {
@@ -11,16 +11,34 @@ jest.mock('@tensorflow/tfjs-node', () => ({
     ready: jest.fn().mockResolvedValue(undefined),
     setBackend: jest.fn().mockResolvedValue(undefined),
     disposeVariables: jest.fn(),
-    sequential: jest.fn().mockReturnValue({
+    sequential: jest.fn(() => ({
         add: jest.fn(),
         compile: jest.fn(),
-        fit: jest.fn().mockResolvedValue({}),
-        predict: jest.fn()
-    }),
-    tensor2d: jest.fn(),
-    tensor1d: jest.fn(),
-    oneHot: jest.fn(),
-    dispose: jest.fn()
+        fit: jest.fn().mockResolvedValue({ history: { loss: [0.1] } }),
+        predict: jest.fn(() => ({
+            dataSync: jest.fn(() => new Float32Array([0.1, 0.2, 0.3])),
+            dispose: jest.fn()
+        }))
+    })),
+    layers: {
+        dense: jest.fn().mockReturnValue({}),
+        dropout: jest.fn().mockReturnValue({})
+    },
+    train: {
+        adam: jest.fn()
+    },
+    tensor2d: jest.fn(() => ({
+        dataSync: jest.fn(() => new Float32Array([1, 2, 3])),
+        dispose: jest.fn()
+    })),
+    tensor1d: jest.fn(() => ({
+        dataSync: jest.fn(() => new Float32Array([1])),
+        dispose: jest.fn()
+    })),
+    oneHot: jest.fn(() => ({
+        dataSync: jest.fn(() => new Float32Array([1, 0, 0])),
+        dispose: jest.fn()
+    }))
 }));
 describe('VulnerabilityDetectionModel', () => {
     let model: VulnerabilityDetectionModel;
@@ -50,8 +68,15 @@ const testData = [
 ] as { features: number[]; vulnerabilityType: VulnerabilityType }[];
 
     it('should train without errors', async () => {
-    const trainingData = testData.map(d => ({...d})); // Create copy
-    await expect(model.train(trainingData.map(d => d.features), trainingData.map(d => Object.values(VulnerabilityType).indexOf(d.vulnerabilityType)))).resolves.not.toThrow();
+        const trainingData = testData.map(d => ({...d})); // Create copy
+        const result = await model.train(
+            trainingData.map(d => ({
+                features: d.features,
+                label: d.vulnerabilityType
+            }))
+        );
+        expect(result.loss).toBeDefined();
+        expect(result.loss).toBeLessThan(1);
     });
 
     it('should handle empty training data', async () => {
@@ -60,14 +85,15 @@ const testData = [
 
 describe('predict', () => {
     it('should return valid prediction structure', async () => {
-        const features: number[] = Array.from({length: 20}, () => Math.random());
-        const prediction = await model.predict(features) as ModelOutput;
+        const features = Array.from({length: 20}, () => Math.random());
+        const prediction = await model.predict(features);
         
         expect(prediction).toHaveProperty('type');
         expect(prediction).toHaveProperty('confidence');
         expect(prediction.confidence).toBeGreaterThanOrEqual(0);
         expect(prediction.confidence).toBeLessThanOrEqual(1);
         expect(Object.values(VulnerabilityType)).toContain(prediction.type);
+        expect(typeof prediction.confidence).toBe('number');
     });
 
     it('should handle invalid input features', async () => {

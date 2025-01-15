@@ -6,7 +6,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+const REDIS_URL = process.env.REDIS_URL || 'redis://r.glitchgremlin.ai:6379';
 const METRICS_PORT = parseInt(process.env.METRICS_PORT || '9464');
 
 export class GlitchService {

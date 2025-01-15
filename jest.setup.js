@@ -84,7 +84,7 @@ jest.mock('@solana/web3.js', () => ({
 
 // Set up environment variables for testing
 process.env.SOLANA_CLUSTER_URL = 'http://localhost:8899';
-process.env.REDIS_URL = 'redis://localhost:6379';
+process.env.REDIS_URL = 'redis://r.glitchgremlin.ai:6379';
 process.env.NODE_ENV = 'test';
 
 // Configure Jest environment

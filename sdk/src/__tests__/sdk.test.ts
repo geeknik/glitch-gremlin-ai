@@ -25,7 +25,7 @@ describe('GlitchSDK', () => {
             simulateTransaction: jest.fn(),
             disconnect: jest.fn().mockResolvedValue(undefined),
             commitment: 'confirmed' as Commitment,
-            rpcEndpoint: 'http://localhost:8899'
+            rpcEndpoint: 'https://api.devnet.solana.com'
         } as unknown as MockedObject<Connection>;
 
         mockRedisClient = {
@@ -73,7 +73,7 @@ describe('GlitchSDK', () => {
         
         const createSpy = jest.spyOn(GlitchSDK, 'create');
         sdk = await GlitchSDK.create({
-            cluster: "http://localhost:8899",
+            cluster: "https://api.devnet.solana.com",
             wallet: Keypair.generate(),
             redisConfig: {
                 host: "localhost",

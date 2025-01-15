@@ -15,8 +15,12 @@ describe('Rate Limiting', () => {
     beforeAll(async () => {
         const wallet = Keypair.generate();
         sdk = await GlitchSDK.init({
-            cluster: 'https://api.devnet.solana.com',
-            wallet
+            cluster: 'https://api.devnet.solana.com/',
+            wallet,
+            redisConfig: {
+                host: 'localhost',
+                port: 6379
+            }
         });
 
         // Mock Redis methods globally

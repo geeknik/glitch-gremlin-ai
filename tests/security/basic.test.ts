@@ -4,7 +4,7 @@ import { security } from '../../jest.setup';
 describe('Security Tests', () => {
   it('should run basic security scan', async () => {
     const sdk = await GlitchSDK.init({
-      cluster: 'devnet',
+    cluster: 'https://api.devnet.solana.com',
       wallet: {} as any,
       redisConfig: {
         host: 'r.glitchgremlin.ai',

@@ -111,13 +111,38 @@ export class SecurityScoring {
         this.connection = connection;
     }
 
-    public async analyzeProgram(programId: string): Promise<AnalysisResult> {
-        this.lastAnalyzedProgramId = programId;
+    public async analyzeProgram(programId: PublicKey | string): Promise<AnalysisResult> {
+        const programIdStr = typeof programId === 'string' ? programId : programId.toBase58();
+        this.lastAnalyzedProgramId = programIdStr;
+        const metrics = await this.analyzeSecurityMetrics(programIdStr);
+        const score = this.calculateScore(metrics);
+        const validation = await this.validateProgram(programIdStr);
+        const risks = await this.detectRiskPatterns(metrics);
+        const analysis = await this.analyzeSecurity(programIdStr);
+
+        return {
+            score,
+            riskLevel: analysis.riskLevel,
+            patterns: risks,
+            suggestions: this.generateSuggestions(score, validation),
+            validation,
+            timestamp: new Date(),
+            programId: programIdStr
+        };
+    }
+
+    public async analyzeSecurity(program: PublicKey | string): Promise<AnalysisResult> {
+        const programId = typeof program === 'string' ? program : program.toBase58();
         const metrics = await this.analyzeSecurityMetrics(programId);
         const score = this.calculateScore(metrics);
         const validation = await this.validateProgram(programId);
         const risks = await this.detectRiskPatterns(metrics);
-        const analysis = await this.analyzeSecurity(metrics);
+        const analysis: SecurityAnalysis = {
+            patterns: await this.detectPatterns(programId),
+            riskLevel: this.determineRiskLevel(await this.detectPatterns(programId)),
+            timestamp: new Date(),
+            programId
+        };
 
         return {
             score,
@@ -127,28 +152,6 @@ export class SecurityScoring {
             validation,
             timestamp: new Date(),
             programId
-        };
-
-    public async analyzeSecurity(program: PublicKey): Promise<AnalysisResult> {
-        const metrics = await this.analyzeSecurityMetrics(program.toBase58());
-        const score = this.calculateScore(metrics);
-        const validation = await this.validateProgram(program.toBase58());
-        const risks = await this.detectRiskPatterns(metrics);
-        const analysis: SecurityAnalysis = {
-            patterns: await this.detectPatterns(metrics),
-            riskLevel: this.determineRiskLevel(await this.detectPatterns(metrics)),
-            timestamp: new Date(),
-            programId: program.toBase58()
-        };
-
-        return {
-            score,
-            riskLevel: analysis.riskLevel,
-            patterns: risks,
-            suggestions: this.generateSuggestions(score, validation), 
-            validation,
-            timestamp: new Date(),
-            programId: program.toBase58()
         };
     }
 
@@ -187,7 +190,8 @@ export class SecurityScoring {
             patterns,
             suggestions: this.generateSuggestions(score, validation),
             validation,
-            timestamp: new Date()
+            timestamp: new Date(),
+            programId
         };
     }
 

@@ -41,13 +41,13 @@ describe('SecurityScoringModel', () => {
             const program = new PublicKey('11111111111111111111111111111111');
             
             // Act
-            const result = await securityScoring.analyzeProgram(program.toBase58());
+            const result = await securityScoring.analyzeProgram(program);
             
             // Assert
             expect(result).toBeDefined();
-            expect(result.score).toBeGreaterThanOrEqual(0);
-            expect(result.score).toBeLessThanOrEqual(100);
-            expect(result.riskLevel).toBeDefined();
+            expect(result.score.score).toBeGreaterThanOrEqual(0);
+            expect(result.score.score).toBeLessThanOrEqual(1);
+            expect(result.score.risk).toBeDefined();
             expect(result.timestamp).toBeInstanceOf(Date);
             expect(result.programId).toBeDefined();
             expect(result.patterns).toBeInstanceOf(Array);
@@ -61,8 +61,10 @@ describe('SecurityScoringModel', () => {
             expect(analysis.patterns).toBeDefined();
             expect(Array.isArray(analysis.patterns)).toBe(true);
             expect(analysis.timestamp).toBeInstanceOf(Date);
-            expect(analysis.risks).toBeDefined();
-            expect(Array.isArray(analysis.risks)).toBe(true);
+            analysis.patterns.forEach(pattern => {
+                expect(pattern.risk).toBeDefined();
+                expect(pattern.details).toBeDefined();
+            });
         });
     });
 });

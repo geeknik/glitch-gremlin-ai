@@ -18,7 +18,7 @@ export class RedisQueueWorker {
     };
     constructor(redisClient?: RedisType) {
         this.redis = redisClient || new IORedis({
-            host: process.env.REDIS_HOST || 'r.glitchgremlin.ai',
+            host: process.env.REDIS_HOST || 'r.glitchgremlin.ai', 
             port: parseInt(process.env.REDIS_PORT || '6379'),
             connectTimeout: 5000,
             maxRetriesPerRequest: 3,

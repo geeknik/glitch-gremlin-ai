@@ -4,7 +4,7 @@ import { security } from '../../jest.setup';
 describe('Fuzz Tests', () => {
   it('should run basic fuzz test', async () => {
     const sdk = new GlitchSDK({
-      cluster: 'devnet',
+    cluster: 'https://api.devnet.solana.com',
       wallet: {} as any
     });
 

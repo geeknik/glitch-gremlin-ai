@@ -4,7 +4,7 @@ import { security } from '../../jest.setup';
 describe('Mutation Tests', () => {
   it('should run basic mutation test', async () => {
     const sdk = new GlitchSDK({
-      cluster: 'devnet',
+    cluster: 'https://api.devnet.solana.com',
       wallet: {} as any
     });
 

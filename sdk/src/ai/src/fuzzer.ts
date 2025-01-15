@@ -337,24 +337,29 @@ export class Fuzzer {
     public async fuzzWithAnomalyDetection(programId: PublicKey, anomalyDetectionModel: AnomalyDetectionModel): Promise<void> {
         this.logger.info('Fuzzing with anomaly detection...');
         const inputs = this.generateFuzzInputs(programId);
-        const metrics: TimeSeriesMetrics[] = [];
+        const metrics: TimeSeriesMetric[] = [];
 
         for (const input of inputs) {
             try {
                 const result = await this.executeFuzzedInput(input);
 
                 // Collect metrics after each execution
-                const currentMetrics = {
-                    instructionFrequency: [input.instruction],
-                    memoryAccess: [input.data.length], // Use data length as a proxy for memory access
-                    accountAccess: [0], // Replace with actual account access count
-                    stateChanges: [0], // Replace with actual state changes count
+                const currentMetrics: TimeSeriesMetric = {
+                    instructionFrequency: input.instruction,
+                    executionTime: Date.now() - input.created,
+                    memoryUsage: input.data.length, // Use data length as proxy for memory usage
+                    cpuUtilization: 0, // Will need actual CPU metrics
+                    errorRate: 0, // Track errors over time
+                    pdaValidation: true, // Set based on PDA checks
+                    accountDataMatching: true, // Set based on account data validation
+                    cpiSafety: true, // Set based on CPI safety checks
+                    authorityChecks: true, // Set based on authority validation
                     timestamp: Date.now()
                 };
                 metrics.push(currentMetrics);
 
                 // Check for anomalies periodically
-                if (metrics.length >= anomalyDetectionModel['inputWindowSize']) {
+                if (metrics.length >= 10) { // Use a reasonable window size for anomaly detection
                     const anomalyResult = await anomalyDetectionModel.detect(metrics);
                     if (anomalyResult.isAnomaly) {
                         this.logger.warn(`Anomaly detected: ${JSON.stringify(anomalyResult)}`);

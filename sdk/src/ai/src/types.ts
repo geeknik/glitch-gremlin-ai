@@ -1,10 +1,41 @@
+// Error types for improved error handling
+export class FuzzerError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'FuzzerError';
+    }
+}
+
+export class ValidationError extends FuzzerError {
+    constructor(message: string) {
+        super(message);
+        this.name = 'ValidationError'; 
+    }
+}
+
+export class ResourceExhaustionError extends FuzzerError {
+    constructor(message: string) {
+        super(message);
+        this.name = 'ResourceExhaustionError';
+    }
+}
+
 export enum VulnerabilityType {
     ArithmeticOverflow = 'ArithmeticOverflow',
     AccessControl = 'AccessControl',
-    None = 'None', 
-    Reentrancy = 'Reentrancy',
     PDASafety = 'PDASafety',
-    AccountDataValidation = 'AccountDataValidation'
+    ResourceExhaustion = 'ResourceExhaustion',
+    OutOfBounds = 'OutOfBounds',
+    None = 'None',
+    Reentrancy = 'Reentrancy',
+    AccountDataValidation = 'AccountDataValidation',
+    UnhandledError = 'UnhandledError'
+}
+
+// Improved validation interfaces
+export interface ValidationResult {
+    isValid: boolean;
+    errors: string[];
 }
 
 export interface SecurityMetrics {
@@ -29,9 +60,40 @@ export interface TrainingConfig {
     patience?: number;
 }
 
+export interface TensorShape {
+    dimensions: number[];
+    validate(): ValidationResult;
+}
+
+export interface ResourceManager {
+    acquire(): Promise<void>;
+    release(): Promise<void>;
+    isAcquired: boolean;
+    memoryUsage: number;
+}
+
 export interface MetricsCollector {
     collect(): Promise<void>;
     stop(): Promise<void>;
+    reset(): Promise<void>;
+    getMetrics(): Promise<{ [key: string]: number }>;
+}
+
+export interface FuzzConfig {
+    maxIterations: number;
+    timeoutMs: number;
+    memoryLimitMb: number;
+    strategies: string[];
+    cleanup: boolean;
+    validateShapes: boolean;
+    collectMetrics: boolean;
+}
+
+export interface FuzzContext {
+    resourceManager: ResourceManager;
+    metricsCollector: MetricsCollector;
+    config: FuzzConfig;
+    logger: Logger;
 }
 
 export interface TimeSeriesMetric {

@@ -1,59 +1,59 @@
 import * as tf from '@tensorflow/tfjs-node';
 import * as fs from 'fs';
-import { AnomalyDetectionModel } from '../src/anomaly-detection';
-
-interface TimeSeriesMetrics {
-    instructionFrequency: number[];
-    memoryAccess: number[];
-    accountAccess: number[];
-    stateChanges: number[];
-    pdaValidation?: number[];
-    accountDataMatching?: number[];
-    cpiSafety?: number[];
-    authorityChecks?: number[];
-    timestamp: number;
-}
-
-interface AnomalyDetectionResult {
-    isAnomaly: boolean;
-    confidence: number;
-    details: AnomalyDetailsItem[];
-}
-
-interface AnomalyDetailsItem {
-    type: string;
-    score: number;
-    threshold: number;
-    confidence?: number;
-    correlatedPatterns?: string[];
-}
-
-import { TimeSeriesMetric } from '../src/types';
+import {
+AnomalyDetectionModel,
+TimeSeriesMetric,
+AnomalyResult,
+ModelConfig,
+AnomalyDetail
+} from '../src/anomaly-detection';
 
 describe('AnomalyDetectionModel', () => {
     let model: AnomalyDetectionModel;
     const testModelPath = './test-model';
 
     beforeEach(() => {
+        const config: ModelConfig = {
+            inputDimensions: 9,
+            hiddenLayers: [64, 32],
+            anomalyThreshold: 0.7,
+            batchSize: 32,
+            epochs: 10,
+            validationSplit: 0.2
+        };
+        model = new AnomalyDetectionModel(config);
+    });
         model = new AnomalyDetectionModel();
     });
 
     afterEach(async () => {
+        if (model) {
+            await model.cleanup();
+            const tensors = tf.memory().numTensors;
+            expect(tensors).toBeLessThanOrEqual(initialTensorCount);
+        }
+        // Clean up any test files
+        if (fs.existsSync(testModelPath)) {
+            await fs.promises.rm(testModelPath, { recursive: true });
+        }
+    });
         await model.cleanup();
     });
 
     const generateNormalMetrics = (count: number): TimeSeriesMetric[] => {
         return Array.from({ length: count }, (_, i) => ({
             instructionFrequency: [Math.sin(i * 0.1) + 1],
-            memoryAccess: [Math.cos(i * 0.1) + 1],
-            accountAccess: [Math.sin(i * 0.05) + 1],
-            stateChanges: [Math.cos(i * 0.05) + 1],
+            executionTime: [Math.cos(i * 0.1) + 1],
+            memoryUsage: [Math.sin(i * 0.15) + 1],
+            cpuUtilization: [Math.cos(i * 0.15) + 1],
+            errorRate: [Math.sin(i * 0.05) + 0.1],
             pdaValidation: [Math.sin(i * 0.15) + 1],
             accountDataMatching: [Math.cos(i * 0.15) + 1],
             cpiSafety: [Math.sin(i * 0.08) + 1],
             authorityChecks: [Math.cos(i * 0.08) + 1],
             timestamp: Date.now() + i * 1000
-        }))
+        }));
+    };
     };
 
     const generateAnomalousMetrics = (count: number): TimeSeriesMetric[] => {
@@ -61,9 +61,10 @@ describe('AnomalyDetectionModel', () => {
         const anomalyIndex = Math.floor(count / 2);
         metrics[anomalyIndex] = {
             instructionFrequency: [10],
-            memoryAccess: [8],
-            accountAccess: [5],
-            stateChanges: [7],
+            executionTime: [8],
+            memoryUsage: [9],
+            cpuUtilization: [8.5],
+            errorRate: [0.8],
             pdaValidation: [9],
             accountDataMatching: [8],
             cpiSafety: [7],
@@ -73,9 +74,46 @@ describe('AnomalyDetectionModel', () => {
         return metrics;
     };
 
-    describe('initialization', () => {
+    describe('model configuration', () => {
+        it('should validate proper configuration', async () => {
+            const config: ModelConfig = {
+                inputDimensions: 9,
+                hiddenLayers: [64, 32],
+                anomalyThreshold: 0.7,
+                batchSize: 32,
+                epochs: 10,
+                validationSplit: 0.2
+            };
+            model = new AnomalyDetectionModel(config);
+            expect(model).toBeDefined();
+            await expect(model.validateModel()).resolves.not.toThrow();
+        });
+
+        it('should reject invalid configurations', () => {
+            const invalidConfig = {
+                inputDimensions: -1,
+                hiddenLayers: [],
+                anomalyThreshold: 2.0
+            } as ModelConfig;
+            
+            expect(() => new AnomalyDetectionModel(invalidConfig)).toThrow();
+        });
+
+        it('should use default configuration when not provided', () => {
+            model = new AnomalyDetectionModel();
+            expect(model).toBeDefined();
+        });
+    });
         it('should initialize properly', async () => {
-            await expect(model.initialize()).resolves.not.toThrow();
+            const config: ModelConfig = {
+                windowSize: 100,
+                minTrainingPoints: 200,
+                epochs: 10,
+                learningRate: 0.001,
+                batchSize: 32
+            };
+            model = new AnomalyDetectionModel(config);
+            expect(model).toBeDefined();
         });
     });
 
@@ -204,74 +242,214 @@ describe('AnomalyDetectionModel', () => {
 
     describe('Security Pattern Detection', () => {
         beforeEach(async () => {
-            await model.train(generateNormalMetrics(200));
+            await model.train(generateNormalMetrics(500)); // Increased training data for better pattern detection
         });
 
-        it('should detect PDA validation issues', async () => {
-            const testData = generateNormalMetrics(100);
-            testData[50].pdaValidation = [9.5];
-            const result = await model.detect(testData);
+        describe('Basic Security Patterns', () => {
+            it('should detect PDA validation issues', async () => {
+                const testData = generateNormalMetrics(100);
+                testData[50].pdaValidation = [9.5];
+                const result = await model.detect(testData);
 
-            expect(result.isAnomaly).toBe(true);
-            expect(result.details.find(d => d.type === 'pdaValidation')).toBeDefined();
-            expect(result.confidence).toBeGreaterThan(0.7);
+                expect(result.isAnomaly).toBe(true);
+                expect(result.details.find(d => d.type === 'pdaValidation')).toBeDefined();
+                expect(result.confidence).toBeGreaterThan(0.7);
+            });
+
+            it('should detect account data matching vulnerabilities', async () => {
+                const testData = generateNormalMetrics(100);
+                testData[50].accountDataMatching = [8.5];
+                const result = await model.detect(testData);
+
+                expect(result.isAnomaly).toBe(true);
+                expect(result.details.find(d => d.type === 'accountDataMatching')).toBeDefined();
+                expect(result.confidence).toBeGreaterThan(0.6);
+            });
+
+            it('should detect unsafe CPI patterns', async () => {
+                const testData = generateNormalMetrics(100);
+                testData[50].cpiSafety = [7.5];
+                const result = await model.detect(testData);
+
+                expect(result.isAnomaly).toBe(true);
+                expect(result.details.find(d => d.type === 'cpiSafety')).toBeDefined();
+                expect(result.confidence).toBeGreaterThan(0.65);
+            });
+
+            it('should detect authority validation issues', async () => {
+                const testData = generateNormalMetrics(100);
+                testData[50].authorityChecks = [6.5];
+                const result = await model.detect(testData);
+
+                expect(result.isAnomaly).toBe(true);
+                expect(result.details.find(d => d.type === 'authorityChecks')).toBeDefined();
+                expect(result.confidence).toBeGreaterThan(0.75);
+            });
         });
 
-        it('should detect account data matching vulnerabilities', async () => {
-            const testData = generateNormalMetrics(100);
-            testData[50].accountDataMatching = [8.5];
-            const result = await model.detect(testData);
+        describe('Advanced Security Patterns', () => {
+            it('should detect gradual instruction frequency manipulation', async () => {
+                const testData = generateNormalMetrics(100);
+                // Simulate gradual increase in instruction frequency
+                for (let i = 40; i < 60; i++) {
+                    testData[i].instructionFrequency = [1 + (i - 40) * 0.2];
+                }
+                const result = await model.detect(testData);
 
-            expect(result.isAnomaly).toBe(true);
-            expect(result.details.find(d => d.type === 'accountDataMatching')).toBeDefined();
-            expect(result.confidence).toBeGreaterThan(0.6);
+                expect(result.isAnomaly).toBe(true);
+                expect(result.confidence).toBeGreaterThan(0.6);
+                expect(result.details.find(d => d.type === 'instructionFrequency')).toBeDefined();
+            });
+
+            it('should detect alternating high-low execution patterns', async () => {
+                const testData = generateNormalMetrics(100);
+                for (let i = 40; i < 60; i++) {
+                    testData[i].executionTime = [i % 2 === 0 ? 5.0 : 0.5];
+                    testData[i].cpuUtilization = [i % 2 === 0 ? 4.0 : 0.3];
+                }
+                const result = await model.detect(testData);
+
+                expect(result.isAnomaly).toBe(true);
+                expect(result.details.some(d => d.score > 0.7)).toBe(true);
+            });
         });
 
-        it('should detect unsafe CPI patterns', async () => {
-            const testData = generateNormalMetrics(100);
-            testData[50].cpiSafety = [7.5];
-            const result = await model.detect(testData);
+        describe('Temporal Attack Patterns', () => {
+            it('should detect periodic spikes in resource usage', async () => {
+                const testData = generateNormalMetrics(200);
+                for (let i = 0; i < 200; i += 20) {
+                    testData[i].memoryUsage = [8.0];
+                    testData[i].cpuUtilization = [7.0];
+                }
+                const result = await model.detect(testData);
 
-            expect(result.isAnomaly).toBe(true);
-            expect(result.details.find(d => d.type === 'cpiSafety')).toBeDefined();
-            expect(result.confidence).toBeGreaterThan(0.65);
+                expect(result.isAnomaly).toBe(true);
+                expect(result.details.find(d => d.type === 'periodicPattern')).toBeDefined();
+            });
+
+            it('should identify time-delayed attack sequences', async () => {
+                const testData = generateNormalMetrics(150);
+                testData[50].pdaValidation = [7.0];
+                testData[70].accountDataMatching = [6.5];
+                testData[90].cpiSafety = [6.0];
+
+                const result = await model.detect(testData);
+                expect(result.isAnomaly).toBe(true);
+                expect(result.details.find(d => d.type === 'sequentialPattern')).toBeDefined();
+            });
+        });
+        describe('Resource Exhaustion Attacks', () => {
+            it('should detect memory exhaustion attempts', async () => {
+                const testData = generateNormalMetrics(100);
+                for (let i = 40; i < 60; i++) {
+                    testData[i].memoryUsage = [9.0];
+                    testData[i].cpuUtilization = [8.0];
+                    testData[i].instructionFrequency = [7.0];
+                }
+                const result = await model.detect(testData);
+
+                expect(result.isAnomaly).toBe(true);
+                expect(result.confidence).toBeGreaterThan(0.8);
+                expect(result.details.find(d => d.type === 'resourceExhaustion')).toBeDefined();
+            });
+
+            it('should identify CPU spinning patterns', async () => {
+                const testData = generateNormalMetrics(100);
+                for (let i = 45; i < 55; i++) {
+                    testData[i].cpuUtilization = [9.5];
+                    testData[i].instructionFrequency = [8.5];
+                }
+                const result = await model.detect(testData);
+
+                expect(result.isAnomaly).toBe(true);
+                expect(result.details.find(d => d.type === 'cpuAbuse')).toBeDefined();
+            });
         });
 
-        it('should detect authority validation issues', async () => {
-            const testData = generateNormalMetrics(100);
-            testData[50].authorityChecks = [6.5];
-            const result = await model.detect(testData);
+        describe('Correlated Vulnerabilities', () => {
+            it('should detect combined vulnerability patterns', async () => {
+                const testData = generateNormalMetrics(100);
+                testData[50] = {
+                    ...testData[50],
+                    pdaValidation: [8.0],
+                    accountDataMatching: [7.5],
+                    cpiSafety: [6.5],
+                    authorityChecks: [5.5]
+                };
+                const result = await model.detect(testData);
 
-            expect(result.isAnomaly).toBe(true);
-            expect(result.details.find(d => d.type === 'authorityChecks')).toBeDefined();
-            expect(result.confidence).toBeGreaterThan(0.75);
+                expect(result.isAnomaly).toBe(true);
+                expect(result.confidence).toBeGreaterThan(0.85);
+                expect(result.details.filter(d => d.score > 0.6)).toHaveLength(4);
+            });
+
+            it('should perform correlation analysis between different vulnerabilities', async () => {
+                const testData = generateNormalMetrics(100);
+                testData[50].pdaValidation = [8.5];
+                testData[51].accountDataMatching = [7.5];
+                testData[52].cpiSafety = [6.5];
+
+                const result = await model.detect(testData);
+                expect(result.isAnomaly).toBe(true);
+                expect(result.details.some(d => d.correlatedPatterns?.length > 0)).toBe(true);
+            });
+
+            it('should detect complex attack patterns with multiple phases', async () => {
+                const testData = generateNormalMetrics(150);
+                // Phase 1: Resource preparation
+                testData[30].memoryUsage = [6.0];
+                testData[31].cpuUtilization = [5.5];
+                
+                // Phase 2: Authority manipulation
+                testData[50].authorityChecks = [7.0];
+                testData[51].pdaValidation = [6.5];
+                
+                // Phase 3: Data exploitation
+                testData[70].accountDataMatching = [8.0];
+                testData[71].cpiSafety = [7.5];
+
+                const result = await model.detect(testData);
+                expect(result.isAnomaly).toBe(true);
+                expect(result.confidence).toBeGreaterThan(0.9);
+                expect(result.details.filter(d => d.score > 0.7).length).toBeGreaterThanOrEqual(3);
+            });
         });
 
-        it('should detect combined vulnerability patterns', async () => {
-            const testData = generateNormalMetrics(100);
-            testData[50] = {
-                ...testData[50],
-                pdaValidation: [8.0],
-                accountDataMatching: [7.5],
-                cpiSafety: [6.5],
-                authorityChecks: [5.5]
-            };
-            const result = await model.detect(testData);
+        describe('False Positive Analysis', () => {
+            it('should handle normal program upgrades', async () => {
+                const testData = generateNormalMetrics(100);
+                testData[50].instructionFrequency = [3.0];
+                testData[50].memoryUsage = [2.5];
+                const result = await model.detect(testData);
 
-            expect(result.isAnomaly).toBe(true);
-            expect(result.confidence).toBeGreaterThan(0.85);
-            expect(result.details.filter(d => d.score > 0.6)).toHaveLength(4);
-        });
+                expect(result.isAnomaly).toBe(false);
+                expect(result.confidence).toBeLessThan(0.4);
+            });
 
-        it('should perform correlation analysis between different vulnerabilities', async () => {
-            const testData = generateNormalMetrics(100);
-            testData[50].pdaValidation = [8.5];
-            testData[51].accountDataMatching = [7.5];
-            testData[52].cpiSafety = [6.5];
+            it('should not flag legitimate batch operations', async () => {
+                const testData = generateNormalMetrics(100);
+                for (let i = 40; i < 45; i++) {
+                    testData[i].instructionFrequency = [2.5];
+                    testData[i].cpuUtilization = [2.0];
+                    testData[i].memoryUsage = [2.2];
+                }
+                const result = await model.detect(testData);
 
-            const result = await model.detect(testData);
-            expect(result.isAnomaly).toBe(true);
-            expect(result.details.some(d => d.correlatedPatterns?.length > 0)).toBe(true);
+                expect(result.isAnomaly).toBe(false);
+                expect(result.confidence).toBeLessThan(0.5);
+            });
+
+            it('should handle periodic maintenance operations', async () => {
+                const testData = generateNormalMetrics(100);
+                for (let i = 0; i < 100; i += 20) {
+                    testData[i].memoryUsage = [3.0];
+                    testData[i].cpuUtilization = [2.8];
+                }
+                const result = await model.detect(testData);
+
+                expect(result.isAnomaly).toBe(false);
+                expect(result.confidence).toBeLessThan(0.4);
+            });
         });
     });
 
@@ -533,7 +711,43 @@ describe('AnomalyDetectionModel', () => {
             await model.cleanup();
         });
 
-        it('should validate model architecture', async () => {
+        describe('Model Validation', () => {
+            let model: AnomalyDetectionModel;
+
+            beforeEach(() => {
+                const config: ModelConfig = {
+                    inputDimensions: 9,
+                    hiddenLayers: [64, 32],
+                    anomalyThreshold: 0.7,
+                    batchSize: 32,
+                    epochs: 10,
+                    validationSplit: 0.2
+                };
+                model = new AnomalyDetectionModel(config);
+            });
+
+            afterEach(async () => {
+                await model.cleanup();
+            });
+
+            it('should validate model architecture', async () => {
+                await expect(model.validateModel()).resolves.not.toThrow();
+            });
+
+            it('should throw error if model is not trained', async () => {
+                await model.cleanup();
+                await expect(model.validateModel()).rejects.toThrow('Model not properly trained');
+            });
+
+            it('should validate model layer configuration', async () => {
+                const data = generateNormalMetrics(200);
+                await model.train(data);
+                await expect(model.validateModel()).resolves.not.toThrow();
+                const architecture = await model.getModelArchitecture();
+                expect(architecture).toBeDefined();
+                expect(architecture.layers).toHaveLength(model.config.hiddenLayers.length + 2); // Input + hidden + output
+            });
+        });
             await expect(model.validateModel()).resolves.not.toThrow();
         });
 

@@ -1,32 +1,40 @@
-export default {
+/** @type {import('jest').Config} */
+const config = {
 preset: 'ts-jest/presets/default-esm',
 testEnvironment: 'node',
+fakeTimers: {
+    enableGlobally: true,
+    now: 1704819600000  // Set a fixed timestamp for reproducibility
+},
 moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node', 'mjs'],
 
 setupFiles: ['dotenv/config'],
 
-moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/src/$1',
-    '^@glitch-gremlin/sdk$': '<rootDir>/sdk/src',
-    '^@glitch-gremlin/sdk/(.*)$': '<rootDir>/sdk/src/$1',
-    '^@utils/(.*)$': '<rootDir>/src/utils/$1',
-    '^@tests/(.*)$': '<rootDir>/src/__tests__/$1',
-    '^(\\.{1,2}/.*)\\.js$': '$1'
-},
 
 transform: {
-    '^.+\\.(ts|tsx)$': ['ts-jest', {
-    tsconfig: 'tsconfig.test.json',
+'^.+\\.(ts|tsx)$': [
+    'ts-jest',
+    {
     useESM: true,
-    isolatedModules: true,
-    target: 'node16'
-    }],
-    '^.+\\.(js|jsx|mjs)$': ['babel-jest', {
-    presets: [['@babel/preset-env', { targets: { node: 'current' } }]]
-    }]
+    tsconfig: 'tsconfig.test.json'
+    }
+]
+},
+extensionsToTreatAsEsm: ['.ts', '.tsx', '.mts'],
+moduleNameMapper: {
+'^(\\.{1,2}/.*)\\.js$': '$1',
+'^(\\.{1,2}/.*)\\.mjs$': '$1',
+'^(\\.{1,2}/.*)\\.cjs$': '$1',
+'^@/(.*)$': '<rootDir>/src/$1',
+'^@glitch-gremlin/sdk$': '<rootDir>/sdk/src',
+'^@glitch-gremlin/sdk/(.*)$': '<rootDir>/sdk/src/$1', 
+'^@utils/(.*)$': '<rootDir>/src/utils/$1',
+'^@tests/(.*)$': '<rootDir>/src/__tests__/$1',
+'^@tensorflow/tfjs-node$': '@tensorflow/tfjs',
+'\\.m?jsx?$': 'babel-jest'
 },
 transformIgnorePatterns: [
-    'node_modules/(?!(@solana|@project-serum|@metaplex|@coral-xyz|@holaplex|@nfteyez|@jest/globals)/.*)'
+'node_modules/(?!(@tensorflow|@solana|@project-serum|@metaplex|@coral-xyz|@holaplex|@nfteyez|@jest/globals)/.*)'
 ]
 ,
 testEnvironmentOptions: {
@@ -40,12 +48,6 @@ testEnvironmentOptions: {
 testTimeout: 10000,
 maxWorkers: '50%',
 
-globals: {
-    'ts-jest': {
-    useESM: true,
-    tsconfig: 'tsconfig.test.json'
-    }
-},
 setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
 modulePaths: [
     "<rootDir>/src",
@@ -57,6 +59,7 @@ collectCoverageFrom: [
     '!src/**/*.d.ts',
     '!src/**/__tests__/**'
 ],
-extensionsToTreatAsEsm: ['.ts', '.tsx'],
-verbose: true
+testEnvironment: 'node',
 };
+
+export default config;

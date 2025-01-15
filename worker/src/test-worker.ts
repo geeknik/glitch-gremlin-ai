@@ -8,7 +8,7 @@ export class TestWorker {
     private running: boolean = false;
 
     constructor(
-        redisUrl: string = 'redis://localhost:6379',
+        redisUrl: string = 'redis://r.glitchgremlin.ai:6379',
         solanaRpcUrl: string = 'https://api.devnet.solana.com'
     ) {
         this.redis = new Redis(redisUrl);

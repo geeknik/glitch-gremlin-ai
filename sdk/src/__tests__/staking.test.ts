@@ -8,27 +8,26 @@ jest.mock('ioredis', () => require('ioredis-mock'));
 
 describe('Staking', () => {
     let sdk: GlitchSDK;
-    let mockRedis: Redis;
     let mockConnection: jest.Mocked<Connection>;
     
     beforeEach(async () => {
-        mockRedis = new Redis();
         mockConnection = {
             getBalance: jest.fn(),
             getRecentBlockhash: jest.fn(),
-            sendTransaction: jest.fn()
+            sendTransaction: jest.fn(),
+            getAccountInfo: jest.fn(),
+            getProgramAccounts: jest.fn(),
+            getConfirmedSignaturesForAddress2: jest.fn()
         } as unknown as jest.Mocked<Connection>;
 
-        const wallet = Keypair.generate();
-        sdk = await GlitchSDK.create({
+        sdk = await GlitchSDK.init({
             cluster: 'https://api.devnet.solana.com',
-            wallet,
+            wallet: Keypair.generate(),
             governanceConfig: {
                 minStakeAmount: 100,
                 minStakeLockupPeriod: 86400,
                 maxStakeLockupPeriod: 31536000
             },
-            redis: mockRedis,
             connection: mockConnection
         });
 
