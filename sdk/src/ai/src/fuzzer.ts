@@ -378,11 +378,11 @@ export class Fuzzer {
                         executionTime: [Date.now() - input.created]
                     }
                 };
-                        this.logger.warn(`Anomaly detected: ${JSON.stringify(anomalyResult)}`);
-                        // Handle anomaly (e.g., stop fuzzing, adjust parameters)
-                    }
+                const anomalyResult = await anomalyDetectionModel.detectAnomalies(currentMetrics);
+                if (anomalyResult.anomalyScore > anomalyDetectionModel.config.anomalyThreshold) {
+                    this.logger.warn(`Anomaly detected: ${JSON.stringify(anomalyResult)}`);
+                    // Handle anomaly (e.g., stop fuzzing, adjust parameters)
                 }
-
             } catch (error) {
                 await this.analyzeFuzzResult(error, input);
             }
