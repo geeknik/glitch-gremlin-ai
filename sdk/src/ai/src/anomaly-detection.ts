@@ -259,31 +259,31 @@ private preprocessMetrics(metrics: TimeSeriesMetric[]): tf.Tensor2D {
 }
 
 public async train(metrics: TimeSeriesMetric[]): Promise<void> {
-this.validateTrainingData(metrics);
+    this.validateTrainingData(metrics);
 
-const processedData = this.preprocessMetrics(metrics);
-this.model = this.buildModel();
+    const processedData = this.preprocessMetrics(metrics);
+    this.model = this.buildModel();
 
-this.model.compile({
-    optimizer: tf.train.adam(this.config.learningRate),
-    loss: 'meanSquaredError'
-});
-
-const tensorData = tf.tensor2d(processedData);
-
-try {
-    await this.model.fit(tensorData, tensorData, {
-    epochs: this.config.epochs,
-    callbacks: {
-        onEpochEnd: (epoch, logs) => {
-        this.emit('trainingProgress', { epoch, logs });
-        }
-    }
+    this.model.compile({
+        optimizer: tf.train.adam(this.config.learningRate),
+        loss: 'meanSquaredError'
     });
-} catch (error) {
-    this.emit('trainingError', error);
-    throw error;
-}
+
+    const tensorData = tf.tensor2d(processedData);
+
+    try {
+        await this.model.fit(tensorData, tensorData, {
+            epochs: this.config.epochs,
+            callbacks: {
+                onEpochEnd: (epoch, logs) => {
+                    this.emit('trainingProgress', { epoch, logs });
+                }
+            }
+        });
+    } catch (error) {
+        this.emit('trainingError', error);
+        throw error;
+    }
 }
 
 private validateTrainingData(metrics: TimeSeriesMetric[]): void {
