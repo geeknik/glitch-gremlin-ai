@@ -19,10 +19,12 @@ const runCLI = (args: string[] = []) => spawnSync('node', [
 ], {
     env: { 
         ...process.env,
-        NODE_ENV: 'test'
+        NODE_ENV: 'test',
+        DEBUG: 'false'
     },
     encoding: 'utf8',
-    stdio: 'pipe'
+    stdio: 'pipe',
+    shell: true
 });
 
 // Read package.json for version
@@ -60,7 +62,7 @@ describe('CLI', () => {
                 ]);
                 
                 expect(result.status).not.toBe(0);
-                expect(result.stderr).toContain('Missing required argument: program');
+                expect(result.stderr).toContain('error: required option \'--program <address>\' not specified');
             });
         });
     });
