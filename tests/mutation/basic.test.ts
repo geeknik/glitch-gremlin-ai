@@ -79,9 +79,9 @@ describe('Mutation Testing', () => {
 
         it('should handle mutation test failures gracefully', async () => {
             // Configure mock to simulate failure with a GlitchError
-            global.security.mutation.test.mockImplementationOnce(() => {
-                throw new GlitchError('Test execution failed: Invalid program state');
-            });
+            global.security.mutation.test.mockRejectedValueOnce(
+                new GlitchError('Test execution failed: Invalid program state')
+            );
 
             const mutationParams = {
                 targetProgram: TEST_PROGRAM,
@@ -101,8 +101,7 @@ describe('Mutation Testing', () => {
 
         it('should enforce parameter boundaries', async () => {
             // Test duration limits
-            await expect(async () => {
-                await sdk.createChaosRequest({
+            await expect(sdk.createChaosRequest({
                     targetProgram: TEST_PROGRAM,
                     testType: "MUTATION",
                     duration: 30, // Below minimum
@@ -147,16 +146,15 @@ describe('Mutation Testing', () => {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 1000);
 
-            await expect(async () => {
-                await request.waitForCompletion({ signal: controller.signal });
-            }).rejects.toThrow('Test execution timed out');
+            await expect(
+                request.waitForCompletion({ signal: controller.signal })
+            ).rejects.toThrow('Test execution timed out');
 
             clearTimeout(timeoutId);
         }, DEFAULT_TEST_TIMEOUT);
 
         it('should validate program ID format', async () => {
-            await expect(async () => {
-                await sdk.createChaosRequest({
+            await expect(sdk.createChaosRequest({
                     targetProgram: "invalid-program-id",
                     testType: "MUTATION",
                     duration: 60,
