@@ -41,7 +41,6 @@ interface CampaignResult {
     executionsPerSecond: number;
 }
 
-
 export class Fuzzer {
     private config: FuzzingConfig;
     private anomalyDetectionModel: AnomalyDetector | null = null;
@@ -98,10 +97,8 @@ export class Fuzzer {
         this.resourceManager = new ResourceManagerImpl();
         this.metricsCollector = new MetricsCollectorImpl();
 
-
         this.logger.info('Fuzzer initialized');
     }
-
 
     public async fuzz(inputs: FuzzInput[]): Promise<FuzzResult[]> {
         if (!this.programId || !this.anomalyDetectionModel || !this.connection) {
@@ -171,7 +168,6 @@ export class Fuzzer {
         const mutationIndex = Math.floor(Math.random() * data.length);
         mutatedData[mutationIndex] = Math.floor(Math.random() * 256);
 
-
         return mutatedData;
     }
 
@@ -228,7 +224,6 @@ export class Fuzzer {
 
         return Math.min(probability, 1);
     }
-
 
     // Implement missing methods based on test descriptions
 
@@ -379,7 +374,7 @@ export class Fuzzer {
                     }
                 };
                 const anomalyResult = await anomalyDetectionModel.detectAnomalies(currentMetrics);
-                if (anomalyResult.anomalyScore > anomalyDetectionModel.config.anomalyThreshold) {
+                if (anomalyResult.confidence > anomalyDetectionModel.getConfig().anomalyThreshold) {
                     this.logger.warn(`Anomaly detected: ${JSON.stringify(anomalyResult)}`);
                     // Handle anomaly (e.g., stop fuzzing, adjust parameters)
                 }

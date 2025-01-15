@@ -27,7 +27,6 @@ interface Thresholds {
     [key: string]: number | undefined;
 }
 
-
 export interface ModelConfig {
     inputSize: number;
     featureSize: number;
@@ -112,7 +111,7 @@ correlatedPatterns?: string[];
 
 export class FeatureExtractor {
     constructor(private config: ModelConfig['featureEngineering']) {}
-    
+
     public extractFeatures(data: TimeSeriesMetric[]): tf.Tensor2D {
         return tf.tidy(() => {
             // Convert raw data to tensor format
@@ -127,7 +126,7 @@ export class FeatureExtractor {
 
 export class StatisticalAnalyzer {
     public analyze(data: TimeSeriesMetric[]): { mean: number; std: number; } {
-        const values = data.flatMap(metric => 
+        const values = data.flatMap(metric =>
             Object.values(metric.metrics).flat()
         );
         const mean = values.reduce((a, b) => a + b, 0) / values.length;
@@ -142,12 +141,12 @@ export class StatisticalAnalyzer {
 export class PerformanceMonitor {
     private startTime: number = 0;
     private memoryUsage: number = 0;
-    
+
     public start(): void {
         this.startTime = Date.now();
         this.memoryUsage = process.memoryUsage().heapUsed;
     }
-    
+
     public end(): PerformanceMetrics {
         return {
             processingTime: Date.now() - this.startTime,
@@ -172,11 +171,11 @@ export class PerformanceMonitor {
         private isInitialized = false;
         private readonly metrics: MetricKey[] = [
             'instructionFrequency',
-            'executionTime', 
+            'executionTime',
             'memoryUsage',
             'cpuUtilization',
             'errorRate',
-            'pdaValidation', 
+            'pdaValidation',
             'accountDataMatching',
             'cpiSafety',
             'authorityChecks'
@@ -279,7 +278,7 @@ private buildLSTM(): tf.LayersModel {
 
 private buildAutoencoder(): tf.LayersModel {
     const model = tf.sequential();
-    
+
     // Encoder layers
     for (let i = 0; i < this.config.encoderLayers.length; i++) {
         model.add(tf.layers.dense({
@@ -287,7 +286,7 @@ private buildAutoencoder(): tf.LayersModel {
             activation: 'relu'
         }));
     }
-    
+
     // Decoder layers
     for (let i = this.config.decoderLayers.length - 1; i >= 0; i--) {
         model.add(tf.layers.dense({
@@ -295,7 +294,7 @@ private buildAutoencoder(): tf.LayersModel {
             activation: i === 0 ? 'sigmoid' : 'relu'
         }));
     }
-    
+
     return model;
 }
 
@@ -314,7 +313,7 @@ private preprocessMetrics(metrics: TimeSeriesMetric[]): tf.Tensor2D {
         });
 
         const tensorData = tf.tensor2d(flattenedData);
-        
+
         if (!this.meanStd) {
             const moments = tf.moments(tensorData, 0);
             this.meanStd = {
@@ -373,7 +372,7 @@ public async train(metrics: TimeSeriesMetric[]): Promise<void> {
         const sorted = errorsArray.sort((a: number, b: number) => a - b);
         const index = Math.floor(sorted.length * this.config.anomalyThreshold);
         const threshold = sorted[index]; // Manual quantile calculation
-        
+
         this.thresholds = {
             reconstruction: threshold
         };
@@ -395,7 +394,6 @@ private validateTrainingData(metrics: TimeSeriesMetric[]): void {
     }
 }
 
-
 private analyzeAnomalyDetails(metrics: TimeSeriesMetric[], error: number): string[] {
     const details: string[] = [];
     const errorThreshold = this.config.anomalyThreshold;
@@ -405,11 +403,11 @@ private analyzeAnomalyDetails(metrics: TimeSeriesMetric[], error: number): strin
             .map(m => m.metrics[metric])
             .filter((v): v is number[] => !!v)
             .map(arr => arr.reduce((a, b) => a + b, 0) / arr.length);
-        
+
         if (metricValues.length > 0) {
             const meanValue = this.calculateMean(metricValues.flat());
             const variance = this.calculateVariance(metricValues.flat());
-    
+
             if (variance > errorThreshold) {
                 details.push(`High variance in ${metric}: possible anomaly source`);
             }
@@ -430,14 +428,14 @@ return this.calculateMean(squaredDiffs);
 
     public async detect(metrics: TimeSeriesMetric[]): Promise<AnomalyResult> {
         this.performanceMonitor.start();
-        
+
         if (!this.isInitialized) {
             throw new Error('Model not trained');
         }
         const tensorData = this.preprocessMetrics(metrics);
         const predictions = this.models.autoencoder.predict(tensorData) as tf.Tensor;
         const reconstructionErrors = tf.sub(predictions, tensorData).abs().mean(1);
-        
+
         const anomalyScores = reconstructionErrors.div(tf.scalar(this.config.anomalyThreshold));
         const isAnomaly = anomalyScores.greater(tf.scalar(1));
 
@@ -445,7 +443,7 @@ return this.calculateMean(squaredDiffs);
         for (let i = 0; i < this.metrics.length; i++) {
             const metricScore = anomalyScores.slice([0, i * 4], [-1, 4]).mean();
             const score = metricScore.dataSync()[0];
-            
+
             if (score > 0.8) {
                 details.push({
                     type: this.metrics[i],
@@ -505,18 +503,17 @@ return this.calculateMean(squaredDiffs);
                 this.models.lstm.dispose();
             }
         }
-        tf.dispose(); // Clean up any remaining tensors 
+        tf.dispose(); // Clean up any remaining tensors
         this.meanStd = { mean: [], std: [] };
         this.thresholds = {};
         this.isInitialized = false;
     }
 
-
     private findCorrelatedPatterns(metricType: string, metrics: TimeSeriesMetric[]): string[] {
         const correlatedPatterns: string[] = [];
-        
+
         this.metrics.forEach(metric => {
-            if (metric !== metricType && 
+            if (metric !== metricType &&
                 this.isMetricCorrelated(metrics, metricType as MetricKey, metric as MetricKey)) {
                 correlatedPatterns.push(metric);
             }
@@ -567,13 +564,13 @@ public async save(modelPath: string): Promise<void> {
     }
 
     await fs.promises.mkdir(modelPath, { recursive: true });
-    
+
     // Save model architecture and weights
     await Promise.all([
         this.models.autoencoder.save(`file://${modelPath}/autoencoder`),
         this.models.lstm.save(`file://${modelPath}/lstm`)
     ])
-    
+
     // Save normalization parameters and thresholds
     await fs.promises.writeFile(
     path.join(modelPath, 'metadata.json'),
@@ -594,20 +591,27 @@ public async load(modelPath: string): Promise<void> {
     // Load model architecture and weights
     this.models.autoencoder = await tf.loadLayersModel(`file://${modelPath}/autoencoder/model.json`);
     this.models.lstm = await tf.loadLayersModel(`file://${modelPath}/lstm/model.json`);
-    
+
     // Load metadata
     const metadata = JSON.parse(
         await fs.promises.readFile(path.join(modelPath, 'metadata.json'), 'utf8')
     );
-    
+
     this.meanStd = metadata.meanStd;
     this.thresholds = metadata.thresholds;
     Object.assign(this.config, metadata.config); // Update config properties
-    
+
     this.isInitialized = true;
     } catch (error) {
     throw new Error('Invalid model format');
     }
 }
 
+public async detectAnomalies(metrics: TimeSeriesMetric[]): Promise<AnomalyResult> {
+    return this.detect(metrics);
+}
+
+public getConfig(): ModelConfig {
+    return this.config;
+}
 }
