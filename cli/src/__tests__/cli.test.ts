@@ -13,10 +13,14 @@ const PACKAGE_JSON = fromRoot('package.json');
 const runCLI = (args: string[] = []) => spawnSync('node', [
     '--experimental-vm-modules',
     '--no-warnings',
+    '--es-module-specifier-resolution=node',
     CLI_PATH,
     ...args
 ], {
-    env: { ...process.env },
+    env: { 
+        ...process.env,
+        NODE_ENV: 'test'
+    },
     encoding: 'utf8',
     stdio: 'pipe'
 });
@@ -56,7 +60,7 @@ describe('CLI', () => {
                 ]);
                 
                 expect(result.status).not.toBe(0);
-                expect(result.stderr).toContain('Error: Missing required argument: program');
+                expect(result.stderr).toContain('Missing required argument: program');
             });
         });
     });

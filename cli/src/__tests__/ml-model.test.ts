@@ -2,12 +2,14 @@ import { jest } from '@jest/globals';
 
 // Mock the SDK
 jest.mock('@glitch-gremlin/sdk', () => ({
-    VulnerabilityDetectionModel: jest.fn().mockImplementation(() => ({
-        predict: jest.fn().mockResolvedValue({
-            type: 'BUFFER_OVERFLOW',
-            confidence: 0.85
-        })
-    }))
+    VulnerabilityDetectionModel: jest.fn().mockImplementation(() => {
+        return {
+            predict: jest.fn().mockResolvedValue({
+                type: 'BUFFER_OVERFLOW',
+                confidence: 0.85
+            })
+        };
+    })
 }));
 
 import { VulnerabilityDetectionModel } from '@glitch-gremlin/sdk';
