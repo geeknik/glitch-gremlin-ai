@@ -6,7 +6,7 @@ import { readFileSync } from 'fs';
 const PROJECT_ROOT = process.cwd();
 const CLI_ROOT = join(PROJECT_ROOT, 'cli');
 const CLI_PATH = join(CLI_ROOT, 'dist/index.js');
-const CLI_PACKAGE_JSON = join(CLI_ROOT, 'package.json');
+const CLI_PACKAGE_JSON = join(PROJECT_ROOT, 'package.json');
 
 // Read CLI package.json for version
 const cliPackageJson = JSON.parse(
