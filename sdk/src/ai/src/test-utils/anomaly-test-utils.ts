@@ -4,19 +4,21 @@ export function generateAnomalousMetrics(numPoints: number): TimeSeriesMetric[] 
     const metrics: TimeSeriesMetric[] = [];
 
     for (let i = 0; i < numPoints; i++) {
+        const baseMetrics = {
+            instructionFrequency: [Math.random() * 100],
+            executionTime: [Math.random() * 50],
+            memoryUsage: [Math.random() * 80],
+            cpuUtilization: [Math.random() * 90],
+            errorRate: [Math.random() * 10],
+            pdaValidation: [Math.random() * 100],
+            accountDataMatching: [Math.random() * 100],
+            cpiSafety: [Math.random() * 100],
+            authorityChecks: [Math.random() * 100],
+        };
+
         metrics.push({
             timestamp: Date.now() + i * 1000,
-            metrics: {
-                instructionFrequency: [Math.random() * 100],
-                executionTime: [Math.random() * 50],
-                memoryUsage: [Math.random() * 80],
-                cpuUtilization: [Math.random() * 90],
-                errorRate: [Math.random() * 10],
-                pdaValidation: [Math.random() * 100],
-                accountDataMatching: [Math.random() * 100],
-                cpiSafety: [Math.random() * 100],
-                authorityChecks: [Math.random() * 100],
-            },
+            metrics: baseMetrics,
             metadata: {}
         });
 
