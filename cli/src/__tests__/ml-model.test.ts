@@ -7,10 +7,15 @@ const mockPredict = jest.fn().mockResolvedValue({
 });
 
 jest.mock('@glitch-gremlin/sdk', () => ({
-    VulnerabilityDetectionModel: jest.fn().mockImplementation(() => ({
-        predict: mockPredict
-    }))
+    VulnerabilityDetectionModel: jest.fn().mockImplementation(() => {
+        return {
+            predict: mockPredict
+        };
+    })
 }));
+
+// Export mock for testing
+export { mockPredict };
 
 import { VulnerabilityDetectionModel } from '@glitch-gremlin/sdk';
 
