@@ -78,6 +78,13 @@ interface VoteWeights {
     abstain: number;
 }
 
+interface Vote {
+    voter: PublicKey;
+    vote: boolean;
+    votingPower: number;
+    timestamp: number;
+}
+
 interface ProposalData {
     state: ProposalState;
     executed: boolean;
@@ -88,7 +95,7 @@ interface ProposalData {
     endTime: number;
     timeLockEnd: number;
     voteWeights: VoteWeights;
-    votes: Array<{voter: PublicKey}>;
+    votes: Vote[];
     yesVotes: number;
     noVotes: number;
     quorumRequired: number;
@@ -102,20 +109,51 @@ describe('GovernanceManager', () => {
     let wallet: Keypair;
     let governanceManager: GovernanceManager;
     let mockProposalData: ProposalData;
-    let validateProposalMock: jest.SpyInstance;
     let getAccountInfoMock: jest.SpyInstance;
     let simulateTransactionMock: jest.SpyInstance;
     let sendTransactionMock: jest.SpyInstance;
     let proposalAddress: PublicKey;
 
     beforeEach(async () => {
-        // Reset all mocks
+        // Reset mocks and use fake timers
         jest.clearAllMocks();
+        jest.useFakeTimers();
+        
+        // Set a fixed base time (e.g., Jan 1, 2024)
+        const mockBaseTime = 1704067200000; // 2024-01-01T00:00:00.000Z
+        jest.setSystemTime(mockBaseTime);
 
         // Setup connection mock
         connection = new MockConnection();
+        wallet = Keypair.generate();
+        proposalAddress = new PublicKey('ProposalAddressAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
+        
+        // Initialize governance manager
+        governanceManager = new GovernanceManager(
+            new PublicKey('GLt5cQeRgVMqnE9DGJQNNrbAfnRQYWqYVNWnJo7WNLZ9')
+        );
 
-        // Setup mock account data
+        // Setup base mock proposal data
+        mockProposalData = {
+            state: ProposalState.Active,
+            executed: false,
+            title: "Test Proposal",
+            description: "Test Description", 
+            proposer: wallet.publicKey,
+            startTime: mockBaseTime - 3600000, // Started 1 hour ago
+            endTime: mockBaseTime + 82800000, // Ends in 23 hours
+            timeLockEnd: mockBaseTime + 172800000,
+            voteWeights: { yes: 0, no: 0, abstain: 0 },
+            votes: [],
+            yesVotes: 0,
+            noVotes: 0,
+            quorumRequired: 100,
+            executionTime: mockBaseTime + 172800000,
+            quorum: 100,
+            status: 'active'
+        };
+
+        // Setup mock account data with proper proposal state
         const mockAccountData = {
             data: Buffer.alloc(392), // Minimum buffer size for proposal data
             executable: false,
@@ -147,58 +185,67 @@ describe('GovernanceManager', () => {
         connection.getBalance.mockResolvedValue(1000000);
         connection.getProgramAccounts.mockResolvedValue([]);
         connection.getSlot.mockResolvedValue(0);
-        wallet = Keypair.generate();
-        governanceManager = new GovernanceManager(
-            new PublicKey('GLt5cQeRgVMqnE9DGJQNNrbAfnRQYWqYVNWnJo7WNLZ9')
-        );
-
+        // Setup mock spies
+        getAccountInfoMock = jest.spyOn(connection, 'getAccountInfo');
+        simulateTransactionMock = jest.spyOn(connection, 'simulateTransaction');
+        sendTransactionMock = jest.spyOn(connection, 'sendTransaction');
+        
+        // Set up mock proposal data based on current timestamp
+        const currentTime = Date.now();
         mockProposalData = {
             state: ProposalState.Active,
             executed: false,
             title: "Test Proposal",
             description: "Test Description",
             proposer: wallet.publicKey,
-            startTime: Date.now() - 1000,
-            endTime: Date.now() + 86400000,
-            timeLockEnd: Date.now() + 172800000,
+            startTime: currentTime - 1000,
+            endTime: currentTime + 86400000, // +24h
+            timeLockEnd: currentTime + 172800000, // +48h
             voteWeights: { yes: 0, no: 0, abstain: 0 },
             votes: [],
             yesVotes: 0,
             noVotes: 0,
             quorumRequired: 100,
-            executionTime: Date.now() + 172800000,
+            executionTime: currentTime + 172800000, // +48h
             quorum: 100,
             status: 'active'
         };
 
-        validateProposalMock = jest.spyOn(governanceManager as any, 'validateProposal').mockResolvedValue(mockProposalData);
-
-        getAccountInfoMock = jest.spyOn(connection, 'getAccountInfo');
-        simulateTransactionMock = jest.spyOn(connection, 'simulateTransaction');
-        sendTransactionMock = jest.spyOn(connection, 'sendTransaction');
-        proposalAddress = Keypair.generate().publicKey;
+        // Add proposal state mock
+        jest.spyOn(governanceManager, 'getProposalState')
+            .mockImplementation(async () => {
+                const currentTime = Date.now();
+                return {
+                    state: ProposalState.Draft,
+                    executed: false,
+                    title: "Test Proposal",
+                    description: "Test Description",
+                    proposer: wallet.publicKey,
+                    startTime: currentTime - 1000,
+                    endTime: currentTime + 86400000,
+                    timeLockEnd: currentTime + 172800000,
+                    voteWeights: { yes: 0, no: 0, abstain: 0 },
+                    votes: [],
+                    yesVotes: 0,
+                    noVotes: 0,
+                    quorumRequired: 100,
+                    executionTime: currentTime + 172800000,
+                    quorum: 100,
+                    status: 'draft'
+                };
+            });
     });
 
-    afterEach(async () => {
-        // Cleanup mocks and reset state
-        jest.restoreAllMocks();
-        await connection.simulateTransaction.mockClear();
-        await connection.sendTransaction.mockClear();
-        wallet = Keypair.generate();
+    afterEach(() => {
+        // Reset timers and mocks after each test
+        jest.useRealTimers();
+        jest.clearAllMocks();
     });
 
     describe('proposal creation', () => {
         it('should create a proposal with valid parameters', async () => {
-            // Setup mock data
-            const mockProposalPubkey = new PublicKey(Keypair.generate().publicKey);
-            validateProposalMock.mockResolvedValueOnce(mockProposalData);
-            simulateTransactionMock.mockResolvedValueOnce({
-                context: { slot: 0 },
-                value: { err: null }
-            });
-
             const { proposalAddress, tx } = await governanceManager.createProposalAccount(
-                connection,
+                connection, 
                 wallet,
                 {
                     title: "Test Proposal",
@@ -206,45 +253,23 @@ describe('GovernanceManager', () => {
                     votingPeriod: 86400 // 24 hours in seconds
                 }
             );
-        
-            // Simulate the transaction to trigger validation
-            await connection.simulateTransaction(tx);
+            
             expect(proposalAddress).toBeDefined();
-            expect(validateProposalMock).toHaveBeenCalled();
+            expect(tx).toBeInstanceOf(Transaction);
             expect(simulateTransactionMock).toHaveBeenCalled();
             expect(sendTransactionMock).toHaveBeenCalled();
         });
     });
     describe('voting', () => {
-        it('should vote on a proposal', async () => {
-            // Setup mock proposal state
-            const mockProposalState = {
-                state: ProposalState.Active,
-                executed: false,
-                title: "Test Proposal",
-                description: "Test Description",
-                proposer: wallet.publicKey,
-                startTime: Date.now() - 1000,
-                endTime: Date.now() + 86400000,
-                timeLockEnd: Date.now() + 172800000,
-                voteWeights: { yes: 0, no: 0, abstain: 0 },
-                votes: [],
-                yesVotes: 0,
-                noVotes: 0,
-                quorumRequired: 100,
-                executionTime: Date.now() + 172800000,
-                quorum: 100,
-                status: 'active'
-            };
+        it('should successfully vote on an active proposal', async () => {
+            jest.spyOn(governanceManager as any, 'calculateVoteWeight')
+                .mockResolvedValue(100);
 
-            validateProposalMock.mockResolvedValueOnce(mockProposalState);
-            connection.getAccountInfo.mockResolvedValueOnce({
-                data: Buffer.alloc(392), // Proper size buffer with mock data
-                executable: false,
-                lamports: 1000000,
-                owner: new PublicKey('GLt5cQeRgVMqnE9DGJQNNrbAfnRQYWqYVNWnJo7WNLZ9'),
-                rentEpoch: 0
-            });
+            jest.spyOn(governanceManager, 'getProposalState')
+                .mockResolvedValue({
+                    ...mockProposalData,
+                    state: ProposalState.Active
+                });
 
             const vote = await governanceManager.castVote(
                 connection,
@@ -252,38 +277,128 @@ describe('GovernanceManager', () => {
                 proposalAddress,
                 true
             );
+
             expect(vote).toBeInstanceOf(Transaction);
             expect(simulateTransactionMock).toHaveBeenCalled();
             expect(sendTransactionMock).toHaveBeenCalled();
         });
+
+        it('should reject vote if voter has already voted', async () => {
+            jest.spyOn(governanceManager as any, 'calculateVoteWeight')
+                .mockResolvedValue(100);
+
+            jest.spyOn(governanceManager, 'getProposalState')
+                .mockResolvedValue({
+                    ...mockProposalData,
+                    votes: [{
+                        voter: wallet.publicKey,
+                        vote: true,
+                        votingPower: 100,
+                        timestamp: Date.now() - 1000
+                    }]
+                });
+
+            await expect(
+                governanceManager.castVote(connection, wallet, proposalAddress, true)
+            ).rejects.toThrow('Already voted on this proposal');
+        });
+
+        it('should reject vote if voting period has expired', async () => {
+            jest.spyOn(governanceManager as any, 'calculateVoteWeight')
+                .mockResolvedValue(100);
+
+            jest.spyOn(governanceManager, 'getProposalState')
+                .mockResolvedValue({
+                    ...mockProposalData,
+                    endTime: Date.now() - 3600000 // Ended 1 hour ago
+                });
+
+            await expect(
+                governanceManager.castVote(connection, wallet, proposalAddress, true)
+            ).rejects.toThrow('Voting period has ended');
+        });
+
+        it('should reject vote if proposal is not active', async () => {
+            jest.spyOn(governanceManager as any, 'calculateVoteWeight')
+                .mockResolvedValue(100);
+
+            jest.spyOn(governanceManager, 'getProposalState')
+                .mockResolvedValue({
+                    ...mockProposalData,
+                    state: ProposalState.Defeated
+                });
+
+            await expect(
+                governanceManager.castVote(connection, wallet, proposalAddress, true)
+            ).rejects.toThrow('Proposal is not in voting state');
+        });
+
+        it('should reject vote if voter has insufficient voting power', async () => {
+            jest.spyOn(governanceManager as any, 'calculateVoteWeight')
+                .mockResolvedValue(0);
+
+            jest.spyOn(governanceManager, 'getProposalState')
+                .mockResolvedValue({
+                    ...mockProposalData,
+                    state: ProposalState.Active
+                });
+
+            await expect(
+                governanceManager.castVote(connection, wallet, proposalAddress, true)
+            ).rejects.toThrow('Insufficient voting power');
+        });
     });
     describe('proposal execution', () => {
-        it('should execute a proposal', async () => {
-            // Create a proper binary layout for proposal data
-            const proposalBuffer = Buffer.alloc(1024); // Adjust size based on actual layout
-            proposalBuffer.write("Test Proposal", 0, 64); // Title: 64 bytes
-            proposalBuffer.write("Test Description", 64, 256); // Description: 256 bytes
-            proposalBuffer.writeUInt8(ProposalState.Succeeded, 320); // State: 1 byte
-            proposalBuffer.writeUInt8(0, 321); // Executed: 1 byte
-            wallet.publicKey.toBuffer().copy(proposalBuffer, 322); // Proposer: 32 bytes
-            proposalBuffer.writeBigUInt64LE(BigInt(Date.now() - 1000), 354); // StartTime
-            proposalBuffer.writeBigUInt64LE(BigInt(Date.now() - 1000), 362); // EndTime
-            proposalBuffer.writeBigUInt64LE(BigInt(Date.now() + 172800000), 370); // TimeLockEnd
-            proposalBuffer.writeBigUInt64LE(BigInt(100), 378); // Yes votes
-            proposalBuffer.writeBigUInt64LE(BigInt(50), 386); // No votes
-            proposalBuffer.writeUInt8(ProposalState.Succeeded, 394); // State
+        it('should execute a proposal when conditions are met', async () => {
+            // Mock getVoteCount to meet quorum requirements
+            jest.spyOn(governanceManager as any, 'getVoteCount')
+                .mockResolvedValue({
+                    yes: 150,
+                    no: 50,
+                    abstain: 0
+                });
 
-            getAccountInfoMock.mockResolvedValueOnce({
-                data: proposalBuffer,
-                executable: false,
-                lamports: 0,
-                owner: PublicKey.default,
-                rentEpoch: 0
-            });
+            // Override the proposal state for this test
+            const currentTime = Date.now();
+            jest.spyOn(governanceManager, 'getProposalState')
+                .mockImplementation(async () => ({
+                    ...mockProposalData,
+                    state: ProposalState.Succeeded,
+                    status: 'succeeded',
+                    timeLockEnd: currentTime - 1000, // Make sure time lock has passed
+                    quorumRequired: 100
+                }));
+
+            // Advance the timer past the time lock period
+            jest.advanceTimersByTime(172800000 + 1000); // 48h + 1s
+            
             const result = await governanceManager.executeProposal(connection, wallet, proposalAddress);
+            
             expect(result).toBeInstanceOf(Transaction);
             expect(simulateTransactionMock).toHaveBeenCalled();
             expect(sendTransactionMock).toHaveBeenCalled();
         });
+
+        it('should fail to execute if quorum is not met', async () => {
+            // Mock low vote count
+            jest.spyOn(governanceManager as any, 'getVoteCount')
+                .mockResolvedValue({
+                    yes: 50,
+                    no: 20,
+                    abstain: 0
+                });
+
+            jest.spyOn(governanceManager, 'getProposalState')
+                .mockImplementation(async () => ({
+                    ...mockProposalData,
+                    state: ProposalState.Succeeded,
+                    quorumRequired: 100
+                }));
+
+            await expect(
+                governanceManager.executeProposal(connection, wallet, proposalAddress)
+            ).rejects.toThrow('Cannot execute: Required quorum');
+        });
+    });
     });
 });
