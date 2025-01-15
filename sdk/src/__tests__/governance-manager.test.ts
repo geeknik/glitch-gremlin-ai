@@ -176,7 +176,7 @@ describe('GovernanceManager', () => {
         getAccountInfoMock = jest.spyOn(connection, 'getAccountInfo');
         simulateTransactionMock = jest.spyOn(connection, 'simulateTransaction');
         sendTransactionMock = jest.spyOn(connection, 'sendTransaction');
-        proposalAddress = new PublicKey(Keypair.generate().publicKey);
+        proposalAddress = Keypair.generate().publicKey;
     });
 
     afterEach(async () => {
