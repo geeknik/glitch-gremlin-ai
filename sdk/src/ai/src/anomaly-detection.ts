@@ -1,5 +1,17 @@
 import * as tf from '@tensorflow/tfjs-node';
 import { EventEmitter } from 'events';
+import * as fs from 'fs';
+import * as path from 'path';
+
+interface MeanStd {
+    mean: number[];
+    std: number[];
+}
+
+interface Thresholds {
+    reconstruction?: number;
+    [key: string]: number | undefined;
+}
 
 export interface TimeSeriesMetric {
     timestamp: number;
@@ -93,14 +105,6 @@ threshold: number;
 correlatedPatterns?: string[];
 }
 
-export interface ModelConfig {
-inputSize: number;
-hiddenLayers?: number[];
-learningRate: number;
-epochs: number;
-anomalyThreshold: number;
-}
-
 export class AnomalyDetector extends EventEmitter {
     private models: {
         autoencoder: tf.LayersModel;
@@ -110,6 +114,8 @@ export class AnomalyDetector extends EventEmitter {
     private readonly featureExtractor: FeatureExtractor;
     private readonly statisticalAnalyzer: StatisticalAnalyzer;
     private readonly performanceMonitor: PerformanceMonitor;
+    private meanStd: MeanStd;
+    private thresholds: Thresholds;
     private readonly metrics = [
         'instructionFrequency', 'executionTime', 'memoryUsage', 'cpuUtilization',
         'errorRate', 'pdaValidation', 'accountDataMatching', 'cpiSafety', 'authorityChecks'
@@ -149,16 +155,15 @@ export class AnomalyDetector extends EventEmitter {
     }
 
     private validateConfig(): void {
-    if (this.config.inputSize <= 0) {
-        throw new Error('Input size must be a positive number');
-    }
-    if (this.config.epochs <= 0) {
-        throw new Error('Epochs must be a positive number');
-    }
-    if (this.config.anomalyThreshold < 0 || this.config.anomalyThreshold > 1) {
-        throw new Error('Anomaly threshold must be between 0 and 1');
-    }
-    }
+        if (this.config.inputSize <= 0) {
+            throw new Error('Input size must be a positive number');
+        }
+        if (this.config.epochs <= 0) {
+            throw new Error('Epochs must be a positive number');
+        }
+        if (this.config.anomalyThreshold < 0 || this.config.anomalyThreshold > 1) {
+            throw new Error('Anomaly threshold must be between 0 and 1');
+        }
     }
 
 private initializeComponents(): void {
@@ -187,27 +192,39 @@ private buildModels(): void {
         this.models.lstm = lstm;
     });
 }
-    // Hidden layers
-    for (let i = 1; i < this.config.hiddenLayers.length; i++) {
-    model.add(tf.layers.dense({
-        units: this.config.hiddenLayers[i],
-        activation: 'relu'
+
+private buildLSTM(): tf.LayersModel {
+    const model = tf.sequential();
+    model.add(tf.layers.lstm({
+        units: this.config.lstmUnits,
+        inputShape: [this.config.timeSteps, this.config.featureSize],
+        returnSequences: true
     }));
+    model.add(tf.layers.dropout({ rate: this.config.dropoutRate }));
+    model.add(tf.layers.dense({ units: this.config.featureSize }));
+    return model;
+}
+
+private buildAutoencoder(): tf.LayersModel {
+    const model = tf.sequential();
+    
+    // Encoder layers
+    for (let i = 0; i < this.config.encoderLayers.length; i++) {
+        model.add(tf.layers.dense({
+            units: this.config.encoderLayers[i],
+            activation: 'relu'
+        }));
     }
-
-    // Output layer (reconstruction)
-    model.add(tf.layers.dense({
-    units: this.config.inputDimensions,
-    activation: 'sigmoid'
-    }));
-
-    model.compile({
-    optimizer: tf.train.adam(0.001),
-    loss: 'meanSquaredError'
-    });
-
-    this.model = model;
-    this.isInitialized = true;
+    
+    // Decoder layers
+    for (let i = this.config.decoderLayers.length - 1; i >= 0; i--) {
+        model.add(tf.layers.dense({
+            units: this.config.decoderLayers[i],
+            activation: i === 0 ? 'sigmoid' : 'relu'
+        }));
+    }
+    
+    return model;
 }
 
 private preprocessMetrics(metrics: TimeSeriesMetric[]): tf.Tensor2D {
@@ -319,28 +336,6 @@ if (validMetrics.length === 0) {
     };
 }
 
-public async detect(metrics: TimeSeriesMetric[]): Promise<{ 
-isAnomaly: boolean, 
-confidence: number, 
-details: string[] 
-}> {
-if (!this.model) {
-    throw new Error('Model not trained');
-}
-
-const processedData = this.preprocessMetrics(metrics);
-const tensorData = tf.tensor2d(processedData);
-
-const prediction = this.model.predict(tensorData) as tf.Tensor;
-const reconstructionError = tf.mean(tf.abs(tf.sub(tensorData, prediction))).dataSync()[0];
-
-const isAnomaly = reconstructionError > this.config.anomalyThreshold;
-const confidence = reconstructionError;
-
-const details = this.analyzeAnomalyDetails(metrics, reconstructionError);
-
-return { isAnomaly, confidence, details };
-}
 
 private analyzeAnomalyDetails(metrics: TimeSeriesMetric[], error: number): string[] {
 const details: string[] = [];
@@ -418,20 +413,8 @@ return this.calculateMean(squaredDiffs);
         this.isInitialized = false;
     }
 
-    public async cleanup(): Promise<void> {
-        if (this.models) {
-            if (this.models.autoencoder) {
-                this.models.autoencoder.dispose();
-            }
-            if (this.models.lstm) {
-                this.models.lstm.dispose();
-            }
-        }
-        this.isInitialized = false;
-    }
-}
 
-private findCorrelatedPatterns(metricType: string, metrics: TimeSeriesMetric[]): string[] {
+    private findCorrelatedPatterns(metricType: string, metrics: TimeSeriesMetric[]): string[] {
     const correlatedPatterns: string[] = [];
     const thresholds = {
     instructionFrequency: 0.8,
@@ -507,7 +490,7 @@ public async save(modelPath: string): Promise<void> {
     );
 }
 
-async load(modelPath: string): Promise<void> {
+public async load(modelPath: string): Promise<void> {
     if (!fs.existsSync(modelPath)) {
     throw new Error('Model file not found');
     }
@@ -531,13 +514,4 @@ async load(modelPath: string): Promise<void> {
     }
 }
 
-async cleanup(): Promise<void> {
-    if (this.model) {
-    this.model.dispose();
-    }
-    this.isInitialized = false;
-    this.meanStd = null;
-    this.thresholds = {};
 }
-}
-
