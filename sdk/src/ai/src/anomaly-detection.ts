@@ -230,15 +230,15 @@ private buildAutoencoder(): tf.LayersModel {
 private preprocessMetrics(metrics: TimeSeriesMetric[]): tf.Tensor2D {
     return tf.tidy((): tf.Tensor2D => {
         const flattenedData = metrics.map(metric => [
-        ...metric.instructionFrequency,
-        ...metric.executionTime,
-        ...metric.memoryUsage,
-        ...metric.cpuUtilization,
-        ...metric.errorRate,
-        ...metric.pdaValidation,
-        ...metric.accountDataMatching,
-        ...metric.cpiSafety,
-        ...metric.authorityChecks
+            ...metric.instructionFrequency,
+            ...metric.executionTime,
+            ...metric.memoryUsage,
+            ...metric.cpuUtilization,
+            ...metric.errorRate,
+            ...metric.pdaValidation,
+            ...metric.accountDataMatching,
+            ...metric.cpiSafety,
+            ...metric.authorityChecks
         ]);
 
         const tensorData = tf.tensor2d(flattenedData);
@@ -252,10 +252,11 @@ private preprocessMetrics(metrics: TimeSeriesMetric[]): tf.Tensor2D {
             tf.dispose([moments.mean, moments.variance]);
         }
 
-    const normalizedData = tensorData.sub(tf.tensor2d([this.meanStd.mean]))
-    .div(tf.tensor2d([this.meanStd.std]));
+        const normalizedData = tensorData.sub(tf.tensor2d([this.meanStd.mean]))
+            .div(tf.tensor2d([this.meanStd.std]));
 
-    return normalizedData as tf.Tensor2D; // Explicit cast
+        return normalizedData as tf.Tensor2D; // Explicit cast
+    });
 }
 
 public async train(metrics: TimeSeriesMetric[]): Promise<void> {
