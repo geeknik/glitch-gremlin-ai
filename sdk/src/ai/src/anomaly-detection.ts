@@ -301,26 +301,26 @@ if (validMetrics.length === 0) {
 }
 
     if (!this.isInitialized) {
-    await this.buildModel();
+        await this.buildModel();
     }
 
     const tensorData = this.preprocessMetrics(metrics);
 
     const trainCallback = {
-    onEpochEnd: (epoch: number, logs?: tf.Logs) => {
-        this.emit('trainingProgress', {
-        epoch,
-        totalEpochs: this.config.epochs,
-        loss: logs?.loss?.toFixed(4)
-        });
-    }
+        onEpochEnd: (epoch: number, logs?: tf.Logs) => {
+            this.emit('trainingProgress', {
+                epoch,
+                totalEpochs: this.config.epochs,
+                loss: logs?.loss?.toFixed(4)
+            });
+        }
     };
 
     await this.model.fit(tensorData, tensorData, {
-    epochs: this.config.epochs,
-    batchSize: this.config.batchSize,
-    validationSplit: this.config.validationSplit,
-    callbacks: trainCallback
+        epochs: this.config.epochs,
+        batchSize: this.config.batchSize,
+        validationSplit: this.config.validationSplit,
+        callbacks: trainCallback
     });
 
     // Calculate reconstruction error thresholds
@@ -332,7 +332,7 @@ if (validMetrics.length === 0) {
     const threshold = sorted[index]; // Manual quantile calculation
     
     this.thresholds = {
-    reconstruction: threshold
+        reconstruction: threshold
     };
 }
 
