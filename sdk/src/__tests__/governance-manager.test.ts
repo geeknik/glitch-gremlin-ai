@@ -111,10 +111,10 @@ describe('GovernanceManager', () => {
     beforeEach(async () => {
         // Reset all mocks
         jest.clearAllMocks();
-        
+
         // Setup connection mock
         connection = new MockConnection();
-        
+
         // Setup mock account data
         const mockAccountData = {
             data: Buffer.alloc(392), // Minimum buffer size for proposal data
@@ -123,7 +123,7 @@ describe('GovernanceManager', () => {
             owner: new PublicKey('GLt5cQeRgVMqnE9DGJQNNrbAfnRQYWqYVNWnJo7WNLZ9'),
             rentEpoch: 0
         };
-        
+
         connection.getAccountInfo.mockResolvedValue(mockAccountData);
 
         connection.sendTransaction.mockResolvedValue('mock-signature');
@@ -202,10 +202,6 @@ describe('GovernanceManager', () => {
                 wallet,
                 {
                     title: "Test Proposal",
-                    description: "Test Description",
-                    votingPeriod: 86400 // 24 hours in seconds
-                }
-            );
                     description: "Test Description",
                     votingPeriod: 86400 // 24 hours in seconds
                 }
