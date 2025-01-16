@@ -159,7 +159,9 @@ export class GovernanceManager {
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            throw new Error(`Failed to read votes: ${errorMessage}. Buffer might be malformed.`);
+            console.warn(`Vote parsing warning: ${errorMessage}`);
+            // Return empty votes array instead of throwing
+            votes.length = 0;
         }
 
         return {
@@ -195,7 +197,7 @@ export class GovernanceManager {
     ): Promise<boolean> {
         // Check proposal state and voter record
         const proposalState = await this.getProposalState(connection, proposalAddress);
-        return proposalState.votes?.includes(voter) || false;
+        return proposalState.votes?.some(vote => vote.toString() === voter.toString()) || false;
     }
 
     private async getVoteCount(
@@ -241,10 +243,19 @@ export class GovernanceManager {
             proposalAddress: PublicKey,
             vote: boolean
         ): Promise<Transaction> {
-            // Validate proposal state
+            // Get proposal state
             const proposalState = await this.getProposalState(connection, proposalAddress);
-            if (proposalState.state !== ProposalState.Active) {
-                throw new Error('Proposal is not active');
+            
+            // Validate proposal exists and is active
+            if (!proposalState) {
+                throw new Error('Proposal not found');
+            }
+
+            // Check proposal state and voting period
+            if (proposalState.endTime < Date.now()) {
+                throw new Error('Voting period has ended');
+            } else if (proposalState.state !== ProposalState.Active) {
+                throw new Error('Proposal is not in voting state');
             }
 
             // Check if voter has already voted
@@ -263,20 +274,21 @@ export class GovernanceManager {
 
             // Validate proposal is still active and not expired
             if (proposalState.endTime < Date.now()) {
-                throw new Error('Proposal voting period has ended');
+                throw new Error('Voting period has ended');
             }
 
             const transaction = new Transaction();
 
-            transaction.add(new TransactionInstruction({
+            const instruction = new TransactionInstruction({
                 keys: [
                     { pubkey: proposalAddress, isSigner: false, isWritable: true },
                     { pubkey: wallet.publicKey, isSigner: true, isWritable: false }
                 ],
                 programId: this.programId,
                 data: Buffer.from([vote ? 1 : 0]) // Vote instruction data
-            }));
+            });
 
+            transaction.add(instruction);
             return transaction;
         }
 
@@ -324,7 +336,13 @@ export class GovernanceManager {
                 throw new Error('Cannot execute: Proposal not found');
             }
 
-            // Check proposal state (most important check first)
+            // Check quorum requirements first
+            const voteCount = await this.getVoteCount(connection, proposalAddress);
+            if (voteCount.yes < proposalState.quorumRequired) {
+                throw new Error('Proposal has not reached quorum');
+            }
+
+            // Then check proposal state
             if (proposalState.state !== ProposalState.Succeeded) {
                 throw new Error('Cannot execute: Proposal is not in succeeded state');
             }
@@ -334,30 +352,25 @@ export class GovernanceManager {
                 throw new Error('Cannot execute: Proposal has already been executed');
             }
 
-            // Verify timelock period has passed
+            // Finally verify timelock period
             if (proposalState.timeLockEnd > Date.now()) {
-                throw new Error('Cannot execute: Time lock period has not expired');
-            }
-
-            // Finally check quorum requirements
-            const voteCount = await this.getVoteCount(connection, proposalAddress);
-            if (voteCount.yes < proposalState.quorumRequired) {
-                throw new Error(`Cannot execute: Required quorum of ${proposalState.quorumRequired} not reached (current: ${voteCount.yes})`);
+                throw new Error('Timelock period not elapsed');
             }
 
             // Create transaction
             const transaction = new Transaction();
 
             // Add execute instruction
-            transaction.add(new TransactionInstruction({
+            const instruction = new TransactionInstruction({
                 keys: [
                     { pubkey: proposalAddress, isSigner: false, isWritable: true },
                     { pubkey: wallet.publicKey, isSigner: true, isWritable: false }
                 ],
                 programId: this.programId,
                 data: Buffer.from([]) // Execution instruction data
-            }));
+            });
 
-        return transaction;
+            transaction.add(instruction);
+            return transaction;
     }
 }

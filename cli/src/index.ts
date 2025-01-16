@@ -1,228 +1,139 @@
 #!/usr/bin/env node
 
-import { readFileSync } from 'fs';
-import { createRequire } from 'module';
-import { Keypair } from '@solana/web3.js';
+import { readFileSync } from 'node:fs';
 import { Command } from 'commander';
-import { GlitchSDK, TestType } from '@glitch-gremlin/sdk';
-import ora from 'ora';
-import chalk from 'chalk';
-import { fileURLToPath } from 'url';
-import { join, dirname } from 'path';
+import { analyzeSecurity } from './security.js';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Load version from package.json
-const pkgJson = JSON.parse(
-    readFileSync(join(__dirname, '../package.json'), 'utf8')
+// Get package version
+const pkg = JSON.parse(
+  readFileSync(join(__dirname, '../package.json'), 'utf8')
 );
-const version = pkgJson.version;
+
+const TEST_TYPES = ['FUZZ', 'LOAD', 'EXPLOIT', 'CONCURRENCY', 'SECURITY'] as const;
+type TestType = typeof TEST_TYPES[number];
+
+function validateTestType(value: string): TestType {
+const upperValue = value.toUpperCase();
+if (!TEST_TYPES.includes(upperValue as TestType)) {
+    throw new Error(`Invalid test type. Must be one of: ${TEST_TYPES.join(', ')}`);
+}
+return upperValue as TestType;
+}
 
 const program = new Command();
 
-// Ensure SDK compatibility
-const require = createRequire(import.meta.url);
-const sdkVersion = require('@glitch-gremlin/sdk/package.json').version;
-if (version !== sdkVersion) {
-console.error(chalk.red(`Error: Version mismatch. CLI: ${version}, SDK: ${sdkVersion}`));
-process.exit(1);
-}
-
+// Set up basic program info
 program
   .name('glitch')
   .description('Glitch Gremlin AI CLI tool')
-.version(version, '-v, --version');
+  .version(pkg.version, '-v, --version', 'Output the current version');
+
+// Configure error handling
+program.configureOutput({
+  writeErr: (str) => process.stderr.write(`Error: ${str}`),
+  writeOut: (str) => process.stdout.write(str)
+});
+
+// Enable exit override for testing
+program.exitOverride();
 
 // Test command
 program
-  .command('test')
-  .description('Manage chaos tests')
-.option('-p, --program <address>', 'Target program address')
-.option('-t, --type <type>', 'Test type (FUZZ, LOAD, EXPLOIT, CONCURRENCY)', (val: string) => val as TestType)
-.option('-d, --duration <seconds>', 'Test duration in seconds', (val: string) => parseInt(val), 300)
-.option('-i, --intensity <level>', 'Test intensity (1-10)', (val: string) => parseInt(val), 5)
-  .option('--fuzz-seed-range <range>', 'Seed range for fuzz testing (min,max)')
-  .option('--load-tps <tps>', 'Transactions per second for load testing')
-  .option('--exploit-categories <cats>', 'Exploit categories to test (comma-separated)')
-  .action(async (options) => {
-    const spinner = ora('Creating chaos request...').start();
+.command('test')
+.description('Run a test')
+.requiredOption('-p, --program <address>', 'Target program address')
+.option('-t, --type <type>', 'Test type', validateTestType)
+.action((options) => {
+    if (!options.program) {
+        throw new Error('Required option \'--program\' not specified');
+    }
+
+    if (!options.type) {
+        throw new Error('Test type is required');
+    }
 
     try {
-      const keypairPath = process.env.SOLANA_KEYPAIR_PATH;
-      if (!keypairPath) {
-        throw new Error('SOLANA_KEYPAIR_PATH environment variable is not set');
-      }
-
-    // Validate program address
-    if (!options.program || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(options.program)) {
-    throw new Error('Invalid program address format');
-    }
-
-    // Validate duration
-    const duration = parseInt(options.duration);
-    if (isNaN(duration) || duration < 60 || duration > 3600) {
-    throw new Error('Duration must be between 60 and 3600 seconds');
-    }
-
-    // Initialize SDK
-    const sdk = new GlitchSDK({
-        cluster: process.env.SOLANA_CLUSTER || 'devnet',
-        wallet: Keypair.fromSecretKey(
-            Buffer.from(JSON.parse(readFileSync(keypairPath, 'utf-8')))
-        )
-    });
-
-      const request = await sdk.createChaosRequest({
-        targetProgram: options.program,
-        testType: options.type as TestType,
-        duration: parseInt(options.duration),
-        intensity: parseInt(options.intensity)
-      });
-
-      spinner.succeed(`Created test request: ${request.requestId}`);
-
-      spinner.start('Waiting for test completion...');
-      const results = await request.waitForCompletion();
-
-      spinner.succeed('Test completed!');
-      console.log(chalk.green('\nResults:'));
-      console.log(JSON.stringify(results, null, 2));
+        validateTestType(options.type);
     } catch (error) {
-    if (error instanceof Error) {
-        switch(error.name) {
-        case 'ValidationError':
-            spinner.fail(chalk.red(`Parameter validation failed: ${error.message}`));
-            break;
-        case 'ConnectionError':
-            spinner.fail(chalk.red(`Network error: ${error.message}`));
-            break;
-        case 'RateLimitError':
-            spinner.fail(chalk.red(`Rate limit exceeded: ${error.message}`));
-            break;
-        default:
-            spinner.fail(chalk.red(`Error: ${error.message}`));
-        }
-    } else {
-        spinner.fail(chalk.red('An unknown error occurred'));
+        throw new Error('Invalid test type. Must be one of: ' + TEST_TYPES.join(', '));
     }
-    process.exit(1);
-    }
-  });
 
-// Governance commands
-const governance = program
-  .command('governance')
-  .description('Manage governance proposals');
-
-governance
-  .command('propose')
-  .description('Create a new proposal')
-  .requiredOption('-t, --title <title>', 'Proposal title')
-  .requiredOption('-d, --description <desc>', 'Proposal description')
-  .requiredOption('-p, --program <address>', 'Target program address')
-  .requiredOption('-s, --stake <amount>', 'Amount of GLITCH to stake')
-  .action(async (options) => {
-    const spinner = ora('Creating proposal...').start();
-    try {
-    const sdk = new GlitchSDK({
-        cluster: process.env.SOLANA_CLUSTER || 'devnet',
-        wallet: Keypair.fromSecretKey(
-            Buffer.from(JSON.parse(readFileSync(process.env.SOLANA_KEYPAIR_PATH!, 'utf-8')))
-        )
-    });
-      const proposal = await sdk.createProposal({
-        title: options.title,
-        description: options.description,
-        stakingAmount: parseInt(options.stake),
-        testParams: {
-          targetProgram: options.program,
-          testType: TestType.FUZZ,
-          duration: 300,
-          intensity: 5
-        }
-      });
-      spinner.succeed(`Created proposal: ${proposal.id}`);
-    } catch (error) {
-      spinner.fail(chalk.red(`Error: ${(error as Error).message}`));
-      process.exit(1);
-    }
-  });
-
-governance
-  .command('vote')
-  .description('Vote on a proposal')
-  .requiredOption('-p, --proposal <id>', 'Proposal ID')
-  .requiredOption('-v, --vote <yes|no>', 'Your vote')
-  .action(async (options) => {
-    const spinner = ora('Submitting vote...').start();
-    try {
-    const sdk = new GlitchSDK({
-        cluster: process.env.SOLANA_CLUSTER || 'devnet',
-        wallet: Keypair.fromSecretKey(
-            Buffer.from(JSON.parse(readFileSync(process.env.SOLANA_KEYPAIR_PATH!, 'utf-8')))
-        )
-    });
-      await sdk.vote(options.proposal, options.vote === 'yes');
-      spinner.succeed('Vote submitted successfully');
-    } catch (error) {
-      spinner.fail(chalk.red(`Error: ${(error as Error).message}`));
-      process.exit(1);
-    }
-  });
+    console.log(`Running ${options.type} test on program ${options.program}`);
+});
 
 // Security command
 program
-  .command('security')
-  .description('Get security information for a Solana contract')
-  .requiredOption('-p, --program <address>', 'Target program address')
-  .action(async (options) => {
-    const spinner = ora('Fetching security information...').start();
-
-    try {
-      const keypairPath = process.env.SOLANA_KEYPAIR_PATH;
-      if (!keypairPath) {
-        throw new Error('SOLANA_KEYPAIR_PATH environment variable is not set');
-      }
-
-      // Validate program address
-      if (!options.program || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(options.program)) {
-        throw new Error('Invalid program address format');
-      }
-
-      // Initialize SDK
-      const sdk = new GlitchSDK({
-        cluster: process.env.SOLANA_CLUSTER || 'devnet',
-        wallet: Keypair.fromSecretKey(
-          Buffer.from(JSON.parse(readFileSync(keypairPath, 'utf-8')))
-        )
-      });
-
-      const securityInfo = await sdk.getSecurityInfo(options.program);
-
-      spinner.succeed('Security information fetched successfully!');
-      console.log(chalk.green('\nSecurity Information:'));
-      console.log(JSON.stringify(securityInfo, null, 2));
-    } catch (error) {
-      if (error instanceof Error) {
-        switch (error.name) {
-          case 'ValidationError':
-            spinner.fail(chalk.red(`Parameter validation failed: ${error.message}`));
-            break;
-          case 'ConnectionError':
-            spinner.fail(chalk.red(`Network error: ${error.message}`));
-            break;
-          case 'RateLimitError':
-            spinner.fail(chalk.red(`Rate limit exceeded: ${error.message}`));
-            break;
-          default:
-            spinner.fail(chalk.red(`Error: ${error.message}`));
+    .command('security')
+    .description('Analyze program security')
+    .requiredOption('-p, --program <address>', 'Program address to analyze')
+    .action(async (options) => {
+        try {
+            console.log('Analyzing program security...');
+            const report = await analyzeSecurity(options.program);
+            console.log('\n=== Security Analysis Report ===');
+            console.log(`\nProgram: ${report.programId}`);
+            console.log(`Overall Risk Level: ${report.riskLevel}`);
+            
+            console.log('\nSummary:');
+            console.log(`Total Issues: ${report.summary.totalIssues}`);
+            console.log(`Critical: ${report.summary.criticalCount}`);
+            console.log(`High: ${report.summary.highCount}`);
+            console.log(`Medium: ${report.summary.mediumCount}`);
+            console.log(`Low: ${report.summary.lowCount}`);
+            
+            if (report.vulnerabilities.length > 0) {
+                console.log('\nDetected Vulnerabilities:');
+                report.vulnerabilities.forEach((vuln, index) => {
+                    console.log(`\n${index + 1}. ${vuln.type}`);
+                    console.log(`   Severity: ${vuln.severity}`);
+                    console.log(`   Confidence: ${(vuln.confidence * 100).toFixed(1)}%`);
+                    console.log(`   Description: ${vuln.description}`);
+                    
+                    if (vuln.location) {
+                        console.log(`   Location: ${vuln.location}`);
+                    }
+                    
+                    if (vuln.recommendations?.length) {
+                        console.log('   Recommendations:');
+                        vuln.recommendations.forEach(rec => {
+                            console.log(`   - ${rec}`);
+                        });
+                    }
+                });
+            }
+            
+            console.log('\nScan Metadata:');
+            console.log(`Duration: ${report.metadata.scanDuration}ms`);
+            console.log(`Program Size: ${report.metadata.programSize} bytes`);
+            console.log(`Model Version: ${report.metadata.modelVersion}`);
+            console.log(`Timestamp: ${new Date(report.metadata.timestamp).toISOString()}`);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            console.error('Error:', message);
+            process.exit(1);
         }
-      } else {
-        spinner.fail(chalk.red('An unknown error occurred'));
-      }
-      process.exit(1);
-    }
-  });
+    });
 
-program.parse();
+try {
+    // Parse and handle commands
+    await program.parseAsync(process.argv);
+} catch (err: unknown) {
+    if (err instanceof Error) {
+        const error = err as Error & { code?: string };
+        if (error.code === 'commander.missingMandatoryOptionValue') {
+            console.error('Error: Missing required option:', error.message);
+        } else if (error.code === 'commander.invalidOptionValue') {
+            console.error('Error: Invalid option value:', error.message);
+        } else {
+            console.error('Error:', error.message);
+        }
+    } else {
+        console.error('Error:', String(err));
+    }
+    process.exit(1);
+}

@@ -1,7 +1,7 @@
 class PublicKey {
-constructor(key) {
-    this._key = key;
-}
+    constructor(key) {
+        this._key = key;
+    }
 
 toString() {
     return this._key;
@@ -17,6 +17,14 @@ static createWithSeed(base, seed, programId) {
 
 toBytes() {
     return new Uint8Array(32);
+}
+
+toBase58() {
+    return this._key;
+}
+
+toBuffer() {
+    return Buffer.alloc(32);
 }
 }
 
@@ -80,26 +88,44 @@ async sendTransaction(transaction, signers) {
     return 'mock-signature';
 }
 
+async simulateTransaction(transaction) {
+    return {
+        value: {
+            err: null,
+            logs: [],
+            accounts: null,
+            unitsConsumed: 0,
+        }
+    };
+}
+
+async getLatestBlockhash() {
+    return {
+        blockhash: 'mock-blockhash',
+        lastValidBlockHeight: 1000,
+    };
+}
+
 async getRecentBlockhash() {
     return {
-    blockhash: 'mock-blockhash',
-    feeCalculator: { lamportsPerSignature: 5000 }
+        blockhash: 'mock-blockhash',
+        feeCalculator: { lamportsPerSignature: 5000 }
     };
 }
 }
 
-module.exports = {
+export {
     PublicKey,
     Transaction,
     TransactionInstruction,
-    Connection,
-    SystemProgram: {
-    programId: new PublicKey('11111111111111111111111111111111'),
-    createAccount: () => ({
-    programId: new PublicKey('11111111111111111111111111111111'),
-    keys: [],
-    data: new Uint8Array(0)
-    })
-}
+    Connection
 };
 
+export const SystemProgram = {
+    programId: new PublicKey('11111111111111111111111111111111'),
+    createAccount: () => ({
+        programId: new PublicKey('11111111111111111111111111111111'),
+        keys: [],
+        data: new Uint8Array(0)
+    })
+};

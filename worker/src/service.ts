@@ -1,6 +1,7 @@
 import { QueueListener } from './queue-listener';
 import { PrometheusExporter } from '@opentelemetry/exporter-prometheus';
-import { metrics, MeterProvider } from '@opentelemetry/api';
+import { metrics } from '@opentelemetry/api';
+import { MeterProvider } from '@opentelemetry/sdk-metrics';
 import { Logger } from './utils/logger';
 import dotenv from 'dotenv';
 

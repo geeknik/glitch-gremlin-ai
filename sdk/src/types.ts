@@ -1,56 +1,111 @@
-/** Types of chaos engineering tests that can be performed */
-export enum TestType {
-    /** Fuzz testing to find edge cases and crashes */
-    FUZZ = 'FUZZ',
-    
-    /** Load testing to verify performance under stress */
-    LOAD = 'LOAD',
-    
-    /** Security testing to find vulnerabilities */
-    SECURITY = 'SECURITY',
-    
-    /** Network partition testing */
-    NETWORK = 'NETWORK'
+import { RedisKey, Redis } from 'ioredis';
+import { PublicKey, Keypair } from '@solana/web3.js';
+import { TestType } from './token-economics.js';
+
+export interface SDKConfig {
+    cluster: string;
+    wallet: Keypair;
+    programId?: string;
+    governanceConfig?: GovernanceConfig;
+    redisConfig?: RedisConfig;
+    heliusApiKey: string | undefined;
 }
 
-/** Vulnerability types that can be detected by the security analysis */
-export enum VulnerabilityType {
-/** Program crashes or panics due to unhandled errors */
-Crash = 'Crash',
-
-/** Buffer overflow vulnerabilities that can corrupt memory */
-BufferOverflow = 'BufferOverflow',
-
-/** Integer overflow/underflow vulnerabilities */
-ArithmeticOverflow = 'ArithmeticOverflow',
-
-/** Reentrancy vulnerabilities allowing multiple concurrent calls */
-Reentrancy = 'Reentrancy',
-
-/** Access control or authorization bypass vulnerabilities */
-AccessControl = 'AccessControl',
-
-/** General program logic errors and bugs */
-LogicError = 'LogicError'
+export interface RedisConfig {
+    host: string;
+    port: number;
+    maxRetriesPerRequest?: number;
+    connectTimeout?: number;
+    retryStrategy?: (times: number) => number | null;
 }
 
-/** States that a governance proposal can be in during its lifecycle */
+export type RedisClient = Redis | MockRedisClient;
+
+export interface MockRedisClient {
+    queue?: string[];
+    connected?: boolean;
+    incr: (key: RedisKey) => Promise<number>;
+    expire: (key: RedisKey, seconds: number) => Promise<number>;
+    get: (key: RedisKey) => Promise<string | null>;
+    set: (key: RedisKey, value: string) => Promise<'OK'>;
+    on: (event: string, callback: Function) => MockRedisClient;
+    quit?: () => Promise<'OK'>;
+    disconnect?: () => Promise<void>;
+    flushall: () => Promise<'OK'>;
+    hset: (key: RedisKey, field: string, value: string) => Promise<number>;
+    hget: (key: RedisKey, field: string) => Promise<string | null>;
+    lpush: (key: RedisKey, value: string) => Promise<number>;
+    rpop: (key: RedisKey) => Promise<string | null>;
+}
+
+export { TestType, VulnerabilityType };
+
 export enum ProposalState {
-/** Initial state when proposal is first created but not yet activated */
-Draft = 'Draft',
-
-/** Proposal is active and accepting votes */
-Active = 'Active',
-
-/** Proposal has passed voting and met quorum requirements */
-Succeeded = 'Succeeded',
-
-/** Proposal failed to meet voting threshold or quorum requirements */
-Defeated = 'Defeated',  
-
-/** Proposal instructions have been executed successfully */
-Executed = 'Executed',
-
-/** Proposal was cancelled before execution */
-Cancelled = 'Cancelled'
+    Draft = 'Draft',
+    Active = 'Active',
+    Succeeded = 'Succeeded',
+    Defeated = 'Defeated',
+    Executed = 'Executed',
+    Cancelled = 'Cancelled'
 }
+
+export interface GovernanceConfig {
+    minVotingPeriod: number;
+    maxVotingPeriod: number;
+    minStakeAmount: number;
+    votingPeriod: number;
+    quorum: number;
+    executionDelay: number;
+}
+
+export interface ChaosRequestParams {
+    targetProgram: string;
+    testType: TestType;
+    duration: number;
+    intensity: number;
+}
+
+export interface ChaosResult {
+    requestId: string;
+    status: string;
+    resultRef: string;
+    logs: string[];
+    metrics: {
+        totalTransactions: number;
+        errorRate: number;
+        avgLatency: number;
+    };
+}
+
+export interface PredictionResult {
+    type: VulnerabilityType;
+    confidence: number;
+    timestamp?: number;
+    modelVersion?: string;
+    prediction: number[];
+    details?: string;
+    location?: string;
+}
+
+export interface ProposalParams {
+    title: string;
+    description: string;
+    stakingAmount: number;
+    testParams: ChaosRequestParams;
+}
+
+export interface VulnerabilityResult {
+    prediction: number[];
+    confidence: number;
+    type: VulnerabilityType;
+}
+
+export interface VulnerabilityDetectionModel {
+    predict(features: number[]): Promise<PredictionResult>;
+    ensureInitialized(): Promise<void>;
+    cleanup(): Promise<void>;
+    save(path: string): Promise<void>;
+    load(path: string): Promise<void>;
+}
+
+export type { VulnerabilityResult, PredictionResult };

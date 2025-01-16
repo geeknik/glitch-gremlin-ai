@@ -1,34 +1,36 @@
 {
-"name": "@glitch-gremlin/cli",
-"version": "0.1.0",
-"type": "module",
-"main": "./dist/index.js",
-"bin": {
-    "glitch": "./dist/index.js"
-},
-"scripts": {
-    "build": "npx tsc --project tsconfig.json",
-    "clean": "rm -rf dist",
-    "test": "jest",
-    "test:security": "npm audit --production --audit-level=moderate && snyk test",
-    "lint": "eslint 'src/**/*.{ts,tsx}' --fix",
-    "lint:fix": "eslint 'src/**/*.{ts,tsx}' --fix",
-    "audit": "npm audit --production --audit-level=moderate"
-},
-"dependencies": {
-    "@glitch-gremlin/sdk": "file:../sdk",
-    "@solana/web3.js": "^1.98.0",
-    "chalk": "^4.1.2",
-    "commander": "^11.0.0",
-    "ora": "^5.4.1"
-},
-"devDependencies": {
-    "@types/node": "^20.0.0",
-    "typescript": "^4.9.0",
-    "jest": "^29.7.0",
-    "ts-jest": "^29.1.1",
-    "@types/jest": "^29.5.11",
-    "@jest/globals": "^29.7.0",
-    "cross-env": "^7.0.3"
-}
+    "name": "@glitch-gremlin/cli",
+    "version": "0.1.0",
+    "description": "CLI for Glitch Gremlin AI",
+    "type": "module",
+    "main": "./dist/index.js",
+    "bin": {
+        "glitch": "./dist/index.js"
+    },
+    "scripts": {
+        "build": "npx tsc --project tsconfig.json",
+        "clean": "rm -rf dist",
+        "test": "jest",
+        "test:security": "npm audit --production --audit-level=moderate && snyk test",
+        "lint": "eslint 'src/**/*.{ts,tsx}' --fix",
+        "lint:fix": "eslint 'src/**/*.{ts,tsx}' --fix",
+        "audit": "npm audit --production --audit-level=moderate",
+        "start": "node dist/index.js"
+    },
+    "dependencies": {
+        "@glitch-gremlin/sdk": "file:../sdk",
+        "@solana/web3.js": "^1.98.0",
+        "chalk": "^4.1.2",
+        "commander": "^11.0.0",
+        "ora": "^5.4.1"
+    },
+    "devDependencies": {
+        "@types/node": "^20.0.0",
+        "typescript": "^4.9.0",
+        "jest": "^29.7.0",
+        "ts-jest": "^29.1.1",
+        "@types/jest": "^29.5.11",
+        "@jest/globals": "^29.7.0",
+        "cross-env": "^7.0.3"
+    }
 }

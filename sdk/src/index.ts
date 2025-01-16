@@ -1,6 +1,4 @@
-export { GlitchSDK } from './sdk.js';
-export { TestType, VulnerabilityType } from './types.js';
-export { GlitchError, InsufficientFundsError, InvalidProgramError, RequestTimeoutError } from './errors.js';
-export { VulnerabilityDetectionModel } from './ai/ml-model.js';
-
+export * from './types';
+export { VulnerabilityType, type PredictionResult, type VulnerabilityDetectionModel } from './ai/src/types';
+export { VulnerabilityDetectionModel } from './ai/src/ml-model';
 export const version = '0.1.0';

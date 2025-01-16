@@ -1,25 +1,19 @@
-import {
-    Connection,
-    Keypair,
-    PublicKey,
-    Transaction,
-    TransactionInstruction
+import { 
+    Connection, 
+    PublicKey, 
+    Keypair, 
+    Transaction, 
+    TransactionInstruction 
 } from '@solana/web3.js';
-import Redis from 'ioredis';
-interface RedisConfig {
-    host: string;
-    port: number;
-    maxRetriesPerRequest?: number;
-    connectTimeout?: number;
-    retryStrategy?: (times: number) => number | null;
-}
-
-type RedisClient = InstanceType<typeof Redis>;
-import { TokenEconomics } from './token-economics.js';
-import { GovernanceConfig, ChaosRequestParams, ChaosResult, TestType, ProposalParams } from './types.js';
-import { GovernanceManager } from './governance.js';
-import { RedisQueueWorker } from './queue/redis-worker.js';
-import { GlitchError, InsufficientFundsError, InvalidProgramError, ErrorCode } from './errors.js';
+import { 
+    ChaosRequestParams, 
+    TestType, 
+    GovernanceConfig, 
+    ProposalState 
+} from './types';
+import { RedisQueueWorker } from './queue/redis-worker';
+import { GlitchError, ErrorCode } from './errors';
+import { GovernanceManager } from './governance';
 
 /**
  * GlitchSDK provides the main interface for interacting with the Glitch Gremlin AI platform.
@@ -40,47 +34,54 @@ import { GlitchError, InsufficientFundsError, InvalidProgramError, ErrorCode } f
  * });
  * ```
  */
-export class GlitchSDK {
-    private connection: Connection;
-    private programId: PublicKey;
-    private wallet: Keypair;
-    private queueWorker!: RedisQueueWorker;
-    private governanceManager: GovernanceManager;
-    private lastRequestTime = 0;
-    private readonly MIN_REQUEST_INTERVAL = 2000; // 2 seconds between requests
-    private readonly MAX_REQUESTS_PER_MINUTE = 3;
-    private readonly REQUEST_COOLDOWN = 2000; // 2 seconds
+export interface RedisConfig {
+    host: string;
+    port: number;
+    retryStrategy?: (times: number) => number | null;
+}
 
-    private readonly REDIS_CONFIG = {
-        retryStrategy: (times: number) => {
-            if (times > 3) return null;
-            return Math.min(times * 1000, 3000);
-        },
-        maxRetriesPerRequest: 3,
-        enableOfflineQueue: false,
-        connectTimeout: 10000,
-        disconnectTimeout: 5000,
-        lazyConnect: true
+export interface ProposalStatus {
+    id: string;
+    status: 'draft' | 'active' | 'succeeded' | 'defeated' | 'executed' | 'cancelled' | 'queued' | 'expired';
+    title: string;
+    description: string;
+    proposer: string;
+    votes: {
+        yes: number;
+        no: number;
+        abstain: number;
     };
-    private readonly MIN_STAKE_LOCKUP = 86400; // 1 day in seconds
-    private readonly MAX_STAKE_LOCKUP = 31536000; // 1 year in seconds
-    private readonly MIN_STAKE_AMOUNT = 1000; // Minimum stake amount
-    private governanceConfig: GovernanceConfig;
+    startTime: number;
+    endTime: number;
+    executionTime?: number;
+    quorum: number;
+    stakedAmount: number;
+    testParams: ChaosRequestParams;
+    state: {
+        isActive: boolean;
+        isPassed: boolean;
+        isExecuted: boolean;
+        isExpired: boolean;
+        canExecute: boolean;
+        canVote: boolean;
+        timeRemaining: number;
+    };
+}
+export class GlitchSDK {
+private readonly connection: Connection;
+private readonly programId: PublicKey;
+private readonly wallet: Keypair;
+private readonly queueWorker: RedisQueueWorker;
+private lastRequestTime = 0;
+private readonly MIN_REQUEST_INTERVAL = 1000;
 
-    private static instance: GlitchSDK;
-    private initialized = false;
-
-    public constructor(config: {
-        cluster?: string;
-        wallet: Keypair;
-        programId?: string;
-        governanceConfig?: Partial<GovernanceConfig>;
-        redisConfig?: {
-            host: string;
-            port: number;
-        };
-        heliusApiKey?: string;
-    }) {
+constructor(config: {
+    cluster?: string;
+    wallet: Keypair;
+    programId?: string;
+    redisConfig?: RedisConfig;
+    heliusApiKey?: string;
+}) {
         const defaultConfig: GovernanceConfig = {
             minVotingPeriod: 86400, // 1 day
             maxVotingPeriod: 604800, // 1 week
@@ -119,7 +120,6 @@ export class GlitchSDK {
         this.wallet = config.wallet;
         this.governanceManager = new GovernanceManager(this.programId);
     }
-
     public static async create(config: {
         cluster?: string;
         wallet: Keypair;
@@ -129,57 +129,80 @@ export class GlitchSDK {
             host: string;
             port: number;
         };
+        heliusApiKey?: string;
     }): Promise<GlitchSDK> {
         if (!GlitchSDK.instance) {
-            GlitchSDK.instance = new GlitchSDK(config);
+            const sdk = new GlitchSDK(config);
+            await sdk.initialize(config.redisConfig);
+            GlitchSDK.instance = sdk;
+            GlitchSDK.initialized = true;
+        } else if (!GlitchSDK.initialized) {
             await GlitchSDK.instance.initialize(config.redisConfig);
+            GlitchSDK.initialized = true;
         }
         return GlitchSDK.instance;
     }
 
     private async initialize(redisConfig?: RedisConfig): Promise<void> {
-        if (this.initialized) return;
+        if (GlitchSDK.initialized) return;
 
         // Use mock Redis in test environment
         if (process.env.NODE_ENV === 'test') {
-            const { Redis } = require('ioredis-mock');
-            const redis = new Redis({
-                host: 'r.glitchgremlin.ai',
-                port: 6379
-            });
-            this.queueWorker = new RedisQueueWorker(redis);
+            try {
+                const RedisMock = await import('ioredis-mock');
+                const redis = new RedisMock.default({
+                    host: 'r.glitchgremlin.ai',
+                    port: 6379,
+                    lazyConnect: true
+                });
+                this.queueWorker = new RedisQueueWorker(redis);
+            } catch (error) {
+                console.error('Failed to initialize Redis mock:', error);
+                throw error;
+            }
         } else {
             // Initialize Redis worker with provided config or default localhost config
             let redis: RedisClient | undefined;
             try {
-                redis = new Redis({
-                    host: redisConfig?.host ?? 'r.glitchgremlin.ai',
-                    port: redisConfig?.port ?? 6379,
-                    maxRetriesPerRequest: redisConfig?.maxRetriesPerRequest ?? this.REDIS_CONFIG.maxRetriesPerRequest,
-                    connectTimeout: redisConfig?.connectTimeout ?? this.REDIS_CONFIG.connectTimeout,
-                    retryStrategy: redisConfig?.retryStrategy ?? this.REDIS_CONFIG.retryStrategy,
-                    enableOfflineQueue: false
+                const RedisClient = await import('ioredis');
+                const redis = new RedisClient.default({
+                    ...redisConfig,
+                    retryStrategy: redisConfig?.retryStrategy ?? ((times) => Math.min(times * 50, 2000)),
+                    enableOfflineQueue: false,
+                    lazyConnect: true
                 });
 
-                // Test Redis connection
                 await redis.ping();
-
                 this.queueWorker = new RedisQueueWorker(redis);
             } catch (error) {
-                if (redis) {
-                    await redis.disconnect();
-                }
-                if (error instanceof Error) {
-                    throw new Error(`Failed to initialize GlitchSDK: ${error.message}`);
-                }
-                throw error;
+                console.error('Failed to initialize Redis:', error);
+                throw error instanceof Error ? 
+                    new Error(`Failed to initialize GlitchSDK: ${error.message}`) :
+                    error;
+            }
+            try {
+                const RedisClient = await import('ioredis');
+                redis = new RedisClient.default({
+                    ...redisConfig,
+                    retryStrategy: redisConfig?.retryStrategy ?? ((times) => Math.min(times * 50, 2000)),
+                    enableOfflineQueue: false,
+                    lazyConnect: true
+                });
+
+                await redis.ping();
+                this.queueWorker = new RedisQueueWorker(redis);
+            } catch (error) {
+                console.error('Failed to initialize Redis:', error);
+                throw error instanceof Error ? 
+                    new Error(`Failed to initialize GlitchSDK: ${error.message}`) :
+                    error;
             }
         }
 
         // Verify Solana connection
         await this.connection.getVersion();
 
-        this.initialized = true;
+        GlitchSDK.initialized = true;
     }
 
     private async checkRateLimit(): Promise<void> {
@@ -189,7 +212,7 @@ export class GlitchSDK {
         if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
             const waitTime = this.MIN_REQUEST_INTERVAL - timeSinceLastRequest;
             console.warn(`Rate limit warning: Must wait ${waitTime}ms before next request`);
-            throw new GlitchError(`Rate limit exceeded`, 1007);
+            throw new GlitchError(`Rate limit exceeded`, ErrorCode.RATE_LIMIT_EXCEEDED);
         }
 
         // Check global rate limit counter
@@ -202,7 +225,7 @@ export class GlitchSDK {
             await client.expire(requestKey, 60);
 
             if (requestCount > 3) { // Lower limit for testing
-                throw new GlitchError('Rate limit exceeded', 1007);
+                throw new GlitchError('Rate limit exceeded', ErrorCode.RATE_LIMIT_EXCEEDED);
             }
 
             // Add delay to ensure rate limit is enforced in tests
@@ -222,6 +245,7 @@ export class GlitchSDK {
         throw new GlitchError('Rate limit exceeded', ErrorCode.RATE_LIMIT_EXCEEDED);
     }
 
+
     public async createChaosRequest(params: ChaosRequestParams): Promise<{
         requestId: string;
         waitForCompletion: () => Promise<ChaosResult>;
@@ -231,13 +255,13 @@ export class GlitchSDK {
             throw new InvalidProgramError();
         }
         if (!params.testType || !Object.values(TestType).includes(params.testType)) {
-            throw new GlitchError('Invalid test type', 1004);
+            throw new GlitchError('Invalid test type', ErrorCode.INVALID_PROGRAM);
         }
         if (params.intensity < 1 || params.intensity > 10) {
-            throw new GlitchError('Intensity must be between 1 and 10', 1005);
+            throw new GlitchError('Intensity must be between 1 and 10', ErrorCode.INVALID_AMOUNT);
         }
         if (params.duration < 60 || params.duration > 3600) {
-            throw new GlitchError('Duration must be between 60 and 3600 seconds', 1006);
+            throw new GlitchError('Duration must be between 60 and 3600 seconds', ErrorCode.INVALID_AMOUNT);
         }
 
         // Check rate limits using Redis
@@ -250,7 +274,7 @@ export class GlitchSDK {
         if (lastRequest) {
             const timeSinceLastRequest = now - parseInt(lastRequest);
             if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
-                throw new GlitchError('Rate limit exceeded', 1007);
+                throw new GlitchError('Rate limit exceeded', ErrorCode.RATE_LIMIT_EXCEEDED);
             }
         }
 
@@ -277,7 +301,7 @@ export class GlitchSDK {
 
             // Verify the test config is valid
             if (!mutationConfig.targetProgram || !global?.security?.mutation?.test) {
-                throw new GlitchError('Invalid mutation test configuration', 1004);
+                throw new GlitchError('Invalid mutation test configuration', ErrorCode.INVALID_PROGRAM);
             }
 
             // Send transaction
@@ -808,13 +832,13 @@ export class GlitchSDK {
         try {
             const stakeAccount = await this.connection.getAccountInfo(new PublicKey(stakeId));
             if (!stakeAccount || !stakeAccount.data) {
-                throw new GlitchError('Stake not found', 1015);
+                throw new GlitchError('Stake not found', ErrorCode.STAKE_NOT_FOUND);
             }
 
             // Parse account data into StakeInfo
             const data = stakeAccount.data;
             if (data.length < 56) { // Validate minimum data length
-                throw new GlitchError('Stake not found', 1015); // Keep consistent error message
+                throw new GlitchError('Stake not found', ErrorCode.STAKE_NOT_FOUND); // Keep consistent error message
             }
 
             const amount = data.readBigInt64LE(0);
@@ -838,7 +862,7 @@ export class GlitchSDK {
             if (error instanceof GlitchError) {
                 throw error;
             }
-            throw new GlitchError('Stake not found', 1015);
+            throw new GlitchError('Stake not found', ErrorCode.STAKE_NOT_FOUND);
         }
     }
 
@@ -849,27 +873,35 @@ export class GlitchSDK {
     }> {
         const proposal = await this.getProposalStatus(proposalId);
 
-        if (proposal.status !== 'active') {
-            throw new GlitchError('Proposal not passed', 1009);
+        // 1. Check if proposal is active
+        if (!proposal) {
+            throw new GlitchError('Proposal not found', ErrorCode.INVALID_PROGRAM);
+        }
+        if (!proposal.state.isActive) {
+            throw new GlitchError('Proposal is not active', ErrorCode.INVALID_STATE);
         }
 
-        // Check quorum and vote outcome
+        // Get proposal metadata
         const metadata = await this.governanceManager.validateProposal(
             this.connection,
             new PublicKey(proposalId)
         );
 
-        const passThreshold = metadata.voteWeights.yes > metadata.voteWeights.no;
-        if (!passThreshold) {
-            throw new GlitchError('Proposal did not pass', ErrorCode.PROPOSAL_REJECTED);
+        // 2. Check quorum requirements
+        if (metadata.voteWeights.yes < metadata.quorum) {
+            throw new GlitchError('Proposal has not reached quorum', ErrorCode.INSUFFICIENT_QUORUM);
         }
 
-        // For test proposals, skip timelock check
-        if (!proposalId.startsWith('test-')) {
-            const executionTime = metadata.endTime + (this.governanceConfig.executionDelay || 86400000);
-            if (Date.now() < executionTime) {
-                throw new GlitchError('Timelock period not elapsed', 1012);
-            }
+        // 3. Check timelock period
+        const executionTime = metadata.endTime + (this.governanceConfig.executionDelay || 86400000);
+        if (Date.now() < executionTime) {
+            throw new GlitchError('Timelock period not elapsed', ErrorCode.TIMELOCK_NOT_EXPIRED);
+        }
+
+        // 4. Check if proposal passed
+        const passThreshold = metadata.voteWeights.yes > metadata.voteWeights.no;
+        if (!passThreshold) {
+            throw new GlitchError('Proposal did not pass', ErrorCode.PROPOSAL_FAILED);
         }
 
         // Create execution instruction
@@ -895,137 +927,64 @@ export class GlitchSDK {
         };
     }
 
-    public async calculateChaosRequestFee(params: Omit<ChaosRequestParams, 'targetProgram'>): Promise<number> {
-        TokenEconomics.validateTestParameters(params.duration, params.intensity);
-        return TokenEconomics.calculateTestFee(
-            params.testType,
-            params.duration,
-            params.intensity
-        );
-    }
-
     private async hasVotedOnProposal(proposalId: string): Promise<boolean> {
         try {
             const voteAccount = await this.connection.getAccountInfo(
-                new PublicKey(proposalId + '-vote-' + this.wallet.publicKey.toString())
+                new PublicKey(proposalId + '-vote')
             );
             return voteAccount !== null;
-        } catch {
+        } catch (error) {
             return false;
         }
     }
 
-    async getProposalStatus(proposalId: string): Promise<{
-        id: string;
-        status: 'draft' | 'active' | 'succeeded' | 'defeated' | 'executed' | 'cancelled' | 'queued' | 'expired';
-        title: string;
-        description: string;
-        proposer: string;
-        votes: {
-            yes: number;
-            no: number;
-            abstain: number;
-        };
-        startTime: number;
-        endTime: number;
-        executionTime?: number;
-        quorum: number;
-        stakedAmount: number;
-        testParams: ChaosRequestParams;
-        state: {
-            isActive: boolean;
-            isPassed: boolean;
-            isExecuted: boolean;
-            isExpired: boolean;
-            canExecute: boolean;
-            canVote: boolean;
-            timeRemaining: number;
-        };
-    }> {
+    public async getProposalStatus(proposalId: string): Promise<ProposalStatus> {
         try {
-            // For testing, return mock data based on proposal ID
-            if (proposalId === 'proposal-1234') {
-                const now = Date.now();
-                const endTime = now - 86400000;
-                const isActive = false;
-                const isPassed = false;
-                const isExecuted = false;
-                const isExpired = true;
-                const canExecute = false;
-                const canVote = false;
-                const timeRemaining = 0;
+            const proposal = await this.governanceManager.validateProposal(
+                this.connection,
+                new PublicKey(proposalId)
+            );
 
-                return {
-                    id: proposalId,
-                    status: 'defeated',
-                    title: 'Test Proposal',
-                    description: 'Test Description',
-                    proposer: this.wallet.publicKey.toString(),
-                    votes: {
-                        yes: 100,
-                        no: 200,
-                        abstain: 0
-                    },
-                    startTime: now - 172800000,
-                    endTime,
-                    executionTime: undefined,
-                    quorum: 100,
-                    stakedAmount: 1000,
-                    testParams: {
-                        targetProgram: '11111111111111111111111111111111',
-                        testType: TestType.FUZZ,
-                        duration: 300,
-                        intensity: 5
-                    },
-                    state: {
-                        isActive,
-                        isPassed,
-                        isExecuted,
-                        isExpired,
-                        canExecute,
-                        canVote,
-                        timeRemaining
-                    }
-                };
-            } else if (proposalId === 'proposal-5678') {
-                const now = Date.now();
-                return {
-                    id: proposalId,
-                    status: 'active',
-                    title: "Test Proposal",
-                    description: "Test Description",
-                    proposer: this.wallet.publicKey.toString(),
-                    startTime: now - 86400000,
-                    endTime: now + 86400000,
-                    votes: {
-                        yes: 100,
-                        no: 50,
-                        abstain: 0
-                    },
-                    quorum: 100,
-                    stakedAmount: 1000,
-                    testParams: {
-                        targetProgram: "11111111111111111111111111111111",
-                        testType: TestType.FUZZ,
-                        duration: 300,
-                        intensity: 5
-                    },
-                    state: {
-                        isActive: true,
-                        isPassed: false,
-                        isExecuted: false,
-                        isExpired: false,
-                        canExecute: false,
-                        canVote: true,
-                        timeRemaining: 86400000
-                    }
-                };
-            }
+            const now = Date.now();
+            const isActive = now < proposal.endTime;
+            const isPassed = proposal.voteWeights.yes > proposal.voteWeights.no;
+            const isExecuted = proposal.executed;
+            const isExpired = now > proposal.endTime;
+            const canExecute = isPassed && !isExecuted && now > proposal.executionTime;
+            const canVote = isActive && !isExecuted;
+            const timeRemaining = Math.max(0, proposal.endTime - now);
 
-            throw new Error('Proposal not found');
+            return {
+                id: proposalId,
+                status: proposal.status,
+                title: proposal.title,
+                description: proposal.description,
+                proposer: proposal.proposer.toString(),
+                votes: proposal.voteWeights,
+                startTime: proposal.startTime,
+                endTime: proposal.endTime,
+                executionTime: proposal.executionTime,
+                quorum: proposal.quorum,
+                stakedAmount: 0, // TODO: Implement stake tracking
+                testParams: {
+                    targetProgram: '11111111111111111111111111111111',
+                    testType: TestType.FUZZ,
+                    duration: 300,
+                    intensity: 5
+                },
+                state: {
+                    isActive,
+                    isPassed,
+                    isExecuted,
+                    isExpired,
+                    canExecute,
+                    canVote,
+                    timeRemaining
+                }
+            };
         } catch (error) {
             if (error instanceof Error && error.message.includes('Invalid proposal ID')) {
-                throw new GlitchError('Invalid proposal ID format', 1011);
+                throw new GlitchError('Invalid proposal ID format', ErrorCode.INVALID_PROGRAM);
             }
             throw error;
         }

@@ -3,26 +3,46 @@ import { GlitchError } from '../errors.js';
 import type { Redis as RedisType } from 'ioredis';
 import type { ChaosRequestParams, ChaosResult } from '../types.js';
 
+interface RequestLimit {
+    maxRequests: number;
+    window: number;
+}
+
+interface RequestLimits {
+    [key: string]: RequestLimit;
+}
 export class RedisQueueWorker {
-    private redis: RedisType;
+    protected redis: RedisType;
     private readonly queueKey = 'glitch:chaos:queue';
     private readonly resultKey = 'glitch:chaos:results';
     private readonly rateLimitKey = 'glitch:chaos:ratelimit';
     private readonly limitTrackerKey = 'glitch:chaos:limittracker';
     private readonly requestCountKey = 'glitch:chaos:requestcount';
     
-    private readonly requestLimits = {
+    private readonly requestLimits: RequestLimits = {
         DEFAULT: { maxRequests: 100, window: 3600 },
         FUZZING: { maxRequests: 50, window: 1800 },
         SECURITY: { maxRequests: 30, window: 1800 }
     };
+
+    /**
+    * Get the raw Redis client for testing purposes only
+    * @internal
+    */
+    public getRawClient(): RedisType {
+        if (!this.redis) {
+            throw new GlitchError('Redis client not initialized', 2007);
+        }
+        return this.redis;
+    }
+
     constructor(redisClient?: RedisType) {
         this.redis = redisClient || new IORedis({
             host: process.env.REDIS_HOST || 'r.glitchgremlin.ai', 
             port: parseInt(process.env.REDIS_PORT || '6379'),
             connectTimeout: 5000,
             maxRetriesPerRequest: 3,
-            retryStrategy: (times: number): number => {
+            retryStrategy: (times: number): number | null => {
                 if (times > 5) return null; // Stop retrying after 5 attempts
                 return Math.min(times * 100, 3000); // Exponential backoff up to 3s
             },
@@ -36,6 +56,10 @@ export class RedisQueueWorker {
                 return false;
             }
         }) as RedisType;
+
+        if (!this.redis) {
+            throw new GlitchError('Failed to initialize Redis client', 2007);
+        }
 
         this.redis.on('error', (err: Error): void => {
             console.error('Redis connection error:', err.message, err.stack);

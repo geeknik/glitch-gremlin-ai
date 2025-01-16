@@ -4,7 +4,8 @@ export enum TestType {
     FUZZ = 'FUZZ',
     LOAD = 'LOAD',
     EXPLOIT = 'EXPLOIT',
-    CONCURRENCY = 'CONCURRENCY'
+    CONCURRENCY = 'CONCURRENCY',
+    MUTATION = 'MUTATION'
 }
 
 export interface TokenDistribution {
@@ -43,7 +44,8 @@ export class TokenEconomics {
             [TestType.FUZZ]: 1.0,
             [TestType.LOAD]: 1.2,
             [TestType.EXPLOIT]: 1.5,
-            [TestType.CONCURRENCY]: 1.3
+            [TestType.CONCURRENCY]: 1.3,
+            [TestType.MUTATION]: 1.4
         }
     };
 

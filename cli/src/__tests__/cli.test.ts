@@ -1,37 +1,44 @@
 import { spawnSync } from 'child_process';
-import { join, resolve } from 'path';
+import { dirname, resolve } from 'path';
 import { readFileSync } from 'fs';
 
 // Helper function to resolve paths from test root
-const fromRoot = (...paths: string[]) => resolve(__dirname, '../..', ...paths);
+const fromRoot = (...paths: string[]) => {
+    return resolve(__dirname, '..', ...paths);
+};
 
 // Constants 
-const CLI_PATH = fromRoot('dist/index.js');
+const CLI_PATH = fromRoot('../../src/index.ts');
 const PACKAGE_JSON = fromRoot('package.json');
 
 // Helper to execute CLI commands
-const runCLI = (args: string[] = []) => spawnSync('node', [
-    '--experimental-vm-modules',
-    '--no-warnings',
-    '--es-module-specifier-resolution=node',
-    '--experimental-json-modules',
-    CLI_PATH,
-    ...args
-], {
-    env: { 
-        ...process.env,
-        NODE_ENV: 'test',
-        DEBUG: 'false',
-        NO_COLOR: 'true'
-    },
-    encoding: 'utf8',
-    stdio: 'pipe',
-    shell: false,
-    windowsHide: true
-});
+const runCLI = (args: string[] = []) => {
+    const result = spawnSync('node', [
+        '--loader=ts-node/esm',
+        '--experimental-vm-modules',
+        '--no-warnings',
+        CLI_PATH,
+        ...args
+    ], {
+        env: {
+            ...process.env,
+            NODE_ENV: 'test',
+            DEBUG: 'false',
+            NO_COLOR: 'true'
+        },
+        encoding: 'utf8',
+        stdio: 'pipe'
+    });
+    
+    // Normalize line endings for consistent testing
+    if (result.stdout) result.stdout = result.stdout.replace(/\r\n/g, '\n');
+    if (result.stderr) result.stderr = result.stderr.replace(/\r\n/g, '\n');
+    
+    return result;
+};
 
-// Read package.json for version
-const pkg = JSON.parse(readFileSync(PACKAGE_JSON, 'utf8'));
+// Read CLI package.json for version
+const pkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'utf8'));
 const VERSION = pkg.version;
 
 describe('CLI', () => {

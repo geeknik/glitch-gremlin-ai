@@ -1,13 +1,14 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "NodeNext",
+    "module": "ESNext",
     "moduleResolution": "NodeNext",
     "esModuleInterop": true,
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "outDir": "./dist",
+    "outDir": "./dist/esm",
+    "declarationDir": "./dist/types",
     "rootDir": "./src",
     "strict": true,
     "allowJs": true,

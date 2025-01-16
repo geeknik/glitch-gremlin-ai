@@ -1,12 +1,28 @@
 import * as tf from '@tensorflow/tfjs-node';
+import type { VulnerabilityDetectionModel, PredictionResult } from './types';
 import { VulnerabilityType } from './types';
 
-export class VulnerabilityDetectionModel {
+export class VulnerabilityDetectionModelImpl implements VulnerabilityDetectionModel {
     private model: tf.LayersModel;
     private initialized: boolean = false;
 
     constructor() {
         this.model = this.buildModel();
+    }
+
+    async ensureInitialized(): Promise<void> {
+        if (!this.initialized) {
+            // Try to initialize with default weights if not trained
+            const model = this.buildModel();
+            await model.compile({
+                optimizer: 'adam',
+                loss: 'categoricalCrossentropy',
+                metrics: ['accuracy']
+            });
+            this.model = model;
+            this.initialized = true;
+            await this.model.loadWeights(); // Ensure weights are loaded
+        }
     }
 
     private buildModel(): tf.LayersModel {
@@ -83,3 +99,5 @@ export class VulnerabilityDetectionModel {
         this.initialized = true;
     }
     }
+
+    export const VulnerabilityDetectionModel = VulnerabilityDetectionModelImpl;

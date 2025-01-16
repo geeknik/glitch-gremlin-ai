@@ -1,5 +1,17 @@
 import { TimeSeriesMetric } from '../anomaly-detection';
 
+interface MetricsData {
+    instructionFrequency: number[];
+    executionTime: number[];
+    memoryUsage: number[];
+    cpuUtilization: number[];
+    errorRate: number[];
+    pdaValidation: number[];
+    accountDataMatching: number[];
+    cpiSafety: number[];
+    authorityChecks: number[];
+}
+
 export function generateAnomalousMetrics(numPoints: number): TimeSeriesMetric[] {
     const metrics: TimeSeriesMetric[] = [];
 
@@ -24,15 +36,18 @@ export function generateAnomalousMetrics(numPoints: number): TimeSeriesMetric[] 
 
         if (i > numPoints / 2) {
             // Introduce anomaly in all metrics
-            metrics[i].metrics.instructionFrequency = metrics[i].metrics.instructionFrequency ? [metrics[i].metrics.instructionFrequency[0] * 2] : [0];
-            metrics[i].metrics.executionTime = metrics[i].metrics.executionTime ? [metrics[i].metrics.executionTime[0] * 1.5] : [0];
-            metrics[i].metrics.memoryUsage = metrics[i].metrics.memoryUsage ? [metrics[i].metrics.memoryUsage[0] * 2] : [0];
-            metrics[i].metrics.cpuUtilization = metrics[i].metrics.cpuUtilization ? [metrics[i].metrics.cpuUtilization[0] * 1.8] : [0];
-            metrics[i].metrics.errorRate = metrics[i].metrics.errorRate ? [metrics[i].metrics.errorRate[0] * 3] : [0];
-            metrics[i].metrics.pdaValidation = metrics[i].metrics.pdaValidation ? [metrics[i].metrics.pdaValidation[0] * 0.5] : [0];
-            metrics[i].metrics.accountDataMatching = metrics[i].metrics.accountDataMatching ? [metrics[i].metrics.accountDataMatching[0] * 0.6] : [0];
-            metrics[i].metrics.cpiSafety = metrics[i].metrics.cpiSafety ? [metrics[i].metrics.cpiSafety[0] * 0.4] : [0];
-            metrics[i].metrics.authorityChecks = metrics[i].metrics.authorityChecks ? [metrics[i].metrics.authorityChecks[0] * 0.3] : [0];
+            const currentMetrics = metrics[i]?.metrics as MetricsData;
+            if (currentMetrics) {
+                currentMetrics.instructionFrequency = [(currentMetrics.instructionFrequency?.[0] ?? 0) * 2];
+                currentMetrics.executionTime = [(currentMetrics.executionTime?.[0] ?? 0) * 1.5];
+                currentMetrics.memoryUsage = [(currentMetrics.memoryUsage?.[0] ?? 0) * 2];
+                currentMetrics.cpuUtilization = [(currentMetrics.cpuUtilization?.[0] ?? 0) * 1.8];
+                currentMetrics.errorRate = [(currentMetrics.errorRate?.[0] ?? 0) * 3];
+                currentMetrics.pdaValidation = [(currentMetrics.pdaValidation?.[0] ?? 0) * 0.5];
+                currentMetrics.accountDataMatching = [(currentMetrics.accountDataMatching?.[0] ?? 0) * 0.6];
+                currentMetrics.cpiSafety = [(currentMetrics.cpiSafety?.[0] ?? 0) * 0.4];
+                currentMetrics.authorityChecks = [(currentMetrics.authorityChecks?.[0] ?? 0) * 0.3];
+            }
         }
     }
 

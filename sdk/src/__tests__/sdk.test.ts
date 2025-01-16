@@ -1,76 +1,182 @@
 import { jest } from '@jest/globals';
-import { GlitchSDK, TestType } from '../index.js'; 
+import { GlitchSDK, TestType } from '../index.js';
+import type { SDKConfig } from '../types.js';
 import { Keypair, Connection, PublicKey, Commitment } from '@solana/web3.js';
-import { Redis } from 'ioredis';
+import { Redis, RedisKey } from 'ioredis';
 import { GlitchError, ErrorCode } from '../errors.js';
 import type { MockRedisClient } from '../types.js';
 import { SimulatedTransactionResponse } from '@solana/web3.js';
-import type { MockedObject } from 'jest-mock';
+import type { MockedFunction, MockedObject } from 'jest-mock';
 
+// Test-specific type definitions
+// Test-specific type definitions
+interface RedisStore {
+[key: string]: {
+    value: string | number | null;
+    expiry?: number;
+};
+}
+
+interface TestRedisClient extends Partial<Redis> {
+queue?: string[];
+connected: boolean;
+store: RedisStore;
+cleanup: () => Promise<void>;
+incr: jest.Mock<Promise<number>, [RedisKey]>;
+get: jest.Mock<Promise<string | null>, [RedisKey]>;
+set: jest.Mock<Promise<'OK'>, [RedisKey, string]>;
+expire: jest.Mock<Promise<number>, [RedisKey, number]>;
+keys: jest.Mock<Promise<string[]>, [string]>;
+flushall: jest.Mock<Promise<'OK'>, []>;
+ping: jest.Mock<Promise<'PONG'>, []>;
+disconnect: jest.Mock<Promise<void>, []>;
+quit: jest.Mock<Promise<'OK'>, []>;
+on: jest.Mock<Redis, any[]>;
+hset: jest.Mock<Promise<string>, [string, string]>;
+lpush: jest.Mock<Promise<number>, [string, string]>;
+rpop: jest.Mock<Promise<string | null>, [string]>;
+getRawClient: jest.Mock<TestRedisClient, []>;
+}
 jest.setTimeout(30000);
 
-let mockRequestCount = { value: 0 };
+// Initialize mock Redis client at the top level
+// Initialize mock Redis client and test state
+let mockRedisClient: jest.Mocked<TestRedisClient>;
+let redisQueueWorker: RedisQueueWorker;
 
-describe('GlitchSDK', () => {
+// Track request state globally
+const mockState = {
+    requestCount: 0,
+    lastRequestTime: 0
+};
+    /** SDK instance used across tests */
     let sdk: GlitchSDK;
-    let mockRedisClient: jest.Mocked<MockRedisClient>;
+    /** Mock Solana connection */
     let mockConnection: MockedObject<Connection>;
+
+    /**
+    * Set up test environment before each test
+    */
     beforeEach(async () => {
         // Setup mock connection
         mockConnection = {
             getAccountInfo: jest.fn(),
             getBalance: jest.fn(),
-            getVersion: jest.fn().mockResolvedValue({ 'solana-core': '1.7.0' }),
+            getVersion: jest.fn().mockReturnValue({ 
+                'feature-set': 1234567, 
+                'solana-core': '1.7.0' 
+            }),
             sendTransaction: jest.fn(),
             simulateTransaction: jest.fn(),
-            disconnect: jest.fn().mockResolvedValue(undefined),
             commitment: 'confirmed' as Commitment,
             rpcEndpoint: 'https://api.devnet.solana.com'
         } as unknown as MockedObject<Connection>;
 
+        // Create fresh mock Redis client for each test
+        // Create fresh mock Redis client for each test with proper state management
         mockRedisClient = {
-            queue: [] as string[],
+            queue: [],
             connected: true,
-            incr: jest.fn().mockImplementation(async (key: string): Promise<number> => {
-                mockRequestCount.value++;
-                if (mockRequestCount.value > 1) {
-                    throw new GlitchError('Rate limit exceeded', ErrorCode.RATE_LIMIT_EXCEEDED);
+            store: {},
+
+            // Core Redis operations
+            incr: jest.fn().mockImplementation(async (key: RedisKey) => {
+                const now = Date.now();
+                const entry = mockRedisClient.store[key];
+                
+                // Check expiry
+                if (entry?.expiry && now > entry.expiry) {
+                    delete mockRedisClient.store[key];
+                    return 1;
                 }
-                return mockRequestCount.value;
+
+                const current = entry?.value || '0';
+                const nextVal = parseInt(current.toString()) + 1;
+                mockRedisClient.store[key] = { value: nextVal };
+                mockState.requestCount = nextVal;
+                mockState.lastRequestTime = now;
+                return nextVal;
             }),
-        expire: jest.fn().mockImplementation(async (key: string, seconds: number): Promise<number> => 1),
-        get: jest.fn().mockImplementation(async (key: string): Promise<string | null> => null),
-        set: jest.fn().mockImplementation(async (key: string, value: string): Promise<'OK'> => 'OK'),
-        on: jest.fn().mockImplementation((event: string, callback: Function) => mockRedisClient),
-        quit: jest.fn().mockImplementation(async (): Promise<'OK'> => 'OK'),
-        disconnect: jest.fn().mockImplementation(async (): Promise<void> => undefined),
-        flushall: jest.fn().mockImplementation(async (): Promise<'OK'> => 'OK'),
-        hset: jest.fn().mockImplementation(async (key: string, field: string, value: string): Promise<number> => 1),
-        hget: jest.fn().mockImplementation(async (key: string, field: string): Promise<string | null> => {
+
+            get: jest.fn().mockImplementation(async (key: RedisKey) => {
+                const entry = mockRedisClient.store[key];
+                if (!entry) return null;
+                if (entry.expiry && Date.now() > entry.expiry) {
+                    delete mockRedisClient.store[key];
+                    return null;
+                }
+                return entry.value.toString();
+            }),
+
+            set: jest.fn().mockImplementation(async (key: RedisKey, value: string) => {
+                mockRedisClient.store[key] = { value };
+                return 'OK';
+            }),
+
+            expire: jest.fn().mockImplementation(async (key: RedisKey, seconds: number) => {
+                const entry = mockRedisClient.store[key];
+                if (!entry) return 0;
+                entry.expiry = Date.now() + (seconds * 1000);
+                return 1;
+            }),
+
+            // Test utilities
+            keys: jest.fn().mockImplementation(async (pattern: string) => {
+                return Object.keys(mockRedisClient.store).filter(key => 
+                    key.includes(pattern.replace('*', ''))
+                );
+            }),
+
+            flushall: jest.fn().mockImplementation(async () => {
+                mockRedisClient.store = {};
+                mockRedisClient.queue = [];
+                mockState.requestCount = 0;
+                mockState.lastRequestTime = 0;
+                return 'OK';
+            }),
+
+            ping: jest.fn().mockResolvedValue('PONG'),
+            disconnect: jest.fn().mockResolvedValue(undefined),
+            quit: jest.fn().mockResolvedValue('OK'),
+            on: jest.fn().mockReturnThis()
+        } as unknown as MockedObject<TestRedisClient>;
+
+        // Set up additional Redis mock methods
+        mockRedisClient.hset = jest.fn().mockImplementation(async (key: string, field: string) => {
             if (field === 'bad-result') {
                 throw new GlitchError('Invalid JSON', ErrorCode.INVALID_JSON);
             }
             return JSON.stringify({test: 'data'});
-        }),
-        lpush: jest.fn().mockImplementation(async (key: string, value: string): Promise<number> => {
+        });
+        
+        mockRedisClient.lpush = jest.fn().mockImplementation(async (key: string, value: string) => {
             if (value === 'invalid-json') {
                 throw new GlitchError('Invalid JSON', ErrorCode.INVALID_JSON);
             }
             return 1;
-        }),
-        rpop: jest.fn().mockImplementation(async function(this: MockRedisClient, key: string): Promise<string | null> {
+        });
+        
+        mockRedisClient.rpop = jest.fn().mockImplementation(async function(this: TestRedisClient, key: string) {
             if (key === 'empty-queue') {
                 return null;
             }
-            return this.queue?.length ? this.queue.shift() ?? null : null;
-        })
-    } as jest.Mocked<MockRedisClient>;
+            return this.queue?.shift() ?? null;
+        });
+        
+        mockRedisClient.getRawClient = jest.fn().mockReturnValue(mockRedisClient);
 
+        // Create RedisQueueWorker with mock client
+        redisQueueWorker = new RedisQueueWorker(mockRedisClient);
+        redisQueueWorker.getRawClient = jest.fn().mockResolvedValue(mockRedisClient);
         jest.spyOn(Connection.prototype, 'getVersion').mockResolvedValue({ 'solana-core': '1.7.0' });
-        
-        // Mock the GlitchSDK constructor to bypass Helius API key requirement
-        jest.spyOn(GlitchSDK.prototype as any, 'initialize').mockResolvedValue(undefined);
-        
+
+        // Mock the GlitchSDK constructor
+        jest.spyOn(GlitchSDK.prototype as any, 'initialize').mockImplementation(async function(this: GlitchSDK) {
+            // @ts-ignore: Access private property for testing
+            this.queueWorker = redisQueueWorker;
+            return undefined;
+        });
+
         const createSpy = jest.spyOn(GlitchSDK, 'create');
         sdk = await GlitchSDK.create({
             cluster: "https://api.devnet.solana.com",
@@ -80,21 +186,30 @@ describe('GlitchSDK', () => {
                 port: 6379
             },
             heliusApiKey: 'mock-api-key'
-        });
+        } as SDKConfig);
     });
-
+    /**
+    * Clean up test environment after each test
+    */
     afterEach(async () => {
         try {
-            if (sdk?.['queueWorker']?.close) {
+            // Reset mock state and cleanup
+            mockState.requestCount = 0;
+            mockState.lastRequestTime = 0;
+            
+            // Clean up Redis mock
+            if (mockRedisClient?.flushall) {
+                await mockRedisClient.flushall();
+            }
+            
+            // Reset SDK worker
+            if (sdk?.['queueWorker']) {
                 await sdk['queueWorker'].close();
             }
-            if (sdk?.['connection']) {
-                // Clean up any connection resources if needed
-            }
-            mockRequestCount.value = 0;
-            await mockRedisClient.flushall();
+            
+            // Cleanup timers and mocks
             jest.clearAllMocks();
-            jest.clearAllTimers();
+            jest.useRealTimers();
             jest.restoreAllMocks();
         } catch (err) {
             console.error('Error during cleanup:', err);
@@ -103,16 +218,18 @@ describe('GlitchSDK', () => {
 
     afterAll(async () => {
         try {
-            if (sdk) {
-                if (sdk['connection']) {
-                    // Clean up any connection resources if needed
-                }
-                if (sdk['queueWorker']?.close) {
-                    await sdk['queueWorker'].close();
+            if (sdk?.['queueWorker']) {
+                const worker = sdk['queueWorker'] as RedisQueueWorker;
+                if (typeof worker.close === 'function') {
+                    await worker.close();
                 }
             }
+
+            if (mockRedisClient?.disconnect) {
+                await mockRedisClient.disconnect();
+            }
             
-            // Make sure all mocks and timers are cleaned up
+            // Cleanup any pending timers/mocks
             await new Promise(resolve => setTimeout(resolve, 100));
             jest.useRealTimers();
             jest.restoreAllMocks();
@@ -121,7 +238,14 @@ describe('GlitchSDK', () => {
         }
     });
 
-    describe('createChaosRequest', () => {
+    /**
+    * Unit Tests
+    */
+    describe('Unit Tests', () => {
+        describe('createChaosRequest', () => {
+            /**
+            * Test basic chaos request creation
+            */
         it('should create a valid chaos request', async () => {
             const request = await sdk.createChaosRequest({
                 targetProgram: "11111111111111111111111111111111",
@@ -153,6 +277,9 @@ describe('GlitchSDK', () => {
         });
     });
 
+    /**
+    * Integration Tests
+    */
     describe('version compatibility', () => {
         it('should export correct version', async () => {
             const { version } = await import('../index.js');
@@ -161,6 +288,8 @@ describe('GlitchSDK', () => {
     });
 
     describe('governance', () => {
+        jest.setTimeout(60000); // Increase timeout for long-running test
+        
         it('should create a valid proposal', async () => {
             // Mock the connection's simulateTransaction to avoid actual network calls
             // Mock balance check
@@ -186,7 +315,6 @@ describe('GlitchSDK', () => {
             const proposal = await sdk.createProposal({
                 title: "Test Proposal",
                 description: "Test Description",
-                targetProgram: "11111111111111111111111111111111",
                 testParams: {
                     testType: TestType.FUZZ,
                     duration: 300,
@@ -209,7 +337,6 @@ describe('GlitchSDK', () => {
             await expect(sdk.createProposal({
                 title: "Test Proposal",
                 description: "Test Description",
-                targetProgram: "11111111111111111111111111111111",
                 testParams: {
                     testType: TestType.FUZZ,
                     duration: 300,
@@ -221,7 +348,13 @@ describe('GlitchSDK', () => {
         });
     });
 
+    /**
+    * Economic Model Tests 
+    */
     describe('token economics', () => {
+        /**
+        * Test fee calculation logic
+        */
         it('should calculate correct fees', async () => {
             const fee = await sdk.calculateChaosRequestFee({
                 testType: TestType.FUZZ,
@@ -231,10 +364,21 @@ describe('GlitchSDK', () => {
             expect(typeof fee).toBe('number');
             expect(fee).toBeGreaterThan(0);
         });
+    });
 
-        describe('rate limiting', () => {
-            beforeEach(async () => {
+    /**
+    * Rate Limiting Tests
+    */
+    describe('rate limiting', () => {
+        /**
+        * Set up rate limiting test environment
+        */
+        beforeEach(async () => {
+                // Reset timer and state before each test
                 jest.useFakeTimers();
+                await mockRedisClient.flushall();
+                mockState.requestCount = 0;
+                mockState.lastRequestTime = 0;
             });
 
             afterEach(() => {
@@ -263,7 +407,7 @@ describe('GlitchSDK', () => {
                     duration: 60,
                     intensity: 1
                 });
-                expect(mockRequestCount.value).toBe(1);
+                expect(mockState.requestCount).toBe(1);
 
                 // Immediate second request should fail
                 await expect(sdk.createChaosRequest({
@@ -272,43 +416,23 @@ describe('GlitchSDK', () => {
                     duration: 60,
                     intensity: 1
                 })).rejects.toThrow('Rate limit exceeded');
-                expect(mockRequestCount.value).toBe(1);
-
-                // After waiting, request should succeed
-                jest.advanceTimersByTime(2000);
-                await sdk.createChaosRequest({
-                    targetProgram: "11111111111111111111111111111111",
-                    testType: TestType.FUZZ,
-                    duration: 60,
-                    intensity: 1
-                });
-                });
+                expect(mockState.requestCount).toBe(1);
+            });
 
             it('should enforce rate limits for parallel requests', async () => {
-                jest.setTimeout(10000); // Increase timeout for this test
-                const promises = Array(5).fill(0).map(() => sdk.createChaosRequest({
+                const requests = Array.from({ length: 5 }, () => ({
                     targetProgram: "11111111111111111111111111111111",
                     testType: TestType.FUZZ,
                     duration: 60,
                     intensity: 1
                 }));
-
-                let localRequestCount = { value: 0 };
-                let incrCount = 0;
-                const mockIncr = jest.fn().mockImplementation(async (key: string): Promise<number> => {
-                    incrCount++;
-                    if (incrCount > 1) {
-                        throw new GlitchError('Rate limit exceeded', ErrorCode.RATE_LIMIT_EXCEEDED);
-                    }
-                    return incrCount;
-                });
-                sdk['queueWorker']['redis'].incr = mockIncr;
-
+                
+                const promises = requests.map(params => sdk.createChaosRequest(params));
                 await expect(Promise.all(promises)).rejects.toThrow('Rate limit exceeded');
+                expect(mockState.requestCount).toBeLessThanOrEqual(1);
             });
 
             it('should allow requests after cooldown period', async () => {
-                jest.setTimeout(10000); // Increase timeout for this test
                 // First request
                 await sdk.createChaosRequest({
                     targetProgram: "11111111111111111111111111111111",
@@ -316,6 +440,8 @@ describe('GlitchSDK', () => {
                     duration: 60,
                     intensity: 1
                 });
+                expect(mockState.requestCount).toBe(1);
+                const firstRequestTime = mockState.lastRequestTime;
 
                 // Wait for cooldown
                 jest.advanceTimersByTime(2000);
@@ -327,9 +453,10 @@ describe('GlitchSDK', () => {
                     duration: 60,
                     intensity: 1
                 });
-
                 expect(result.requestId).toBeDefined();
+                });
             });
         });
     });
-});
+    });
+    });

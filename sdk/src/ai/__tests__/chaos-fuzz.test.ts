@@ -4,10 +4,11 @@ import * as tf from '@tensorflow/tfjs';
 import type { MemoryInfo } from '@tensorflow/tfjs-core/dist/engine';
 import { PublicKey, Connection } from '@solana/web3.js';
 import { 
-AnomalyDetector, 
-TimeSeriesMetric,
-AnomalyResult,
-ModelConfig 
+    AnomalyDetector, 
+    TimeSeriesMetric,
+    ModelConfig,
+    AnomalyResult,
+    DetectionError
 } from '../src/anomaly-detection';
 import { Fuzzer } from '../src/fuzzer';
 import { Logger } from '../../utils/logger';
@@ -122,9 +123,14 @@ describe('Chaos Fuzzing and Anomaly Detection Tests', () => {
             cacheSize: 1000
         };
         
-        anomalyModel = new AnomalyDetector(config);
-        fuzzer = new Fuzzer({ port: 9464, metricsCollector: null });
-        mockMetrics = generateAnomalousMetrics(50); // Reduced from 100 to 50
+        try {
+            anomalyModel = new AnomalyDetector(config);
+            fuzzer = new Fuzzer({ port: 9464, metricsCollector: null });
+            mockMetrics = generateAnomalousMetrics(50); // Reduced from 100 to 50
+        } catch (error) {
+            console.error('Failed to initialize anomaly detector:', error);
+            throw error;
+        }
     });
 
     afterEach(async () => {
@@ -164,11 +170,19 @@ describe('Chaos Fuzzing and Anomaly Detection Tests', () => {
     });
 
     it('should handle anomalies during network latency', async () => {
-        const metrics = generateAnomalousMetrics(100);
-
-        const result = await anomalyModel.detect(metrics);
-        expect(result.isAnomaly).toBe(false); // Check anomaly detection
-        expect(result.confidence).toBeLessThanOrEqual(0.5);
+        try {
+            const metrics = generateAnomalousMetrics(100);
+            
+            const result = await anomalyModel.detect(metrics);
+            expect(result.anomalyDetected).toBe(false); // Check anomaly detection
+            expect(result.score).toBeLessThanOrEqual(0.5);
+        } catch (error) {
+            if (error instanceof DetectionError) {
+                console.error('Anomaly detection failed:', error.message);
+                throw error;
+            }
+            throw new Error('Unexpected error during anomaly detection');
+        }
     }, 20000); // Increased timeout to 20s
 
 
@@ -195,7 +209,7 @@ describe('Chaos Fuzzing and Anomaly Detection Tests', () => {
             await expect(async () => {
                 const result = await anomalyModel.detect(metrics);
                 return result;
-            }).rejects.toThrow();
+            }).rejects.toThrow(DetectionError);
 
         } finally {
             currentMemory = tf.memory();
@@ -208,7 +222,15 @@ describe('Chaos Fuzzing and Anomaly Detection Tests', () => {
         console.log('[Test] Tensor cleanup test - Initial memory:', initialMemory);
 
         const metrics = generateAnomalousMetrics(50);
-        await anomalyModel.detect(metrics);
+        try {
+            await anomalyModel.detect(metrics);
+        } catch (error) {
+            if (error instanceof DetectionError) {
+                console.error('Failed to detect anomalies:', error.message);
+                throw error;
+            }
+            throw new Error('Unexpected error during anomaly detection');
+        }
 
         const finalMemory = tf.memory();
         console.log('[Test] Tensor cleanup test - Final memory:', finalMemory);

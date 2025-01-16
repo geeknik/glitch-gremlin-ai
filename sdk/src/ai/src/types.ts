@@ -1,3 +1,33 @@
+export enum VulnerabilityType {
+    ArithmeticOverflow = 'ArithmeticOverflow',
+    Reentrancy = 'Reentrancy',
+    AccessControl = 'AccessControl',
+    PDASafety = 'PDASafety'
+}
+
+export interface PredictionResult {
+    type: VulnerabilityType;
+    confidence: number;
+    timestamp?: number;
+    modelVersion?: string;
+}
+
+export interface VulnerabilityDetectionModel {
+    ensureInitialized(): Promise<void>;
+    predict(features: number[]): Promise<PredictionResult>;
+    cleanup(): Promise<void>;
+    save(path: string): Promise<void>;
+    load(path: string): Promise<void>;
+}
+
+export interface VulnerabilityDetectionModel {
+    ensureInitialized(): Promise<void>;
+    predict(features: number[]): Promise<PredictionResult>;
+    cleanup(): Promise<void>;
+    save(path: string): Promise<void>;
+    load(path: string): Promise<void>;
+}
+
 // Error types for improved error handling
 export class FuzzerError extends Error {
     constructor(message: string) {

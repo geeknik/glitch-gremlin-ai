@@ -1,4 +1,5 @@
 import * as tf from '@tensorflow/tfjs-node';
+import { tidy } from '@tensorflow/tfjs-core';
 import { EventEmitter } from 'events';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -113,14 +114,19 @@ export class FeatureExtractor {
     constructor(private config: ModelConfig['featureEngineering']) {}
 
     public extractFeatures(data: TimeSeriesMetric[]): tf.Tensor2D {
-        return tf.tidy(() => {
-            // Convert raw data to tensor format
-            const features = data.map(metric => {
-                const values = Object.values(metric.metrics).flat();
-                return values;
+        try {
+            return tidy(() => {
+                // Convert raw data to tensor format
+                const features = data.map(metric => {
+                    const values = Object.values(metric.metrics).flat();
+                    return values;
+                });
+                return tf.tensor2d(features);
             });
-            return tf.tensor2d(features);
-        });
+        } catch (error) {
+            console.error('Error extracting features:', error);
+            throw new Error('Failed to extract features: ' + error.message);
+        }
     }
 }
 
@@ -245,72 +251,78 @@ private initializeComponents(): void {
 }
 
 private buildModels(): void {
-    tf.tidy(() => {
-        // Build autoencoder model
-        const autoencoder = this.buildAutoencoder();
-        autoencoder.compile({
-            optimizer: tf.train.adam(this.config.learningRate),
-            loss: 'meanSquaredError'
-        });
-        this.models.autoencoder = autoencoder;
+    try {
+        const modelBuilder = () => {
+            // Build autoencoder model
+            const autoencoder = this.buildAutoencoder();
+            autoencoder.compile({
+                optimizer: tf.train.adam(this.config.learningRate),
+                loss: 'meanSquaredError'
+            });
+            this.models.autoencoder = autoencoder;
 
-        // Build LSTM model
-        const lstm = this.buildLSTM();
-        lstm.compile({
-            optimizer: tf.train.adam(this.config.learningRate),
-            loss: 'meanSquaredError'
-        });
-        this.models.lstm = lstm;
-    });
-}
-
-private buildLSTM(): tf.LayersModel {
-    const model = tf.sequential();
-    model.add(tf.layers.lstm({
-        units: this.config.lstmUnits,
-        inputShape: [this.config.timeSteps, this.config.featureSize],
-        returnSequences: true
-    }));
-    model.add(tf.layers.dropout({ rate: this.config.dropoutRate }));
-    model.add(tf.layers.dense({ units: this.config.featureSize }));
-    return model;
-}
-
-private buildAutoencoder(): tf.LayersModel {
-    const model = tf.sequential();
-
-    // Encoder layers
-    for (let i = 0; i < this.config.encoderLayers.length; i++) {
-        model.add(tf.layers.dense({
-            units: this.config.encoderLayers[i],
-            activation: 'relu'
-        }));
+            // Build LSTM model
+            const lstm = this.buildLSTM();
+            lstm.compile({
+                optimizer: tf.train.adam(this.config.learningRate),
+                loss: 'meanSquaredError'
+            });
+            this.models.lstm = lstm;
+        };
+        
+        // Use imported tidy function
+        tidy(modelBuilder);
+    } catch (error) {
+        console.error('Error building models:', error);
+        throw new Error('Failed to initialize TensorFlow models: ' + error.message);
     }
-
-    // Decoder layers
-    for (let i = this.config.decoderLayers.length - 1; i >= 0; i--) {
-        model.add(tf.layers.dense({
-            units: this.config.decoderLayers[i],
-            activation: i === 0 ? 'sigmoid' : 'relu'
-        }));
-    }
-
-    return model;
 }
+    private buildLSTM(): tf.LayersModel {
+        const model = tf.sequential();
+        model.add(tf.layers.lstm({
+            units: this.config.lstmUnits,
+            inputShape: [this.config.timeSteps, this.config.featureSize],
+            returnSequences: true
+        }));
+        model.add(tf.layers.dropout({ rate: this.config.dropoutRate }));
+        model.add(tf.layers.dense({ units: this.config.featureSize }));
+        return model;
+    }
+    private buildAutoencoder(): tf.LayersModel {
+        const model = tf.sequential();
 
-private preprocessMetrics(metrics: TimeSeriesMetric[]): tf.Tensor2D {
-    return tf.tidy((): tf.Tensor2D => {
-        const flattenedData = metrics.map(metric => {
-            const allValues = [];
-            for (const key of this.metrics) {
-                if (metric.metrics[key]) {
-                    allValues.push(...metric.metrics[key]);
-                } else {
-                    allValues.push(0); // Default value if metric is missing
-                }
-            }
-            return allValues;
-        });
+        // Encoder layers
+        for (let i = 0; i < this.config.encoderLayers.length; i++) {
+            model.add(tf.layers.dense({
+                units: this.config.encoderLayers[i],
+                activation: 'relu'
+            }));
+        }
+
+        // Decoder layers
+        for (let i = this.config.decoderLayers.length - 1; i >= 0; i--) {
+            model.add(tf.layers.dense({
+                units: this.config.decoderLayers[i],
+                activation: i === 0 ? 'sigmoid' : 'relu'
+            }));
+        }
+
+        return model;
+    }
+    private preprocessMetrics(metrics: TimeSeriesMetric[]): tf.Tensor2D {
+        try {
+            return tidy((): tf.Tensor2D => {
+                const flattenedData = metrics.map(metric => {
+                    const allValues = [];
+                    for (const key of this.metrics) {
+                        if (metric.metrics[key]) {
+                            allValues.push(...metric.metrics[key]);
+                        } else {
+                            allValues.push(0); // Default value if metric is missing
+                        }
+                    }
+                    return allValues;
+                });
 
         const tensorData = tf.tensor2d(flattenedData);
 
@@ -328,27 +340,25 @@ private preprocessMetrics(metrics: TimeSeriesMetric[]): tf.Tensor2D {
 
         return normalizedData as tf.Tensor2D; // Explicit cast
     });
-}
+    public async train(metrics: TimeSeriesMetric[]): Promise<void> {
+        this.validateTrainingData(metrics);
 
-public async train(metrics: TimeSeriesMetric[]): Promise<void> {
-    this.validateTrainingData(metrics);
-
-    if (!this.isInitialized) {
-        await this.buildModels();
-        this.isInitialized = true;
-    }
-
-    const tensorData = this.preprocessMetrics(metrics);
-
-    const trainCallback = {
-        onEpochEnd: (epoch: number, logs?: tf.Logs) => {
-            this.emit('trainingProgress', {
-                epoch,
-                totalEpochs: this.config.epochs,
-                loss: logs?.loss?.toFixed(4)
-            });
+        if (!this.isInitialized) {
+            await this.buildModels();
+            this.isInitialized = true;
         }
-    };
+
+        const tensorData = this.preprocessMetrics(metrics);
+
+        const trainCallback = {
+            onEpochEnd: (epoch: number, logs?: tf.Logs) => {
+                this.emit('trainingProgress', {
+                    epoch,
+                    totalEpochs: this.config.epochs,
+                    loss: logs?.loss?.toFixed(4)
+                });
+            }
+        };
 
     try {
         await this.models.autoencoder.fit(tensorData, tensorData, {
@@ -380,47 +390,41 @@ public async train(metrics: TimeSeriesMetric[]): Promise<void> {
         this.emit('trainingError', error);
         throw error;
     }
-}
-
-private validateTrainingData(metrics: TimeSeriesMetric[]): void {
-    if (!metrics || metrics.length < 10) {
-        throw new Error('Insufficient training data: At least 10 data points required');
-    }
-
-    for (const metric of metrics) {
-        if (!metric.metrics || Object.keys(metric.metrics).length === 0) {
-            throw new Error('No valid metrics found for training');
+    private validateTrainingData(metrics: TimeSeriesMetric[]): void {
+        if (!metrics || metrics.length < 10) {
+            throw new Error('Insufficient training data: At least 10 data points required');
         }
-    }
-}
 
-private analyzeAnomalyDetails(metrics: TimeSeriesMetric[], error: number): string[] {
-    const details: string[] = [];
-    const errorThreshold = this.config.anomalyThreshold;
-
-    this.metrics.forEach((metric: MetricKey) => {
-        const metricValues = metrics
-            .map(m => m.metrics[metric])
-            .filter((v): v is number[] => !!v)
-            .map(arr => arr.reduce((a, b) => a + b, 0) / arr.length);
-
-        if (metricValues.length > 0) {
-            const meanValue = this.calculateMean(metricValues.flat());
-            const variance = this.calculateVariance(metricValues.flat());
-
-            if (variance > errorThreshold) {
-                details.push(`High variance in ${metric}: possible anomaly source`);
+        for (const metric of metrics) {
+            if (!metric.metrics || Object.keys(metric.metrics).length === 0) {
+                throw new Error('No valid metrics found for training');
             }
         }
-    });
-return details;
-}
+    }
+    private analyzeAnomalyDetails(metrics: TimeSeriesMetric[], error: number): string[] {
+        const details: string[] = [];
+        const errorThreshold = this.config.anomalyThreshold;
 
-private calculateMean(values: number[]): number {
+        this.metrics.forEach((metric: MetricKey) => {
+            const metricValues = metrics
+                .map(m => m.metrics[metric])
+                .filter((v): v is number[] => !!v)
+                .map(arr => arr.reduce((a, b) => a + b, 0) / arr.length);
+
+            if (metricValues.length > 0) {
+                const meanValue = this.calculateMean(metricValues.flat());
+                const variance = this.calculateVariance(metricValues.flat());
+
+                if (variance > errorThreshold) {
+                    details.push(`High variance in ${metric}: possible anomaly source`);
+                }
+            }
+        });
+        return details;
+    }
+    private calculateMean(values: number[]): number {
 return values.reduce((a, b) => a + b, 0) / values.length;
-}
-
-private calculateVariance(values: number[]): number {
+    private calculateVariance(values: number[]): number {
 const mean = this.calculateMean(values);
 const squaredDiffs = values.map(v => Math.pow(v - mean, 2));
 return this.calculateMean(squaredDiffs);
@@ -552,9 +556,7 @@ const num = pSum - (sum1 * sum2 / n);
 const den = Math.sqrt((sum1Sq - sum1 * sum1 / n) * (sum2Sq - sum2 * sum2 / n));
 
 return den === 0 ? 0 : num / den;
-}
-
-public async save(modelPath: string): Promise<void> {
+    public async save(modelPath: string): Promise<void> {
     if (!this.isInitialized) {
     throw new Error('Model not trained');
 }
@@ -580,9 +582,7 @@ public async save(modelPath: string): Promise<void> {
         config: this.config
     })
     );
-}
-
-public async load(modelPath: string): Promise<void> {
+    public async load(modelPath: string): Promise<void> {
     if (!fs.existsSync(modelPath)) {
     throw new Error('Model file not found');
     }
@@ -605,13 +605,9 @@ public async load(modelPath: string): Promise<void> {
     } catch (error) {
     throw new Error('Invalid model format');
     }
-}
-
-public async detectAnomalies(metrics: TimeSeriesMetric[]): Promise<AnomalyResult> {
+    public async detectAnomalies(metrics: TimeSeriesMetric[]): Promise<AnomalyResult> {
     return this.detect(metrics);
-}
-
-public getConfig(): ModelConfig {
+    public getConfig(): ModelConfig {
     return this.config;
 }
 }
