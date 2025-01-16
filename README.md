@@ -32,7 +32,7 @@ The more chaos you create, the more you earn. Stake $GREMLINAI to fuel the ecosy
 ## Token Details
 
 - Symbol: $GREMLINAI
-- Decimals: 9  
+- Decimals: 6  
 - Chain: Solana  
 - Total Supply: 1,000,000,000  
 - Contract Address: Bx6XZrN7pjbDA5wkiKagbbyHSr1jai45m8peSSmJpump
