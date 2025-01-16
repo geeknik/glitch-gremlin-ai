@@ -1,6 +1,6 @@
-import { GlitchSDK } from '@glitch-gremlin/sdk';
-import { TestType } from '../../src/token/worker/src/ai/engine';
-import { GlitchError } from '../../sdk/src/errors';
+import { GlitchSDK } from '../../cli/src/glitch-sdk';
+import { TestType } from '../../cli/src/types';
+import { CLIError as GlitchError } from '../../cli/src/utils/errors';
 import { jest } from '@jest/globals';
 
 /**

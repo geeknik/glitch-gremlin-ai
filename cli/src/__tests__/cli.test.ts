@@ -1,85 +1,158 @@
-import { spawnSync } from 'child_process';
-import { dirname, resolve } from 'path';
+import { resolve } from 'path';
 import { readFileSync } from 'fs';
+import { runCLI, fromRoot } from './test-helpers';
+import { ErrorCode, formatErrorMessage } from '../utils/errors';
 
-// Helper function to resolve paths from test root
-const fromRoot = (...paths: string[]) => {
-    return resolve(__dirname, '..', ...paths);
+// Constants
+const CLI_PATH = fromRoot('index.ts');
+const PACKAGE_JSON = resolve(__dirname, '../../package.json');
+const VALID_PROGRAM_ADDRESS = '11111111111111111111111111111111';
+const VERSION = JSON.parse(readFileSync(PACKAGE_JSON, 'utf8')).version;
+
+// Test Addresses for Different Error Scenarios
+const ERROR_ADDRESS = '22222222222222222222222222222222';
+const NETWORK_ERROR_ADDRESS = '33333333333333333333333333333333';
+const TIMEOUT_ADDRESS = '44444444444444444444444444444444';
+
+// Global test setup and teardown
+const originalConsoleError = console.error;
+const originalProcessListeners = {
+    SIGINT: process.listeners('SIGINT'),
+    unhandledRejection: process.listeners('unhandledRejection')
 };
+let consoleErrors: string[] = [];
 
-// Constants 
-const CLI_PATH = fromRoot('../../src/index.ts');
-const PACKAGE_JSON = fromRoot('package.json');
+beforeAll(() => {
+    // Remove existing listeners
+    process.removeAllListeners('SIGINT');
+    process.removeAllListeners('unhandledRejection');
+    
+    // Capture console errors
+    console.error = (msg: string) => {
+        consoleErrors.push(msg);
+    };
+});
 
-// Helper to execute CLI commands
-const runCLI = (args: string[] = []) => {
-    const result = spawnSync('node', [
-        '--loader=ts-node/esm',
-        '--experimental-vm-modules',
-        '--no-warnings',
-        CLI_PATH,
-        ...args
-    ], {
-        env: {
-            ...process.env,
-            NODE_ENV: 'test',
-            DEBUG: 'false',
-            NO_COLOR: 'true'
-        },
-        encoding: 'utf8',
-        stdio: 'pipe'
+afterAll(() => {
+    // Restore original console.error
+    console.error = originalConsoleError;
+    
+    // Restore original process listeners
+    process.removeAllListeners('SIGINT');
+    process.removeAllListeners('unhandledRejection');
+    originalProcessListeners.SIGINT.forEach(listener => {
+        process.on('SIGINT', listener);
     });
-    
-    // Normalize line endings for consistent testing
-    if (result.stdout) result.stdout = result.stdout.replace(/\r\n/g, '\n');
-    if (result.stderr) result.stderr = result.stderr.replace(/\r\n/g, '\n');
-    
-    return result;
+    originalProcessListeners.unhandledRejection.forEach(listener => {
+        process.on('unhandledRejection', listener);
+    });
+});
+
+beforeEach(() => {
+    consoleErrors = [];
+});
+
+// Helper Functions
+const expectError = async (command: string[], expectedError: string) => {
+    const result = await runCLI(command);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(expectedError);
 };
 
-// Read CLI package.json for version
-const pkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'utf8'));
-const VERSION = pkg.version;
+const expectSuccess = async (command: string[], expectedOutput: string) => {
+    const result = await runCLI(command);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain(expectedOutput);
+};
 
 describe('CLI', () => {
     describe('Version Command', () => {
-        it('should display version', () => {
-            const result = runCLI(['--version']);
-            
-            // Check if CLI executed successfully
-            if (result.status !== 0) {
-                console.error('CLI Error:', result.stderr);
-            }
+        it('should display version from package.json', async () => {
+            const result = await runCLI(['--version']);
             expect(result.status).toBe(0);
-            expect(result.stdout).toContain(VERSION);
+            expect(result.stdout.trim()).toBe(`v${VERSION}`);
+        });
+
+        it('should handle version flag with other commands', async () => {
+            const result = await runCLI(['test', '--version']);
+            expect(result.status).toBe(0);
+            expect(result.stdout.trim()).toBe(`v${VERSION}`);
         });
     });
 
     describe('Test Command', () => {
         describe('Parameter Validation', () => {
-            it('should validate test type parameter', () => {
-                const result = runCLI([
-                    'test',
-                    '--program', '11111111111111111111111111111111',
-                    '--type', 'INVALID_TYPE'
-                ]);
-                
-                expect(result.stderr).toContain('Error');
-                expect(result.status).not.toBe(0);
+            it('should require program address', async () => {
+                await expectError(
+                    ['test'],
+                    formatErrorMessage(ErrorCode.MISSING_PROGRAM_ADDRESS)
+                );
             });
 
-            it('should require program address', () => {
-                const result = runCLI([
-                    'test',
-                    '--type', 'FUZZ'
-                ]);
-                
-                expect(result.status).not.toBe(0);
-                if (!result.stderr.includes('error: required option \'--program\' not specified')) {
-                    console.error('Unexpected error:', result.stderr);
-                }
-                expect(result.stderr).toContain('error: required option \'--program\' not specified');
+            it('should validate program address format', async () => {
+                await expectError(
+                    ['test', '--program', 'invalid-address'],
+                    formatErrorMessage(ErrorCode.INVALID_PROGRAM_ADDRESS)
+                );
             });
+
+            it('should validate test type parameter', async () => {
+                await expectError(
+                    ['test', '--program', VALID_PROGRAM_ADDRESS, '--type', 'INVALID_TYPE'],
+                    formatErrorMessage(ErrorCode.INVALID_TEST_TYPE)
+                );
+            });
+
+            it('should accept valid test parameters', async () => {
+                await expectSuccess(
+                    ['test', '--program', VALID_PROGRAM_ADDRESS, '--type', 'security'],
+                    'Test completed successfully'
+                );
+            });
+        });
+    });
+
+    describe('Security Command', () => {
+        it('should require program address', async () => {
+            await expectError(
+                ['security'],
+                formatErrorMessage(ErrorCode.MISSING_PROGRAM_ADDRESS)
+            );
+        });
+
+        it('should validate program address format', async () => {
+            await expectError(
+                ['security', '--program', 'invalid-address'],
+                formatErrorMessage(ErrorCode.INVALID_PROGRAM_ADDRESS)
+            );
+        });
+
+        it('should analyze program security with valid address', async () => {
+            await expectSuccess(
+                ['security', '--program', VALID_PROGRAM_ADDRESS],
+                'Security Analysis Report'
+            );
+        });
+
+        it('should handle analysis errors gracefully', async () => {
+            await expectError(
+                ['security', '--program', ERROR_ADDRESS],
+                formatErrorMessage(ErrorCode.SECURITY_ANALYSIS_FAILED)
+            );
+        });
+
+        it('should handle network errors gracefully', async () => {
+            await expectError(
+                ['security', '--program', NETWORK_ERROR_ADDRESS],
+                formatErrorMessage(ErrorCode.NETWORK_ERROR)
+            );
+        });
+
+        it('should handle timeout errors gracefully', async () => {
+            await expectError(
+                ['security', '--program', TIMEOUT_ADDRESS],
+                formatErrorMessage(ErrorCode.TIMEOUT_ERROR)
+            );
         });
     });
 });
