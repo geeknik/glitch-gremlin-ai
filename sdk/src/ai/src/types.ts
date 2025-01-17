@@ -107,6 +107,7 @@ export interface MetricsCollector {
     stop(): Promise<void>;
     reset(): Promise<void>;
     getMetrics(): Promise<{ [key: string]: number }>;
+    recordMetric(name: string, value: number): void;
 }
 
 export interface FuzzConfig {

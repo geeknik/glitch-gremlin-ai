@@ -1,6 +1,36 @@
 import { RedisKey, Redis } from 'ioredis';
 import { PublicKey, Keypair } from '@solana/web3.js';
-import { TestType } from './token-economics.js';
+
+export enum TestType {
+    FUZZ = "FUZZ",
+    LOAD = "LOAD", 
+    EXPLOIT = "EXPLOIT",
+    CONCURRENCY = "CONCURRENCY"
+}
+
+export enum VulnerabilityType {
+    Reentrancy = "reentrancy",
+    ArithmeticOverflow = "arithmetic-overflow",
+    AccessControl = "access-control",
+    RaceCondition = "race-condition",
+    InstructionInjection = "instruction-injection",
+    AccountConfusion = "account-confusion", 
+    SignerAuthorization = "signer-authorization",
+    PdaValidation = "pda-validation",
+    ClockManipulation = "clock-manipulation",
+    LamportDrain = "lamport-drain"
+}
+
+export enum ProposalState {
+    Draft = "draft",
+    Active = "active", 
+    Succeeded = "succeeded",
+    Defeated = "defeated",
+    Executed = "executed",
+    Cancelled = "cancelled",
+    Queued = "queued",
+    Expired = "expired"
+}
 
 export interface SDKConfig {
     cluster: string;
@@ -38,16 +68,7 @@ export interface MockRedisClient {
     rpop: (key: RedisKey) => Promise<string | null>;
 }
 
-export { TestType, VulnerabilityType };
 
-export enum ProposalState {
-    Draft = 'Draft',
-    Active = 'Active',
-    Succeeded = 'Succeeded',
-    Defeated = 'Defeated',
-    Executed = 'Executed',
-    Cancelled = 'Cancelled'
-}
 
 export interface GovernanceConfig {
     minVotingPeriod: number;

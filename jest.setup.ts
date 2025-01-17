@@ -2,6 +2,17 @@ import { Connection } from '@solana/web3.js';
 import RedisMock from './__mocks__/ioredis';
 import { jest } from '@jest/globals';
 
+// Import mock first
+import { mockTF } from './__mocks__/tf-mock';
+
+// Setup mock before any imports that might use it
+jest.mock('@tensorflow/tfjs-node', () => {
+  return mockTF;
+});
+
+// Add to global scope
+global.tf = mockTF;
+
 // Setup Jest environment
 jest.useFakeTimers({ enableGlobally: true });
 

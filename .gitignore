@@ -1,4 +1,20 @@
-# IDE and editor files
+# Security and private keys
+.anchor/
+.keys/
+**/keys/
+**/*.key
+**/*.pem
+**/*.der
+**/*.p12
+**/*.pfx
+**/*.keystore
+**/*.jks
+mnemonic.txt
+**/mnemonic*
+**/*wallet*
+**/*secret*
+**/*private*
+.env*
 .aider*
 .env*
 .env.local
@@ -102,6 +118,11 @@ lcov.info
 coverage.xml
 *.cover
 htmlcov/
+
+# Security documentation
+docs/SECURITY.md
+**/security/*.md
+!docs/SECURITY-PUBLIC.md
 
 # Build output
 dist/

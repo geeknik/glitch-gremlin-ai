@@ -1,4 +1,11 @@
 import * as tf from '@tensorflow/tfjs-node';
+
+class ModelBuildError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'ModelBuildError';
+    }
+}
 import { SmartMutationOperator } from './reinforcement-fuzzing-utils.js';
 
 /**
@@ -38,41 +45,64 @@ export class RLFuzzingModel {
         private readonly epsilonDecay: number = 0.995,
         private readonly targetUpdateFreq: number = 100
     ) {
+        if (stateSize <= 0 || actionSize <= 0 || batchSize <= 0) {
+            throw new ModelBuildError('Invalid model configuration: dimensions must be positive');
+        }
         this.replayBuffer = [];
         this.epsilon = 1.0;
-        this.model = this.buildNetwork();
-        this.targetModel = this.buildNetwork();
-        this.updateTargetModel();
+        try {
+            this.model = this.buildNetwork();
+            this.targetModel = this.buildNetwork();
+            this.updateTargetModel();
+        } catch (error) {
+            throw new ModelBuildError(`Failed to build neural network: ${error.message}`);
+        }
     }
 
     /**
     * Builds the DQN network architecture
     */
     private buildNetwork(): tf.LayersModel {
-        const model = tf.sequential();
-        
-        model.add(tf.layers.dense({
-            units: 128,
-            activation: 'relu',
-            inputShape: [this.stateSize]
-        }));
-        
-        model.add(tf.layers.dense({
-            units: 64,
-            activation: 'relu'
-        }));
-        
-        model.add(tf.layers.dense({
-            units: this.actionSize,
-            activation: 'linear'
-        }));
+        try {
+            const model = tf.sequential({
+                name: 'reinforcement-learning-model'
+            });
+            
+            // Input layer
+            model.add(tf.layers.dense({
+                units: 128,
+                activation: 'relu',
+                inputShape: [this.stateSize],
+                kernelInitializer: 'glorotUniform',
+                name: 'input_layer'
+            }));
+            
+            // Hidden layer
+            model.add(tf.layers.dense({
+                units: 64,
+                activation: 'relu',
+                kernelInitializer: 'glorotUniform',
+                name: 'hidden_layer'
+            }));
+            
+            // Output layer
+            model.add(tf.layers.dense({
+                units: this.actionSize,
+                activation: 'linear',
+                kernelInitializer: 'glorotUniform',
+                name: 'output_layer'
+            }));
 
-        model.compile({
-            optimizer: tf.train.adam(0.001),
-            loss: 'meanSquaredError'
-        });
+            model.compile({
+                optimizer: tf.train.adam(0.001),
+                loss: 'meanSquaredError',
+                metrics: ['mse']
+            });
 
-        return model;
+            return model;
+        } catch (error) {
+            throw new ModelBuildError(`Failed to build network: ${error.message}`);
+        }
     }
 
     /**

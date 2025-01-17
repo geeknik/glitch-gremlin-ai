@@ -211,6 +211,7 @@ describe('AnomalyDetector', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
+        TensorTracker.reset();
         detector = new AnomalyDetector(defaultTestConfig);
         mockData = Array.from({ length: 10 }, () => ({
             instructionFrequency: [1],
@@ -224,6 +225,12 @@ describe('AnomalyDetector', () => {
             authorityChecks: [1],
             timestamp: Date.now()
         }));
+        
+        // Initialize models
+        detector['models'] = {
+            autoencoder: createLayerModel(),
+            lstm: createLayerModel()
+        };
     });
 
     afterEach(async () => {

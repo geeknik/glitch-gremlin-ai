@@ -71,6 +71,101 @@ export class GovernanceManager {
                 { dataSize: 128 }, // Expected size of delegate account
                 { memcmp: { offset: 32, bytes: wallet.toBase58() } }
             ]
+            describe('initialization', () => {
+                it('should initialize correctly', async () => {
+                    await fuzzer.initialize(testProgramId, mockConnection);
+                    expect(fuzzer['programId']).toEqual(testProgramId);
+                    expect(fuzzer['connection']).toBe(mockConnection);
+                    expect(fuzzer['anomalyDetectionModel']).toBeDefined();
+                });
+
+                it('should handle initialization errors', async () => {
+                    const invalidProgramId = null as any;
+                    await expect(fuzzer.initialize(invalidProgramId, mockConnection))
+                        .rejects.toThrow();
+                });
+            });
+
+            describe('fuzz', () => {
+                beforeEach(async () => {
+                    await fuzzer.initialize(testProgramId, mockConnection);
+                });
+
+                it('should execute fuzz testing successfully', async () => {
+                    const mockInputs = [
+                        { instruction: 1, data: Buffer.from([1, 2, 3]) }
+                    ];
+                    mockConnection.sendAndConfirmTransaction.mockResolvedValue('tx-hash');
+
+                    const results = await fuzzer.fuzz(mockInputs);
+                    expect(results).toBeDefined();
+                    expect(results.length).toBeGreaterThan(0);
+                });
+
+                it('should handle fuzz execution errors', async () => {
+                    const mockInputs = [
+                        { instruction: 1, data: Buffer.from([1, 2, 3]) }
+                    ];
+                    mockConnection.sendAndConfirmTransaction.mockRejectedValue(new Error('Test error'));
+
+                    const results = await fuzzer.fuzz(mockInputs);
+                    expect(results[0].type).toBe(VulnerabilityType.UnhandledError);
+                });
+            });
+
+            describe('generateMutations', () => {
+                it('should generate multiple mutations', async () => {
+                    const input = Buffer.from([1, 2, 3, 4]);
+                    const mutations = await fuzzer.generateMutations(input);
+                    expect(mutations.length).toBe(10);
+                    expect(mutations[0]).not.toEqual(input);
+                });
+            });
+
+            describe('generateEdgeCases', () => {
+                it('should generate edge case inputs', async () => {
+                    const edgeCases = await fuzzer.generateEdgeCases();
+                    expect(edgeCases).toHaveLength(2);
+                    expect(edgeCases[0].data.length).toBe(0);
+                    expect(edgeCases[1].data.length).toBe(1024);
+                });
+            });
+
+            describe('generateVulnerableInput', () => {
+                it('should generate input for arithmetic overflow', async () => {
+                    const input = await fuzzer.generateVulnerableInput(VulnerabilityType.ArithmeticOverflow);
+                    expect(input.data).toBeDefined();
+                    expect(input.data.length).toBe(4);
+                });
+            });
+
+            describe('startFuzzingCampaign', () => {
+                beforeEach(async () => {
+                    await fuzzer.initialize(testProgramId, mockConnection);
+                });
+
+                it('should run a fuzzing campaign', async () => {
+                    mockConnection.sendAndConfirmTransaction.mockResolvedValue('tx-hash');
+            
+                    const result = await fuzzer.startFuzzingCampaign({
+                        duration: 100,
+                        maxIterations: 10,
+                        programId: testProgramId,
+                        connection: mockConnection
+                    });
+
+                    expect(result.coverage).toBeGreaterThan(0);
+                    expect(result.executionsPerSecond).toBeGreaterThan(0);
+                });
+            });
+
+            describe('cleanup', () => {
+                it('should cleanup resources', async () => {
+                    await fuzzer.initialize(testProgramId, mockConnection);
+                    await fuzzer.cleanup();
+                    expect(fuzzer['anomalyDetectionModel']).toBeNull();
+                });
+            });
         });
 
         return delegateAccounts.reduce((total, account) =>
