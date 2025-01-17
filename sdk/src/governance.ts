@@ -36,8 +36,30 @@ export interface ProposalData {
 
 export class GovernanceManager {
     constructor(
-        private readonly programId: PublicKey,
+        public readonly connection: Connection,
+        private readonly programId: PublicKey = new PublicKey('Governance111111111111111111111111111111111')
     ) {}
+
+    async createProposal(params: {
+        votingPeriod?: number,
+        title?: string,
+        description?: string
+    }): Promise<{ proposalAddress: PublicKey, tx: Transaction }> {
+        return this.createProposalAccount(this.connection, Keypair.generate(), params);
+    }
+
+    async vote(proposalAddress: PublicKey, vote: boolean): Promise<Transaction> {
+        return this.castVote(this.connection, Keypair.generate(), proposalAddress, vote);
+    }
+
+    async getProposal(proposalAddress: PublicKey): Promise<ProposalData> {
+        return this.validateProposal(this.connection, proposalAddress);
+    }
+
+    async getProposals(): Promise<ProposalData[]> {
+        // Implementation would fetch multiple proposals
+        return [];
+    }
 
     private async getDelegatedBalance(
         connection: Connection,
