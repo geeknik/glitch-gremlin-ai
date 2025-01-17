@@ -1,131 +1,74 @@
-class PublicKey {
+// Mock necessary classes and methods
+class MockConnection {
+    constructor(endpoint) {
+        this._rpcEndpoint = endpoint;
+        this.getAccountInfo = jest.fn();
+        this.getBalance = jest.fn();
+        this.getRecentBlockhash = jest.fn().mockResolvedValue({
+            blockhash: 'mock-blockhash',
+            feeCalculator: { lamportsPerSignature: 5000 }
+        });
+        this.sendTransaction = jest.fn().mockResolvedValue('mock-signature');
+        this.confirmTransaction = jest.fn().mockResolvedValue({ value: { err: null } });
+        this.simulateTransaction = jest.fn().mockResolvedValue({ value: { err: null } });
+        this.getVersion = jest.fn().mockResolvedValue({
+            "solana-core": '1.11.0'
+        });
+        this.getProgramAccounts = jest.fn();
+    }
+}
+
+
+class MockPublicKey {
     constructor(key) {
-        this._key = key;
+        this._bn = key;
     }
-
-toString() {
-    return this._key;
-}
-
-equals(other) {
-    return this._key === other._key;
-}
-
-static createWithSeed(base, seed, programId) {
-    return new PublicKey(`${base.toString()}-${seed}-${programId.toString()}`);
-}
-
-toBytes() {
-    return new Uint8Array(32);
-}
-
-toBase58() {
-    return this._key;
-}
-
-toBuffer() {
-    return Buffer.alloc(32);
-}
-}
-
-class TransactionInstruction {
-    constructor(config) {
-        this.keys = config.keys || [];
-        this.programId = config.programId;
-        this.data = config.data || Buffer.from([]);
+    toString() {
+        return this._bn.toString();
+    }
+    equals(other) {
+        return this._bn.toString() === other.toString();
+    }
+    toBase58() {
+        return this._bn.toString();
+    }
+    toBytes() {
+        return new Uint8Array(32);
     }
 }
 
-class Transaction {
-    constructor(options = {}) {
-        this.signatures = [];
+class MockTransaction {
+    constructor() {
         this.instructions = [];
-        this.recentBlockhash = options.recentBlockhash || 'mock-blockhash';
-        this.feePayer = options.feePayer;
     }
-
-add(...instructions) {
-    this.instructions.push(...instructions);
+    add(instruction) {
+        this.instructions.push(instruction);
+        return this;
+    }
 }
 
-sign(...signers) {
-    this.signatures = signers.map(signer => ({
-    signature: new Uint8Array(64),
-    publicKey: signer.publicKey
-    }));
+class MockTransactionInstruction {
+    constructor(keys, programId, data) {
+        this.keys = keys;
+        this.programId = programId;
+        this.data = data;
+    }
 }
 
-serialize() {
-    return new Uint8Array(100);
-}
-}
-
-class Connection {
-constructor(endpoint, commitment) {
-    this.endpoint = endpoint;
-    this.commitment = commitment;
-}
-
-async getAccountInfo(publicKey) {
-    return {
-    data: new Uint8Array(0),
-    executable: false,
-    lamports: 1000000000,
-    owner: new PublicKey('mock-owner'),
-    rentEpoch: 0
-    };
-}
-
-async getBalance(publicKey) {
-    return 1000000000;
-}
-
-async getProgramAccounts(programId) {
-    return [];
-}
-
-async sendTransaction(transaction, signers) {
-    return 'mock-signature';
-}
-
-async simulateTransaction(transaction) {
-    return {
-        value: {
-            err: null,
-            logs: [],
-            accounts: null,
-            unitsConsumed: 0,
-        }
-    };
-}
-
-async getLatestBlockhash() {
-    return {
-        blockhash: 'mock-blockhash',
-        lastValidBlockHeight: 1000,
-    };
-}
-
-async getRecentBlockhash() {
-    return {
-        blockhash: 'mock-blockhash',
-        feeCalculator: { lamportsPerSignature: 5000 }
-    };
-}
-}
-
-export {
-    PublicKey,
-    Transaction,
-    TransactionInstruction,
-    Connection
+const SystemProgram = {
+    programId: new MockPublicKey('11111111111111111111111111111111'),
 };
 
-export const SystemProgram = {
-    programId: new PublicKey('11111111111111111111111111111111'),
-    createAccount: () => ({
-        programId: new PublicKey('11111111111111111111111111111111'),
-        keys: [],
-        data: new Uint8Array(0)
-    })
+const mockConnectionInstance = new MockConnection('http://localhost'); // Create an instance
+
+module.exports = {
+    Connection: jest.fn(() => mockConnectionInstance), // Return the instance
+    PublicKey: MockPublicKey,
+    Transaction: MockTransaction,
+    TransactionInstruction: MockTransactionInstruction,
+    SystemProgram: SystemProgram,
+    LAMPORTS_PER_SOL: 1000000000,
+    sendAndConfirmTransaction: jest.fn(),
+    sendAndConfirmRawTransaction: jest.fn(),
+    clusterApiUrl: jest.fn(),
 };

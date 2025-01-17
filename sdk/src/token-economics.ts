@@ -1,12 +1,22 @@
-import { GlitchError, ErrorCode } from './errors.js';
+import { GlitchError } from './errors.js';
+import { ErrorCode } from './errors.js';
 
 export enum TestType {
     FUZZ = 'FUZZ',
-    LOAD = 'LOAD',
+    LOAD = 'LOAD', 
     EXPLOIT = 'EXPLOIT',
     CONCURRENCY = 'CONCURRENCY',
     MUTATION = 'MUTATION'
 }
+
+// Add error codes that are used in this file
+const LOCAL_ERROR_CODES = {
+    INVALID_TEST_TYPE: 1004,
+    STAKE_TOO_LOW: 1011,
+    STAKE_TOO_HIGH: 1012,
+    INVALID_TEST_DURATION: 1013,
+    INVALID_TEST_INTENSITY: 1014
+} as const;
 
 export interface TokenDistribution {
     team: number;        // 15%
@@ -51,10 +61,10 @@ export class TokenEconomics {
 
     public static validateStakeAmount(amount: number): void {
         if (amount < this.MIN_STAKE) {
-            throw new GlitchError('Stake amount below minimum required', ErrorCode.STAKE_TOO_LOW);
+            throw new GlitchError('Stake amount below minimum required', LOCAL_ERROR_CODES.STAKE_TOO_LOW);
         }
         if (amount > this.MAX_STAKE) {
-            throw new GlitchError(`Stake amount cannot exceed ${this.MAX_STAKE}`, ErrorCode.STAKE_TOO_HIGH);
+            throw new GlitchError(`Stake amount cannot exceed ${this.MAX_STAKE}`, LOCAL_ERROR_CODES.STAKE_TOO_HIGH);
         }
     }
 
@@ -64,7 +74,7 @@ export class TokenEconomics {
         intensity: number
     ): number {
         if (!this.DEFAULT_FEE_STRUCTURE.testTypeMultipliers[testType]) {
-            throw new GlitchError('Invalid test type', ErrorCode.INVALID_TEST_TYPE);
+            throw new GlitchError('Invalid test type', LOCAL_ERROR_CODES.INVALID_TEST_TYPE);
         }
         const structure = this.DEFAULT_FEE_STRUCTURE;
         const typeMultiplier = structure.testTypeMultipliers[testType] || 1.0;
@@ -98,10 +108,10 @@ export class TokenEconomics {
         intensity: number
     ): void {
         if (duration < 60 || duration > 3600) {
-            throw new GlitchError('Test duration must be between 60 and 3600 seconds', ErrorCode.INVALID_TEST_DURATION);
+            throw new GlitchError('Test duration must be between 60 and 3600 seconds', LOCAL_ERROR_CODES.INVALID_TEST_DURATION);
         }
         if (intensity < 1 || intensity > 10) {
-            throw new GlitchError('Test intensity must be between 1 and 10', ErrorCode.INVALID_TEST_INTENSITY);
+            throw new GlitchError('Test intensity must be between 1 and 10', LOCAL_ERROR_CODES.INVALID_TEST_INTENSITY);
         }
     }
 }
