@@ -33,8 +33,8 @@ A typical user or developer will interact with three main layers:
 
 3.1 SPL Token Details
 
-Symbol: GLITCH
-Decimals: 9 (typical for SPL tokens, but can be configurable)
+Symbol: GREMLINAI
+Decimals: 6 (typical for SPL tokens, but can be configurable)
 Initial Mint: Defined by the project’s governance or leadership at inception.
 Mint Authority: Controlled by a multisig or the same on-chain program to allow for expansions or supply modifications in a transparent manner.
 
