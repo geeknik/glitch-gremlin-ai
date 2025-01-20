@@ -27,13 +27,17 @@ export interface FuzzResult {
 
 export class Fuzzer {
   private config: FuzzingConfig;
+  private redis: any;
 
-  constructor(config: Partial<FuzzingConfig> = {}) {
+  private metricsCollector: any;
+
+  constructor(maxIterations: number, redis: any, metricsCollector: any) {
     this.config = {
-      maxIterations: config.maxIterations ?? 1000,
-      timeout: config.timeout ?? 30000,
-      seed: config.seed
+      maxIterations: maxIterations,
+      timeout: 30000
     };
+    this.redis = redis;
+    this.metricsCollector = metricsCollector;
   }
 
   async fuzz(program: PublicKey): Promise<FuzzResult[]> {
@@ -90,32 +94,55 @@ private generateInput(): FuzzInput {
   }
 
 async generateFuzzInputs(programId: PublicKey): Promise<FuzzInput[]> {
-    const inputs: FuzzInput[] = [];
-    for(let i = 0; i < 100; i++) {
-    inputs.push(this.generateInput());
+    if (!programId) {
+        throw new Error('Invalid program ID');
     }
-    return inputs;
+
+    try {
+        const instructions = await this.redis.lrange('instructions', 0, -1);
+        if (!instructions || instructions.length === 0) {
+            return [];
+        }
+
+        const inputs: FuzzInput[] = [];
+        for(let i = 0; i < 1000; i++) {
+            inputs.push(this.generateInput());
+            this.metricsCollector.recordMetric('fuzz_input_generated', {count: i + 1});
+        }
+        return inputs;
+    } catch (error) {
+        console.error('Error fetching instructions:', error);
+        return [];
+    }
 }
 
-async analyzeFuzzResult(result: FuzzResult, input: FuzzInput): Promise<VulnerabilityAnalysis> {
+async analyzeFuzzResult(result: any, input: FuzzInput): Promise<VulnerabilityAnalysis> {
     // Initialize empty analysis
     const analysis: VulnerabilityAnalysis = {
-    type: null,
-    confidence: 0
+        type: null,
+        confidence: 0
     };
 
     // Check for arithmetic overflow/underflow
-    if (result.error && result.error.message.includes('overflow')) {
-    analysis.type = VulnerabilityType.ARITHMETIC_OVERFLOW;
-    analysis.confidence = 0.8;
-    return analysis;
+    if (result?.error?.message?.includes('arithmetic overflow')) {
+        analysis.type = VulnerabilityType.ArithmeticOverflow;
+        analysis.confidence = 0.8;
+        this.metricsCollector.recordMetric('vulnerability_detected', {
+            type: VulnerabilityType.ArithmeticOverflow,
+            confidence: 0.8
+        });
+        return analysis;
     }
 
     // Check for access control issues
-    if (result.error && result.error.message.includes('unauthorized')) {
-    analysis.type = VulnerabilityType.ACCESS_CONTROL;
-    analysis.confidence = 0.7;
-    return analysis;
+    if (result?.error?.message?.includes('unauthorized access')) {
+        analysis.type = VulnerabilityType.AccessControl;
+        analysis.confidence = 0.8;
+        this.metricsCollector.recordMetric('vulnerability_detected', {
+            type: VulnerabilityType.AccessControl,
+            confidence: 0.8
+        });
+        return analysis;
     }
 
     return analysis;

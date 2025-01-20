@@ -6,7 +6,13 @@ import { MetricsCollector } from '../metrics/collector';
 import { jest } from '@jest/globals';
 
 // Mock MetricsCollector
-jest.mock('../metrics/collector');
+jest.mock('../metrics/collector', () => {
+    return {
+        MetricsCollector: jest.fn().mockImplementation(() => ({
+            recordMetric: jest.fn()
+        }))
+    };
+});
 
 describe('Fuzzer', () => {
     let fuzzer: Fuzzer;
@@ -34,6 +40,7 @@ describe('Fuzzer', () => {
 
     describe('generateFuzzInputs', () => {
         it('should generate the specified number of inputs', async () => {
+            redisMock.lrange.mockResolvedValueOnce(['instruction1', 'instruction2']);
             const testProgramId = new PublicKey('11111111111111111111111111111111');
             const inputs = await fuzzer.generateFuzzInputs(testProgramId);
             expect(inputs).toHaveLength(1000);
@@ -41,6 +48,7 @@ describe('Fuzzer', () => {
         });
 
         it('should generate inputs with valid structure', async () => {
+            redisMock.lrange.mockResolvedValueOnce(['instruction1', 'instruction2']);
             const testProgramId = new PublicKey('11111111111111111111111111111111');
             const inputs = await fuzzer.generateFuzzInputs(testProgramId);
 
@@ -61,7 +69,6 @@ describe('Fuzzer', () => {
             const inputs = await fuzzer.generateFuzzInputs(new PublicKey('11111111111111111111111111111111'));
             expect(inputs).toHaveLength(0);
         });
-    });
     });
 
     describe('analyzeFuzzResult', () => {
