@@ -1,5 +1,6 @@
 import * as tf from '@tensorflow/tfjs-node';
-import { VulnerabilityType, Finding } from '../../../types.js';
+import { VulnerabilityType } from '../types.js';
+import { Finding } from '../types.js';
 import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 // Remove unused Logger import

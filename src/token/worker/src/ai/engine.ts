@@ -2,7 +2,7 @@ import { Connection } from '@solana/web3.js';
 import { ExploitScanner } from './exploit-scanner.js';
 import { VulnerabilityDetectionModel } from './ml-model.js';
 import { ChaosTestResult, Finding, StaticAnalysisResult, DynamicAnalysisResult } from './types.js';
-import { VulnerabilityType } from '../../../../types.js';
+import { VulnerabilityType } from '../types.js';
 
 enum TestType {
   EXPLOIT = 'EXPLOIT',

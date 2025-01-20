@@ -8,13 +8,13 @@
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
         "outDir": "./dist",
-        "rootDir": "./src",
+        "rootDir": ".",
         "declaration": false,
         "sourceMap": true,
         "types": ["jest", "node"],
         "paths": {
             "@/*": ["./src/*"],
-            "@glitch-gremlin/sdk": ["../sdk/src"]
+            "@glitch-gremlin/sdk": ["./sdk/src"]
         },
         "baseUrl": ".",
         "allowJs": true,

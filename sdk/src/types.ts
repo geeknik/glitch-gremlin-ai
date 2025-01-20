@@ -129,4 +129,3 @@ export interface VulnerabilityDetectionModel {
     load(path: string): Promise<void>;
 }
 
-export type { VulnerabilityResult, PredictionResult };

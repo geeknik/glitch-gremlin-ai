@@ -1,3 +1,10 @@
+export var TestType;
+(function (TestType) {
+    TestType["FUZZ"] = "FUZZ";
+    TestType["LOAD"] = "LOAD";
+    TestType["EXPLOIT"] = "EXPLOIT";
+    TestType["CONCURRENCY"] = "CONCURRENCY";
+})(TestType || (TestType = {}));
 export var VulnerabilityType;
 (function (VulnerabilityType) {
     VulnerabilityType["Reentrancy"] = "reentrancy";
@@ -11,13 +18,6 @@ export var VulnerabilityType;
     VulnerabilityType["ClockManipulation"] = "clock-manipulation";
     VulnerabilityType["LamportDrain"] = "lamport-drain";
 })(VulnerabilityType || (VulnerabilityType = {}));
-export var TestType;
-(function (TestType) {
-    TestType["FUZZ"] = "FUZZ";
-    TestType["LOAD"] = "LOAD";
-    TestType["EXPLOIT"] = "EXPLOIT";
-    TestType["CONCURRENCY"] = "CONCURRENCY";
-})(TestType || (TestType = {}));
 export var ProposalState;
 (function (ProposalState) {
     ProposalState["Draft"] = "draft";
@@ -29,4 +29,4 @@ export var ProposalState;
     ProposalState["Queued"] = "queued";
     ProposalState["Expired"] = "expired";
 })(ProposalState || (ProposalState = {}));
-
+//# sourceMappingURL=types.js.map
