@@ -1,34 +1,32 @@
-export interface AnalysisResult {
-vulnerabilities: string[];
-riskScore: number;
-recommendations: string[];
-}
+import { VulnerabilityType } from '../../../../types.js';
 
-export interface TestMetrics {
-totalTransactions: number;
-errorRate: number;
-avgLatency: number;
-}
+export { VulnerabilityType };
 
-export interface StaticAnalysisResult {
-findings: string[];
-riskScore: number;
-}
-
-export interface DynamicAnalysisResult {
-findings: string[];
-riskScore: number;
+export interface ChaosTestResult {
+    success: boolean;
+    findings: Finding[];
+    metrics: TestMetrics;
 }
 
 export interface Finding {
-type: string;
-recommendation?: string;
-mitigation?: string;
+    type: VulnerabilityType;
+    description: string;
+    recommendation?: string;
+    mitigation?: string;
 }
 
-export interface ChaosTestResult {
-success: boolean;
-findings: string[];
-metrics: TestMetrics;
+export interface StaticAnalysisResult {
+    findings: string[];
+    riskScore: number;
 }
 
+export interface DynamicAnalysisResult {
+    findings: string[];
+    riskScore: number;
+}
+
+export interface TestMetrics {
+    totalTransactions: number;
+    errorRate: number;
+    avgLatency: number;
+}

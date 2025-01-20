@@ -62,23 +62,6 @@ export interface ErrorDetails {
     context?: Record<string, unknown>;
 }
 
-export class InvalidArgumentError extends GlitchError {
-    constructor(details?: Partial<ErrorDetails>) {
-        super('Invalid argument provided', ErrorCode.INVALID_ARGUMENT, details);
-    }
-}
-
-export class RateLimitExceededError extends GlitchError {
-    constructor(details?: Partial<ErrorDetails>) {
-        super('Rate limit exceeded', ErrorCode.RATE_LIMIT_EXCEEDED, details);
-    }
-}
-
-export class InvalidStateError extends GlitchError {
-    constructor(details?: Partial<ErrorDetails>) {
-        super('Invalid system state', ErrorCode.INVALID_STATE, details);
-    }
-}
 
 export class GlitchError extends Error {
     public readonly code: ErrorCode;
@@ -97,6 +80,24 @@ export class GlitchError extends Error {
         if (Error.captureStackTrace) {
             Error.captureStackTrace(this, GlitchError);
         }
+    }
+}
+
+export class InvalidArgumentError extends GlitchError {
+    constructor(details?: Partial<ErrorDetails>) {
+        super('Invalid argument provided', ErrorCode.INVALID_ARGUMENT, details);
+    }
+}
+
+export class RateLimitExceededError extends GlitchError {
+    constructor(details?: Partial<ErrorDetails>) {
+        super('Rate limit exceeded', ErrorCode.RATE_LIMIT_EXCEEDED, details);
+    }
+}
+
+export class InvalidStateError extends GlitchError {
+    constructor(details?: Partial<ErrorDetails>) {
+        super('Invalid system state', ErrorCode.INVALID_STATE, details);
     }
 
     public toJSON(): Record<string, unknown> {

@@ -6,7 +6,7 @@ import {
     TransactionInstruction 
 } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
-import { GlitchError, ErrorCode } from './errors';
+import { GlitchError, ErrorCode } from './errors.js';
 import type { Commitment, GetAccountInfoConfig } from '@solana/web3.js';
 import { ProposalState, GovernanceConfig, ProposalMetadata } from './types.js';
 
@@ -139,7 +139,7 @@ export class GovernanceManager {
         proposalAddress: PublicKey,
         support: boolean,
         weight?: number,
-        commitment?: Commitment
+        _commitment?: Commitment
     ): Promise<Transaction> {
         const metadata = await this.validateProposal(connection, proposalAddress);
 

@@ -1,3 +1,24 @@
+export enum VulnerabilityType {
+    Reentrancy = 'reentrancy',
+    ArithmeticOverflow = 'arithmetic-overflow',
+    AccessControl = 'access-control',
+    RaceCondition = 'race-condition',
+    InstructionInjection = 'instruction-injection',
+    AccountConfusion = 'account-confusion',
+    SignerAuthorization = 'signer-authorization',
+    PdaValidation = 'pda-validation',
+    ClockManipulation = 'clock-manipulation'
+}
+
+export enum ProposalState {
+    Draft = 'draft',
+    Active = 'active',
+    Succeeded = 'succeeded',
+    Defeated = 'defeated',
+    Executed = 'executed',
+    Cancelled = 'cancelled'
+}
+
 export enum TestType {
 MUTATION = 'mutation',
 FUZZING = 'fuzzing',
@@ -69,8 +90,8 @@ error?: Error;
 }
 
 export class GlitchError extends Error {
-constructor(message: string, options?: ErrorOptions) {
-    super(message, options);
+constructor(message: string) {
+    super(message);
     this.name = 'GlitchError';
 }
 }

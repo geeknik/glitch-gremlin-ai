@@ -1,4 +1,4 @@
-import { VulnerabilityType, RiskLevel } from '../types';
+import { VulnerabilityType, RiskLevel } from '../types.js';
 
 export class ScoringSystem {
     private static readonly BASE_WEIGHTS = {
@@ -31,7 +31,7 @@ export class ScoringSystem {
         let maxPossibleScore = 0;
 
         for (const finding of findings) {
-            const baseWeight = this.BASE_WEIGHTS[finding.type] || 5.0;
+            const baseWeight = this.BASE_WEIGHTS[finding.type as keyof typeof this.BASE_WEIGHTS] || 5.0;
             const severityMultiplier = this.SEVERITY_MULTIPLIERS[finding.severity];
             const confidenceAdjustment = finding.confidence;
 

@@ -1,6 +1,7 @@
 import { Connection, Keypair, PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js';
 import { ProposalState } from './types.js';
-import { GlitchError } from './errors';
+import { GlitchError } from './errors.js';
+import { ErrorCode } from './governance/errors.js';
 
 export interface GovernanceConfig {
     minStakeAmount: number;
@@ -41,7 +42,7 @@ export class GovernanceManager {
         votingPeriod?: number
     ): Promise<{ proposal: Proposal; transaction: Transaction }> {
         if (!title || !description) {
-            throw new GlitchError('Invalid proposal parameters');
+            throw new GlitchError('Invalid proposal parameters', ErrorCode.INVALID_ARGUMENT);
         }
 
         const period = votingPeriod || this.config.votingPeriod;
@@ -93,11 +94,11 @@ export class GovernanceManager {
         const proposal = await this.getProposal(proposalId);
 
         if (proposal.state !== ProposalState.Active) {
-            throw new GlitchError('Proposal is not active');
+            throw new GlitchError('Proposal is not active', ErrorCode.PROPOSAL_NOT_ACTIVE);
         }
 
         if (Date.now() / 1000 > proposal.endTime) {
-            throw new GlitchError('Voting period has ended');
+            throw new GlitchError('Voting period has ended', ErrorCode.VOTING_PERIOD_ENDED);
         }
 
         const transaction = new Transaction();
@@ -123,11 +124,11 @@ export class GovernanceManager {
         const proposal = await this.getProposal(proposalId);
 
         if (proposal.state !== ProposalState.Succeeded) {
-            throw new GlitchError('Proposal cannot be executed');
+            throw new GlitchError('Proposal cannot be executed', ErrorCode.PROPOSAL_EXECUTION_FAILED);
         }
 
         if (Date.now() / 1000 < proposal.executionTime) {
-            throw new GlitchError('Execution delay has not elapsed');
+            throw new GlitchError('Execution delay has not elapsed', ErrorCode.PROPOSAL_EXECUTION_FAILED);
         }
 
         const transaction = new Transaction();
@@ -150,7 +151,7 @@ export class GovernanceManager {
         const accountInfo = await this.connection.getAccountInfo(proposalPubkey);
         
         if (!accountInfo) {
-            throw new GlitchError('Proposal not found');
+            throw new GlitchError('Proposal not found', ErrorCode.PROPOSAL_NOT_FOUND);
         }
 
         // Deserialize account data into Proposal
@@ -206,7 +207,7 @@ export class GovernanceManager {
             proposer,
             title,
             description,
-            state: state as ProposalState,
+            state: state as unknown as ProposalState,
             yesVotes: Number(yesVotes),
             noVotes: Number(noVotes),
             startTime,

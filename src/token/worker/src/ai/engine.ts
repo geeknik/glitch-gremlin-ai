@@ -1,7 +1,8 @@
 import { Connection } from '@solana/web3.js';
-import { ExploitScanner } from './exploit-scanner';
-import { VulnerabilityDetectionModel } from './ml-model';
-import { ChaosTestResult, Finding, StaticAnalysisResult, DynamicAnalysisResult } from './types';
+import { ExploitScanner } from './exploit-scanner.js';
+import { VulnerabilityDetectionModel } from './ml-model.js';
+import { ChaosTestResult, Finding, StaticAnalysisResult, DynamicAnalysisResult } from './types.js';
+import { VulnerabilityType } from '../../../../types.js';
 
 enum TestType {
   EXPLOIT = 'EXPLOIT',
@@ -25,22 +26,22 @@ class Logger {
 }
 
 class FuzzTester {
-  quickScan(programId: string) {
+  quickScan(_programId: string) {
     return { findings: [], riskScore: 0 };
   }
-  runExtendedTest(programId: string, params: ChaosParams) {
+  runExtendedTest(_programId: string, _params: ChaosParams) {
     return { success: true, findings: [], metrics: { totalTransactions: 0, errorRate: 0, avgLatency: 0 } };
   }
 }
 
 class LoadTester {
-  runLoadTest(programId: string, params: ChaosParams) {
+  runLoadTest(_programId: string, _params: ChaosParams) {
     return { success: true, findings: [], metrics: { totalTransactions: 0, errorRate: 0, avgLatency: 0 } };
   }
 }
 
 class ConcurrencyTester {
-  runConcurrencyTest(programId: string, params: ChaosParams) {
+  runConcurrencyTest(_programId: string, _params: ChaosParams) {
     return { success: true, findings: [], metrics: { totalTransactions: 0, errorRate: 0, avgLatency: 0 } };
   }
 }

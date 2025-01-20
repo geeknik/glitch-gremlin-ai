@@ -1,5 +1,5 @@
 import * as tf from '@tensorflow/tfjs-node';
-import { VulnerabilityType } from './types.js';
+import { VulnerabilityType } from '../types.js';
 
 export interface ModelOutput {
     prediction: number[];

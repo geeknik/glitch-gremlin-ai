@@ -30,11 +30,13 @@ export interface ValidationResult {
     errors: string[];
 }
 
+export type RiskLevel = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+
 export interface SecurityScore {
     score: number;
     weight: number;
     details: string[];
-    risk: 'HIGH' | 'MEDIUM' | 'LOW';
+    risk: RiskLevel;
 }
 
 export interface SecurityAnalysis {

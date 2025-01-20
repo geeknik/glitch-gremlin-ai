@@ -1,19 +1,19 @@
 // src/index.ts
-import GlitchSDK from './glitch-sdk';
-export { VulnerabilityDetectionModel } from './ai/src/ml-model.js';
+import GlitchSDK from './glitch-sdk.js';
+export { MLModel as VulnerabilityDetectionModel } from './ai/src/ml-model.js';
 
 async function initializeSDKs() {
-    const sdk1 = await GlitchSDK.init({
+    const sdk1 = new GlitchSDK({
         cluster: process.env.SOLANA_CLUSTER || 'https://api.testnet.solana.com',
         // other config
     });
 
-    const sdk2 = await GlitchSDK.init({
+    const sdk2 = new GlitchSDK({
         cluster: process.env.SOLANA_CLUSTER || 'devnet',
         // other config
     });
 
-    const sdk3 = await GlitchSDK.init({
+    const sdk3 = new GlitchSDK({
         cluster: process.env.SOLANA_CLUSTER || 'devnet',
         // other config
     });

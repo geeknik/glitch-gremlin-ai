@@ -11,11 +11,11 @@ RequestStatus
 } from './types.js';
 
 export interface GlitchSDKConfig {
-cluster: string;
-wallet: any; // Should be proper wallet type based on your wallet implementation
-modelPath?: string;
-timeout?: number;
-maxRetries?: number;
+    cluster: string;
+    wallet?: any; // Made optional
+    modelPath?: string;
+    timeout?: number;
+    maxRetries?: number;
 }
 
 const DEFAULT_CONFIG: Partial<GlitchSDKConfig> = {
@@ -35,11 +35,12 @@ constructor(config: GlitchSDKConfig) {
 
 private validateConfig(config: GlitchSDKConfig): void {
     if (!config.cluster) {
-    throw new ValidationError('Cluster URL is required');
+        throw new ValidationError('Cluster URL is required');
     }
-    if (!config.wallet) {
-    throw new ValidationError('Wallet is required');
-    }
+    // Make wallet optional for now
+    // if (!config.wallet) {
+    //     throw new ValidationError('Wallet is required');
+    // }
 }
 
 private validateTestParams(params: MutationTestParams): void {
@@ -74,9 +75,9 @@ async createChaosRequest(params: MutationTestParams): Promise<{
         
         this.requests.set(id, status);
 
-        const waitForCompletion = async (options?: { signal?: AbortSignal }): Promise<MutationTestResult> => {
+        const waitForCompletion = async (_options?: { signal?: AbortSignal }): Promise<MutationTestResult> => {
             try {
-                const result = await global.security.mutation.test({
+                const result = await (global as any).security.mutation.test({
                     program: params.targetProgram,
                     duration: params.duration,
                     intensity: params.intensity
@@ -88,7 +89,7 @@ async createChaosRequest(params: MutationTestParams): Promise<{
                 return result;
             } catch (error) {
                 this.requests.get(id)!.status = TestStatus.FAILED;
-                this.requests.get(id)!.error = error;
+                this.requests.get(id)!.error = error instanceof Error ? error : new Error(String(error));
                 
                 if (error instanceof TimeoutError) {
                     throw error;
