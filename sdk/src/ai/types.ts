@@ -1,13 +1,22 @@
+
 export enum VulnerabilityType {
-    AccessControl = 'ACCESS_CONTROL',
-    ArithmeticOverflow = 'ARITHMETIC_OVERFLOW',
-    Reentrancy = 'REENTRANCY',
-    None = 'NONE'
+    ArithmeticOverflow = 'ArithmeticOverflow',
+    AccessControl = 'AccessControl',
+    PDASafety = 'PDASafety',
+    ResourceExhaustion = 'ResourceExhaustion',
+    OutOfBounds = 'OutOfBounds',
+    None = 'None',
+    Reentrancy = 'Reentrancy',
+    AccountDataValidation = 'AccountDataValidation',
+    UnhandledError = 'UnhandledError'
 }
 
-export interface ModelOutput {
-    type: VulnerabilityType;
-    confidence: number;
+export interface VulnerabilityDetectionModel {
+    ensureInitialized(): Promise<void>;
+    predict(input: number[]): Promise<PredictionResult>;
+    cleanup(): Promise<void>;
+    save(path: string): Promise<void>;
+    load(path: string): Promise<void>;
 }
 
 export interface TrainingResult {
@@ -26,6 +35,14 @@ export interface ModelConfig {
     threshold: number;
     learningRate: number;
     epochs: number;
+}
+
+export interface PredictionResult {
+    type: VulnerabilityType;
+    confidence: number;
+    timestamp: number;
+    modelVersion: string;
+    details: string[];
 }
 
 export interface AnomalyResult {
