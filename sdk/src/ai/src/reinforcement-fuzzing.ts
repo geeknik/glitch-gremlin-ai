@@ -11,7 +11,7 @@ import { SmartMutationOperator } from './reinforcement-fuzzing-utils.js';
 /**
 * Interface defining the state representation for the RL agent
 */
-interface FuzzingState {
+export interface FuzzingState {
     programCounter: number;
     coverage: number;
     lastCrash: number;
@@ -31,9 +31,9 @@ interface ActionResult {
 /**
 * Reinforcement Learning based fuzzing model using Deep Q-Network (DQN)
 */
-export class RLFuzzingModel {
-    private model: tf.LayersModel;
-    private targetModel: tf.LayersModel;
+export class ReinforcementFuzzer {
+    private model!: tf.LayersModel;  // Definite assignment assertion
+    private targetModel!: tf.LayersModel;  // Definite assignment assertion
     private replayBuffer: Array<[FuzzingState, number, number, FuzzingState, boolean]>;
     private epsilon: number;
     
@@ -43,20 +43,30 @@ export class RLFuzzingModel {
         private readonly batchSize: number = 32,
         private readonly gamma: number = 0.99,
         private readonly epsilonDecay: number = 0.995,
+        private readonly initialEpsilon: number = 1.0,
         private readonly targetUpdateFreq: number = 100
     ) {
         if (stateSize <= 0 || actionSize <= 0 || batchSize <= 0) {
             throw new ModelBuildError('Invalid model configuration: dimensions must be positive');
         }
         this.replayBuffer = [];
-        this.epsilon = 1.0;
-        try {
-            this.model = this.buildNetwork();
-            this.targetModel = this.buildNetwork();
-            this.updateTargetModel();
-        } catch (error) {
-            throw new ModelBuildError(`Failed to build neural network: ${error.message}`);
-        }
+        this.epsilon = this.initialEpsilon;
+        
+        // Initialize TensorFlow.js
+        tf.ready().then(() => {
+            try {
+                this.model = this.buildNetwork();
+                this.targetModel = this.buildNetwork();
+                this.updateTargetModel();
+            } catch (error) {
+                if (error instanceof Error) {
+                    throw new ModelBuildError(`Failed to build neural network: ${error.message}`);
+                }
+                throw new ModelBuildError('Failed to build neural network');
+            }
+        }).catch(error => {
+            throw new ModelBuildError(`Failed to initialize TensorFlow: ${error.message}`);
+        });
     }
 
     /**
@@ -64,44 +74,62 @@ export class RLFuzzingModel {
     */
     private buildNetwork(): tf.LayersModel {
         try {
-            const model = tf.sequential({
-                name: 'reinforcement-learning-model'
-            });
-            
-            // Input layer
-            model.add(tf.layers.dense({
-                units: 128,
-                activation: 'relu',
-                inputShape: [this.stateSize],
-                kernelInitializer: 'glorotUniform',
-                name: 'input_layer'
-            }));
-            
-            // Hidden layer
-            model.add(tf.layers.dense({
-                units: 64,
-                activation: 'relu',
-                kernelInitializer: 'glorotUniform',
-                name: 'hidden_layer'
-            }));
-            
-            // Output layer
-            model.add(tf.layers.dense({
-                units: this.actionSize,
-                activation: 'linear',
-                kernelInitializer: 'glorotUniform',
-                name: 'output_layer'
-            }));
+            // Verify TensorFlow is properly initialized
+            if (!tf || !tf.sequential || !tf.layers || !tf.train) {
+                throw new Error('TensorFlow not properly initialized');
+            }
 
-            model.compile({
-                optimizer: tf.train.adam(0.001),
-                loss: 'meanSquaredError',
-                metrics: ['mse']
-            });
+            // Create model
+            const model = tf.sequential();
+            
+            // Add layers with error handling
+            try {
+                // Input layer
+                const inputLayer = tf.layers.dense({
+                    units: 128,
+                    activation: 'relu',
+                    inputShape: [this.stateSize],
+                    kernelInitializer: 'glorotUniform',
+                    name: 'input_layer'
+                });
+                model.add(inputLayer);
+                
+                // Hidden layer
+                const hiddenLayer = tf.layers.dense({
+                    units: 64,
+                    activation: 'relu',
+                    kernelInitializer: 'glorotUniform',
+                    name: 'hidden_layer'
+                });
+                model.add(hiddenLayer);
+                
+                // Output layer
+                const outputLayer = tf.layers.dense({
+                    units: this.actionSize,
+                    activation: 'linear',
+                    kernelInitializer: 'glorotUniform',
+                    name: 'output_layer'
+                });
+                model.add(outputLayer);
+            } catch (layerError) {
+                throw new Error(`Failed to add layers: ${layerError instanceof Error ? layerError.message : 'Unknown error'}`);
+            }
+
+            // Compile model
+            try {
+                const optimizer = tf.train.adam(0.001);
+                model.compile({
+                    optimizer: optimizer,
+                    loss: 'meanSquaredError',
+                    metrics: ['mse']
+                });
+            } catch (compileError) {
+                throw new Error(`Failed to compile model: ${compileError instanceof Error ? compileError.message : 'Unknown error'}`);
+            }
 
             return model;
         } catch (error) {
-            throw new ModelBuildError(`Failed to build network: ${error.message}`);
+            throw new ModelBuildError(`Failed to build network: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
 
@@ -116,14 +144,28 @@ export class RLFuzzingModel {
     * Converts a FuzzingState to tensor representation
     */
     private stateToTensor(state: FuzzingState): tf.Tensor {
-        // Convert state object to flat array
-        const stateArray = [
-            state.programCounter,
-            state.coverage,
-            state.lastCrash,
-            state.executionTime,
-            ...state.mutationHistory.map(m => m.id)
-        ];
+        // Validate state types
+        if (typeof state.programCounter !== 'number' ||
+            typeof state.coverage !== 'number' ||
+            typeof state.lastCrash !== 'number' ||
+            typeof state.executionTime !== 'number' ||
+            !Array.isArray(state.mutationHistory)) {
+            throw new Error('Invalid FuzzingState type structure');
+        }
+        // Convert state object to flat array with padding
+        const stateArray = new Array(this.stateSize).fill(0);
+        
+        // Set fixed position values
+        stateArray[0] = state.programCounter;
+        stateArray[1] = state.coverage;
+        stateArray[2] = state.lastCrash;
+        stateArray[3] = state.executionTime;
+        
+        // Fill mutation history indices starting from index 4
+        const maxMutations = this.stateSize - 4;
+        for (let i = 0; i < Math.min(state.mutationHistory.length, maxMutations); i++) {
+            stateArray[4 + i] = i; // Store index as ID
+        }
         
         return tf.tensor2d([stateArray], [1, this.stateSize]);
     }
@@ -132,7 +174,21 @@ export class RLFuzzingModel {
     * Selects an action using epsilon-greedy policy
     */
     public async selectAction(state: FuzzingState): Promise<number> {
+        // Validate state before processing
+        if (typeof state.programCounter !== 'number' ||
+            typeof state.coverage !== 'number' ||
+            typeof state.lastCrash !== 'number' ||
+            typeof state.executionTime !== 'number' ||
+            !Array.isArray(state.mutationHistory)) {
+            throw new Error('Invalid FuzzingState type structure');
+        }
+        if (state.mutationHistory.length > this.stateSize - 4) {
+            throw new Error(`State dimensions exceed network input size (max ${this.stateSize - 4} mutations)`);
+        }
+        
+        // Decay epsilon on every exploration step
         if (Math.random() < this.epsilon) {
+            this.epsilon *= this.epsilonDecay;
             return Math.floor(Math.random() * this.actionSize);
         }
 
@@ -176,7 +232,7 @@ export class RLFuzzingModel {
         const currentQs = await this.model.predict(states) as tf.Tensor;
         const targetQs = await this.targetModel.predict(nextStates) as tf.Tensor;
 
-        const updates = currentQs.arraySync();
+        const updates = currentQs.arraySync() as number[][];
         
         for (let i = 0; i < this.batchSize; i++) {
             const [_, action, reward, __, done] = batch[i];
@@ -184,7 +240,7 @@ export class RLFuzzingModel {
             if (done) {
                 updates[i][action] = reward;
             } else {
-                const futureQ = Math.max(...targetQs.arraySync()[i]);
+                const futureQ = Math.max(...(targetQs.arraySync() as number[][])[i]);
                 updates[i][action] = reward + this.gamma * futureQ;
             }
         }

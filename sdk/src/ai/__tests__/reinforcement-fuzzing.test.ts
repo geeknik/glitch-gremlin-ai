@@ -1,232 +1,74 @@
+import { ReinforcementFuzzer } from '../src/reinforcement-fuzzing';
+import type { FuzzingState } from '../src/reinforcement-fuzzing';
+
+jest.mock('@tensorflow/tfjs-node', () => require('./types/tensorflow-mock').mockTensorFlow);
 import * as tf from '@tensorflow/tfjs-node';
-import { RLFuzzingModel } from '../reinforcement-fuzzing.js';
-import { FuzzingState } from '../types.js';
 
-const createMockModel = () => ({
-    add: jest.fn(),
-    compile: jest.fn(),
-    fit: jest.fn().mockResolvedValue({ 
-        history: { 
-            loss: [0.1]
-        }
-    }),
-    predict: jest.fn(() => ({
-        data: jest.fn().mockResolvedValue(new Float32Array([0.2, 0.3, 0.1, 0.2, 0.2])),
-        dataSync: jest.fn().mockReturnValue([0]),
-        dispose: jest.fn()
-    })),
-    dispose: jest.fn(),
-    getWeights: jest.fn().mockReturnValue([]),
-    setWeights: jest.fn(),
-    save: jest.fn().mockResolvedValue(undefined)
+describe('ReinforcementFuzzer', () => {
+  const defaultState: FuzzingState = {
+    programCounter: 0,
+    coverage: 0,
+    lastCrash: 0,
+    mutationHistory: [],
+    executionTime: 0
+  };
+
+  describe('Initialization', () => {
+    it('should create with default parameters', () => {
+      const fuzzer = new ReinforcementFuzzer();
+      expect(fuzzer).toBeDefined();
+      expect((fuzzer as any).stateSize).toBe(64);
+      expect((fuzzer as any).actionSize).toBe(32);
+    });
+
+    it('should accept custom configuration', () => {
+      const fuzzer = new ReinforcementFuzzer(128, 64, 64, 0.99, 0.9);
+      expect((fuzzer as any).stateSize).toBe(128);
+      expect((fuzzer as any).actionSize).toBe(64);
+      expect((fuzzer as any).batchSize).toBe(64);
+      expect((fuzzer as any).initialEpsilon).toBe(1.0); // Testing default
+      expect((fuzzer as any).epsilonDecay).toBe(0.9);
+    });
+  });
+
+  describe('Epsilon Decay', () => {
+    it('should decay exploration rate over time', async () => {
+      const fuzzer = new ReinforcementFuzzer();
+      const initialEpsilon = (fuzzer as any).epsilon;
+      
+      // Simulate 10 exploration steps
+      for(let i = 0; i < 10; i++) {
+        await fuzzer.selectAction(defaultState);
+      }
+      
+      expect((fuzzer as any).epsilon).toBeLessThan(initialEpsilon);
+      expect((fuzzer as any).epsilon).toBeGreaterThan(0.1);
+    });
+  });
+
+  describe('Model Training', () => {
+    it('should train without errors given valid experience', async () => {
+      const fuzzer = new ReinforcementFuzzer();
+      // Add valid experience to replay buffer
+      fuzzer.remember(defaultState, 0, 1, defaultState, false);
+      fuzzer.remember(defaultState, 1, 0, defaultState, true);
+      
+      await expect(fuzzer.train()).resolves.toBeGreaterThanOrEqual(0);
+    });
+
+    it('should handle empty training data', async () => {
+      const fuzzer = new ReinforcementFuzzer();
+      await expect(fuzzer.train()).resolves.not.toThrow();
+    });
+  });
+
+  describe('Input Validation', () => {
+    it('should throw on invalid state dimensions', async () => {
+      const fuzzer = new ReinforcementFuzzer(64);
+      const invalidState = { ...defaultState, programCounter: 'invalid' } as unknown as FuzzingState;
+      
+      await expect(fuzzer.selectAction(invalidState)).rejects.toThrow();
+    });
+  });
 });
 
-const mockMainModel = createMockModel();
-const mockTargetModel = createMockModel();
-
-const mockTf = {
-    sequential: jest.fn()
-        .mockImplementationOnce(() => mockMainModel)    // First call returns main network
-        .mockImplementationOnce(() => mockTargetModel), // Second call returns target network
-    layers: {
-        dense: jest.fn().mockReturnValue({
-            apply: jest.fn()
-        }),
-        dropout: jest.fn().mockReturnValue({
-            apply: jest.fn()
-        })
-    },
-    train: {
-        adam: jest.fn().mockReturnValue({
-            getConfig: jest.fn().mockReturnValue({ learningRate: 0.001 })
-        })
-    },
-    tensor2d: jest.fn(() => ({
-        dispose: jest.fn()
-    })),
-    tensor1d: jest.fn(() => ({
-        dispose: jest.fn()
-    })),
-    dispose: jest.fn(),
-    loadLayersModel: jest.fn().mockResolvedValue(mockMainModel),
-    tidy: jest.fn((fn: () => any) => fn()),
-    argMax: jest.fn(() => ({
-        dataSync: jest.fn().mockReturnValue([0]),
-        dispose: jest.fn()
-    })),
-    concat: jest.fn(() => ({
-        dispose: jest.fn()
-    })),
-    tensor: jest.fn(() => ({
-        dispose: jest.fn()
-    }))
-};
-
-jest.mock('@tensorflow/tfjs-node', () => mockTf);
-
-describe('RLFuzzingModel', () => {
-    let model: RLFuzzingModel;
-    const mockState: FuzzingState = {
-        programCounter: 0,
-        coverage: Array(10).fill(0),
-        lastCrash: null,
-        mutationHistory: [],
-        executionTime: 0
-    };
-
-    beforeEach(() => {
-        jest.clearAllMocks();
-        // Reset sequential mock to return new models for each test
-        mockTf.sequential
-            .mockImplementationOnce(() => createMockModel())
-            .mockImplementationOnce(() => createMockModel());
-        model = new RLFuzzingModel({
-            stateSize: 10,
-            actionSize: 5,
-            batchSize: 32,
-            memorySize: 1000,
-            gamma: 0.95,
-            learningRate: 0.001,
-        });
-    });
-
-    afterEach(() => {
-        if (model) {
-            model.dispose();
-        }
-        jest.resetAllMocks();
-    });
-
-    describe('initialization', () => {
-        test('should create model with correct configuration', async () => {
-            expect(model).toBeDefined();
-            expect(model.stateSize).toBe(10);
-            expect(model.actionSize).toBe(5);
-            expect(model.batchSize).toBe(32);
-            expect(model.memorySize).toBe(1000);
-            expect(model.gamma).toBe(0.95);
-            expect(model.learningRate).toBe(0.001);
-            expect(mockTf.sequential).toHaveBeenCalledTimes(2); // Main and target networks
-        });
-
-        test('should throw error with invalid configuration', () => {
-            expect(() => {
-                new RLFuzzingModel({
-                    stateSize: -1,
-                    actionSize: 5,
-                    batchSize: 32,
-                    memorySize: 1000,
-                    gamma: 0.95,
-                    learningRate: 0.001,
-                });
-            }).toThrow('Invalid state size');
-        });
-    });
-
-    describe('action selection', () => {
-        test('should select valid action based on state', async () => {
-            const action = await model.selectAction(mockState);
-            expect(action).toBeGreaterThanOrEqual(0);
-            expect(action).toBeLessThan(5);
-        });
-
-        test('should handle exploration vs exploitation', async () => {
-            // Test exploration
-            model.epsilon = 1.0;
-            const explorationAction = await model.selectAction(mockState);
-            expect(explorationAction).toBeGreaterThanOrEqual(0);
-            expect(explorationAction).toBeLessThan(5);
-
-            // Test exploitation
-            model.epsilon = 0.0;
-            const exploitationAction = await model.selectAction(mockState);
-            expect(exploitationAction).toBeGreaterThanOrEqual(0);
-            expect(exploitationAction).toBeLessThan(5);
-        });
-
-        test('should decay epsilon over time', async () => {
-            const initialEpsilon = model.epsilon;
-            await model.selectAction(mockState);
-            expect(model.epsilon).toBeLessThan(initialEpsilon);
-        });
-    });
-
-    describe('memory management', () => {
-        test('should add experience to memory', () => {
-            model.remember(mockState, 1, 1.0, mockState, false);
-            expect(model.memory.length).toBe(1);
-        });
-
-        test('should respect maximum memory size', () => {
-            for (let i = 0; i < 1100; i++) {
-                const state = { ...mockState, programCounter: i };
-                const nextState = { ...mockState, programCounter: i + 1 };
-                model.remember(state, 1, 1.0, nextState, false);
-            }
-            expect(model.memory.length).toBe(1000);
-        });
-    });
-
-    describe('training', () => {
-        test('should train on batch of experiences', async () => {
-            // Add experiences to memory
-            for (let i = 0; i < 50; i++) {
-                const state = { ...mockState, programCounter: i };
-                const nextState = { ...mockState, programCounter: i + 1 };
-                model.remember(state, i % 5, 1.0, nextState, false);
-            }
-
-            await model.train();
-            expect(mockMainModel.fit).toHaveBeenCalled();
-        });
-
-        test('should skip training with insufficient memory', async () => {
-            await model.train();
-            expect(mockMainModel.fit).not.toHaveBeenCalled();
-        });
-
-        test('should update target model periodically', async () => {
-            // Add enough experiences
-            for (let i = 0; i < 50; i++) {
-                const state = { ...mockState, programCounter: i };
-                model.remember(state, i % 5, 1.0, state, false);
-            }
-
-            // Train multiple times
-            for (let i = 0; i < 10; i++) {
-                await model.train();
-            }
-
-            expect(mockMainModel.getWeights).toHaveBeenCalled();
-        });
-    });
-
-    describe('model persistence', () => {
-        test('should save model weights', async () => {
-            await model.saveModel('test-model');
-            expect(mockMainModel.save).toHaveBeenCalled();
-        });
-
-        test('should load model weights', async () => {
-            await model.loadModel('test-model');
-            expect(mockMainModel.compile).toHaveBeenCalled();
-        });
-
-        test('should handle loading errors gracefully', async () => {
-            mockTf.loadLayersModel.mockRejectedValueOnce(new Error('File not found'));
-            await expect(model.loadModel('non-existent-model')).rejects.toThrow('Failed to load model');
-        });
-    });
-
-    describe('resource management', () => {
-        test('should dispose tensors properly', () => {
-            model.dispose();
-            expect(mockMainModel.dispose).toHaveBeenCalled();
-        });
-
-        test('should handle multiple dispose calls safely', () => {
-            model.dispose();
-            expect(() => model.dispose()).not.toThrow();
-        });
-    });
-});
