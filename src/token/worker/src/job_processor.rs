@@ -1,19 +1,19 @@
 use borsh::BorshSerialize;
 use solana_client::nonblocking::rpc_client::RpcClient;
+use solana_program::sysvar::rent::Rent;
 use solana_sdk::{
     pubkey::Pubkey,
     instruction::{AccountMeta, Instruction},
     signature::{Keypair, Signer},
     transaction::Transaction,
     system_instruction,
-    sysvar::rent::Rent,
 };
-use std::error::Error;
 use std::fmt;
 use std::error::Error;
 
 #[derive(Debug)]
 pub enum JobProcessorError {
+    ParseError(String),
     InvalidJobFormat,
     ProgramIdParseError,
     TestSetupError,
@@ -24,6 +24,7 @@ pub enum JobProcessorError {
 impl fmt::Display for JobProcessorError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            JobProcessorError::ParseError(msg) => write!(f, "Parse error: {}", msg),
             JobProcessorError::InvalidJobFormat => write!(f, "Invalid job format"),
             JobProcessorError::ProgramIdParseError => write!(f, "Failed to parse program ID"),
             JobProcessorError::TestSetupError => write!(f, "Test environment setup failed"),
@@ -33,11 +34,30 @@ impl fmt::Display for JobProcessorError {
     }
 }
 
-impl Error for JobProcessorError {}
 
 impl From<&str> for JobProcessorError {
     fn from(err: &str) -> Self {
-        JobProcessorError::InvalidJobFormat
+        JobProcessorError::ParseError(err.to_string())
+    }
+}
+
+impl From<String> for JobProcessorError {
+    fn from(err: String) -> Self {
+        JobProcessorError::ParseError(err)
+    }
+}
+
+impl From<solana_sdk::pubkey::ParsePubkeyError> for JobProcessorError {
+    fn from(err: solana_sdk::pubkey::ParsePubkeyError) -> Self {
+        JobProcessorError::ParseError(err.to_string())
+    }
+}
+
+impl std::error::Error for JobProcessorError {}
+
+impl From<Box<dyn std::error::Error>> for JobProcessorError {
+    fn from(err: Box<dyn std::error::Error>) -> Self {
+        JobProcessorError::ParseError(err.to_string())
     }
 }
 
@@ -47,11 +67,6 @@ impl From<Box<dyn Error + Send + Sync>> for JobProcessorError {
     }
 }
 
-impl From<JobProcessorError> for Box<dyn Error + Send + Sync> {
-    fn from(e: JobProcessorError) -> Self {
-        Box::new(e)
-    }
-}
 use super::chaos_engine::{run_chaos_test, ChaosTestResult};
 use crate::instruction::GlitchInstruction;
 
@@ -84,7 +99,7 @@ pub async fn process_chaos_job(
     Ok(())
 }
 
-async fn setup_test_environment(target_program: &Pubkey) -> Result<TestEnvironment, Box<dyn Error + Send + Sync>> {
+async fn setup_test_environment(target_program: &Pubkey) -> Result<TestEnvironment, Box<dyn Error + Send + Sync + 'static>> {
     // Initialize test environment with default values
     Ok(TestEnvironment {
         target_program: *target_program,

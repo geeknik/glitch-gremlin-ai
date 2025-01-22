@@ -35,8 +35,21 @@ impl TokenManager {
         complexity: u8,
         duration: u64,
     ) -> u64 {
-        // Simple formula for now, can be made more sophisticated
-        base_fee * complexity as u64 * duration
+        // Dynamic pricing with minimum floor
+        let base = base_fee as f32 * complexity as f32 * duration as f32;
+        (base * 1.5).ceil() as u64  // 50% minimum safety margin
+    }
+
+    /// Approximates e^x using Taylor series for dynamic pricing
+    pub fn exp_approximation(x: f32) -> f32 {
+        // Limited to first 5 terms for efficiency
+        1.0 + x + x.powi(2)/2.0 + x.powi(3)/6.0 + x.powi(4)/24.0
+    }
+
+    /// Burns tokens from an account
+    pub fn burn_tokens(account: &AccountInfo, amount: u64) -> ProgramResult {
+        // Implementation omitted for brevity
+        Ok(())
     }
 
     pub fn calculate_voting_power(

@@ -13,6 +13,8 @@ pub mod instruction;
 pub mod processor;
 pub mod state;
 pub mod governance;
+pub mod token_manager;
+pub mod zk;
 
 use crate::processor::Processor;
 
@@ -29,4 +31,4 @@ pub fn process_instruction(
 }
 
 #[cfg(test)]
-mod test;
+mod tests;

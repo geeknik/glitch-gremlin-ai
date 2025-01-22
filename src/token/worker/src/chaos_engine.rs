@@ -76,10 +76,10 @@ async fn spawn_concurrent_task(
 async fn await_all(
     tasks: Vec<Pin<Box<dyn Future<Output = Result<ConcurrencyResult, Box<dyn Error>>> + Send + 'static>>>,
     _test_env: &TestEnvironment,
-) -> Result<Vec<ConcurrencyResult>, Box<dyn Error>> {
+) -> Result<Vec<ConcurrencyResult>, Box<dyn Error + Send + Sync>> {
     let mut results = Vec::new();
     for task in tasks {
-        results.push(task.await?);
+        results.push(task.await.map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)?);
     }
     Ok(results)
 }

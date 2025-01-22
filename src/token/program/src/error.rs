@@ -34,11 +34,32 @@ pub enum GlitchError {
     InvalidTokenProgram,
 
     #[error("Arithmetic overflow")]
-    Overflow,
+    ArithmeticOverflow,
+
+    #[error("Invalid burn percentage")]
+    InvalidBurnPercentage,
+
+    #[error("Invalid dynamic pricing factor")]
+    InvalidPricingFactor,
 
     // Rate limiting errors
     #[error("Rate limit exceeded")]
     RateLimitExceeded,
+    
+    #[error("Human verification required")]
+    HumanVerificationRequired,
+
+    #[error("Invalid target program")]
+    InvalidTargetProgram,
+
+    #[error("Rate limit exceeded - tokens burned")]
+    RateLimitExceededWithBurn,
+
+    #[error("Invalid completion proof")]
+    InvalidCompletionProof,
+
+    #[error("Invalid result reference")]
+    InvalidResultReference,
     
     #[error("Invalid rate limit parameters")]
     InvalidRateLimit,
@@ -77,6 +98,13 @@ pub enum GlitchError {
     
     #[error("Quorum not reached")]
     QuorumNotReached,
+    
+    #[error("Execution delay not met")]
+    ExecutionDelayNotMet,
+    
+    #[error("Proposal not approved")]
+    ProposalNotApproved,
+    
 }
 
 impl From<GlitchError> for ProgramError {

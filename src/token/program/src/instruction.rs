@@ -1,15 +1,15 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{
     program_error::ProgramError,
-    pubkey::Pubkey,
-    instruction::{Instruction, AccountMeta},
-    system_instruction,
+    pubkey::Pubkey
 };
+use solana_program_test::*;
 use solana_sdk::{
+    account::AccountSharedData,
     signature::{Keypair, Signer},
     transaction::Transaction,
+    system_instruction,
 };
-use crate::governance::GovernanceProposal;
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq)]
 pub enum GlitchInstruction {
     /// Initialize a new chaos request
@@ -24,8 +24,6 @@ pub enum GlitchInstruction {
         amount: u64,
         /// Parameters for the chaos test
         params: Vec<u8>,
-        /// Rate limit configuration
-        rate_limit: RateLimitConfig,
     },
 
     /// Finalize a chaos request
@@ -116,6 +114,59 @@ impl GlitchInstruction {
                     result_ref,
                 }
             }
+            2 => {
+                let (id, rest) = rest.split_at(8);
+                let id = u64::from_le_bytes(id.try_into().unwrap());
+                
+                let (description_len, rest) = rest.split_at(4);
+                let description_len = u32::from_le_bytes(description_len.try_into().unwrap()) as usize;
+                
+                let description = String::from_utf8(rest[..description_len].to_vec())
+                    .map_err(|_| ProgramError::InvalidInstructionData)?;
+                
+                let rest = &rest[description_len..];
+                let target_program = Pubkey::new(&rest[..32]);
+                let staked_amount = u64::from_le_bytes(rest[32..40].try_into().unwrap());
+                let deadline = i64::from_le_bytes(rest[40..48].try_into().unwrap());
+                let multisig_signers = rest[48..48+(32*10)]
+                    .chunks(32)
+                    .map(Pubkey::new)
+                    .collect::<Result<Vec<_>,_>>()?;
+                let required_signatures = rest[48+(32*10)];
+                let multisig_signers = rest[48..48+(32*10)]
+                    .chunks(32)
+                    .map(|chunk| Pubkey::new(chunk))
+                    .collect::<Result<Vec<_>, _>>()?;
+                let required_signatures = rest[48+(32*10)];
+                
+                Self::CreateProposal {
+                    id,
+                    description,
+                    target_program,
+                    staked_amount,
+                    deadline,
+                    multisig_signers: multisig_signers.try_into().map_err(|_| ProgramError::InvalidInstructionData)?,
+                    required_signatures,
+                }
+            }
+            3 => {
+                let proposal_id = u64::from_le_bytes(rest[..8].try_into().unwrap());
+                let vote_for = rest[8] != 0;
+                let vote_amount = u64::from_le_bytes(rest[9..17].try_into().unwrap());
+                
+                Self::Vote {
+                    proposal_id,
+                    vote_for,
+                    vote_amount,
+                }
+            }
+            4 => {
+                let proposal_id = u64::from_le_bytes(rest[..8].try_into().unwrap());
+                
+                Self::ExecuteProposal {
+                    proposal_id,
+                }
+            }
             _ => return Err(ProgramError::InvalidInstructionData),
         })
     }
@@ -201,7 +252,9 @@ pub enum GovernanceInstruction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test::{program_test, id};
+    use solana_program::program_test;
+    use solana_sdk::signature::Keypair;
+    use crate::id;
     
     #[test]
     fn test_serialize_initialize_chaos_request() {
@@ -258,7 +311,7 @@ mod tests {
             &proposal.pubkey(),
             account_rent,
             account_size as u64,
-            &id(),
+            &crate::id(),
         );
 
         // Create proposal instruction

@@ -1,5 +1,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::pubkey::Pubkey;
+use solana_program::sysvar::clock::Clock;
+use solana_program::sysvar::Sysvar;
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
 pub struct ChaosRequest {
@@ -16,8 +18,11 @@ pub struct ChaosRequest {
     /// Escrow account for tokens
     pub escrow_account: Pubkey,
     /// Rate limiting data
-    /// Rate limiting data
     pub rate_limit: RateLimitInfo,
+    /// When the request was created
+    pub created_at: i64,
+    /// When the request was completed
+    pub completed_at: i64,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
@@ -48,7 +53,7 @@ pub struct StakeAccount {
     pub proposal_id: Option<u64>,
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Debug)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Default)]
 pub struct RateLimitInfo {
     /// Last request timestamp
     pub last_request: i64,
@@ -56,9 +61,13 @@ pub struct RateLimitInfo {
     pub request_count: u32,
     /// Start of current window
     pub window_start: i64,
+    /// Number of failed requests (for state-contingent throttling)
+    pub failed_requests: u32,
+    /// Proof-of-human verification nonce (8 bytes per DESIGN.md 9.1)
+    pub human_proof_nonce: [u8; 8],
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Debug)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Default)]
 pub struct RateLimitConfig {
     /// Maximum requests per window
     pub max_requests: u32,
@@ -66,10 +75,31 @@ pub struct RateLimitConfig {
     pub window_duration: i64,
     /// Minimum time between requests in seconds
     pub min_interval: i64,
+    /// Percentage of tokens to burn when rate limited (0-100)
+    pub burn_percentage: u8,
+    /// Dynamic pricing multiplier factor
+    pub dynamic_pricing_factor: u16,
+    /// Minimum stake amount required
+    pub min_stake_amount: u64,
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Debug)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Default)]
+pub struct TestParams {
+    pub quorum: u64,
+    pub execution_time: i64,
+    pub test_type: String,
+    pub duration: i64,
+    pub intensity: u8,
+    pub concurrency_level: u8,
+    pub max_latency: u64,
+    pub error_threshold: u8,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug, Default)]
 pub struct GovernanceProposal {
+    pub status: u8,
+    pub deadline: i64,
+    pub test_params: TestParams,
     /// Unique proposal ID
     pub id: u64,
     /// Creator of the proposal
@@ -84,16 +114,34 @@ pub struct GovernanceProposal {
     pub end_time: i64,
     /// Execution delay after passing
     pub execution_delay: u64,
-    /// Yes votes
-    pub yes_votes: u64,
-    /// No votes
-    pub no_votes: u64,
+    /// Votes for
+    pub votes_for: u64,
+    /// Votes against 
+    pub votes_against: u64,
     /// Required quorum
     pub quorum: u64,
     /// Whether executed
     pub executed: bool,
+    /// Execution timestamp
+    pub executed_at: i64,
+    /// Security level (0=low, 1=medium, 2=high)
+    pub security_level: u8,
+    /// Associated chaos request
+    pub chaos_request: Option<Pubkey>,
     /// Vote weights by account
     pub vote_weights: Vec<VoteRecord>,
+    /// Minimum stake required (from DESIGN.md 9.3)
+    pub min_stake_amount: u64,
+    /// Execution timestamp (for time-locked chaos)
+    pub execution_time: i64,
+    /// Slashing percentage (0-100) from DESIGN.md 9.3
+    pub slash_percentage: u8,
+    /// Insurance fund address from DESIGN.md 9.1
+    pub insurance_fund: Pubkey,
+    /// Multisig signers (7/10) per DESIGN.md 9.1
+    pub multisig_signers: [Pubkey; 10],
+    /// Required signatures threshold
+    pub required_signatures: u8,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
@@ -104,10 +152,17 @@ pub struct VoteRecord {
     pub weight: u64,
     /// Whether voted yes
     pub support: bool,
+    /// Timestamp of vote
+    pub timestamp: i64,
+    /// Voter type (0=user, 1=delegate)
+    pub voter_type: u8,
+    /// Staked amount at time of voting
+    pub staked_amount: u64,
 }
 
 impl ChaosRequest {
     pub fn new(owner: Pubkey, amount: u64, params: Vec<u8>, escrow_account: Pubkey, rate_limit: RateLimitInfo) -> Self {
+        let clock = Clock::get().expect("Failed to get clock");
         Self {
             owner,
             amount,
@@ -116,6 +171,8 @@ impl ChaosRequest {
             result_ref: String::new(),
             escrow_account,
             rate_limit,
+            created_at: clock.unix_timestamp,
+            completed_at: 0,
         }
     }
 }
