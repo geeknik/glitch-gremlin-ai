@@ -271,37 +271,6 @@ export class Fuzzer {
 
         return Math.min(probability, 1);
     }
-
-        if (typeof error === 'object' && error !== null && 'error' in error) {
-            const errorMessage = String((error as {error: string}).error);
-            
-            if (errorMessage.includes('arithmetic operation overflow') || errorMessage.includes('overflow')) {
-                return { 
-                    type: VulnerabilityType.ARITHMETIC_OVERFLOW,
-                    confidence: 0.8,
-                    details: 'Arithmetic overflow detected'
-                };
-            } else if (errorMessage.includes('unauthorized access attempt') || errorMessage.includes('access denied')) {
-                return { 
-                    type: VulnerabilityType.ACCESS_CONTROL,
-                    confidence: 0.8,
-                    details: 'Access control violation'
-                };
-            } else if (errorMessage.includes('invalid PDA derivation') || errorMessage.includes('PDA')) {
-                return { 
-                    type: VulnerabilityType.PDASAFETY,
-                    confidence: 0.8,
-                    details: 'PDA safety issue'
-                };
-            } else if (errorMessage.includes('reentrancy') || errorMessage.includes('reentrant')) {
-                return { 
-                    type: VulnerabilityType.REENTRANCY,
-                    confidence: 0.8,
-                    details: 'Reentrancy vulnerability'
-                };
-            }
-        }
-        return { type: null, confidence: 0 };
     }
 
     public async cleanup(): Promise<void> {
@@ -401,7 +370,7 @@ export class Fuzzer {
     }
 
     public async analyzeFuzzResult(error: unknown, input: FuzzInput): Promise<FuzzResult> {
-        if (typeof error === 'object' && error !== null && 'error' in error) {
+        if (error && typeof error === 'object' && 'error' in error) {
             const errorMessage = String((error as {error: string}).error);
             
             if (errorMessage.includes('arithmetic operation overflow') || errorMessage.includes('overflow')) {
