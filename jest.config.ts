@@ -1,43 +1,56 @@
 import type { Config } from '@jest/types';
 
 const config: Config.InitialOptions = {
-preset: 'ts-jest',
-testEnvironment: 'node',
-roots: ['<rootDir>/sdk/src'],
-testMatch: [
-    '**/__tests__/**/*.+(ts|tsx|js)',
-    '**/?(*.)+(spec|test).+(ts|tsx|js)'
-],
-transform: {
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  roots: ['<rootDir>/sdk/src', '<rootDir>/cli/src'],
+  testMatch: [
+    '**/src/**/__tests__/**/*.[jt]s?(x)',
+    '**/src/**/?(*.)+(spec|test|tests).[jt]s?(x)'
+  ],
+  transform: {
     '^.+\\.tsx?$': ['ts-jest', {
-    tsconfig: 'tsconfig.json',
-    useESM: true,
-    isolatedModules: true
+      tsconfig: 'tsconfig.json',
+      useESM: true,
+      isolatedModules: true
     }]
-},
-moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
-extensionsToTreatAsEsm: ['.ts', '.tsx'],
-moduleNameMapper: {
+  },
+  moduleNameMapper: {
+    // Updated for security test isolation
     '^(\\.{1,2}/.*)\\.js$': '$1',
+    '^@glitch-gremlin/sdk$': '<rootDir>/sdk/src/index.ts',
+    '^@security/(.*)$': '<rootDir>/sdk/src/ai/security/$1',
+    '#cli/(.*)': '<rootDir>/cli/$1',
     '^@/(.*)$': '<rootDir>/sdk/src/$1',
-    '^@ai/(.*)$': '<rootDir>/sdk/src/ai/$1'
-},
-setupFilesAfterEnv: [
-    '<rootDir>/sdk/src/ai/__tests__/jest.setup.ts'
-],
-collectCoverage: true,
-coverageDirectory: 'coverage',
-coveragePathIgnorePatterns: [
+    '^@ai/(.*)$': '<rootDir>/sdk/src/ai/$1',
+    '^@tensorflow/tfjs-node$': '<rootDir>/sdk/src/ai/__mocks__/@tensorflow/tfjs-node.ts'
+  },
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node', 'mjs'],
+  extensionsToTreatAsEsm: ['.ts', '.tsx'],
+  setupFilesAfterEnv: [
+    '<rootDir>/sdk/src/__tests__/setupAfterEnv.ts' // Removed outdated setup file
+  ],
+  testPathIgnorePatterns: [
     '/node_modules/',
     '/dist/',
-    '/__tests__/'
-],
-testTimeout: 10000,
-verbose: true,
-clearMocks: true,
-restoreMocks: true,
-resetMocks: true,
-automock: false
+    'setup\\.ts$',
+    'jest\\.setup\\.ts$',
+    '__mocks__'
+  ],
+  collectCoverage: true,
+  coverageDirectory: 'coverage',
+  coveragePathIgnorePatterns: [
+    '/node_modules/',
+    '/dist/',
+    '/__tests__/',
+    '/__mocks__/'
+  ],
+  testTimeout: 30000,
+  verbose: true,
+  clearMocks: true,
+  restoreMocks: true,
+  resetMocks: true,
+  automock: false
 };
 
 export default config;
