@@ -1,4 +1,4 @@
-import { Fuzzer } from '../ai/fuzzer';
+import { Fuzzer } from '../ai/fuzzer.js';
 import { VulnerabilityType } from '../types';
 import { PublicKey } from '@solana/web3.js';
 import { IoRedisMock } from '../__mocks__/ioredis';
@@ -30,7 +30,7 @@ describe('Fuzzer', () => {
         mockMetricsCollector = new MetricsCollector() as jest.Mocked<MetricsCollector>;
         mockMetricsCollector.recordMetric = jest.fn();
 
-        fuzzer = new Fuzzer(100, redisMock, mockMetricsCollector);
+        fuzzer = new Fuzzer(redisMock, mockMetricsCollector);
     });
 
     afterEach(async () => {
@@ -38,36 +38,33 @@ describe('Fuzzer', () => {
         jest.clearAllMocks();
     });
 
-    describe('generateFuzzInputs', () => {
-        it('should generate the specified number of inputs', async () => {
-            redisMock.lrange.mockResolvedValueOnce(['instruction1', 'instruction2']);
-            const testProgramId = new PublicKey('11111111111111111111111111111111');
-            const inputs = await fuzzer.generateFuzzInputs(testProgramId);
-            expect(inputs).toHaveLength(1000);
-            expect(mockMetricsCollector.recordMetric).toHaveBeenCalled();
-        });
+    describe('generateFuzzInput', () => {
+        const baseInput = {
+            instruction: 1,
+            data: Buffer.from([0, 1, 2, 3]),
+            probability: 0.5,
+            metadata: {},
+            created: Date.now()
+        };
 
-        it('should generate inputs with valid structure', async () => {
-            redisMock.lrange.mockResolvedValueOnce(['instruction1', 'instruction2']);
-            const testProgramId = new PublicKey('11111111111111111111111111111111');
-            const inputs = await fuzzer.generateFuzzInputs(testProgramId);
-
-            expect(inputs[0]).toHaveProperty('instruction');
-            expect(inputs[0]).toHaveProperty('data');
-            expect(inputs[0]).toHaveProperty('probability');
-            expect(inputs[0].probability).toBeGreaterThanOrEqual(0);
-            expect(inputs[0].probability).toBeLessThanOrEqual(1);
+        it('should generate a mutated input', async () => {
+            const input = await fuzzer.generateFuzzInput(baseInput);
+            expect(input).toHaveProperty('instruction');
+            expect(input).toHaveProperty('data');
+            expect(input).toHaveProperty('probability');
+            expect(input.probability).toBeGreaterThanOrEqual(0);
+            expect(input.probability).toBeLessThanOrEqual(1);
         });
 
         it('should handle edge cases', async () => {
-            // Test with invalid program ID
-            await expect(fuzzer.generateFuzzInputs(null as any))
-                .rejects.toThrow('Invalid program ID');
+            // Test with invalid base input
+            await expect(fuzzer.generateFuzzInput(null as any))
+                .rejects.toThrow('Invalid base input');
 
-            // Test empty instruction set
-            redisMock.lrange.mockResolvedValueOnce([]);
-            const inputs = await fuzzer.generateFuzzInputs(new PublicKey('11111111111111111111111111111111'));
-            expect(inputs).toHaveLength(0);
+            // Test with empty data
+            const emptyInput = { ...baseInput, data: Buffer.from([]) };
+            const input = await fuzzer.generateFuzzInput(emptyInput);
+            expect(input.data.length).toBeGreaterThan(0);
         });
     });
 
@@ -87,7 +84,9 @@ describe('Fuzzer', () => {
             expect(mockMetricsCollector.recordMetric)
                 .toHaveBeenCalledWith('vulnerability_detected', {
                     type: VulnerabilityType.ArithmeticOverflow,
-                    confidence: expect.any(Number)
+                    confidence: expect.any(Number),
+                    location: expect.any(String),
+                    timestamp: expect.any(Number)
                 });
         });
 
