@@ -1,6 +1,7 @@
 import { AnomalyDetector } from '../src/anomaly-detection';
 import { jest } from '@jest/globals';
 import { TimeSeriesMetric, ModelConfig } from '../src/types';
+import { tf } from '../../../jest.setup';
 
 // Use global tf mock from jest.setup.ts
 
@@ -19,14 +20,30 @@ const sampleData: TimeSeriesMetric[] = [
     type: 'cpu'
   },
   { 
-    timestamp: Date.now() - 1000, 
-    instructionFrequency: [0.6, 0.25, 0.15], 
-    type: 'cpu' 
+    timestamp: Date.now() - 1000,
+    instructionFrequency: [0.6, 0.25, 0.15],
+    executionTime: [],
+    memoryUsage: [],
+    cpuUtilization: [],
+    errorRate: [],
+    pdaValidation: [],
+    accountDataMatching: [],
+    cpiSafety: [],
+    authorityChecks: [],
+    type: 'cpu'
   },
   { 
-    timestamp: Date.now(), 
-    instructionFrequency: [0.4, 0.35, 0.25], 
-    type: 'cpu' 
+    timestamp: Date.now(),
+    instructionFrequency: [0.4, 0.35, 0.25],
+    executionTime: [],
+    memoryUsage: [],
+    cpuUtilization: [],
+    errorRate: [],
+    pdaValidation: [],
+    accountDataMatching: [],
+    cpiSafety: [],
+    authorityChecks: [],
+    type: 'cpu'
   }
 ];
 
