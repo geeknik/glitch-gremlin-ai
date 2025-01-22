@@ -1,4 +1,5 @@
 import { PublicKey, Connection } from '@solana/web3.js';
+import * as tf from '@tensorflow/tfjs-node';
 
 export type RiskLevel = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 
@@ -98,9 +99,25 @@ export class SecurityScoring {
     private overallScore: number = 0;
 
     constructor(config: Partial<SecurityModelConfig> = {}, connection: Connection) {
+        if (!connection) {
+            throw new Error('Connection must be provided');
+        }
+        
+        // Validate configuration thresholds
+        const { thresholds = DEFAULT_CONFIG.thresholds } = config;
+        // From DESIGN.md 9.6.1 - Enhanced validation
+        if (thresholds.high <= thresholds.medium || 
+            thresholds.medium <= thresholds.low ||
+            thresholds.low <= 0) {
+            throw new Error('Invalid threshold values - must be high > medium > low > 0');
+        }
+        if (thresholds.high > 1.0 || thresholds.low < 0.0) {
+            throw new Error('Threshold values must be between 0.0 and 1.0');
+        }
+
         this.config = {
             thresholds: {
-                ...DEFAULT_CONFIG.thresholds,
+                ...thresholds,
                 ...config.thresholds
             },
             weightings: {
@@ -112,23 +129,31 @@ export class SecurityScoring {
     }
 
     public async analyzeProgram(programId: PublicKey | string): Promise<AnalysisResult> {
-        const programIdStr = typeof programId === 'string' ? programId : programId.toBase58();
-        this.lastAnalyzedProgramId = programIdStr;
-        const metrics = await this.analyzeSecurityMetrics(programIdStr);
-        const score = this.calculateScore(metrics);
-        const validation = await this.validateProgram(programIdStr);
-        const risks = await this.detectRiskPatterns(metrics);
-        const analysis = await this.analyzeSecurity(programIdStr);
-
-        return {
-            score,
-            riskLevel: analysis.riskLevel,
-            patterns: risks,
-            suggestions: this.generateSuggestions(score, validation),
-            validation,
-            timestamp: new Date(),
-            programId: programIdStr
-        };
+        try {
+            const programIdStr = typeof programId === 'string' ? programId : programId.toBase58();
+            this.lastAnalyzedProgramId = programIdStr;
+            
+            const [metrics, validation] = await Promise.all([
+                this.analyzeSecurityMetrics(programIdStr),
+                this.validateProgram(programIdStr)
+            ]);
+            
+            const score = await this.calculateScore(metrics);
+            const patterns = await this.detectSecurityPatterns(metrics);
+            
+            return {
+                score,
+                riskLevel: score.risk,
+                patterns,
+                suggestions: this.generateSuggestions(score, validation),
+                validation,
+                timestamp: new Date(),
+                programId: programIdStr
+            };
+        } catch (error) {
+            console.error('Error analyzing program:', error);
+            throw error;
+        }
     }
 
     public async analyzeSecurity(program: PublicKey | string): Promise<AnalysisResult> {
@@ -138,17 +163,17 @@ export class SecurityScoring {
         const validation = await this.validateProgram(programId);
         const risks = await this.detectRiskPatterns(metrics);
         const analysis: SecurityAnalysis = {
-            patterns: await this.detectPatterns(programId),
-            riskLevel: this.determineRiskLevel(await this.detectPatterns(programId)),
+            patterns: (await this.detectPatterns(programId)).patterns,
+            riskLevel: this.determineRiskLevel((await this.detectPatterns(programId)).patterns),
             timestamp: new Date(),
             programId
         };
 
         return {
-            score,
+            score: await score,
             riskLevel: analysis.riskLevel,
             patterns: risks,
-            suggestions: this.generateSuggestions(score, validation),
+            suggestions: this.generateSuggestions(await score, validation),
             validation,
             timestamp: new Date(),
             programId
@@ -182,13 +207,14 @@ export class SecurityScoring {
         const metrics = await this.analyzeSecurityMetrics(programId);
         const score = this.calculateScore(metrics);
         const validation = await this.validateProgram(programId);
-        const patterns = await this.detectRiskPatterns(metrics);
+        const riskMessages = await this.detectRiskPatterns(metrics);
+        const patterns = await this.detectSecurityPatterns(metrics);
 
         return {
-            score,
-            riskLevel: score.risk,
+            score: await score,
+            riskLevel: (await score).risk,
             patterns,
-            suggestions: this.generateSuggestions(score, validation),
+            suggestions: this.generateSuggestions(await score, validation),
             validation,
             timestamp: new Date(),
             programId
@@ -214,27 +240,27 @@ export class SecurityScoring {
             });
         }
 
-        if (metrics.arithmetic?.score < this.config.thresholds.medium) {
+        if (metrics.arithmetic && metrics.arithmetic.score < this.config.thresholds.medium) {
             patterns.push({
                 type: 'arithmetic',
                 confidence: 0.85,
                 severity: 'MEDIUM',
                 description: 'Arithmetic operation risks identified',
-                indicators: metrics.arithmetic.details,
+                indicators: metrics.arithmetic?.details || [],
                 timestamp,
-                location: metrics.arithmetic.location
+                location: metrics.arithmetic?.location
             });
         }
 
-        if (metrics.input?.score < this.config.thresholds.medium) {
+        if (metrics.input && metrics.input.score < this.config.thresholds.medium) {
             patterns.push({
                 type: 'inputValidation',
                 confidence: 0.75,
                 severity: 'MEDIUM',
                 description: 'Input validation improvements needed',
-                indicators: metrics.input.details,
+                indicators: metrics.input?.details || [],
                 timestamp,
-                location: metrics.input.location
+                location: metrics.input?.location
             });
         }
 
@@ -294,19 +320,63 @@ export class SecurityScoring {
         ];
     }
 
-    private calculateScore(metrics: SecurityMetrics): SecurityScore {
+    private async calculateScore(metrics: SecurityMetrics): Promise<SecurityScore> {
+        if (!tf?.sequential) {
+            throw new Error('TensorFlow not initialized');
+        }
+        
+        // Convert metrics to tensors for neural network processing
+        const inputTensor = tf.tensor([
+            metrics.access.score,
+            metrics.ownership.score,
+            metrics.arithmetic?.score || 0,
+            metrics.input?.score || 0,
+            metrics.state?.score || 0
+        ], [1, 5]);
+
+        // Create and train a simple neural network model
+        const model = tf.sequential();
+        
+        // Add layers
+        model.add(tf.layers.dense({
+            units: 5,
+            activation: 'relu',
+            inputShape: [5]
+        }));
+        
+        model.add(tf.layers.dense({
+            units: 1,
+            activation: 'sigmoid'
+        }));
+        
+        model.compile({
+            optimizer: tf.train.adam(0.01),
+            loss: 'meanSquaredError'
+        });
+
+        // Train with dummy data (in real implementation this would use historical data)
+        // Mock training data with matching shape
+        const outputTensor = tf.tensor([0.8], [1, 1]);
+        await model.fit(inputTensor, outputTensor, {
+            epochs: 1,
+            batchSize: 1,
+            verbose: 0
+        });
+
+        // Predict the score
+        const prediction = model.predict(inputTensor) as tf.Tensor;
+        const score = (await prediction.data())[0];
+        prediction.dispose();
+        inputTensor.dispose();
+
         const metricList = Object.values(metrics);
         const totalWeight = metricList.reduce((acc, metric) => acc + metric.weight, 0);
-        const weightedScore = metricList.reduce(
-            (acc, metric) => acc + metric.score * metric.weight,
-            0
-        ) / totalWeight;
-        
         const details = metricList.flatMap(metric => metric.details || []);
-        const risk = this.determineRiskLevel(this.detectSecurityPatterns(metrics));
+        const patterns = await this.detectSecurityPatterns(metrics);
+        const risk = this.determineRiskLevel(patterns);
         
         return {
-            score: weightedScore,
+            score: score,
             weight: totalWeight,
             risk,
             details,
@@ -326,22 +396,41 @@ export class SecurityScoring {
         };
     }
 
-    private async detectRiskPatterns(metrics: SecurityMetrics): Promise<string[]> {
-        const risks: string[] = [];
+    private async detectRiskPatterns(metrics: SecurityMetrics): Promise<SecurityPattern[]> {
+        const patterns: SecurityPattern[] = [];
+        const timestamp = Date.now();
 
         if (metrics.access.score < this.config.thresholds.high) {
-            risks.push('Critical access control vulnerabilities detected');
+            patterns.push({
+                type: 'accessControl',
+                severity: 'HIGH',
+                description: 'Critical access control vulnerabilities detected',
+                timestamp,
+                location: metrics.access.location
+            });
         }
 
-        if (metrics.arithmetic?.score < this.config.thresholds.medium) {
-            risks.push('Potential arithmetic overflow risks identified');
+        if (metrics.arithmetic && metrics.arithmetic.score < this.config.thresholds.medium) {
+            patterns.push({
+                type: 'arithmetic',
+                severity: 'MEDIUM',
+                description: 'Potential arithmetic overflow risks identified',
+                timestamp,
+                location: metrics.arithmetic.location
+            });
         }
 
-        if (metrics.input?.score < this.config.thresholds.medium) {
-            risks.push('Input validation improvements recommended');
+        if (metrics.input && metrics.input.score < this.config.thresholds.medium) {
+            patterns.push({
+                type: 'inputValidation',
+                severity: 'MEDIUM',
+                description: 'Input validation improvements recommended',
+                timestamp,
+                location: metrics.input.location
+            });
         }
 
-        return risks;
+        return patterns;
     }
 
     private async validateProgram(programId: string): Promise<ValidationResult> {

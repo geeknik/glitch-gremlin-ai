@@ -12,6 +12,22 @@ pub enum GlitchError {
     #[error("Invalid chaos request")]
     InvalidChaosRequest,
 
+    #[error("Invalid proof")]
+    InvalidProof,
+
+    #[error("Invalid signature")]
+    InvalidSignature,
+
+    // Security-critical errors from DESIGN.md 9.1
+    #[error("7/10 multisig verification required")]
+    HumanVerificationRequired,
+
+    #[error("Minimum 3 geographic regions required")]
+    InsufficientMultisigSignatures,
+
+    #[error("72-hour execution delay not met")]
+    ExecutionDelayNotMet,
+
     #[error("Account not initialized")]
     UninitializedAccount,
 
@@ -46,9 +62,6 @@ pub enum GlitchError {
     #[error("Rate limit exceeded")]
     RateLimitExceeded,
     
-    #[error("Human verification required")]
-    HumanVerificationRequired,
-
     #[error("Invalid target program")]
     InvalidTargetProgram,
 
@@ -95,12 +108,6 @@ pub enum GlitchError {
     
     #[error("Voting period ended")]
     VotingEnded,
-    
-    #[error("Quorum not reached")]
-    QuorumNotReached,
-    
-    #[error("Execution delay not met")]
-    ExecutionDelayNotMet,
     
     #[error("Proposal not approved")]
     ProposalNotApproved,
