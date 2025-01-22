@@ -1,17 +1,78 @@
 import { Connection } from '@solana/web3.js';
 import RedisMock from './__mocks__/ioredis';
 import { jest } from '@jest/globals';
+import type { TensorFlowMock } from '../__mocks__/@tensorflow/tfjs-node';
+import cryptoRandomString from 'crypto-random-string';
 
-// Import mock first
-import { mockTF } from './__mocks__/tf-mock';
+declare global {
+    var tf: TensorFlowMock; 
+}
 
-// Setup mock before any imports that might use it
-jest.mock('@tensorflow/tfjs-node', () => {
-  return mockTF;
-});
+// Create type-safe mock implementation
+const mockTf = {
+    sequential: jest.fn().mockImplementation(() => ({
+        add: jest.fn().mockReturnThis(),
+        compile: jest.fn().mockReturnThis(),
+        predict: jest.fn().mockResolvedValue({
+            dataSync: () => [0],
+            dispose: jest.fn()
+        }),
+        summary: jest.fn(),
+        dispose: jest.fn(),
+        getWeights: jest.fn().mockReturnValue([]),
+        setWeights: jest.fn(),
+        trainOnBatch: jest.fn().mockResolvedValue(0),
+        layers: [],
+        optimizer: {},
+        name: 'mocked-model'
+    })),
+    layers: {
+        dense: jest.fn().mockImplementation((config: any) => ({
+          apply: jest.fn().mockReturnValue(tf.tensor2d([[0]])),
+          getConfig: jest.fn().mockReturnValue(config),
+          build: jest.fn()
+        })),
+        dropout: jest.fn().mockReturnValue({})
+    },
+    losses: {
+        meanSquaredError: jest.fn().mockReturnValue({})
+    },
+    train: {
+        adam: jest.fn().mockReturnValue({})
+    },
+    tensor: jest.fn().mockReturnValue({}),
+    loadLayersModel: jest.fn().mockResolvedValue({
+        predict: jest.fn().mockResolvedValue([]),
+        compile: jest.fn(),
+        fit: jest.fn(),
+        summary: jest.fn()
+    })
+};
 
-// Add to global scope
-global.tf = mockTF;
+// Export the mock for direct imports
+export const tf = mockTf;
+
+// Assign to global for access in tests
+global.tf = mockTf;
+
+// Declare global tf type
+declare global {
+    var tf: typeof mockTf;
+}
+
+// Add the missing utility function to the mock
+const mockTfWithUtils = {
+    ...mockTf,
+    util: {
+        isNullOrUndefined: (value: any) => value === null || value === undefined
+    }
+};
+
+// Mock the module with updated implementation
+jest.mock('@tensorflow/tfjs-node', () => ({
+    __esModule: true,
+    ...mockTfWithUtils,
+}));
 
 // Setup Jest environment
 jest.useFakeTimers({ enableGlobally: true });
@@ -54,10 +115,10 @@ declare global {
 // Initialize security mock
 global.security = {
     validateRequest: jest.fn(),
-    generateNonce: jest.fn(),
-    verifySignature: jest.fn(),
-    encryptPayload: jest.fn(),
-    decryptPayload: jest.fn(),
+    generateNonce: jest.fn().mockImplementation(() => cryptoRandomString({length: 16})),
+    verifySignature: jest.fn().mockReturnValue(true),
+    encryptPayload: jest.fn().mockImplementation((payload) => Buffer.from(JSON.stringify(payload)).toString('base64')),
+    decryptPayload: jest.fn().mockImplementation((payload) => JSON.parse(Buffer.from(payload, 'base64').toString())),
     mutation: {
         test: jest.fn()
     }
@@ -84,6 +145,9 @@ afterAll(async () => {
         delete global.__REDIS__;
         delete global.redis;
     }
+    // Clean up tf mock
+    delete global.tf;
+    jest.unmock('@tensorflow/tfjs-node');
 });
 
 beforeEach(async () => {
