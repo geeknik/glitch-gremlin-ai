@@ -271,7 +271,6 @@ export class Fuzzer {
 
         return Math.min(probability, 1);
     }
-    }
 
     public async cleanup(): Promise<void> {
         this.logger.info('Cleaning up resources...');
