@@ -1,15 +1,22 @@
 import { AnomalyDetector } from '../src/anomaly-detection';
 import { jest } from '@jest/globals';
-import * as tf from '@tensorflow/tfjs-node';
 import { TimeSeriesMetric, ModelConfig } from '../src/types';
 
 // Use global tf mock from jest.setup.ts
 
 const sampleData: TimeSeriesMetric[] = [
   { 
-    timestamp: Date.now() - 2000, 
-    instructionFrequency: [0.5, 0.3, 0.2], 
-    type: 'cpu' 
+    timestamp: Date.now() - 2000,
+    instructionFrequency: [0.5, 0.3, 0.2],
+    executionTime: [],
+    memoryUsage: [],
+    cpuUtilization: [],
+    errorRate: [],
+    pdaValidation: [],
+    accountDataMatching: [],
+    cpiSafety: [],
+    authorityChecks: [],
+    type: 'cpu'
   },
   { 
     timestamp: Date.now() - 1000, 
@@ -41,6 +48,8 @@ describe('AnomalyDetector', () => {
 
   it('should train model with valid data', async () => {
     const spyFit = jest.spyOn(tf.sequential().fit as jest.Mock, 'mockResolvedValue');
+    // Initialize model before spying
+    await detector.initializeModel();
     await detector.train(sampleData);
     expect(spyFit).toHaveBeenCalled();
     expect(detector.isTrained()).toBe(true);

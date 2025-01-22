@@ -10,7 +10,7 @@ declare global {
 
 // Create type-safe mock implementation
 const mockTf = {
-    sequential: jest.fn().mockImplementation(() => ({
+    sequential: jest.fn(() => ({
         add: jest.fn().mockReturnThis(),
         compile: jest.fn().mockReturnThis(),
         predict: jest.fn().mockResolvedValue({
