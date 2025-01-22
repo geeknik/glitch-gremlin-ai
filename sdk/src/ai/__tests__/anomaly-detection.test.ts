@@ -3,12 +3,7 @@ import { jest } from '@jest/globals';
 import * as tf from '@tensorflow/tfjs-node';
 import { TimeSeriesMetric, ModelConfig } from '../src/types';
 
-// Mock TensorFlow.js methods
-jest.spyOn(tf, 'sequential').mockImplementation(() => ({
-  compile: jest.fn(),
-  fit: jest.fn().mockResolvedValue({}),
-  predict: jest.fn().mockReturnValue(tf.tensor([0.5, 0.6, 0.4])),
-} as unknown as tf.Sequential));
+// Use global tf mock from jest.setup.ts
 
 const sampleData: TimeSeriesMetric[] = [
   { timestamp: Date.now() - 2000, value: 0.5, type: 'cpu' },
