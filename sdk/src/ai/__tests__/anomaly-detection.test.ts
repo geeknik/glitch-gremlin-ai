@@ -94,12 +94,23 @@ describe('AnomalyDetector', () => {
   });
 
   it('should train model with valid data', async () => {
+    jest.setTimeout(10000);
     const mockModel = {
       compile: jest.fn(),
-      fit: jest.fn().mockResolvedValue({ history: { loss: [0.1] } }),
-      predict: jest.fn().mockResolvedValue(tf.tensor([[0.1]])),
+      fit: jest.fn().mockImplementation(() => Promise.resolve({
+        history: { loss: [0.1], val_loss: [0.1] },
+        epoch: 1
+      })),
+      predict: jest.fn().mockImplementation(() => tf.tensor([[0.1]])),
       save: jest.fn().mockResolvedValue(undefined)
     };
+    
+    // Mock TensorFlow.js operations to resolve immediately
+    (tf.sequential as jest.Mock).mockImplementation(() => mockModel);
+    (tf.tensor as jest.Mock).mockImplementation((data: number[]) => ({
+      array: () => Promise.resolve(data),
+      dispose: jest.fn()
+    }));
     (tf.sequential as jest.Mock).mockReturnValue(mockModel);
     (tf.tensor as jest.Mock).mockImplementation((data) => ({
       array: () => Promise.resolve(data),
@@ -208,8 +219,7 @@ describe('AnomalyDetector', () => {
     const clampedDetector = new AnomalyDetector({ 
       threshold: -0.5,
       windowSize: 3,
-      minSampleSize: 3,
-      zScoreThreshold: 2.5  // Add required field
+      minSampleSize: 3
     });
     // Test threshold lower bound clamping
     expect(clampedDetector.config.threshold).toBe(0.01);

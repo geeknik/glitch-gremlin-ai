@@ -29,10 +29,10 @@ export class AnomalyDetector {
     }
 
     private validateConfig(config: Partial<ModelConfig>): ModelConfig {
+        // Use already clamped values from constructor
         const validatedConfig = {
             windowSize: config.windowSize ?? 10,
-            // Ensure threshold is properly clamped with 0.01 minimum
-            threshold: Math.max(0.01, Math.min(config.threshold ?? 0.8, 1.0)),  // Already correct but confirming exact match
+            threshold: config.threshold ?? 0.8,
             learningRate: config.learningRate ?? 0.001,
             epochs: config.epochs ?? 10,
             minSampleSize: config.minSampleSize ?? 3
@@ -169,6 +169,9 @@ export class AnomalyDetector {
         if (!this.model || !this.isTrained) {
             throw new Error('Model not initialized or trained');
         }
+
+        // Convert metric data to numbers
+        const cpuUtilization = metric.cpuUtilization.map(Number);
 
         // 2. Validate input data structure exists
         if (!metric?.cpuUtilization) {
