@@ -30,7 +30,11 @@ impl TokenManager {
         // Transfer to insurance fund address
         let insurance_account = Pubkey::from_str("insurancEFund1111111111111111111111111111111")
             .map_err(|_| ProgramError::InvalidArgument)?;
-            
+        
+        // DESIGN.md 9.1 - Validate insurance fund account
+        let insurance_account_info = next_account_info(account_info_iter)?;
+        Self::validate_token_account(insurance_account_info, program_id)?;
+
         let insurance_amount = amount
             .checked_sub(burn_amount)
             .ok_or(ProgramError::ArithmeticOverflow)?;
