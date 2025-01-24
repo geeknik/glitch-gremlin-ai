@@ -1,7 +1,7 @@
 use borsh_derive::{BorshDeserialize, BorshSerialize};
 use solana_program::pubkey::Pubkey;
 
-#[derive(BorshSerialize, BorshDeserialize, Debug)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
 pub struct GovernanceProposal {
     pub id: u64,
     pub proposer: Pubkey,

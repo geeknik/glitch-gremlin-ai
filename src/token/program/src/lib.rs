@@ -6,7 +6,7 @@ use solana_program::{
     declare_id,
 };
 
-declare_id!("GlitchGremlinProgram11111111111111111111");
+declare_id!("GGremN5xG5gx3VQ8CqpVX1EdfxQt5u4ij1fF8GGR8zf");
 
 /// 7/10 multisig authority addresses from DESIGN.md 9.1
 const MULTISIG_SIGNERS: [&str; 10] = [

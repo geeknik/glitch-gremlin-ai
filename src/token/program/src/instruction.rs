@@ -3,12 +3,10 @@ use solana_program::{
     program_error::ProgramError,
     pubkey::Pubkey
 };
-use solana_program_test::*;
-use solana_sdk::{
-    account::AccountSharedData,
-    signature::{Keypair, Signer},
-    transaction::Transaction,
-    system_instruction,
+use solana_program::{
+    instruction::{AccountMeta, Instruction},
+    pubkey::Pubkey,
+    system_program,
 };
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq)]
 pub enum GlitchInstruction {

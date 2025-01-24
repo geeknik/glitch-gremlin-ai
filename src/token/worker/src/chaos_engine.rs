@@ -30,6 +30,20 @@ pub async fn run_chaos_test(
     Ok(result)
 }
 
+#[derive(Debug)]
+struct SecurityMetrics {
+    avg_latency: u64,
+    memory_usage: usize,
+    cpu_peak: f64,
+    anomaly_score: f64,
+    entropy_checks: bool,
+    syscall_violations: u32,
+    page_faults: u64,
+    cache_misses: u64,
+    branch_mispredicts: u64,
+    spectre_v2_mitigations: bool,
+}
+
 async fn run_load_test(
     test_env: &TestEnvironment,
     params: &ChaosParams,

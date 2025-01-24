@@ -20,7 +20,7 @@ pub enum GlitchError {
 
     // Security-critical errors from DESIGN.md 9.1
     #[error("7/10 multisig verification required")]
-    HumanVerificationRequired,
+    // HumanVerificationRequired,  // Removed duplicate entry
 
     #[error("Minimum 3 geographic regions required")]
     InsufficientMultisigSignatures,
