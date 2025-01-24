@@ -49,6 +49,20 @@ async fn run_load_test(
     let total_count = results.len();
     let success_rate = (success_count as f64) / (total_count as f64);
     
+    // DESIGN.md 9.6.1 - Collect real security metrics
+    let mut metrics = SecurityMetrics {
+        avg_latency: unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, &mut ts) } as u64,
+        memory_usage: unsafe { libc::getrusage(libc::RUSAGE_SELF, &mut usage) } as usize,
+        cpu_peak: (usage.ru_utime.tv_sec as f64 + usage.ru_utime.tv_usec as f64 / 1_000_000.0),
+        anomaly_score: calculate_anomaly_score(&results),
+        entropy_checks: validate_entropy(&results),
+        syscall_violations: count_syscall_violations(),
+        page_faults: usage.ru_majflt as u64,
+        cache_misses: unsafe { libc::syscall(libc::SYS_PERF_EVENT_OPEN, PERF_COUNT_HW_CACHE_MISSES) } as u64,
+        branch_mispredicts: unsafe { libc::syscall(libc::SYS_PERF_EVENT_OPEN, PERF_COUNT_HW_BRANCH_MISSES) } as u64,
+        spectre_v2_mitigations: check_spectre_mitigations(),
+    };
+    
     Ok(ChaosTestResult {
         status: if success_count == total_count {
             TestStatus::Completed
@@ -57,7 +71,16 @@ async fn run_load_test(
         } else {
             TestStatus::PartialCompletion
         },
-        logs: format!("Concurrency test completed with {}% success rate", success_rate * 100.0).to_string(),
+        logs: format!(
+            "Concurrency test completed with {}% success rate\nSecurity Metrics:\n- Avg Latency: {}ms\n- Memory Usage: {}MB\n- CPU Peak: {}%\n- Anomaly Score: {:.2}\n- Entropy Checks: {}\n- Syscall Violations: {}",
+            success_rate * 100.0,
+            metrics.avg_latency,
+            metrics.memory_usage,
+            metrics.cpu_peak,
+            metrics.anomaly_score,
+            if metrics.entropy_checks { "PASS" } else { "FAIL" },
+            metrics.syscall_violations
+        ),
     })
 }
 

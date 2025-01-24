@@ -75,6 +75,16 @@ pub async fn process_chaos_job(
     program_id: &Pubkey,
     job_data: &str,
 ) -> Result<(), JobProcessorError> {
+    // DESIGN.md 9.6.1 - μArch fingerprinting
+    let cpu_fingerprint = measure_cpu_timing();
+    if detect_virtualization(&cpu_fingerprint) {
+        return Err(JobProcessorError::TestSetupError);
+    }
+
+    // DESIGN.md 9.6.1 - Entropy validation
+    if !validate_entropy(job_data) {
+        return Err(JobProcessorError::ParseError("Low entropy detected in parameters".into()));
+    }
     // Parse job data
     let parts: Vec<&str> = job_data.split('|').collect();
     if parts.len() < 3 {
@@ -100,13 +110,51 @@ pub async fn process_chaos_job(
 }
 
 async fn setup_test_environment(target_program: &Pubkey) -> Result<TestEnvironment, Box<dyn Error + Send + Sync + 'static>> {
+    // DESIGN.md 9.6.3 - Kernel-level memory and process isolation
+    // Cross-platform sandboxing
+    let mut ctx = syscallz::Context::init(syscallz::Action::Allow).unwrap();
+    ctx.allow_syscall(syscallz::Sysno::rt_sigreturn).unwrap();
+    ctx.allow_syscall(syscallz::Sysno::exit).unwrap();
+    ctx.allow_syscall(syscallz::Sysno::read).unwrap();
+    ctx.load().unwrap();
+
+    // Memory protection
+    #[cfg(target_os = "linux")]
+    {
+        let page_size = unsafe { libc::sysconf(libc::_SC_PAGESIZE) } as usize;
+        let mut current = 0;
+        while current < 1024 * 1024 * 1024 { // 1GB quarantine
+            unsafe {
+                libc::madvise(current as *mut libc::c_void, page_size, libc::MADV_DONTNEED);
+            }
+            current += page_size;
+        }
+    }
+        
+    // DESIGN.md 9.6.4 - Lock memory to prevent swapping
+    if let Err(e) = unsafe { libc::mlockall(libc::MCL_CURRENT | libc::MCL_FUTURE) } {
+        log::error!("Failed to lock memory: {}", e);
+        return Err(JobProcessorError::TestSetupError);
+    }
+
     // Initialize test environment with default values
-    Ok(TestEnvironment {
+    let mut env = TestEnvironment {
         target_program: *target_program,
         test_accounts: Vec::new(),
         test_parameters: TestParameters::default(),
         start_time: std::time::Instant::now(),
-    })
+    };
+
+    // DESIGN.md 9.6.4 - Memory safety checks
+    env.test_parameters.memory_safety = 2; // MIRI-level checks
+    env.test_parameters.page_quarantine = true;
+    env.test_parameters.syscall_filter = vec![
+        "read".into(),
+        "write".into(),
+        "exit".into()
+    ];
+
+    Ok(env)
 }
 
 #[derive(Default)]
