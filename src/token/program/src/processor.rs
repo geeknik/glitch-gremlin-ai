@@ -136,6 +136,19 @@ impl Processor {
         if valid_signers < 7 {
             return Err(GlitchError::InsufficientMultisigSignatures.into());
         }
+
+        // DESIGN.md 9.1 - Verify 72-hour upgrade delay
+        let clock = Clock::get()?;
+        let last_upgrade = bpf_loader_upgradeable::get_last_upgrade_time(program_data)?;
+        if clock.unix_timestamp - last_upgrade < 259200 {
+            return Err(GlitchError::UpgradeDelayNotMet.into());
+        }
+
+        // DESIGN.md 9.6.1 - Verify entropy initialization
+        let program_data = program_data.data.borrow();
+        if &program_data[..4] != &SGX_PREFIX {
+            return Err(GlitchError::InvalidProof.into());
+        }
         
         Ok(())
     }

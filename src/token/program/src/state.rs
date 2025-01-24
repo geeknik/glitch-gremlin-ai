@@ -93,6 +93,11 @@ pub struct TestParams {
     pub concurrency_level: u8,
     pub max_latency: u64,
     pub error_threshold: u8,
+    // Security parameters from DESIGN.md 9.6
+    pub entropy_checks: bool,
+    pub memory_safety: u8,
+    pub syscall_filter: Vec<String>,
+    pub page_quarantine: bool,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, Default)]

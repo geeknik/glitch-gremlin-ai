@@ -45,4 +45,57 @@ pub fn process_instruction(
 }
 
 #[cfg(test)]
-mod tests;
+mod tests {
+    use super::*;
+    use solana_program::clock::Epoch;
+    use solana_sdk::{signature::Signer, signer::keypair::Keypair};
+
+    #[test]
+    fn test_program_initialization() {
+        let program_id = Pubkey::new_unique();
+        let program_data = Keypair::new();
+        let mut accounts = vec![
+            AccountInfo::new(&program_data.pubkey(), false, false, &mut 0, &mut [], &program_id, false, Epoch::default()),
+        ];
+
+        assert!(Processor::validate_initialized(&program_id, &accounts).is_err());
+    }
+
+    #[test]
+    fn test_security_level_validation() {
+        let mut params = TestParams {
+            security_level: 5, // Invalid level
+            ..TestParams::default()
+        };
+        
+        assert_eq!(
+            Processor::validate_security_level(&params),
+            Err(GlitchError::InvalidSecurityLevel.into())
+        );
+    }
+
+    #[test]
+    fn test_multisig_verification() {
+        let signers = vec![Pubkey::new_unique(); 6]; // Only 6/10
+        assert!(Processor::validate_multisig(&signers).is_err());
+    }
+
+    #[test]
+    fn test_entropy_validation() {
+        let mut data = vec![0u8; 32];
+        data[0..4].copy_from_slice(&[0x53, 0x47, 0x58, 0x21]); // Valid SGX prefix
+        
+        let account = AccountInfo::new(
+            &Pubkey::new_unique(),
+            false,
+            false,
+            &mut 0,
+            &mut data[..],
+            &Pubkey::new_unique(),
+            false,
+            Epoch::default()
+        );
+        
+        assert!(Processor::validate_entropy(&account).is_ok());
+    }
+}

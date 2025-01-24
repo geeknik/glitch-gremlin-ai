@@ -37,6 +37,12 @@ pub enum GlitchError {
     #[error("72-hour execution delay not met")]
     ExecutionDelayNotMet,
 
+    #[error("Invalid security level (must be 1-4)")]
+    InvalidSecurityLevel,
+
+    #[error("Missing required proof of human")]
+    HumanVerificationRequired,
+
     #[error("Account not initialized")]
     UninitializedAccount,
 
