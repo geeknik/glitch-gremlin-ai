@@ -117,11 +117,37 @@ impl Processor {
 
         Ok(())
     }
+    /// Validate program initialization state
+    fn validate_initialized(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
+        // Check if program data account exists and is owned by BPF loader
+        let program_data = next_account_info(&mut accounts.iter())?;
+        if program_data.owner != &bpf_loader_upgradeable::id() {
+            return Err(ProgramError::InvalidAccountOwner);
+        }
+        
+        // Verify multisig authority matches DESIGN.md 9.1 requirements
+        let upgrade_authority = bpf_loader_upgradeable::get_upgrade_authority(program_data)?;
+        let mut valid_signers = 0;
+        for signer in MULTISIG_SIGNERS.iter().map(|s| Pubkey::from_str(s).unwrap()) {
+            if upgrade_authority == Some(signer) {
+                valid_signers += 1;
+            }
+        }
+        if valid_signers < 7 {
+            return Err(GlitchError::InsufficientMultisigSignatures.into());
+        }
+        
+        Ok(())
+    }
+
     pub fn process(
         program_id: &Pubkey,
         accounts: &[AccountInfo],
         instruction_data: &[u8],
     ) -> ProgramResult {
+        // Validate program initialization state before processing any instructions
+        Self::validate_initialized(program_id, accounts)?;
+        
         let instruction = GlitchInstruction::unpack(instruction_data)?;
 
         match instruction {
@@ -258,8 +284,8 @@ impl Processor {
             min_stake_amount: config.min_stake_amount,
             execution_time: clock.unix_timestamp + execution_delay,
             slash_percentage: 50, // Default 50% slash
-            insurance_fund: Pubkey::default(), // Temporary placeholder
-            multisig_signers: [Pubkey::default(); 10],
+            insurance_fund: Pubkey::from_str("insurancEFund1111111111111111111111111111111").unwrap(),
+            multisig_signers: MULTISIG_SIGNERS.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<Vec<_>>().try_into().unwrap(),
             required_signatures: 7, // 7/10 multisig
         };
         proposal.serialize(&mut *proposal_info.data.borrow_mut())?;
