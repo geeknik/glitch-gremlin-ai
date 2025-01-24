@@ -97,13 +97,14 @@ describe('AnomalyDetector', () => {
     const mockModel = {
       compile: jest.fn(),
       fit: jest.fn().mockResolvedValue({ history: { loss: [0.1] } }),
-      predict: jest.fn().mockResolvedValue({ 
-        array: jest.fn().mockResolvedValue([[0.1]]),
-        dispose: jest.fn() 
-      }),
+      predict: jest.fn().mockResolvedValue(tf.tensor([[0.1]])),
       save: jest.fn().mockResolvedValue(undefined)
     };
     (tf.sequential as jest.Mock).mockReturnValue(mockModel);
+    (tf.tensor as jest.Mock).mockImplementation((data) => ({
+      array: () => Promise.resolve(data),
+      dispose: jest.fn()
+    }));
     
     // Mock all async operations to resolve immediately
     mockModel.fit.mockResolvedValue({ 
@@ -125,13 +126,14 @@ describe('AnomalyDetector', () => {
     const mockModel = {
       compile: jest.fn(),
       fit: jest.fn().mockResolvedValue({ history: { loss: [0.1] } }),
-      predict: jest.fn().mockResolvedValue({ 
-        array: jest.fn().mockResolvedValue([[0.1]]),
-        dispose: jest.fn() 
-      }),
+      predict: jest.fn().mockResolvedValue(tf.tensor([[0.1]])),
       save: jest.fn().mockResolvedValue(undefined)
     };
     (tf.sequential as jest.Mock).mockReturnValue(mockModel);
+    (tf.tensor as jest.Mock).mockImplementation((data) => ({
+      array: () => Promise.resolve(data),
+      dispose: jest.fn()
+    }));
     mockModel.fit.mockResolvedValue({ history: { loss: [0.1] } });
     mockModel.predict.mockResolvedValue(tf.tensor([[0.1]]));
     
@@ -206,10 +208,11 @@ describe('AnomalyDetector', () => {
     const clampedDetector = new AnomalyDetector({ 
       threshold: -0.5,
       windowSize: 3,
-      minSampleSize: 3
+      minSampleSize: 3,
+      zScoreThreshold: 2.5  // Add required field
     });
     // Test threshold lower bound clamping
-    expect(clampedDetector.config.threshold).toBeGreaterThanOrEqual(0.01);
+    expect(clampedDetector.config.threshold).toBe(0.01);
     
     // Test threshold upper bound
     const upperBoundDetector = new AnomalyDetector({ 
@@ -282,14 +285,19 @@ describe('AnomalyDetector', () => {
   }, 30000);
 
   it('should handle model save/load lifecycle', async () => {
-    const mockModel = (tf.sequential as jest.Mock).mock.results[0].value;
-    mockModel.fit.mockResolvedValue({ history: { loss: [0.1] } });
+    const mockModel = {
+      compile: jest.fn(),
+      fit: jest.fn().mockResolvedValue({ history: { loss: [0.1] } }),
+      predict: jest.fn().mockResolvedValue(tf.tensor([[0.1]])),
+      save: jest.fn().mockResolvedValue(undefined)
+    };
+    (tf.sequential as jest.Mock).mockReturnValue(mockModel);
     
     await detector.train(sampleData);
     
     // Mock the TensorFlow save/load operations
-    const mockSave = jest.spyOn(tf.LayersModel.prototype, 'save').mockResolvedValue(undefined);
-    const mockLoad = jest.spyOn(tf, 'loadLayersModel').mockResolvedValue(mockModel);
+    const mockSave = jest.spyOn(mockModel, 'save').mockResolvedValue(undefined);
+    const mockLoad = jest.spyOn(tf, 'loadLayersModel').mockResolvedValue(mockModel as any);
     
     await expect(detector.save('./test-model')).resolves.not.toThrow();
     await expect(detector.load('./test-model')).resolves.not.toThrow();
