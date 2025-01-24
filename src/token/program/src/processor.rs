@@ -49,7 +49,7 @@ const EXECUTION_DELAY: i64 = 259200; // 72 hours in seconds
 const HUMAN_PROOF_NONCE_SIZE: usize = 8;
 const DILITHIUM_PUBKEY: &str = "d84a9b3d..."; // Actual public key from DESIGN.md 9.6.2
 const MIN_GEO_REGIONS: usize = 3;
-const SGX_PREFIX: [u8; 4] = [0x53, 0x47, 0x58, 0x21]; // "SGX!" 
+pub const SGX_PREFIX: [u8; 4] = [0x53, 0x47, 0x58, 0x21]; // "SGX!" 
 
 impl Processor {
     fn validate_target_program(params: &str) -> ProgramResult {

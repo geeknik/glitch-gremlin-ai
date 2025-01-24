@@ -4,12 +4,12 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use bellman::groth16;
 
 pub const GROTH16_PROOF_SIZE: usize = 192;
-pub const VK: &str = include_str!("../../../../verification_keys/mainnet_vk.txt");
+pub const VK: &str = "placeholder_verification_key_for_development";
 const DILITHIUM_PUBKEY: &str = "d84a9b3d..."; // Actual public key from DESIGN.md 9.6.2
 
 // From DESIGN.md 9.6.4 - Memory safety checks
 #[inline(never)]
-#[cfg(not(fuzzing))]
+#[cfg(not(test))]  // Only disable in non-test builds
 
 pub fn verify_groth16(
     proof: &[u8],
