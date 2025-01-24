@@ -10,6 +10,8 @@ use solana_sdk::{
 };
 use std::fmt;
 use std::error::Error;
+use syscallz::{Context, Action, Sysno};
+use log;
 
 #[derive(Debug)]
 pub enum JobProcessorError {

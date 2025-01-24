@@ -49,19 +49,20 @@ async fn run_load_test(
     let total_count = results.len();
     let success_rate = (success_count as f64) / (total_count as f64);
     
-    // DESIGN.md 9.6.1 - Collect real security metrics
-    let mut metrics = SecurityMetrics {
-        avg_latency: unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, &mut ts) } as u64,
-        memory_usage: unsafe { libc::getrusage(libc::RUSAGE_SELF, &mut usage) } as usize,
-        cpu_peak: (usage.ru_utime.tv_sec as f64 + usage.ru_utime.tv_usec as f64 / 1_000_000.0),
-        anomaly_score: calculate_anomaly_score(&results),
-        entropy_checks: validate_entropy(&results),
-        syscall_violations: count_syscall_violations(),
-        page_faults: usage.ru_majflt as u64,
-        cache_misses: unsafe { libc::syscall(libc::SYS_PERF_EVENT_OPEN, PERF_COUNT_HW_CACHE_MISSES) } as u64,
-        branch_mispredicts: unsafe { libc::syscall(libc::SYS_PERF_EVENT_OPEN, PERF_COUNT_HW_BRANCH_MISSES) } as u64,
-        spectre_v2_mitigations: check_spectre_mitigations(),
-    };
+    // TODO: Implement security metrics collection
+    // Temporarily commented out until proper implementation
+    // let mut metrics = SecurityMetrics {
+    //     avg_latency: 0,
+    //     memory_usage: 0,
+    //     cpu_peak: 0.0,
+    //     anomaly_score: 0.0,
+    //     entropy_checks: false,
+    //     syscall_violations: 0,
+    //     page_faults: 0,
+    //     cache_misses: 0,
+    //     branch_mispredicts: 0,
+    //     spectre_v2_mitigations: false,
+    // };
     
     Ok(ChaosTestResult {
         status: if success_count == total_count {
