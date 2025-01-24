@@ -1,33 +1,59 @@
-[workspace]
-resolver = "1"
-
 [package]
-name = "glitch-gremlin"
+name = "glitch-gremlin-program"
 version = "0.1.0"
 edition = "2021"
-description = "Glitch Gremlin AI - Chaos Engine for Solana dApps"
+description = "Glitch Gremlin AI Solana Program"
 license = "MIT"
-repository = "https://github.com/solana-labs/solana-program-library"
-
-[features]
-no-entrypoint = []
-
-[target.'cfg(not(target_os = "solana"))'.dependencies]
-solana-sdk = "1.17.0"
+repository = "https://github.com/your-org/glitch-gremlin-ai"
+authors = ["Your Name <your.email@example.com>"]
 
 [dependencies]
-solana-program = "1.17.0"
-borsh = "0.10.3"
-borsh-derive = "0.10.3"
-thiserror = "1.0.50"
-spl-token = { version = "4.0.0", features = ["no-entrypoint"] }
-arrayref = "0.3.7"
+solana-program = "=1.18.26"
+strum = { version = "0.25", features = ["derive"] }
+solana-sdk = "=1.18.26"
+glitch-shared = { path = "../shared" }
+borsh = "=0.10.3" 
+borsh-derive = "=0.10.3"
+spl-token = { version = "=3.5.0", features = ["no-entrypoint"] }
+thiserror = "=1.0.56"
+arrayref = "=0.3.7"
+bls12_381 = "0.7.0"
+bellman = "0.12.0"
+pairing = "0.23.0"
+byteorder = "1.4.3"
+solana-zk-token-sdk = "1.18.26"
+syscallz = "0.17.0"
+libc = "0.2.155"
+
+[dev-dependencies]
+solana-program-test = "1.17.0" 
+solana-sdk = "1.17.0"
+tokio = { version = "1.14", features = ["full"] }
+assert_matches = "1.5.0"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+
+[package.metadata.sbf-settings]
+sbf-tools-version = "1.30"
+sbf-sdk-version = "1.18.26"
+toolchain = "sbf-solana-solana"
+
+[target.sbf-solana-solana]
+rustflags = [
+    "-C", "link-arg=-z",
+    "-C", "link-arg=notext",
+    "-C", "link-arg=-Tbpfelldbg",
+    "-C", "link-arg=-shared",
+    "-C", "link-arg=--Bdynamic",
+    "-C", "link-arg=-Ldeps/solana-sdk/sbf-solana-solana/rust/lib/rustlib/sbf-solana-solana/lib"
+]
 
 [lib]
 crate-type = ["cdylib", "lib"]
 
-[dev-dependencies]
-solana-program-test = "1.17.0"
-solana-sdk = "1.17.0"
-tokio = { version = "1.14", features = ["full"] }
-assert_matches = "1.5.0"
+[features]
+no-entrypoint = []
+no-log = []
