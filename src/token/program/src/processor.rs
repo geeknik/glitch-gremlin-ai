@@ -561,10 +561,15 @@ impl Processor {
             return Err(GlitchError::RateLimitExceeded.into());
         }
         
-        // Calculate dynamic pricing with saturation math
+        // DESIGN.md 9.1 - Dynamic pricing formula: base_fee * e^(requests_per_hour/15)
         let requests_per_hour = rate_limit_info.request_count.saturating_mul(60);
-        let exponent = (requests_per_hour as f64 / 15.0).exp();
-        let dynamic_multiplier = exponent.clamp(1.0, 1000.0); // Cap at 1000x
+        let dynamic_multiplier = (requests_per_hour as f64 / 15.0).exp()
+            .max(1.0)
+            .min(1000.0);
+            
+        // Add cryptoeconomic safeguard from DESIGN.md 9.3
+        let base_fee = config.base_fee as f64;
+        let scaled_fee = (base_fee * dynamic_multiplier).round() as u64;
         
         amount = amount
             .checked_mul(dynamic_multiplier as u64)
@@ -589,9 +594,23 @@ impl Processor {
         TokenManager::burn_tokens(&accounts[1], burn_amount)?;
 
         // State-contingent throttling
+        // DESIGN.md 9.1 state-contingent throttling
         if rate_limit_info.failed_requests > 5 {
-            // Burn 10% of tokens if too many failures
-            let burn_amount = amount / 10;
+            // Enforce proof-of-human workflow
+            let nonce = &rate_limit_info.human_proof_nonce;
+            if nonce == &[0u8; 8] {
+                return Err(GlitchError::HumanVerificationRequired.into());
+            }
+            
+            // Reset nonce after use
+            rate_limit_info.human_proof_nonce = [0u8; 8];
+            
+            // Progressive burn scaling
+            let burn_percent = u64::from(rate_limit_info.failed_requests).min(50); // Cap at 50%
+            let burn_amount = amount
+                .checked_mul(burn_percent)
+                .and_then(|v| v.checked_div(100))
+                .ok_or(GlitchError::ArithmeticOverflow)?;
             amount = amount.checked_sub(burn_amount)
                 .ok_or(GlitchError::ArithmeticOverflow)?;
             TokenManager::burn_tokens(&accounts[1], burn_amount)?;

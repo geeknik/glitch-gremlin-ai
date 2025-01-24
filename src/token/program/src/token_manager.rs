@@ -17,11 +17,19 @@ impl TokenManager {
     }
 
     pub fn burn_tokens(token_account: &AccountInfo, amount: u64) -> ProgramResult {
-        // Enforce 70% burn / 30% insurance split from DESIGN.md 9.1
+        // DESIGN.md 9.1 + 9.3 enhanced tokenomics
         let burn_amount = amount
             .checked_mul(70)
             .and_then(|v| v.checked_div(100))
             .ok_or(ProgramError::ArithmeticOverflow)?;
+            
+        // Insurance fund transfer with overflow protection
+        let insurance_amount = amount.checked_sub(burn_amount)
+            .ok_or(ProgramError::ArithmeticOverflow)?;
+            
+        // Transfer to insurance fund address
+        let insurance_account = Pubkey::from_str("insurancEFund1111111111111111111111111111111")
+            .map_err(|_| ProgramError::InvalidArgument)?;
             
         let insurance_amount = amount
             .checked_sub(burn_amount)

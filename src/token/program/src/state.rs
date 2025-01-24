@@ -85,6 +85,11 @@ pub struct RateLimitConfig {
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, Default)]
 pub struct TestParams {
+    // DESIGN.md 9.6.3 - Simulation containment parameters
+    pub max_cpu_cycles: u64,
+    pub memory_limit_mb: u8,
+    pub max_network_ops: u32,
+    pub allowed_syscalls: Vec<String>,
     pub quorum: u64,
     pub execution_time: i64,
     pub test_type: String,
