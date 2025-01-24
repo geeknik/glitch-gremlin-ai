@@ -52,13 +52,18 @@ const mockTf = {
 // Export the mock for direct imports
 export const tf = mockTf;
 
-// Assign to global for access in tests
-global.tf = mockTf;
-
 // Declare global tf type
 declare global {
     var tf: typeof mockTf;
 }
+
+// Assign clean mock to global
+global.tf = {
+  ...mockTf,
+  sequential: jest.fn(),
+  layers: { dense: jest.fn() },
+  train: { adam: jest.fn() }
+};
 
 // Add the missing utility function to the mock
 const mockTfWithUtils = {
@@ -76,6 +81,7 @@ jest.mock('@tensorflow/tfjs-node', () => ({
 
 // Setup Jest environment
 jest.useFakeTimers({ enableGlobally: true });
+jest.setTimeout(30000); // 30 second timeout for all tests
 
 // Environment variables
 process.env.HELIUS_API_KEY = 'test-helius-key';

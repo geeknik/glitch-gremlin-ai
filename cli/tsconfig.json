@@ -1,26 +1,25 @@
 {
-"compilerOptions": {
-    "module": "NodeNext",
-    "target": "ES2020", 
-    "moduleResolution": "NodeNext",
+  "extends": "../tsconfig.json", 
+  "compilerOptions": {
+      "composite": true,
+      "declaration": true,
+    "target": "ES2020",
+    "module": "ES2022",
+    "rootDir": "../../",
     "outDir": "./dist",
-    "rootDir": "./src",
-    "resolveJsonModule": true,
+    "baseUrl": "./src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "baseUrl": ".",
+    "forceConsistentCasingInFileNames": true,
+    "types": ["jest", "node"],
+    "moduleResolution": "node",
     "paths": {
-      "@glitch-gremlin/sdk": ["../sdk/src"]
-    },
-    "composite": true,
-    "declaration": true,
-    "sourceMap": true,
-    "preserveSymlinks": true
-},
-"include": ["src/**/*.ts"],
-"exclude": ["node_modules", "dist"],
-"references": [
-    { "path": "../sdk" }
-]
+      "@glitch-gremlin/sdk": ["../../sdk/src/index.ts"],
+      "@glitch-gremlin/sdk/*": ["../../sdk/src/*"],
+      "#cli/*": ["./*"]
+    }
+  },
+  "include": ["src/**/*", "../sdk/src/**/*.ts", "../sdk/src/**/*.d.ts"],
+  "exclude": ["node_modules", "dist"]
 }

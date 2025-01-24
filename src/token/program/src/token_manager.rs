@@ -17,16 +17,30 @@ impl TokenManager {
     }
 
     pub fn burn_tokens(token_account: &AccountInfo, amount: u64) -> ProgramResult {
-        let _burn_ix = burn(
-            &solana_program::system_program::id(), // Use system program for native burns per DESIGN.md 9.1
+        // Enforce 70% burn / 30% insurance split from DESIGN.md 9.1
+        let burn_amount = amount
+            .checked_mul(70)
+            .and_then(|v| v.checked_div(100))
+            .ok_or(ProgramError::ArithmeticOverflow)?;
+            
+        let insurance_amount = amount
+            .checked_sub(burn_amount)
+            .ok_or(ProgramError::ArithmeticOverflow)?;
+
+        // Perform actual burn
+        let burn_ix = burn(
+            &spl_token::id(),
             token_account.key, // Mint account
             token_account.key, // Token account
             token_account.key, // Authority
             &[],
-            amount,
+            burn_amount,
         )?;
+
+        // Invoke burn instruction
+        invoke(&burn_ix, &[token_account.clone()])?;
         
-        msg!("Burned {} tokens", amount);
+        msg!("Burned {} tokens", burn_amount);
         Ok(())
     }
 

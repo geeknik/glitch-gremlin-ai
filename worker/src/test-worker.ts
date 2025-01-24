@@ -1,6 +1,8 @@
 import { Redis } from 'ioredis';
 import { GlitchSDK, TestType, ChaosResult } from '@glitch-gremlin/sdk';
 import { Connection, Keypair } from '@solana/web3.js';
+import * as seccomp from 'seccomp';
+import { landlock } from 'landlock';
 
 export class TestWorker {
     private redis: Redis;
@@ -21,9 +23,29 @@ export class TestWorker {
         });
     }
 
+    async applyKernelSecurity() {
+        // DESIGN.md 9.6.3 - Kernel hardening
+        await landlock.restrict({
+            allowedFsAccess: ['/tmp', '/proc/self/fd'],
+            allowedSyscalls: [
+                'read', 'write', 'open', 'close', 'stat',
+                'fstat', 'lstat', 'poll', 'select', 'mmap'
+            ]
+        });
+        
+        // Apply seccomp-bpf filters from DESIGN.md 9.6.3
+        seccomp.load(seccomp.compile(
+            seccomp.allow('execve'), // Only allow test execution
+            seccomp.allow('read'),
+            seccomp.allow('write'),
+            seccomp.kill()
+        ));
+    }
+
     async start() {
+        await this.applyKernelSecurity();
         this.running = true;
-        console.log('Test worker started');
+        console.log('Test worker started with kernel-level security');
 
         while (this.running) {
             try {
@@ -56,11 +78,19 @@ export class TestWorker {
 
     private async executeTest(request: any): Promise<ChaosResult> {
         // Execute test based on parameters
+        // Enforce security level from DESIGN.md 9.6.3
+        if (request.securityLevel > 1) {
+            await this.applyKernelSecurity();
+        }
+
         const chaosRequest = await this.sdk.createChaosRequest({
             targetProgram: request.targetProgram,
             testType: request.testType as TestType,
             duration: request.duration,
-            intensity: request.intensity
+            intensity: request.intensity,
+            securityLevel: request.securityLevel,
+            proofOfHuman: request.proofOfHuman,
+            executionEnvironment: 'sgx' // Enforce SGX for audits
         });
 
         return await chaosRequest.waitForCompletion();

@@ -1,5 +1,30 @@
 import { Connection, Keypair, PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js';
-import { ProposalState } from './types.js';
+
+declare global {
+    interface Window {
+        security?: {
+            mutation?: {
+                test?: (params: any) => Promise<any>;
+            };
+        };
+    }
+}
+export enum ProposalState {
+    Draft = 'Draft',
+    Active = 'Active',
+    Succeeded = 'Succeeded',
+    Defeated = 'Defeated',
+    Executed = 'Executed',
+    Cancelled = 'Cancelled'
+}
+export interface GovernanceConfig {
+    programId: PublicKey;
+    treasuryAddress: PublicKey;
+    minStakeAmount: number;
+    votingPeriod: number;
+    quorumPercentage: number;
+    executionDelay: number;
+}
 
 interface ProposalStateData {
     title: string;
@@ -12,9 +37,10 @@ interface ProposalStateData {
     noVotes: number;
     quorumRequired: number;
     executed: boolean;
-    state: ProposalState;
+    state: string; // Changed to string to match usage
     votes: PublicKey[];
-    }
+    status: string; // Added status field
+}
 
 export interface ProposalData {
     title: string;
@@ -34,16 +60,36 @@ export interface ProposalData {
     status: string;
 }
 
+
 export class GovernanceManager {
     constructor(
         public readonly connection: Connection,
-        private readonly programId: PublicKey = new PublicKey('Governance111111111111111111111111111111111')
-    ) {}
+        public readonly programId: PublicKey,
+        public readonly config: GovernanceConfig
+    ) {
+        // Enhanced security validation per protocol hardening requirements
+        if (config.minStakeAmount <= 0 || config.minStakeAmount > Number.MAX_SAFE_INTEGER) {
+            throw new Error("minStakeAmount must be between 1 and MAX_SAFE_INTEGER");
+        }
+        if (config.quorumPercentage < 5 || config.quorumPercentage > 75) {
+            throw new Error("quorumPercentage must be between 5 and 75");
+        }
+        if (config.executionDelay < 86400 || config.executionDelay > 2592000) {
+            throw new Error("executionDelay must be between 1 day and 30 days");
+        }
+        if (config.votingPeriod < 86400 || config.votingPeriod > 604800) {
+            throw new Error("votingPeriod must be between 1 day and 1 week");
+        }
+        if (!config.programId.equals(new PublicKey('Governance111111111111111111111111111111111'))) {
+            throw new Error("Invalid governance program ID");
+        }
+    }
 
     async createProposal(params: {
-        votingPeriod?: number,
-        title?: string,
-        description?: string
+        proposer: PublicKey;
+        title: string;
+        description: string;
+        votingPeriod?: number;
     }): Promise<{ proposalAddress: PublicKey, tx: Transaction }> {
         return this.createProposalAccount(this.connection, Keypair.generate(), params);
     }
@@ -71,101 +117,6 @@ export class GovernanceManager {
                 { dataSize: 128 }, // Expected size of delegate account
                 { memcmp: { offset: 32, bytes: wallet.toBase58() } }
             ]
-            describe('initialization', () => {
-                it('should initialize correctly', async () => {
-                    await fuzzer.initialize(testProgramId, mockConnection);
-                    expect(fuzzer['programId']).toEqual(testProgramId);
-                    expect(fuzzer['connection']).toBe(mockConnection);
-                    expect(fuzzer['anomalyDetectionModel']).toBeDefined();
-                });
-
-                it('should handle initialization errors', async () => {
-                    const invalidProgramId = null as any;
-                    await expect(fuzzer.initialize(invalidProgramId, mockConnection))
-                        .rejects.toThrow();
-                });
-            });
-
-            describe('fuzz', () => {
-                beforeEach(async () => {
-                    await fuzzer.initialize(testProgramId, mockConnection);
-                });
-
-                it('should execute fuzz testing successfully', async () => {
-                    const mockInputs = [
-                        { instruction: 1, data: Buffer.from([1, 2, 3]) }
-                    ];
-                    mockConnection.sendAndConfirmTransaction.mockResolvedValue('tx-hash');
-
-                    const results = await fuzzer.fuzz(mockInputs);
-                    expect(results).toBeDefined();
-                    expect(results.length).toBeGreaterThan(0);
-                });
-
-                it('should handle fuzz execution errors', async () => {
-                    const mockInputs = [
-                        { instruction: 1, data: Buffer.from([1, 2, 3]) }
-                    ];
-                    mockConnection.sendAndConfirmTransaction.mockRejectedValue(new Error('Test error'));
-
-                    const results = await fuzzer.fuzz(mockInputs);
-                    expect(results[0].type).toBe(VulnerabilityType.UnhandledError);
-                });
-            });
-
-            describe('generateMutations', () => {
-                it('should generate multiple mutations', async () => {
-                    const input = Buffer.from([1, 2, 3, 4]);
-                    const mutations = await fuzzer.generateMutations(input);
-                    expect(mutations.length).toBe(10);
-                    expect(mutations[0]).not.toEqual(input);
-                });
-            });
-
-            describe('generateEdgeCases', () => {
-                it('should generate edge case inputs', async () => {
-                    const edgeCases = await fuzzer.generateEdgeCases();
-                    expect(edgeCases).toHaveLength(2);
-                    expect(edgeCases[0].data.length).toBe(0);
-                    expect(edgeCases[1].data.length).toBe(1024);
-                });
-            });
-
-            describe('generateVulnerableInput', () => {
-                it('should generate input for arithmetic overflow', async () => {
-                    const input = await fuzzer.generateVulnerableInput(VulnerabilityType.ArithmeticOverflow);
-                    expect(input.data).toBeDefined();
-                    expect(input.data.length).toBe(4);
-                });
-            });
-
-            describe('startFuzzingCampaign', () => {
-                beforeEach(async () => {
-                    await fuzzer.initialize(testProgramId, mockConnection);
-                });
-
-                it('should run a fuzzing campaign', async () => {
-                    mockConnection.sendAndConfirmTransaction.mockResolvedValue('tx-hash');
-            
-                    const result = await fuzzer.startFuzzingCampaign({
-                        duration: 100,
-                        maxIterations: 10,
-                        programId: testProgramId,
-                        connection: mockConnection
-                    });
-
-                    expect(result.coverage).toBeGreaterThan(0);
-                    expect(result.executionsPerSecond).toBeGreaterThan(0);
-                });
-            });
-
-            describe('cleanup', () => {
-                it('should cleanup resources', async () => {
-                    await fuzzer.initialize(testProgramId, mockConnection);
-                    await fuzzer.cleanup();
-                    expect(fuzzer['anomalyDetectionModel']).toBeNull();
-                });
-            });
         });
 
         return delegateAccounts.reduce((total, account) =>
@@ -292,6 +243,17 @@ export class GovernanceManager {
             noVotes,
             quorumRequired,
             executed,
+            status: (() => {
+                const stateMap: Record<number, ProposalState> = {
+                    0: ProposalState.Draft,
+                    1: ProposalState.Active,
+                    2: ProposalState.Succeeded,
+                    3: ProposalState.Defeated,
+                    4: ProposalState.Executed,
+                    5: ProposalState.Cancelled
+                };
+                return stateMap[state].toString() || ProposalState.Draft.toString();
+            })(),
             state: (() => {
                 const stateMap: Record<number, ProposalState> = {
                     0: ProposalState.Draft,
@@ -445,8 +407,20 @@ export class GovernanceManager {
             wallet: Keypair,
             proposalAddress: PublicKey
         ): Promise<Transaction> {
+            // Validate signer count (minimum 3/5 signatures)
+            const requiredSigners = 3;
+            if (wallet.publicKey.toBuffer().length < requiredSigners * 32) {
+                throw new Error(`Execution requires at least ${requiredSigners} signers`);
+            }
+
             // Get current proposal state
             const proposalState = await this.getProposalState(connection, proposalAddress);
+        
+            // Enforce time-lock period
+            const currentTime = Math.floor(Date.now() / 1000);
+            if (currentTime < proposalState.timeLockEnd + 86400) { // 24-hour delay
+                throw new Error('Proposal execution requires 24-hour time lock');
+            }
 
             // First check if proposal exists
             if (!proposalState) {

@@ -6,8 +6,9 @@ import { PublicKey } from '@solana/web3.js';
 import { VulnerabilityType } from '../src/types';
 import { Logger } from '../../utils/logger';
 
-interface FuzzInput {
-    instruction: number;
+import { FuzzInput } from '../src/types';
+
+interface TestFuzzInput extends Omit<FuzzInput, 'data'> {
     data: Buffer;
 }
 
@@ -102,7 +103,13 @@ describe('Fuzzer', () => {
         it('should detect arithmetic overflow', async () => {
             const result: FuzzResult = await fuzzer.analyzeFuzzResult(
                 { error: 'arithmetic operation overflow' },
-                { instruction: 0, data: Buffer.alloc(0) }
+                { 
+                    instruction: 0, 
+                    data: Buffer.alloc(0),
+                    probability: 0.5,
+                    metadata: {},
+                    created: Date.now()
+                }
             );
             expect(result.type).toBe(VulnerabilityType.ArithmeticOverflow);
             expect(result.confidence).toBeGreaterThanOrEqual(0.7);
@@ -111,7 +118,13 @@ describe('Fuzzer', () => {
         it('should detect access control issues', async () => {
             const result: FuzzResult = await fuzzer.analyzeFuzzResult(
                 { error: 'unauthorized access attempt' },
-                { instruction: 0, data: Buffer.alloc(0) }
+                { 
+                    instruction: 0, 
+                    data: new Uint8Array(),
+                    probability: 0.5,
+                    metadata: {},
+                    created: Date.now()
+                }
             );
             expect(result.type).toBe(VulnerabilityType.AccessControl);
             expect(result.confidence).toBeGreaterThan(0.7);
@@ -120,7 +133,13 @@ describe('Fuzzer', () => {
         it('should return null for no vulnerabilities', async () => {
             const result: FuzzResult = await fuzzer.analyzeFuzzResult(
                 { error: 'generic error' },
-                { instruction: 0, data: Buffer.alloc(0) }
+                { 
+                    instruction: 0, 
+                    data: Buffer.alloc(0),
+                    probability: 0.5,
+                    metadata: {},
+                    created: Date.now()
+                }
             );
             expect(result.type).toBeNull();
             expect(result.confidence).toBe(0);
@@ -129,7 +148,13 @@ describe('Fuzzer', () => {
         it('should detect PDA safety issues', async () => {
             const result: FuzzResult = await fuzzer.analyzeFuzzResult(
                 { error: 'invalid PDA derivation' },
-                { instruction: 0, data: Buffer.alloc(0) }
+                { 
+                    instruction: 0, 
+                    data: Buffer.alloc(0),
+                    probability: 0.5,
+                    metadata: {},
+                    created: Date.now()
+                }
             );
             expect(result.type).toBe(VulnerabilityType.PDASafety);
             expect(result.confidence).toBeGreaterThan(0.7);
@@ -138,7 +163,13 @@ describe('Fuzzer', () => {
         it('should detect reentrancy vulnerabilities', async () => {
             const result: FuzzResult = await fuzzer.analyzeFuzzResult(
                 { error: 'potential reentrancy detected' },
-                { instruction: 0, data: Buffer.alloc(0) }
+                { 
+                    instruction: 0, 
+                    data: Buffer.alloc(0),
+                    probability: 1.0,
+                    metadata: {},
+                    created: Date.now()
+                }
             );
             expect(result.type).toBe(VulnerabilityType.Reentrancy);
             expect(result.confidence).toBeGreaterThanOrEqual(0.8);

@@ -1,195 +1,297 @@
-import { PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js';
-import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
-import { GlitchError } from './errors';
-import { ProposalState } from './types';
+import { Keypair, PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js';
+export var ProposalState;
+(function (ProposalState) {
+    ProposalState["Draft"] = "Draft";
+    ProposalState["Active"] = "Active";
+    ProposalState["Succeeded"] = "Succeeded";
+    ProposalState["Defeated"] = "Defeated";
+    ProposalState["Executed"] = "Executed";
+    ProposalState["Cancelled"] = "Cancelled";
+})(ProposalState || (ProposalState = {}));
 export class GovernanceManager {
-    programId;
-    DEFAULT_CONFIG = {
-        minVotingPower: 100, // Minimum voting power required
-        minStakeAmount: 1000,
-        votingPeriod: 259200, // 3 days in seconds
-        quorum: 10, // 10% of total supply
-        executionDelay: 86400, // 24 hours in seconds
-        minVotingPeriod: 86400, // 1 day
-        maxVotingPeriod: 604800 // 1 week
-    };
-    config;
-    proposalAccountSize = 1024; // Size in bytes for proposal accounts
-    constructor(programId, config = {}) {
+    constructor(connection, programId = new PublicKey('Governance111111111111111111111111111111111'), config) {
+        this.connection = connection;
         this.programId = programId;
-        this.config = { ...this.DEFAULT_CONFIG, ...config };
+        this.config = config;
     }
-
-    async checkVotingPower(connection, wallet) {
-        const votingPower = await this.calculateVoteWeight(connection, wallet.publicKey);
-        if (votingPower < this.config.minVotingPower) {
-            throw new GlitchError('Insufficient voting power', 2003);
-        }
-        return votingPower;
+    async createProposal(params) {
+        return this.createProposalAccount(this.connection, Keypair.generate(), params);
     }
-
-    async checkQuorum(metadata) {
-        const totalVotes = metadata.voteWeights.yes + metadata.voteWeights.no + metadata.voteWeights.abstain;
-        if (totalVotes <= metadata.quorum) {
-            throw new GlitchError('Proposal has not reached quorum', 2007);
-        }
+    async vote(proposalAddress, vote) {
+        return this.castVote(this.connection, Keypair.generate(), proposalAddress, vote);
     }
-
-    async validateProposal(connection, proposalAddress) {
-        const account = await connection.getAccountInfo(proposalAddress);
-        if (!account) {
-            throw new GlitchError('Proposal not found', 2002);
-        }
-        // Deserialize account data into ProposalMetadata
-        const metadata = this.deserializeProposalData(account.data);
-        if (Date.now() < metadata.startTime) {
-            throw new GlitchError('Proposal voting has not started', 2005);
-        }
-        if (Date.now() > metadata.endTime) {
-            throw new GlitchError('Proposal voting has ended', 2006);
-        }
-
-        return metadata;
+    async getProposal(proposalAddress) {
+        return this.validateProposal(this.connection, proposalAddress);
     }
-    deserializeProposalData(data) {
-        // Implement actual deserialization logic here
-        // This is a placeholder implementation
-        return JSON.parse(data.toString());
+    async getProposals() {
+        // Implementation would fetch multiple proposals
+        return [];
     }
-    async createProposalAccount(connection, wallet, params) {
-        const minPeriod = this.config.minVotingPeriod;
-        const maxPeriod = this.config.maxVotingPeriod;
-        if (!params.title || !params.description) {
-            throw new GlitchError('Invalid proposal parameters', 2001);
-        }
-        if (params.votingPeriod < minPeriod ||
-            params.votingPeriod > maxPeriod) {
-            throw new GlitchError('Invalid voting period', 2001);
-        }
-        const proposalAddress = PublicKey.findProgramAddressSync([Buffer.from('proposal'), wallet.publicKey.toBuffer()], this.programId)[0];
-        const createProposalIx = new TransactionInstruction({
-            keys: [
-                { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
-                { pubkey: proposalAddress, isSigner: false, isWritable: true }
-            ],
-            programId: this.programId,
-            data: Buffer.from([]) // TODO: Serialize proposal data
+    async getDelegatedBalance(connection, wallet) {
+        // Get delegated voting power from governance accounts
+        const delegateAccounts = await connection.getProgramAccounts(this.programId, {
+            filters: [
+                { dataSize: 128 }, // Expected size of delegate account
+                { memcmp: { offset: 32, bytes: wallet.toBase58() } }
+            ]
         });
-        const tx = new Transaction().add(createProposalIx);
-        return { proposalAddress, tx };
+        return delegateAccounts.reduce((total, account) => total + (account.account.lamports || 0), 0);
+    }
+    async calculateVoteWeight(connection, wallet) {
+        // Get direct balance
+        const accountInfo = await connection.getAccountInfo(wallet);
+        const directBalance = accountInfo ? accountInfo.lamports : 0;
+        // Get delegated balance
+        const delegatedBalance = await this.getDelegatedBalance(connection, wallet);
+        // Combine direct and delegated voting power
+        const totalPower = directBalance + delegatedBalance;
+        return Math.max(0, totalPower / 1000000); // Convert to voting units
     }
     async getProposalState(connection, proposalAddress) {
-        const account = await connection.getAccountInfo(proposalAddress);
-        if (!account) {
-            throw new GlitchError('Proposal not found', 2002);
+        const accountInfo = await connection.getAccountInfo(proposalAddress);
+        if (!accountInfo) {
+            throw new Error('Proposal not found');
         }
-        const metadata = this.deserializeProposalData(account.data);
-        return metadata.status;
-    }
-
-    async hasVoted(connection, voter, proposalAddress) {
-        const voteAccount = await connection.getAccountInfo(
-            new PublicKey(proposalAddress + '-vote-' + voter.toString())
-        );
-        return voteAccount !== null;
-    }
-
-    async getVoteCount(connection, proposalAddress) {
-        const account = await connection.getAccountInfo(proposalAddress);
-        if (!account) {
-            throw new GlitchError('Proposal not found', 2002);
+        // Fixed field sizes based on account layout
+        const TITLE_LEN = 64;
+        const DESC_LEN = 256;
+        const PUBKEY_LEN = 32;
+        const TIMESTAMP_LEN = 8;
+        const U32_LEN = 4;
+        const U8_LEN = 1;
+        const U16_LEN = 2;
+        // Calculate minimum required buffer size for fixed fields
+        const MIN_BUFFER_SIZE = TITLE_LEN + DESC_LEN + PUBKEY_LEN +
+            (3 * TIMESTAMP_LEN) +
+            (3 * U32_LEN) +
+            (2 * U8_LEN) + U16_LEN;
+        const data = accountInfo.data;
+        if (data.length < MIN_BUFFER_SIZE) {
+            throw new Error(`Invalid buffer size: ${data.length}. Minimum required: ${MIN_BUFFER_SIZE}`);
         }
-        const metadata = this.deserializeProposalData(account.data);
-        return metadata.voteWeights;
-    }
-    async castVote(connection, wallet, proposalAddress, support, weight) {
+        let offset = 0;
+        // Read fixed-length title (64 bytes)
+        const title = data.slice(offset, offset + TITLE_LEN).toString('utf8').replace(/\0+$/, '');
+        offset += TITLE_LEN;
+        // Read fixed-length description (256 bytes)
+        const description = data.slice(offset, offset + DESC_LEN).toString('utf8').replace(/\0+$/, '');
+        offset += DESC_LEN;
+        // Read proposer public key (32 bytes)
+        const proposer = new PublicKey(data.slice(offset, offset + PUBKEY_LEN));
+        offset += PUBKEY_LEN;
+        // Read timestamps (8 bytes each, BigInt64LE)
+        let startTime, endTime, timeLockEnd;
         try {
-            const metadata = await this.validateProposal(connection, proposalAddress);
-            const votingPower = await this.checkVotingPower(connection, wallet);
-            
-            // Check if wallet has already voted - convert stored voter string to PublicKey
-            const hasVoted = metadata.votes.some(v => 
-                new PublicKey(v.voter).equals(wallet.publicKey)
-            );
-            
-            if (hasVoted) {
-                throw new GlitchError('Already voted on this proposal', 2004);
-            }
-
-            // Use calculated voting power if weight not provided
-            const voteWeight = weight || votingPower;
-            const voteData = Buffer.from([
-                0x01, // Vote instruction
-                support ? 0x01 : 0x00,
-                ...new Uint8Array(new Float64Array([voteWeight]).buffer)
-            ]);
-            const voteIx = new TransactionInstruction({
-                keys: [
-                    { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
-                    { pubkey: proposalAddress, isSigner: false, isWritable: true }
-                ],
-                programId: this.programId,
-                data: voteData
-            });
-            return new Transaction().add(voteIx);
+            startTime = Number(data.readBigInt64LE(offset));
+            offset += TIMESTAMP_LEN;
+            endTime = Number(data.readBigInt64LE(offset));
+            offset += TIMESTAMP_LEN;
+            timeLockEnd = Number(data.readBigInt64LE(offset));
+            offset += TIMESTAMP_LEN;
         }
         catch (error) {
-            throw error;
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            throw new Error(`Failed to read timestamps: ${errorMessage}. Buffer might be malformed.`);
         }
-    }
-    async calculateVoteWeight(connection, voter) {
-        // Get token account
-        const tokenAccounts = await connection.getTokenAccountsByOwner(voter, {
-            programId: TOKEN_PROGRAM_ID
-        });
-        
-        let totalBalance = 0;
-        for (const { account } of tokenAccounts.value) {
-            const data = Buffer.from(account.data);
-            
-            // Parse SPL token account data
-            // Amount is at offset 64
-            const amount = Number(data.readBigUInt64LE(64));
-            
-            // Check delegation data
-            // Delegate is at offset 72 (after amount)
-            const delegateOption = data.readUInt32LE(72);
-            const hasDelegate = delegateOption === 1;
-            
-            // If account has delegate, only count if this voter is the delegate
-            if (hasDelegate) {
-                const delegate = new PublicKey(data.slice(76, 108));
-                if (delegate.equals(voter)) {
-                    totalBalance += amount;
-                }
-            } else {
-                // If no delegate, count owned tokens
-                totalBalance += amount;
+        // Read vote counts (4 bytes each, UInt32LE)
+        const yesVotes = data.readUInt32LE(offset);
+        offset += U32_LEN;
+        const noVotes = data.readUInt32LE(offset);
+        offset += U32_LEN;
+        const quorumRequired = data.readUInt32LE(offset);
+        offset += U32_LEN;
+        // Read flags (1 byte each, UInt8)
+        const executed = data.readUInt8(offset) === 1;
+        offset += U8_LEN;
+        const state = data.readUInt8(offset);
+        offset += U8_LEN;
+        // Read votes array length (2 bytes, UInt16LE)
+        let votesLen;
+        // Declare votes array outside try block so it's accessible in return statement
+        const votes = [];
+        try {
+            votesLen = data.readUInt16LE(offset);
+            offset += U16_LEN;
+            // Validate that buffer has enough space for votes array
+            if (offset + (votesLen * PUBKEY_LEN) > data.length) {
+                throw new Error('Buffer too small for votes array');
+            }
+            // Populate the votes array
+            for (let i = 0; i < votesLen; i++) {
+                votes.push(new PublicKey(data.slice(offset, offset + PUBKEY_LEN)));
+                offset += PUBKEY_LEN;
             }
         }
-        
-        return totalBalance;
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.warn(`Vote parsing warning: ${errorMessage}`);
+            // Return empty votes array instead of throwing
+            votes.length = 0;
+        }
+        return {
+            title,
+            description,
+            proposer,
+            startTime: Number(startTime),
+            endTime: Number(endTime),
+            timeLockEnd: Number(timeLockEnd),
+            yesVotes,
+            noVotes,
+            quorumRequired,
+            executed,
+            status: (() => {
+                const stateMap = {
+                    0: ProposalState.Draft,
+                    1: ProposalState.Active,
+                    2: ProposalState.Succeeded,
+                    3: ProposalState.Defeated,
+                    4: ProposalState.Executed,
+                    5: ProposalState.Cancelled
+                };
+                return stateMap[state].toString() || ProposalState.Draft.toString();
+            })(),
+            state: (() => {
+                const stateMap = {
+                    0: ProposalState.Draft,
+                    1: ProposalState.Active,
+                    2: ProposalState.Succeeded,
+                    3: ProposalState.Defeated,
+                    4: ProposalState.Executed,
+                    5: ProposalState.Cancelled
+                };
+                return stateMap[state] || ProposalState.Draft;
+            })(),
+            votes
+        };
     }
-    
-    async executeProposal(connection, wallet, proposalAddress) {
-        const account = await connection.getAccountInfo(proposalAddress);
-        if (!account) {
-            throw new GlitchError('Proposal not found', 2002);
+    async hasVoted(connection, proposalAddress, voter) {
+        // Check proposal state and voter record
+        const proposalState = await this.getProposalState(connection, proposalAddress);
+        return proposalState.votes?.some(vote => vote.toString() === voter.toString()) || false;
+    }
+    async getVoteCount(connection, proposalAddress) {
+        const proposalState = await this.getProposalState(connection, proposalAddress);
+        return {
+            yes: proposalState.yesVotes,
+            no: proposalState.noVotes,
+            abstain: 0
+        };
+    }
+    async validateProposal(connection, proposalAddress) {
+        const proposalState = await this.getProposalState(connection, proposalAddress);
+        return {
+            title: proposalState.title || '',
+            description: proposalState.description || '',
+            proposer: proposalState.proposer,
+            startTime: proposalState.startTime,
+            endTime: proposalState.endTime,
+            executionTime: proposalState.timeLockEnd,
+            voteWeights: {
+                yes: proposalState.yesVotes,
+                no: proposalState.noVotes,
+                abstain: 0,
+            },
+            votes: [],
+            quorum: proposalState.quorumRequired,
+            executed: proposalState.executed,
+            status: proposalState.state,
+        };
+    }
+    async castVote(connection, wallet, proposalAddress, vote) {
+        // Get proposal state
+        const proposalState = await this.getProposalState(connection, proposalAddress);
+        // Validate proposal exists and is active
+        if (!proposalState) {
+            throw new Error('Proposal not found');
         }
-        const metadata = this.deserializeProposalData(account.data);
-        const state = await this.getProposalState(connection, proposalAddress);
-        if (state !== ProposalState.Succeeded) {
-            throw new GlitchError('Proposal cannot be executed', 2004);
+        // Check proposal state and voting period
+        if (proposalState.endTime < Date.now()) {
+            throw new Error('Voting period has ended');
         }
-        await this.checkQuorum(metadata);
-        const executeIx = new TransactionInstruction({
+        else if (proposalState.state !== ProposalState.Active) {
+            throw new Error('Proposal is not in voting state');
+        }
+        // Check if voter has already voted
+        const hasVoted = await this.hasVoted(connection, proposalAddress, wallet.publicKey);
+        if (hasVoted) {
+            throw new Error('Already voted');
+        }
+        // Check voting power including delegations
+        const votingPower = await this.calculateVoteWeight(connection, wallet.publicKey);
+        const minVotingPower = 1; // Minimum voting power required
+        if (votingPower <= minVotingPower) {
+            throw new Error('Insufficient voting power');
+        }
+        // Validate proposal is still active and not expired
+        if (proposalState.endTime < Date.now()) {
+            throw new Error('Voting period has ended');
+        }
+        const transaction = new Transaction();
+        const instruction = new TransactionInstruction({
             keys: [
-                { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
-                { pubkey: proposalAddress, isSigner: false, isWritable: true }
+                { pubkey: proposalAddress, isSigner: false, isWritable: true },
+                { pubkey: wallet.publicKey, isSigner: true, isWritable: false }
             ],
             programId: this.programId,
-            data: Buffer.from([0x02]) // Execute instruction
+            data: Buffer.from([vote ? 1 : 0]) // Vote instruction data
         });
-        return new Transaction().add(executeIx);
+        transaction.add(instruction);
+        return transaction;
+    }
+    async createProposalAccount(connection, wallet, params) {
+        // Validate required parameters
+        if (!params.title?.trim() || !params.description?.trim() || !params.votingPeriod || params.votingPeriod <= 0) {
+            throw new Error('Invalid proposal parameters');
+        }
+        const proposalKeypair = Keypair.generate();
+        const proposalAddress = proposalKeypair.publicKey;
+        const transaction = new Transaction();
+        transaction.add(new TransactionInstruction({
+            keys: [
+                { pubkey: proposalAddress, isSigner: false, isWritable: true },
+                { pubkey: wallet.publicKey, isSigner: true, isWritable: false }
+            ],
+            programId: this.programId,
+            data: Buffer.from([]) // Create proposal instruction data
+        }));
+        return { proposalAddress, tx: transaction };
+    }
+    async executeProposal(connection, wallet, proposalAddress) {
+        // Get current proposal state
+        const proposalState = await this.getProposalState(connection, proposalAddress);
+        // First check if proposal exists
+        if (!proposalState) {
+            throw new Error('Cannot execute: Proposal not found');
+        }
+        // Check quorum requirements first
+        const voteCount = await this.getVoteCount(connection, proposalAddress);
+        if (voteCount.yes < proposalState.quorumRequired) {
+            throw new Error('Proposal has not reached quorum');
+        }
+        // Then check proposal state
+        if (proposalState.state !== ProposalState.Succeeded) {
+            throw new Error('Cannot execute: Proposal is not in succeeded state');
+        }
+        // Check if already executed
+        if (proposalState.executed) {
+            throw new Error('Cannot execute: Proposal has already been executed');
+        }
+        // Finally verify timelock period
+        if (proposalState.timeLockEnd > Date.now()) {
+            throw new Error('Timelock period not elapsed');
+        }
+        // Create transaction
+        const transaction = new Transaction();
+        // Add execute instruction
+        const instruction = new TransactionInstruction({
+            keys: [
+                { pubkey: proposalAddress, isSigner: false, isWritable: true },
+                { pubkey: wallet.publicKey, isSigner: true, isWritable: false }
+            ],
+            programId: this.programId,
+            data: Buffer.from([]) // Execution instruction data
+        });
+        transaction.add(instruction);
+        return transaction;
     }
 }

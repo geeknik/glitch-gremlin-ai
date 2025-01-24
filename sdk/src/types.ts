@@ -47,6 +47,9 @@ export interface RedisConfig {
     maxRetriesPerRequest?: number;
     connectTimeout?: number;
     retryStrategy?: (times: number) => number | null;
+    enableOfflineQueue?: boolean;
+    lazyConnect?: boolean;
+    reconnectOnError?: (err: Error) => boolean;
 }
 
 export type RedisClient = Redis | MockRedisClient;
@@ -75,8 +78,11 @@ export interface GovernanceConfig {
     maxVotingPeriod: number;
     minStakeAmount: number;
     votingPeriod: number;
-    quorum: number;
-    executionDelay: number;
+    quorum: number;         // Percentage required for quorum
+    executionDelay: number; // In seconds
+    MIN_STAKE_AMOUNT?: number;
+    MIN_STAKE_LOCKUP?: number;
+    MAX_STAKE_LOCKUP?: number;
 }
 
 export interface ChaosRequestParams {
@@ -84,6 +90,10 @@ export interface ChaosRequestParams {
     testType: TestType;
     duration: number;
     intensity: number;
+    proofOfHuman?: string; // CAPTCHA nonce from DESIGN.md 9.1
+    securityLevel: number; // 1-4 corresponding to DESIGN.md 9.6.3 tiers
+    executionEnvironment: 'sgx'|'kvm'|'wasm'; // From DESIGN.md 9.2
+    zkProof?: string; // zk-STARK proof from previous test
 }
 
 export interface ChaosResult {

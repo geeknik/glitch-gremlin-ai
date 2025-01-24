@@ -1,4 +1,4 @@
-import * as tf from '@tensorflow/tfjs-node';
+import tf from '@tensorflow/tfjs-node';
 import { FuzzingState } from './types.js';
 
 interface RLConfig {
@@ -68,47 +68,71 @@ export class RLFuzzingModel {
     }
 
     private initializeNetworks() {
-        const mainNet = tf.sequential();
-        const targetNet = tf.sequential();
+        try {
+            console.log('Initializing main network...');
+            this.mainNetwork = tf.sequential();
+            if (!this.mainNetwork) {
+                throw new Error('mainNetwork is undefined after tf.sequential()');
+            }
 
-        // Create main network
-        this.createNetwork(mainNet);
-        
-        // Create target network with same architecture
-        this.createNetwork(targetNet);
-        
-        // Copy weights from main to target network
-        targetNet.setWeights(mainNet.getWeights());
-
-        this.mainNetwork = mainNet;
-        this.targetNetwork = targetNet;
-        this.initialized = true;
+            console.log('Initializing target network...');
+            this.targetNetwork = tf.sequential();
+            if (!this.targetNetwork) {
+                throw new Error('targetNetwork is undefined after tf.sequential()');
+            }
+            
+            // Configure networks
+            this.configureNetwork(this.mainNetwork);
+            this.configureNetwork(this.targetNetwork);
+            
+            // Copy weights from main to target network
+            this.targetNetwork.setWeights(this.mainNetwork.getWeights());
+            this.initialized = true;
+            console.log('Networks initialized successfully');
+        } catch (error) {
+            console.error('Network initialization error:', error);
+            this.mainNetwork = null;
+            this.targetNetwork = null;
+            this.initialized = false;
+            throw new Error(`Failed to initialize networks: ${error instanceof Error ? error.message : String(error)}`);
+        }
     }
 
-    private createNetwork(network: tf.Sequential) {
-        // Input layer
-        network.add(tf.layers.dense({
-            units: 64,
-            activation: 'relu',
-            inputShape: [this.stateSize]
-        }));
+    private configureNetwork(network: tf.Sequential): void {
+        try {
+            console.log('Adding input layer...');
+            network.add(tf.layers.dense({
+                units: 64,
+                activation: 'relu',
+                inputShape: [this.stateSize]
+            }));
+            console.log('Input layer added');
 
-        // Hidden layer
-        network.add(tf.layers.dense({
-            units: 32,
-            activation: 'relu'
-        }));
+            console.log('Adding hidden layer...');
+            network.add(tf.layers.dense({
+                units: 32,
+                activation: 'relu'
+            }));
+            console.log('Hidden layer added');
 
-        // Output layer
-        network.add(tf.layers.dense({
-            units: this.actionSize,
-            activation: 'linear'
-        }));
+            console.log('Adding output layer...');
+            network.add(tf.layers.dense({
+                units: this.actionSize,
+                activation: 'linear'
+            }));
+            console.log('Output layer added');
 
-        network.compile({
-            optimizer: tf.train.adam(this.learningRate),
-            loss: 'meanSquaredError'
-        });
+            console.log('Compiling network...');
+            const optimizer = tf.train.adam(this.learningRate);
+            network.compile({
+                optimizer,
+                loss: 'meanSquaredError'
+            });
+            console.log('Network compiled successfully');
+        } catch (error) {
+            console.error('Error configuring network:', error);
+            throw error;
+        }
     }
 
     private stateToTensor(state: FuzzingState): tf.Tensor2D {

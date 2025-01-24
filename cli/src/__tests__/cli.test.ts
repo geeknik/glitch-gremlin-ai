@@ -1,10 +1,11 @@
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
 import { runCLI, fromRoot } from './test-helpers';
+import { describe, it, beforeAll, afterAll, beforeEach, expect } from '@jest/globals';
 import { ErrorCode, formatErrorMessage } from '../utils/errors';
 
 // Constants
-const CLI_PATH = fromRoot('index.ts');
+const CLI_PATH = fromRoot('../src/index.ts');
 const PACKAGE_JSON = resolve(__dirname, '../../package.json');
 const VALID_PROGRAM_ADDRESS = '11111111111111111111111111111111';
 const VERSION = JSON.parse(readFileSync(PACKAGE_JSON, 'utf8')).version;

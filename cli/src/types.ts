@@ -37,7 +37,7 @@ constructor(message: string) {
 
 export const validateProgramAddress = (address: string): boolean => {
 // Add program address validation logic
-return address && address.length > 0;
+return Boolean(address && address.length > 0);
 };
 
 export const validateTestType = (type: string): boolean => {

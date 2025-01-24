@@ -1,7 +1,19 @@
-import { ChildProcess, spawn } from 'child_process';
-import { resolve } from 'path';
+import { ChildProcess } from 'child_process';
+import { jest } from '@jest/globals';
 
 // Type definitions with clear documentation
+interface ProcessState {
+  processExited: boolean;
+  timedOut: boolean;
+  isResolved: boolean;
+  exitCode: number | null;
+}
+
+interface OutputBuffers {
+  stdout: string;
+  stderr: string;
+}
+
 interface CLIResult {
 /** Exit status code from the process */
 status: number;
@@ -22,9 +34,6 @@ cwd?: string;
 }
 
 /** Resolve paths relative to project root */
-export const fromRoot = (...paths: string[]): string => {
-    return resolve(__dirname, '..', ...paths);  
-}
 
 /** Filter common Node.js warnings from output */
 export const filterOutput = (output: string): string => {
@@ -75,7 +84,7 @@ private setupOutputCapture(): void {
 
 /** Wait for process completion with timeout */
 public async wait(): Promise<CLIResult> {
-    return new Promise((resolve) => {
+    return new Promise<CLIResult>((resolve) => {
     // Set timeout handler
     this.timeoutHandle = setTimeout(() => {
         this.kill();
@@ -231,47 +240,32 @@ public setResolved(): void {
 }
 }
 
-// Helper to execute CLI commands
-export const runCLI = async (args: string[] = []): Promise<CLIResult> => {
-    const CLI_PATH = fromRoot('cli.ts');
+import { execa } from 'execa';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+export async function runCLI(args: string[] = []): Promise<{
+    status: number;
+    stdout: string;
+    stderr: string;
+}> {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = resolve(__filename, '..');
+    const cliPath = resolve(__dirname, '../../src/index.ts');
     
-    const child = spawn('node', [
-        require.resolve('ts-node/dist/bin'),
-        '--esm',
-        CLI_PATH,
-        ...args
-    ], {
+    const result = await execa('tsx', [cliPath, ...args], {
+        reject: false,
         env: {
-            ...process.env,
-            NODE_ENV: 'test',
-            DEBUG: 'false',
-            NO_COLOR: 'true',
-            TS_NODE_PROJECT: resolve(__dirname, '../../tsconfig.json'),
-            NODE_OPTIONS: '--loader ts-node/esm --no-warnings',
-            FORCE_COLOR: '0'
-        },
-        stdio: 'pipe'
+            NODE_ENV: 'test'
+        }
     });
 
-    const manager = new ProcessManager(child);
-    manager.setupOutputHandlers();
+    return {
+        status: result.exitCode ?? 1,
+        stdout: result.stdout,
+        stderr: result.stderr
+    };
+}
 
-    return new Promise((resolve) => {
-        manager.setupExitHandler((result) => {
-            manager.setResolved();
-            resolve(result);
-        });
-
-        manager.setupErrorHandler((result) => {
-            manager.setResolved();
-            resolve(result);
-        });
-
-        manager.setupTimeout(10000, (result) => {
-            manager.setResolved();
-            resolve(result);
-        });
-    }).finally(() => {
-        manager.cleanup();
-    });
-};
+export const fromRoot = (...paths: string[]): string => 
+    resolve(__dirname, '../..', ...paths);

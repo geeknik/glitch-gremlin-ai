@@ -26,6 +26,12 @@ export interface DetectorConfig {
     sensitivityLevel: number;
     adaptiveThreshold?: boolean;
     seasonalityPeriod?: number;
+    inputSize?: number;
+    anomalyThreshold?: number;
+    timeSteps?: number;
+    dropoutRate?: number;
+    encoderLayers?: number[];
+    decoderLayers?: number[];
 }
 
 export interface AnomalyResult {
@@ -54,6 +60,25 @@ export interface MovingStats {
     count: number;
 }
 
+import * as tf from '@tensorflow/tfjs-node';
+
+export interface ModelConfig {
+    featureEngineering: {
+        enableTrending: boolean;
+        enableSeasonality: boolean;
+        enableCrossCorrelation: boolean;
+        windowSize: number;
+    };
+}
+
+export interface PerformanceMetrics {
+    processingTime: number;
+    memoryUsage: number;
+    modelAccuracy: number;
+    falsePositiveRate: number;
+    falseNegativeRate: number;
+}
+
 export class FeatureExtractor {
     constructor(private config: ModelConfig['featureEngineering']) {}
 
@@ -66,7 +91,7 @@ export class FeatureExtractor {
                         ...metric.instructionFrequency,
                         ...metric.executionTime,
                         ...metric.memoryUsage,
-                        ...metric.cpuUtilization,
+                        ...(metric.cpuUtilization || []),
                         ...metric.errorRate,
                         ...metric.pdaValidation,
                         ...metric.accountDataMatching,
@@ -142,6 +167,7 @@ export class AnomalyDetector extends EventEmitter {
     private mean: number = 0;
     private stdDev: number = 0;
     private readonly metrics: MetricKey[];
+    private isInitialized: boolean = false;
 
     private models: {
         autoencoder: any;
@@ -276,11 +302,17 @@ export class AnomalyDetector extends EventEmitter {
 
     public async train(data: TimeSeriesMetric[]): Promise<void> {
         if (!data?.length) {
-            throw new Error('Training data is empty');
+            throw new Error('Training data cannot be empty');
+        }
+        if (data.length < this.config.minSampleSize) {
+            throw new Error(`Insufficient training data - need at least ${this.config.minSampleSize} samples`);
         }
 
         try {
             const flattenedData = data.flatMap(metric => {
+                if (!metric.cpuUtilization || !Array.isArray(metric.cpuUtilization)) {
+                    throw new Error('Invalid cpuUtilization format - must be array');
+                }
                 if (!metric.instructionFrequency?.length) {
                     throw new Error('Invalid metric data');
                 }
@@ -314,6 +346,11 @@ export class AnomalyDetector extends EventEmitter {
     }
 
     public async detect(data: TimeSeriesMetric[]): Promise<AnomalyResult> {
+        // Check model status first
+        if (!this.model || !this.isTrained) {
+            throw new Error('Model not initialized or trained');
+        }
+
         if (!data?.length) {
             throw new Error('Detection data is empty');
         }

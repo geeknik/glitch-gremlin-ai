@@ -33,9 +33,20 @@ The framework aims to provide an AI-driven chaos testing platform for Solana dAp
     * **Transaction Prioritization:** Prioritize transactions based on predicted impact and potential vulnerability.
     * **Account Rent:**  Manage rent-exempt balances for test accounts.
     * **Program Storage:** Optimize program storage usage during testing.
+    * **Cross-Program Invocation Limits:** Enforce depth limits and circular call detection
+    * **PDA Validation:** Verify program-derived addresses are properly generated with correct seeds
+    * **Signer Authorization:** Ensure proper signer checks for privileged operations
+    * **Sysvar Validation:** Validate sysvar accounts are properly accessed (clock, recent blockhashes, etc.)
 
 ### 2.4 Community Governance Integration
 
+* **Security Metrics Tracking:**
+  * Vulnerability density per program
+  * Time-to-detection for critical issues
+  * False positive/negative rates
+  * Exploit complexity scoring
+  * Attack surface quantification
+  
 * **Test Scenarios:** Allow community members to propose test scenarios and parameters.
 * **Voting:** Implement a voting system for community members to prioritize and approve test cases.
 * **Rewards:** Distribute rewards for successful test cases and vulnerability discoveries.

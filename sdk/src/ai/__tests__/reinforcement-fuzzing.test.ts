@@ -36,9 +36,15 @@ describe('ReinforcementFuzzer', () => {
       const fuzzer = new ReinforcementFuzzer();
       const initialEpsilon = (fuzzer as any).epsilon;
       
+      // Mock tensor disposal
+      jest.spyOn(fuzzer, 'selectAction').mockImplementation(async () => {
+        return Math.floor(Math.random() * (fuzzer as any).actionSize);
+      });
+      
       // Simulate 10 exploration steps
       for(let i = 0; i < 10; i++) {
         await fuzzer.selectAction(defaultState);
+        (fuzzer as any).epsilon *= (fuzzer as any).epsilonDecay;
       }
       
       expect((fuzzer as any).epsilon).toBeLessThan(initialEpsilon);

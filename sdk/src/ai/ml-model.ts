@@ -48,7 +48,7 @@ export class VulnerabilityDetectionModel {
             metrics: ['accuracy']
         });
 
-        this.model = model;
+        this.model = this.model;
         this.initialized = true;
     }
 

@@ -16,9 +16,9 @@ const config: Config.InitialOptions = {
     }]
   },
   moduleNameMapper: {
-    // Updated for security test isolation
     '^(\\.{1,2}/.*)\\.js$': '$1',
     '^@glitch-gremlin/sdk$': '<rootDir>/sdk/src/index.ts',
+    '^@glitch-gremlin/sdk/ai/types$': '<rootDir>/sdk/src/ai/src/types.ts',
     '^@security/(.*)$': '<rootDir>/sdk/src/ai/security/$1',
     '#cli/(.*)': '<rootDir>/cli/$1',
     '^@/(.*)$': '<rootDir>/sdk/src/$1',

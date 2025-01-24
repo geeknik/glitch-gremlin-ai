@@ -1,7 +1,7 @@
-import { Connection, Keypair, PublicKey, Transaction } from '@solana/web3.js';
-import { GovernanceManager as SDKGovernanceManager, GovernanceConfig } from '../../sdk/src/governance';
-import { GOVERNANCE_CONFIG } from '../config/governance';
-import { GlitchError } from '../utils/errors';
+import { Connection, Keypair, PublicKey, Transaction, VersionedTransaction, VersionedMessage } from '@solana/web3.js';
+import { GovernanceManager as SDKGovernanceManager, type GovernanceConfig } from '@glitch-gremlin/sdk';
+import { GOVERNANCE_CONFIG } from './config/governance';
+import { CLIError } from './utils/errors';
 
 export class GovernanceManager {
     private sdkManager: SDKGovernanceManager;
@@ -21,19 +21,32 @@ export class GovernanceManager {
             executionDelay: 2 * 24 * 60 * 60 // 2 days in seconds
         };
 
-        this.sdkManager = new SDKGovernanceManager(connection, config);
+        this.sdkManager = new SDKGovernanceManager(
+            connection,
+            new PublicKey(GOVERNANCE_CONFIG.programId),
+            {
+                programId: new PublicKey(GOVERNANCE_CONFIG.programId),
+                treasuryAddress: new PublicKey(GOVERNANCE_CONFIG.treasuryAddress),
+                minStakeAmount: GOVERNANCE_CONFIG.minStakeAmount,
+                votingPeriod: GOVERNANCE_CONFIG.votingPeriod,
+                quorumPercentage: GOVERNANCE_CONFIG.quorumPercentage,
+                executionDelay: GOVERNANCE_CONFIG.executionDelay
+            }
+        );
     }
 
     async initialize(): Promise<string> {
         try {
-            const { transaction } = await this.sdkManager.createProposal(
-                this.wallet.publicKey,
-                "Initialize Governance",
-                "Initial setup of governance parameters"
-            );
+            const { tx: transaction } = await this.sdkManager.createProposal({
+                proposer: this.wallet.publicKey,
+                title: "Initialize Governance",
+                description: "Initial setup of governance parameters"
+            });
             
             transaction.sign(this.wallet);
-            const signature = await this.connection.sendTransaction(transaction);
+            const signature = await this.connection.sendTransaction(
+                new VersionedTransaction(VersionedMessage.deserialize(transaction.serialize()))
+            );
             await this.connection.confirmTransaction(signature);
             
             return signature;
@@ -44,17 +57,19 @@ export class GovernanceManager {
 
     async createProposal(title: string, description: string): Promise<string> {
         try {
-            const { proposal, transaction } = await this.sdkManager.createProposal(
-                this.wallet.publicKey,
+            const { tx: transaction } = await this.sdkManager.createProposal({
+                proposer: this.wallet.publicKey,
                 title,
                 description
-            );
+            });
             
             transaction.sign(this.wallet);
-            const signature = await this.connection.sendTransaction(transaction);
+            const signature = await this.connection.sendTransaction(
+                new VersionedTransaction(VersionedMessage.deserialize(transaction.serialize()))
+            );
             await this.connection.confirmTransaction(signature);
             
-            return proposal.id;
+            return signature;
         } catch (error) {
             throw new GlitchError('Failed to create proposal', 'PROPOSAL_CREATION_FAILED');
         }
@@ -63,13 +78,14 @@ export class GovernanceManager {
     async vote(proposalId: string, support: boolean): Promise<string> {
         try {
             const transaction = await this.sdkManager.vote(
-                proposalId,
-                this.wallet.publicKey,
+                new PublicKey(proposalId),
                 support
             );
             
             transaction.sign(this.wallet);
-            const signature = await this.connection.sendTransaction(transaction);
+            const signature = await this.connection.sendTransaction(
+                new VersionedTransaction(VersionedMessage.deserialize(transaction.serialize()))
+            );
             await this.connection.confirmTransaction(signature);
             
             return signature;
@@ -80,10 +96,16 @@ export class GovernanceManager {
 
     async executeProposal(proposalId: string): Promise<string> {
         try {
-            const transaction = await this.sdkManager.executeProposal(proposalId);
+            const transaction = await this.sdkManager.executeProposal(
+                this.connection,
+                this.wallet,
+                new PublicKey(proposalId)
+            );
             
             transaction.sign(this.wallet);
-            const signature = await this.connection.sendTransaction(transaction);
+            const signature = await this.connection.sendTransaction(
+                new VersionedTransaction(VersionedMessage.deserialize(transaction.serialize()))
+            );
             await this.connection.confirmTransaction(signature);
             
             return signature;

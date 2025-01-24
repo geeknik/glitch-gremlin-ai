@@ -1,22 +1,27 @@
 import { jest, describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from '@jest/globals';
-import { VulnerabilityDetectionModel, VulnerabilityType, generateTrainingData } from '../ai/src/ml-model';
+import { VulnerabilityDetectionModelImpl as VulnerabilityDetectionModel } from '../ai/src/ml-model';
+import { VulnerabilityType } from '../ai/src/types';
 
 // Mock TensorFlow
 const mockTF = {
-sequential: jest.fn(),
-layers: {
-    dense: jest.fn(),
-    dropout: jest.fn()
-},
-memory: jest.fn(() => ({ numTensors: 0 })),
-tidy: jest.fn((fn) => fn()),
-dispose: jest.fn(),
-tensor: jest.fn(),
-tensor2d: jest.fn(),
-keep: jest.fn(x => x),
-metrics: {
-    categoricalAccuracy: jest.fn()
-}
+    sequential: jest.fn(),
+    layers: {
+        dense: jest.fn(),
+        dropout: jest.fn()
+    },
+    memory: jest.fn(() => ({ numTensors: 0 })),
+    tidy: jest.fn((fn) => fn()),
+    dispose: jest.fn(),
+    tensor: jest.fn(),
+    tensor2d: jest.fn(),
+    keep: jest.fn(x => x),
+    metrics: {
+        categoricalAccuracy: jest.fn()
+    },
+    loadLayersModel: jest.fn(),
+    oneHot: jest.fn(),
+    scalar: jest.fn(),
+    tensor1d: jest.fn()
 };
 
 jest.mock('@tensorflow/tfjs-node', () => mockTF);
@@ -132,6 +137,16 @@ beforeAll(() => {
             // Train the model with minimal dataset before prediction tests
             const sampleData = generateTrainingData(5);
             await model.trainWithData(sampleData);
+        });
+
+        it('should detect adversarial inputs', async () => {
+            const adversarialFeatures = new Array(100).fill(Number.MAX_VALUE);
+            await expect(model.predictVulnerability(adversarialFeatures))
+                .rejects.toThrow('Invalid feature values');
+            
+            const nanFeatures = new Array(100).fill(NaN);
+            await expect(model.predictVulnerability(nanFeatures))
+                .rejects.toThrow('Invalid feature values');
         });
 
         it('should make predictions with proper confidence scores', async () => {
@@ -255,5 +270,6 @@ beforeAll(() => {
             // Verify tensor cleanup
             expect(tf.memory().numTensors).toBeLessThanOrEqual(initialTensors);
         });
+    });
     });
 });

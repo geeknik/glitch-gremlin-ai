@@ -1,13 +1,21 @@
-import { VulnerabilityType, VulnerabilityDetectionModel } from '@glitch-gremlin/sdk';
+import { VulnerabilityType, VulnerabilityDetectionModel } from '../__mocks__/@glitch-gremlin/sdk';
 
-jest.mock('@glitch-gremlin/sdk');
+jest.mock('../../../sdk/src/ai/src/ml-model', () => ({
+  VulnerabilityDetectionModel: jest.fn().mockImplementation(() => ({
+    predict: jest.fn(),
+    ensureInitialized: jest.fn(),
+    cleanup: jest.fn(),
+    save: jest.fn(),
+    load: jest.fn()
+  }))
+}));
 
 describe('ML Model Integration Tests', () => {
     let model: VulnerabilityDetectionModel;
 
     beforeEach(() => {
         jest.clearAllMocks();
-        model = new VulnerabilityDetectionModel();
+        model = new VulnerabilityDetectionModel() as jest.Mocked<VulnerabilityDetectionModel>;
     });
 
     it('should integrate with CLI commands', async () => {

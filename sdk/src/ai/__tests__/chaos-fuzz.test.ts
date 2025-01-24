@@ -1,16 +1,14 @@
 import { jest } from '@jest/globals';
-import '@tensorflow/tfjs-node';
-import { PublicKey } from '@solana/web3.js';
-import { ChaosGenerator, ChaosConfig } from '../chaosGenerator.js';
-import { FuzzInput } from '../fuzzer.js';
-import { VulnerabilityType } from '../types.js';
+import { ChaosGenerator, ChaosConfig } from '../chaosGenerator';
+import { VulnerabilityType } from '../src/types';
+import { FuzzInput } from '../src/types';
 
 describe('ChaosGenerator', () => {
     let chaosGenerator: ChaosGenerator;
     const defaultConfig: ChaosConfig = {
         mutationRate: 0.1,
         maxChaosLevel: 5,
-        targetVulnerabilities: [VulnerabilityType.ArithmeticOverflow]
+        targetVulnerabilities: [VulnerabilityType.ArithmeticOverflow as any]
     };
 
     beforeEach(() => {
@@ -33,7 +31,9 @@ describe('ChaosGenerator', () => {
         const mockInput: FuzzInput = {
             instruction: 100,
             data: new Uint8Array([1, 2, 3, 4]),
-            probability: 0.5
+            probability: 0.5,
+            metadata: {},
+            created: Date.now()
         };
 
         it('should enhance input based on chaos level', () => {
@@ -71,7 +71,9 @@ describe('ChaosGenerator', () => {
             const emptyInput: FuzzInput = {
                 instruction: 0,
                 data: new Uint8Array(),
-                probability: 0.5
+                probability: 0.5,
+                metadata: {},
+                created: Date.now()
             };
             
             const enhanced = chaosGenerator.enhanceInput(emptyInput, 1);
@@ -82,7 +84,9 @@ describe('ChaosGenerator', () => {
             const maxInput: FuzzInput = {
                 instruction: 255,
                 data: new Uint8Array([255, 255]),
-                probability: 1.0
+                probability: 1.0,
+                metadata: {},
+                created: Date.now()
             };
             
             const enhanced = chaosGenerator.enhanceInput(maxInput, 1);

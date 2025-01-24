@@ -29,4 +29,3 @@ export var ProposalState;
     ProposalState["Queued"] = "queued";
     ProposalState["Expired"] = "expired";
 })(ProposalState || (ProposalState = {}));
-//# sourceMappingURL=types.js.map

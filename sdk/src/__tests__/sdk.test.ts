@@ -24,20 +24,20 @@ queue?: string[];
 connected: boolean;
 store: RedisStore;
 cleanup: () => Promise<void>;
-incr: jest.Mock<Promise<number>, [RedisKey]>;
-get: jest.Mock<Promise<string | null>, [RedisKey]>;
-set: jest.Mock<Promise<'OK'>, [RedisKey, string]>;
-expire: jest.Mock<Promise<number>, [RedisKey, number]>;
-keys: jest.Mock<Promise<string[]>, [string]>;
-flushall: jest.Mock<Promise<'OK'>, []>;
-ping: jest.Mock<Promise<'PONG'>, []>;
-disconnect: jest.Mock<Promise<void>, []>;
-quit: jest.Mock<Promise<'OK'>, []>;
-on: jest.Mock<Redis, any[]>;
-hset: jest.Mock<Promise<string>, [string, string]>;
-lpush: jest.Mock<Promise<number>, [string, string]>;
-rpop: jest.Mock<Promise<string | null>, [string]>;
-getRawClient: jest.Mock<TestRedisClient, []>;
+incr: jest.Mock<any>;
+get: jest.Mock<any>;
+set: jest.Mock<any>;
+expire: jest.Mock<any>;
+keys: jest.Mock<any>;
+flushall: jest.Mock<any>;
+ping: jest.Mock<any>;
+disconnect: jest.Mock<any>;
+quit: jest.Mock<any>;
+on: jest.Mock<any>;
+hset: jest.Mock<any>;
+lpush: jest.Mock<any>;
+rpop: jest.Mock<any>;
+getRawClient: jest.Mock<any>;
 }
 jest.setTimeout(30000);
 
@@ -82,9 +82,9 @@ const mockState = {
             store: {},
 
             // Core Redis operations
-            incr: jest.fn().mockImplementation(async (key: RedisKey) => {
+            incr: jest.fn<any>().mockImplementation(async (key: RedisKey) => {
                 const now = Date.now();
-                const entry = mockRedisClient.store[key];
+                const entry = mockRedisClient.store[key as string];
                 
                 // Initialize mock state if needed
                 if (!(global as any).mockState) {
@@ -96,8 +96,8 @@ const mockState = {
                 
                 // Check expiry
                 if (entry?.expiry && now > entry.expiry) {
-                    delete mockRedisClient.store[key];
-                    mockRedisClient.store[key] = { value: 1 };
+                    delete mockRedisClient.store[key as string];
+                    mockRedisClient.store[key as string] = { value: 1 };
                     (global as any).mockState.requestCount = 1;
                     (global as any).mockState.lastRequestTime = now;
                     return 1;
@@ -105,7 +105,7 @@ const mockState = {
 
                 const current = entry?.value || '0';
                 const nextVal = parseInt(current.toString()) + 1;
-                mockRedisClient.store[key] = { value: nextVal };
+                mockRedisClient.store[key as string] = { value: nextVal };
                 
                 // Always increment mock state
                 (global as any).mockState.requestCount += 1;
@@ -114,30 +114,30 @@ const mockState = {
                 return nextVal;
             }),
 
-            get: jest.fn().mockImplementation(async (key: RedisKey) => {
-                const entry = mockRedisClient.store[key];
+            get: jest.fn<any>().mockImplementation(async (key: RedisKey) => {
+                const entry = mockRedisClient.store[key as string];
                 if (!entry) return null;
                 if (entry.expiry && Date.now() > entry.expiry) {
-                    delete mockRedisClient.store[key];
+                    delete mockRedisClient.store[key as string];
                     return null;
                 }
                 return entry.value.toString();
             }),
 
-            set: jest.fn().mockImplementation(async (key: RedisKey, value: string) => {
-                mockRedisClient.store[key] = { value };
+            set: jest.fn<any>().mockImplementation(async (key: RedisKey, value: string) => {
+                mockRedisClient.store[key as string] = { value };
                 return 'OK';
             }),
 
-            expire: jest.fn().mockImplementation(async (key: RedisKey, seconds: number) => {
-                const entry = mockRedisClient.store[key];
+            expire: jest.fn<any>().mockImplementation(async (key: RedisKey, seconds: number) => {
+                const entry = mockRedisClient.store[key as string];
                 if (!entry) return 0;
                 entry.expiry = Date.now() + (seconds * 1000);
                 return 1;
             }),
 
             // Test utilities
-            keys: jest.fn().mockImplementation(async (pattern: string) => {
+            keys: jest.fn<any>().mockImplementation(async (pattern: string) => {
                 return Object.keys(mockRedisClient.store).filter(key => 
                     key.includes(pattern.replace('*', ''))
                 );
@@ -151,28 +151,28 @@ const mockState = {
                 return 'OK';
             }),
 
-            ping: jest.fn().mockResolvedValue('PONG'),
-            disconnect: jest.fn().mockResolvedValue(undefined),
-            quit: jest.fn().mockResolvedValue('OK'),
+            ping: jest.fn<any>().mockResolvedValue('PONG'),
+            disconnect: jest.fn<any>().mockResolvedValue(undefined),
+            quit: jest.fn<any>().mockResolvedValue('OK'),
             on: jest.fn().mockReturnThis()
         } as unknown as MockedObject<TestRedisClient>;
 
         // Set up additional Redis mock methods
-        mockRedisClient.hset = jest.fn().mockImplementation(async (key: string, field: string) => {
+        mockRedisClient.hset = jest.fn<any>().mockImplementation(async (key: string, field: string) => {
             if (field === 'bad-result') {
                 throw new GlitchError('Invalid JSON', ErrorCode.INVALID_JSON);
             }
             return JSON.stringify({test: 'data'});
         });
         
-        mockRedisClient.lpush = jest.fn().mockImplementation(async (key: string, value: string) => {
+        mockRedisClient.lpush = jest.fn<any>().mockImplementation(async (key: string, value: string) => {
             if (value === 'invalid-json') {
                 throw new GlitchError('Invalid JSON', ErrorCode.INVALID_JSON);
             }
             return 1;
         });
         
-        mockRedisClient.rpop = jest.fn().mockImplementation(async function(this: TestRedisClient, key: string) {
+        mockRedisClient.rpop = jest.fn<any>().mockImplementation(async function(this: TestRedisClient, key: string) {
             if (key === 'empty-queue') {
                 return null;
             }
@@ -182,12 +182,12 @@ const mockState = {
         mockRedisClient.getRawClient = jest.fn().mockReturnValue(mockRedisClient);
 
         // Create RedisQueueWorker with mock client
-        redisQueueWorker = new RedisQueueWorker(mockRedisClient);
-        redisQueueWorker.getRawClient = jest.fn().mockResolvedValue(mockRedisClient);
+        redisQueueWorker = new RedisQueueWorker(mockRedisClient as unknown as Redis);
+        redisQueueWorker.getRawClient = jest.fn().mockResolvedValue(mockRedisClient as unknown as Redis);
         jest.spyOn(Connection.prototype, 'getVersion').mockResolvedValue({ 'solana-core': '1.7.0' });
 
         // Create fresh RedisQueueWorker instance
-        redisQueueWorker = new RedisQueueWorker(mockRedisClient);
+        redisQueueWorker = new RedisQueueWorker(mockRedisClient as unknown as Redis);
         await redisQueueWorker.initialize();
 
         // Create SDK instance
@@ -198,7 +198,8 @@ const mockState = {
                 host: "localhost",
                 port: 6379
             },
-            heliusApiKey: 'mock-api-key'
+            heliusApiKey: 'mock-api-key',
+            minStakeAmount: 100_000_000 // 0.1 SOL
         } as SDKConfig);
 
         // Set queue worker directly for testing
@@ -239,7 +240,7 @@ const mockState = {
     afterAll(async () => {
         try {
             if (sdk?.['queueWorker']) {
-                const worker = sdk['queueWorker'] as RedisQueueWorker;
+                const worker = sdk['queueWorker'] as unknown as RedisQueueWorker;
                 if (typeof worker.close === 'function') {
                     await worker.close();
                 }
@@ -363,8 +364,8 @@ const mockState = {
                     intensity: 5,
                     targetProgram: "11111111111111111111111111111111"
                 },
-                stakingAmount: 10 // Too low
-            })).rejects.toThrow('Insufficient stake amount');
+                stakingAmount: 10_000 // 0.00001 SOL (below minimum)
+            })).rejects.toThrow('must be at least 0.1 SOL');
         });
     });
 

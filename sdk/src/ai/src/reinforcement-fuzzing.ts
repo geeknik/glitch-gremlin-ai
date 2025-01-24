@@ -196,8 +196,9 @@ export class ReinforcementFuzzer {
         const predictions = await this.model.predict(stateTensor) as tf.Tensor;
         const action = predictions.argMax(1).dataSync()[0];
         
-        stateTensor.dispose();
-        predictions.dispose();
+        // Cleanup tensors with null safety
+        stateTensor?.dispose();
+        predictions?.dispose();
         
         return action;
     }

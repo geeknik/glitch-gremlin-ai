@@ -1,11 +1,11 @@
 use solana_client::rpc_client::RpcClient;
+use borsh::BorshDeserialize;
 use solana_program::pubkey::Pubkey;
 use std::error::Error;
 use std::time::{SystemTime, UNIX_EPOCH};
 use crate::state::{GovernanceProposal, ProposalStatus};
 use crate::error::GovernanceError;
 
-const VOTING_PERIOD: i64 = 3 * 24 * 60 * 60; // 3 days in seconds
 const EXECUTION_DELAY: i64 = 24 * 60 * 60; // 24 hours in seconds
 const MIN_VOTE_THRESHOLD: u64 = 100_000; // Minimum votes required
 
@@ -81,8 +81,8 @@ async fn process_proposal(
 }
 
 async fn execute_proposal(
-    client: &RpcClient,
-    program_id: &Pubkey,
+    _client: &RpcClient,
+    _program_id: &Pubkey,
     proposal: &GovernanceProposal,
 ) -> Result<(), Box<dyn Error>> {
     // Create and send transaction to execute the proposal
@@ -97,8 +97,8 @@ async fn execute_proposal(
 }
 
 fn update_proposal_status(
-    client: &RpcClient,
-    program_id: &Pubkey,
+    _client: &RpcClient,
+    _program_id: &Pubkey,
     proposal: &GovernanceProposal,
     new_status: ProposalStatus,
 ) -> Result<(), Box<dyn Error>> {

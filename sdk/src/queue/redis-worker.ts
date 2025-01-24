@@ -1,7 +1,7 @@
 import IORedis from 'ioredis';
 import { GlitchError } from '../errors.js';
 import type { Redis as RedisType } from 'ioredis';
-import type { ChaosRequestParams, ChaosResult } from '../types.js';
+import type { ChaosRequestParams, ChaosResult, RedisConfig } from '../types.js';
 
 interface RequestLimit {
     maxRequests: number;
@@ -11,8 +11,13 @@ interface RequestLimit {
 interface RequestLimits {
     [key: string]: RequestLimit;
 }
-export class RedisQueueWorker {
+export class RedisQueueWorker implements RedisConfig {
     protected redis: RedisType;
+    public host: string = 'r.glitchgremlin.ai';
+    public port: number = 6379;
+    public maxRetriesPerRequest?: number = 3;
+    public connectTimeout?: number = 5000;
+    public retryStrategy?: (times: number) => number | null = (times) => Math.min(times * 100, 3000);
     private readonly queueKey = 'glitch:chaos:queue';
     private readonly resultKey = 'glitch:chaos:results';
     private readonly rateLimitKey = 'glitch:chaos:ratelimit';
@@ -36,10 +41,10 @@ export class RedisQueueWorker {
         return this.redis;
     }
 
-    constructor(redisClient?: RedisType) {
+    constructor(redisClient?: RedisType, config?: RedisConfig) {
         this.redis = redisClient || new IORedis({
-            host: process.env.REDIS_HOST || 'r.glitchgremlin.ai', 
-            port: parseInt(process.env.REDIS_PORT || '6379'),
+            host: config?.host || process.env.REDIS_HOST || this.host,
+            port: config?.port || parseInt(process.env.REDIS_PORT || String(this.port)),
             connectTimeout: 5000,
             maxRetriesPerRequest: 3,
             retryStrategy: (times: number): number | null => {

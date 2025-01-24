@@ -21,13 +21,15 @@ patterns?: SecurityPattern[];
 }
 
 export interface SecurityPattern {
-type: string;
-confidence: number;
-severity: RiskLevel;
-description: string;
-indicators: string[];
-timestamp: number;
-location?: string;
+    type: string;
+    confidence: number;
+    severity: RiskLevel;
+    description: string;
+    indicators: string[];
+    timestamp: number;
+    location?: string;
+    risk?: RiskLevel;
+    details?: string[];
 }
 
 export interface SecurityScore {

@@ -1,7 +1,8 @@
 export enum ErrorCode {
     MISSING_PROGRAM_ADDRESS = 'MISSING_PROGRAM_ADDRESS',
-    INVALID_PROGRAM_ADDRESS = 'INVALID_PROGRAM_ADDRESS', 
+    INVALID_PROGRAM_ADDRESS = 'INVALID_PROGRAM_ADDRESS',
     INVALID_TEST_TYPE = 'INVALID_TEST_TYPE',
+    AUDIT_FAILED = 'AUDIT_FAILED',
     SECURITY_ANALYSIS_FAILED = 'SECURITY_ANALYSIS_FAILED',
     NETWORK_ERROR = 'NETWORK_ERROR',
     TIMEOUT_ERROR = 'TIMEOUT_ERROR'
@@ -11,7 +12,7 @@ const ERROR_MESSAGES: Record<ErrorCode, string> = {
     [ErrorCode.MISSING_PROGRAM_ADDRESS]: "error: required option '--program' not specified",
     [ErrorCode.INVALID_PROGRAM_ADDRESS]: "Invalid program address format",
     [ErrorCode.INVALID_TEST_TYPE]: "Invalid test type specified",
-    // Enhanced error messages from DESIGN.md 10
+    [ErrorCode.AUDIT_FAILED]: "Security audit failed",
     [ErrorCode.SECURITY_ANALYSIS_FAILED]: "Security analysis failed - potential vulnerability detected",
     [ErrorCode.NETWORK_ERROR]: "Network error - verify connection and retry",
     [ErrorCode.TIMEOUT_ERROR]: "Operation timed out - increase timeout with --max-wait"

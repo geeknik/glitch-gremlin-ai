@@ -1,11 +1,15 @@
 import { Fuzzer } from '../ai/fuzzer';
 import { VulnerabilityType } from '../types';
+import { VulnerabilityType } from '../types';
 import { PublicKey } from '@solana/web3.js';
+
+const EXPECTED_INPUT_LENGTH = 1000;
 
 describe('Fuzzer', () => {
     let fuzzer;
 
     beforeEach(async () => {
+        // Metrics collection is not needed for tests, hence set to null
         fuzzer = new Fuzzer({ port: 9464, metricsCollector: null }); // Use smaller iteration count for tests
     });
 
@@ -13,12 +17,14 @@ describe('Fuzzer', () => {
         it('should generate valid fuzz inputs', async () => {
             const programId = new PublicKey('11111111111111111111111111111111');
             const inputs = await fuzzer.generateFuzzInputs(programId);
-
+            expect(inputs.length).toBe(EXPECTED_INPUT_LENGTH);
             expect(inputs.length).toBe(1000);
             expect(inputs[0]).toHaveProperty('instruction');
             expect(inputs[0]).toHaveProperty('data');
-            expect(inputs[0]).toHaveProperty('probability');
-
+            // Verify inputs are sorted by probability
+            if (inputs.length > 1) {
+                expect(inputs[0].probability).toBeGreaterThanOrEqual(inputs[1].probability);
+            }
             // Verify inputs are sorted by probability
             expect(inputs[0].probability).toBeGreaterThanOrEqual(inputs[1].probability);
         });

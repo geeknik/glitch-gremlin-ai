@@ -23,35 +23,50 @@ export interface VulnerabilityDetectionModel {
     load(path: string): Promise<void>;
 }
 
-export class VulnerabilityDetectionModel implements IVulnerabilityDetectionModel {
+export class VulnerabilityDetectionModel implements VulnerabilityDetectionModel {
     private initialized = false;
 
-    predict: jest.Mock<Promise<PredictionResult>, [number[]]> = 
-        jest.fn().mockImplementation(async (features) => ({
+    constructor() {
+        this.predict = jest.fn(() => Promise.resolve({
             type: VulnerabilityType.ArithmeticOverflow,
             confidence: 0.85,
             prediction: [Math.random()],
             timestamp: Date.now(),
             modelVersion: '1.0.0'
         }));
-
-    ensureInitialized: jest.Mock<Promise<void>, []> = 
-        jest.fn().mockImplementation(async () => {
+        
+        this.ensureInitialized = jest.fn(() => {
             this.initialized = true;
+            return Promise.resolve();
         });
-
-    cleanup: jest.Mock<Promise<void>, []> = 
-        jest.fn().mockImplementation(async () => {
+        
+        this.cleanup = jest.fn(() => {
             this.initialized = false;
+            return Promise.resolve();
         });
+        
+        this.save = jest.fn(() => Promise.resolve());
+        this.load = jest.fn(() => Promise.resolve());
+    }
 
-    save: jest.Mock<Promise<void>, [string]> = 
-        jest.fn().mockImplementation(async (_path: string) => {
-            // Mock implementation
-        });
-
-    load: jest.Mock<Promise<void>, [string]> = 
-        jest.fn().mockImplementation(async (_path: string) => {
-            this.initialized = true;
-        });
+    async predict(features: number[]): Promise<PredictionResult> {
+        return {
+            type: VulnerabilityType.ArithmeticOverflow,
+            confidence: 0.85,
+            prediction: [Math.random()],
+            timestamp: Date.now(),
+            modelVersion: '1.0.0'
+        };
+    }
+    
+    async ensureInitialized(): Promise<void> {
+        this.initialized = true;
+    }
+    
+    async cleanup(): Promise<void> {
+        this.initialized = false;
+    }
+    
+    async save(path: string): Promise<void> {}
+    async load(path: string): Promise<void> {}
 }

@@ -1,7 +1,9 @@
 import { GovernanceManager } from '../governance';
-import { PublicKey } from '@solana/web3.js';
+import { GOVERNANCE_CONFIG } from '../config/governance';
+import { PublicKey, Keypair } from '@solana/web3.js';
+import { describe, it, beforeEach, expect } from '@jest/globals';
 
-jest.mock('@solana/web3.js', () => require('../../../sdk/src/ai/src/__mocks__/@solana/web3.js'));
+jest.mock('@solana/web3.js', () => require('../../__mocks__/@solana/web3.js'));
 
 describe('GovernanceManager', () => {
     let governanceManager: GovernanceManager;
@@ -11,7 +13,10 @@ describe('GovernanceManager', () => {
     };
 
     beforeEach(() => {
-        governanceManager = new GovernanceManager(mockConnection as any);
+        governanceManager = new GovernanceManager(
+            mockConnection as any,
+            Keypair.generate()
+        );
     });
 
     it('should initialize correctly', () => {

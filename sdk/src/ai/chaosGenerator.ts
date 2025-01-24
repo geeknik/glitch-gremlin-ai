@@ -1,4 +1,4 @@
-import { FuzzInput } from './fuzzer';
+import { FuzzInput } from '../types';
 import { VulnerabilityType } from '../types';
 
 export interface ChaosConfig {

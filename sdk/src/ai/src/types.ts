@@ -1,26 +1,28 @@
 export enum VulnerabilityType {
     ArithmeticOverflow = 'ArithmeticOverflow',
     Reentrancy = 'Reentrancy',
-    AccessControl = 'AccessControl',
-    PDASafety = 'PDASafety'
+    AccessControl = 'AccessControl', 
+    PDASafety = 'PDASafety',
+    ResourceExhaustion = 'ResourceExhaustion',
+    OutOfBounds = 'OutOfBounds',
+    None = 'None',
+    AccountDataValidation = 'AccountDataValidation',
+    UnhandledError = 'UnhandledError',
+    BufferOverflow = 'BufferOverflow',
+    IntegerOverflow = 'IntegerOverflow'
 }
+
+// Error types for improved error handling
 
 export interface PredictionResult {
     type: VulnerabilityType;
     confidence: number;
+    prediction?: number[];
     timestamp?: number;
     modelVersion?: string;
 }
 
-export interface VulnerabilityDetectionModel {
-    ensureInitialized(): Promise<void>;
-    predict(features: number[]): Promise<PredictionResult>;
-    cleanup(): Promise<void>;
-    save(path: string): Promise<void>;
-    load(path: string): Promise<void>;
-}
-
-export interface VulnerabilityDetectionModel {
+export default interface VulnerabilityDetectionModel {
     ensureInitialized(): Promise<void>;
     predict(features: number[]): Promise<PredictionResult>;
     cleanup(): Promise<void>;
@@ -50,17 +52,6 @@ export class ResourceExhaustionError extends FuzzerError {
     }
 }
 
-export enum VulnerabilityType {
-    ArithmeticOverflow = 'ArithmeticOverflow',
-    AccessControl = 'AccessControl',
-    PDASafety = 'PDASafety',
-    ResourceExhaustion = 'ResourceExhaustion',
-    OutOfBounds = 'OutOfBounds',
-    None = 'None',
-    Reentrancy = 'Reentrancy',
-    AccountDataValidation = 'AccountDataValidation',
-    UnhandledError = 'UnhandledError'
-}
 
 // Improved validation interfaces
 export interface ValidationResult {
@@ -154,7 +145,7 @@ export interface TimeSeriesMetric {
 
 export interface FuzzInput {
     instruction: number;
-    data: Buffer;
+    data: Buffer | Uint8Array;
     probability: number;
     metadata: Record<string, any>;
     created: number;

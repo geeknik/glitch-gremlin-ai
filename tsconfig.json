@@ -1,8 +1,10 @@
 {
     "compilerOptions": {
-        "target": "ES2020",
+        "target": "ES2022",
         "module": "NodeNext",
         "moduleResolution": "NodeNext",
+        "rootDirs": ["."],
+        "composite": true,
         "strict": true,
         "esModuleInterop": true,
         "skipLibCheck": true,
@@ -13,18 +15,18 @@
         "sourceMap": true,
         "types": ["jest", "node"],
         "paths": {
-            "@/*": ["./src/*"],
-            "@glitch-gremlin/sdk": ["./sdk/src"]
+            "@glitch-gremlin/sdk": ["./sdk/src/index.ts"],
+            "#cli/*": ["./cli/src/*"],
+            "@glitch-gremlin/sdk/*": ["./sdk/src/*"]
         },
         "baseUrl": ".",
-        "allowJs": true,
         "resolveJsonModule": true,
-        "isolatedModules": true,
-        "allowSyntheticDefaultImports": true,
-        "experimentalDecorators": true,
-        "emitDecoratorMetadata": true,
         "lib": ["es2020"]
     },
-    "include": ["src/**/*", "__tests__/**/*"],
-    "exclude": ["node_modules", "dist"]
+    "include": ["sdk/src/**/*", "cli/src/**/*", "__tests__/**/*"],
+    "exclude": ["node_modules", "dist"],
+    "references": [
+        { "path": "./sdk/tsconfig.json" },
+        { "path": "./cli/tsconfig.json" }
+    ]
 }
