@@ -25,6 +25,15 @@ pub enum GlitchError {
     #[error("Minimum 3 geographic regions required")]
     InsufficientMultisigSignatures,
 
+    #[error("Program not initialized")]
+    UninitializedProgram,
+
+    #[error("Invalid upgrade authority")]
+    InvalidUpgradeAuthority,
+
+    #[error("Upgrade delay not met")]
+    UpgradeDelayNotMet,
+
     #[error("72-hour execution delay not met")]
     ExecutionDelayNotMet,
 
