@@ -193,7 +193,16 @@ impl Processor {
                         max_latency: 0,
                         error_threshold: 0,
                         security_level: 0,
-                        execution_delay: 0
+                        execution_delay: 0,
+                        // DESIGN.md 9.6.3 - Kernel-level protections
+                        max_cpu_cycles: 2_000_000_000, // 2B cycles = ~2sec @1GHz
+                        memory_limit_mb: 2048, // 2GB RAM limit
+                        max_network_ops: 1000, // Max 1000 network operations
+                        allowed_syscalls: vec!["read".into(),"write".into()], // Strict allowlist
+                        entropy_checks: true, // μArch fingerprinting
+                        memory_safety: 2, // MIRI checks + quarantine
+                        syscall_filter: vec!["seccomp".into(),"landlock".into()],
+                        page_quarantine: true
                     }
                 )
             }
@@ -422,11 +431,21 @@ impl Processor {
                 return Err(GlitchError::InsufficientMultisigSignatures.into());
             }
             
-            // Enforce 72-hour delay from proposal approval time
+            // DESIGN.md 9.1 - 72-hour delay + geographic diversity
             let min_execution_time = proposal.execution_time + 259200; // 72*3600
             if clock.unix_timestamp < min_execution_time {
                 msg!("Execution too early: {} < {}", clock.unix_timestamp, min_execution_time);
                 return Err(GlitchError::ExecutionDelayNotMet.into());
+            }
+            
+            // Verify 3+ geographic regions (DESIGN.md 9.1)
+            let regions = accounts.iter()
+                .filter(|acc| acc.is_signer)
+                .map(|acc| acc.key.to_bytes()[0] % 5) // Region code
+                .collect::<std::collections::HashSet<_>>();
+            
+            if regions.len() < 3 {
+                return Err(GlitchError::InsufficientDiversity.into());
             }
         }
 

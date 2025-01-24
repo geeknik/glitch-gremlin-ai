@@ -64,8 +64,9 @@ mod tests {
             // First byte of signature as region code (0-4 for 5 regions)
             regions.insert(signer.as_bytes()[0] % 5);
         }
-        if regions.len() < 3 {
-            return Err(ProgramError::InvalidAccountData.into());
+        // DESIGN.md 9.1 - Require 3+ regions from 7+ signers
+        if regions.len() < 3 || MULTISIG_SIGNERS.len() < 7 {
+            return Err(GlitchError::InsufficientDiversity.into());
         }
 
         assert!(Processor::validate_initialized(&program_id, &accounts).is_err());

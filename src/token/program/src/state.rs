@@ -98,6 +98,11 @@ pub struct TestParams {
     pub concurrency_level: u8,
     pub max_latency: u64,
     pub error_threshold: u8,
+    // DESIGN.md 9.6.3 - Simulation containment
+    pub max_cpu_cycles: u64,
+    pub memory_limit_mb: u8,
+    pub max_network_ops: u32,
+    pub allowed_syscalls: Vec<String>,
     // Security parameters from DESIGN.md 9.6
     pub entropy_checks: bool,
     pub memory_safety: u8,
