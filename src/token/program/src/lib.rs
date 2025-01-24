@@ -55,19 +55,18 @@ mod tests {
         let program_id = Pubkey::new_unique();
         let program_data = Keypair::new();
         let mut accounts = vec![
-            AccountInfo::new(&program_data.pubkey(), false, false, &mut 0, &mut [], &program_id, false, Epoch::default()), 
+            AccountInfo::new(&program_data.pubkey(), false, false, &mut 0, &mut [], &program_id, false, Epoch::default())
         ]);
-    
+
         // DESIGN.md 9.1 - Geographic diversity enforcement
         let mut regions = std::collections::HashSet::new();
-        for signer in &authorized_signers {
+        for signer in &MULTISIG_SIGNERS {
             // First byte of signature as region code (0-4 for 5 regions)
-            regions.insert(signer.to_bytes()[0] % 5);
+            regions.insert(signer.as_bytes()[0] % 5);
         }
-        if regions.len() < MIN_GEO_REGIONS {
-            return Err(ProgramError::InvalidAccountData);
+        if regions.len() < 3 {
+            return Err(ProgramError::InvalidAccountData.into());
         }
-        ];
 
         assert!(Processor::validate_initialized(&program_id, &accounts).is_err());
     }
