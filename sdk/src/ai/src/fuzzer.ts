@@ -17,7 +17,7 @@ import {
 import { FuzzInput } from '../types';
 export { FuzzInput }; // Explicitly export FuzzInput
 import { AnomalyDetector } from './anomaly-detection';
-import { Logger } from '../../utils/logger';
+import { Logger } from '../../utils/logger.js';
 import { PublicKey, Transaction, sendAndConfirmTransaction, TransactionInstruction, Connection } from '@solana/web3.js';
 
 interface FuzzingConfig {
@@ -43,23 +43,6 @@ interface CampaignResult {
 }
 
 export class Fuzzer {
-    public async analyzeFuzzResult(error: unknown, input: FuzzInput): Promise<FuzzResult> {
-        // Simplified implementation for testing
-        return {
-            type: VulnerabilityType.None,
-            confidence: 0,
-            details: 'Mock analysis result'
-        };
-    }
-
-    public async fuzzWithStrategy(strategy: string, programId: PublicKey): Promise<FuzzingResult> {
-        // Simplified implementation for testing
-        return {
-            type: strategy,
-            details: ['Mock fuzzing result'],
-            severity: 'LOW'
-        };
-    }
 
     private config: FuzzingConfig;
     private anomalyDetectionModel: AnomalyDetector | null = null;
@@ -169,11 +152,20 @@ export class Fuzzer {
     public generateFuzzInputs(programId: PublicKey): FuzzInput[] {
         const inputs: FuzzInput[] = [];
         for (let i = 0; i < 1000; i++) {
+            const instruction = Math.floor(Math.random() * 256);
+            const data = Buffer.alloc(Math.floor(Math.random() * 1000), Math.random() * 256);
+            const probability = this.calculateProbability(instruction, data);
             inputs.push({
-                instruction: Math.floor(Math.random() * 256),
-                data: Buffer.alloc(Math.floor(Math.random() * 1000))
+                instruction,
+                data,
+                probability,
+                metadata: {},
+                created: Date.now()
             });
         }
+        
+        // Sort inputs by probability in descending order
+        inputs.sort((a, b) => b.probability - a.probability);
         
         this.metricsCollector.recordMetric("fuzz_inputs_generated", inputs.length);
         return inputs;
@@ -369,15 +361,15 @@ export class Fuzzer {
     }
 
     public async analyzeFuzzResult(error: unknown, input: FuzzInput): Promise<FuzzResult> {
-        if (error && typeof error === 'object' && 'error' in error) {
-            const errorMessage = String((error as {error: string}).error);
+        if (error && typeof error === 'object' && 'message' in error) {
+            const errorMessage = String((error as {message: string}).message);
             
             if (errorMessage.includes('arithmetic operation overflow') || errorMessage.includes('overflow')) {
                 return { 
                     type: VulnerabilityType.ArithmeticOverflow, 
                     confidence: 0.8
                 };
-            } else if (errorMessage.includes('unauthorized access attempt') || errorMessage.includes('access denied')) {
+            } else if (errorMessage.includes('unauthorized access attempt')) {
                 return { 
                     type: VulnerabilityType.AccessControl, 
                     confidence: 0.8
@@ -387,7 +379,7 @@ export class Fuzzer {
                     type: VulnerabilityType.PDASafety, 
                     confidence: 0.8
                 };
-            } else if (errorMessage.includes('reentrancy') || errorMessage.includes('reentrant')) {
+            } else if (errorMessage.includes('potential reentrancy detected')) {
                 return { 
                     type: VulnerabilityType.Reentrancy, 
                     confidence: 0.8
@@ -397,26 +389,7 @@ export class Fuzzer {
         return { type: null, confidence: 0 };
     }
 
-    public async startFuzzingCampaign(config: FuzzingCampaignConfig): Promise<CampaignResult> {
-        const startTime = Date.now();
-        let iterations = 0;
-        const crashes = new Set<string>();
-
-        while (Date.now() - startTime < config.duration) {
-            const inputs = this.generateFuzzInputs(config.programId);
-            for (const input of inputs) {
-                try {
-                    await this.executeFuzzedInput(input);
-                } catch (error) {
-                    const result = await this.analyzeFuzzResult(error, input);
-                    if (result.type !== VulnerabilityType.None) {
-                        crashes.add(JSON.stringify(input)); // Store unique crashes
-                    }
-                }
-                iterations++;
-            }
-        }
-
+    private async runCampaign(startTime: number, iterations: number, crashes: Set<string>): Promise<CampaignResult> {
         const endTime = Date.now();
         const elapsedSeconds = (endTime - startTime) / 1000;
         const executionsPerSecond = iterations / elapsedSeconds;

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 jest.mock('../../utils/logger.ts');
 
-import { Fuzzer } from '../src/fuzzer';
+import { Fuzzer } from '../src/fuzzer.js';
 import { PublicKey } from '@solana/web3.js';
 import { VulnerabilityType } from '../src/types';
 import { Logger } from '../../utils/logger';
@@ -102,7 +102,7 @@ describe('Fuzzer', () => {
     describe('analyzeFuzzResult', () => {
         it('should detect arithmetic overflow', async () => {
             const result: FuzzResult = await fuzzer.analyzeFuzzResult(
-                { error: 'arithmetic operation overflow' },
+                new Error('arithmetic operation overflow'),
                 { 
                     instruction: 0, 
                     data: Buffer.alloc(0),
@@ -117,7 +117,7 @@ describe('Fuzzer', () => {
 
         it('should detect access control issues', async () => {
             const result: FuzzResult = await fuzzer.analyzeFuzzResult(
-                { error: 'unauthorized access attempt' },
+                new Error('unauthorized access attempt'),
                 { 
                     instruction: 0, 
                     data: new Uint8Array(),
@@ -147,7 +147,7 @@ describe('Fuzzer', () => {
 
         it('should detect PDA safety issues', async () => {
             const result: FuzzResult = await fuzzer.analyzeFuzzResult(
-                { error: 'invalid PDA derivation' },
+                new Error('invalid PDA derivation'),
                 { 
                     instruction: 0, 
                     data: Buffer.alloc(0),
@@ -156,13 +156,13 @@ describe('Fuzzer', () => {
                     created: Date.now()
                 }
             );
-            expect(result.type).toBe(VulnerabilityType.PDASafety);
+            expect(result.type).toBe(VulnerabilityType.PDASafety); 
             expect(result.confidence).toBeGreaterThan(0.7);
         });
 
         it('should detect reentrancy vulnerabilities', async () => {
             const result: FuzzResult = await fuzzer.analyzeFuzzResult(
-                { error: 'potential reentrancy detected' },
+                new Error('potential reentrancy detected'),
                 { 
                     instruction: 0, 
                     data: Buffer.alloc(0),
