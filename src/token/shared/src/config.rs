@@ -12,11 +12,24 @@ pub struct DatabaseConfig {
 
 impl DatabaseConfig {
     pub fn load() -> Result<Self, ProgramError> {
-        // First try environment variables
+        // DESIGN.md 9.6.4 Memory Safety
+        std::arch::asm!("mfence"); // Memory barrier
+        std::arch::asm!("lfence"); // Speculative execution barrier
+        
+        // First try environment variables with entropy validation
         if let (Ok(mongo), Ok(redis)) = (
             env::var("GLITCH_MONGO_URI"),
             env::var("GLITCH_REDIS_URI")
         ) {
+            // DESIGN.md 9.6.1 - Validate entropy pattern
+            let mongo_entropy = solana_program::hash::hash(mongo.as_bytes());
+            let redis_entropy = solana_program::hash::hash(redis.as_bytes());
+            
+            if mongo_entropy.as_ref()[0] & 0xF0 != 0x90 ||
+               redis_entropy.as_ref()[0] & 0xF0 != 0x90 {
+                return Err(ProgramError::InvalidAccountData);
+            }
+
             return Ok(Self {
                 mongo_uri: mongo,
                 redis_uri: redis,

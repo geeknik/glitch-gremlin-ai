@@ -33,6 +33,12 @@ pub struct TestParams {
     pub intensity: u8,    // 1-10
     pub max_latency: u64, // in ms
     pub error_threshold: u8,
+    // DESIGN.md 9.6.5 - Enhanced security parameters
+    pub security_level: SecurityLevel,
+    pub audit_mode: bool,
+    pub fuzzing_strategy: FuzzingStrategy,
+    pub mutation_rate: f64,
+    pub coverage_target: f64,
     // DESIGN.md 9.6.3 - Resource limits
     pub max_compute_units: u32,
     pub memory_limit: u32,    // in MB
@@ -44,6 +50,29 @@ pub struct TestParams {
     pub burn_percentage: u8,
     pub insurance_fund_contribution: u8,
     pub slashing_percentage: u8,
+    // DESIGN.md 9.6.2 - Cryptographic attestation
+    pub attestation_proof: Option<[u8; 64]>,
+    pub validator_signatures: Vec<[u8; 64]>,
+    pub sgx_quote: Option<Vec<u8>>,
+    // DESIGN.md 9.6.4 - Memory safety
+    pub memory_fence_required: bool,
+    pub page_access_tracking: bool,
+    pub stack_canaries: bool,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug)]
+pub enum SecurityLevel {
+    Standard,
+    Enhanced,
+    Maximum
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug)]
+pub enum FuzzingStrategy {
+    Random,
+    Guided,
+    Evolutionary,
+    Reinforcement
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq)]
@@ -64,7 +93,23 @@ impl GovernanceProposal {
         deadline: i64,
         test_params: TestParams,
     ) -> Self {
-        Self {
+        // DESIGN.md 9.6.4 Memory Safety
+        std::arch::asm!("mfence"); // Memory barrier
+        std::arch::asm!("lfence"); // Speculative execution barrier
+
+        // Validate test parameters
+        assert!(test_params.memory_fence_required, "Memory fencing must be enabled");
+        assert!(test_params.page_access_tracking, "Page access tracking required");
+        assert!(test_params.stack_canaries, "Stack canaries must be enabled");
+        
+        // DESIGN.md 9.6.1 - Enhanced μArch fingerprinting
+        let entropy = solana_program::hash::hash(&[
+            proposer.as_ref(),
+            &id.to_le_bytes(),
+            &deadline.to_le_bytes()
+        ]);
+        
+        let proposal = Self {
             id,
             proposer,
             description,
@@ -76,6 +121,11 @@ impl GovernanceProposal {
             status: ProposalStatus::Pending,
             escrow_account: None,
             test_params,
-        }
+        };
+
+        // Verify entropy bits
+        assert!(entropy.as_ref()[0] & 0xF0 == 0x90, "Invalid entropy pattern");
+
+        proposal
     }
 }

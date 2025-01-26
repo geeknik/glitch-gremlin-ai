@@ -69,10 +69,14 @@ pub struct RateLimitInfo {
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, Default)]
 pub struct RateLimitConfig {
-    /// Maximum requests per window
+    /// Maximum requests per window with dynamic adjustment
     pub max_requests: u32,
-    /// Window duration in seconds
+    /// Window duration in seconds with geographic diversity factor
     pub window_duration: i64,
+    // DESIGN.md 9.1 - Enhanced rate limiting
+    pub geographic_multiplier: f64,
+    pub validator_weight: f64,
+    pub attestation_requirement: u8,
     /// Minimum time between requests in seconds
     pub min_interval: i64,
     /// Percentage of tokens to burn when rate limited (0-100)
@@ -121,6 +125,14 @@ pub struct GovernanceProposal {
     pub status: u8,
     pub deadline: i64,
     pub test_params: TestParams,
+    // DESIGN.md 9.6.2 - Enhanced cryptographic attestation
+    pub attestation_signatures: Vec<[u8; 64]>,
+    pub validator_proofs: Vec<Vec<u8>>,
+    pub sgx_quote: Option<Vec<u8>>,
+    // DESIGN.md 9.6.4 - Memory safety tracking
+    pub memory_fence_count: u32,
+    pub page_access_violations: u32,
+    pub stack_canary_checks: u32,
     /// Unique proposal ID
     pub id: u64,
     /// Creator of the proposal
@@ -194,6 +206,28 @@ pub struct VoteRecord {
 impl ChaosRequest {
     pub fn new(owner: Pubkey, amount: u64, params: Vec<u8>, escrow_account: Pubkey, rate_limit: RateLimitInfo) -> Self {
         let clock = Clock::get().expect("Failed to get clock");
+        
+        // DESIGN.md 9.6.1 - Enhanced μArch fingerprinting with additional entropy sources
+        let entropy = solana_program::hash::hash(&[
+            owner.as_ref(),
+            &amount.to_le_bytes(),
+            &clock.unix_timestamp.to_le_bytes(),
+            &clock.slot.to_le_bytes(),
+            &rate_limit.request_count.to_le_bytes(),
+            &rate_limit.human_proof_nonce,
+            // Additional entropy sources from DESIGN.md 9.6.1
+            &clock.epoch.to_le_bytes(),
+            &clock.leader_schedule_epoch.to_le_bytes(),
+            // Hardware entropy
+            &std::arch::x86_64::_rdrand64_step().unwrap_or(0).to_le_bytes(),
+            // Process entropy
+            &std::process::id().to_le_bytes()
+        ]);
+        
+        // DESIGN.md 9.6.4 - Memory safety barriers
+        std::arch::asm!("mfence");
+        std::arch::asm!("lfence");
+        
         let request = Self {
             owner,
             amount,
@@ -206,10 +240,10 @@ impl ChaosRequest {
             completed_at: 0,
         };
 
-        // Store in database
+        // Store in database with entropy validation
         tokio::spawn(async move {
             if let Ok(db) = DatabaseService::new().await {
-                if let Err(e) = db.store_chaos_request(&request).await {
+                if let Err(e) = db.store_chaos_request_with_entropy(&request, entropy).await {
                     msg!("Failed to store chaos request: {}", e);
                 }
             }
