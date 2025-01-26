@@ -148,6 +148,19 @@ impl Processor {
         // Verify multisig authority matches DESIGN.md 9.1 requirements
         let upgrade_authority = bpf_loader_upgradeable::get_upgrade_authority(program_data)?;
         let mut valid_signers = 0;
+        const MULTISIG_SIGNERS: &[&str] = &[
+            "MSig111111111111111111111111111111111111111",
+            "MSig222222222222222222222222222222222222222",
+            "MSig333333333333333333333333333333333333333",
+            "MSig444444444444444444444444444444444444444",
+            "MSig555555555555555555555555555555555555555",
+            "MSig666666666666666666666666666666666666666",
+            "MSig777777777777777777777777777777777777777",
+            "MSig888888888888888888888888888888888888888",
+            "MSig999999999999999999999999999999999999999",
+            "MSigAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        ];
+
         for signer in MULTISIG_SIGNERS.iter().map(|s| Pubkey::from_str(s).unwrap()) {
             if upgrade_authority == Some(signer) {
                 valid_signers += 1;
@@ -589,6 +602,13 @@ impl Processor {
                 &crate::id(),
             )?;
             
+            #[derive(BorshDeserialize)]
+            struct NodeMetadata {
+                region_code: u8,
+                uptime: u64,
+                last_heartbeat: i64,
+            }
+
             let metadata = NodeMetadata::try_from_slice(
                 &AccountInfo::new(&metadata_address, false, false, &[], &[], &[], false, 0)
                     .data
@@ -610,6 +630,8 @@ impl Processor {
         
         // Randomly select conflicting jurisdictions
         for region in regions.iter() {
+            const APPROVED_REGIONS: &[u8] = &[1, 2, 3, 4, 5]; // Region codes for US, EU, APAC, etc.
+            
             if !APPROVED_REGIONS.contains(region) {
                 msg!("Invalid region code: {}", region);
                 return Err(GlitchError::InvalidRegion.into());

@@ -75,7 +75,7 @@ async fn run_load_test(
         avg_latency: test_env.avg_latency,
         memory_usage: test_env.max_memory,
         cpu_peak: test_env.cpu_utilization,
-        anomaly_score: calculate_anomaly_score(&results),
+        anomaly_score: calculate_anomaly_score(&results, test_env),
         entropy_checks: true,
         page_faults: 0, // Removed CPU-specific metrics
         cache_misses: 0,
@@ -240,4 +240,39 @@ fn parse_chaos_params(params: &str) -> Result<ChaosParams, Box<dyn Error>> {
         max_latency: input.max_latency,
         error_threshold: input.error_threshold,
     })
+}
+fn calculate_anomaly_score(results: &[ConcurrencyResult], test_env: &TestEnvironment) -> f64 {
+    let mut score = 0.0;
+    
+    // Weight factors from DESIGN.md
+    let latency_weight = 0.4;
+    let error_weight = 0.3;
+    let resource_weight = 0.3;
+
+    // Analyze latency anomalies
+    let avg_latency = results.iter()
+        .map(|r| r.latency as f64)
+        .sum::<f64>() / results.len() as f64;
+    
+    let latency_score = if avg_latency > test_env.avg_latency as f64 * 2.0 {
+        1.0
+    } else {
+        avg_latency / (test_env.avg_latency as f64 * 2.0)
+    };
+
+    // Analyze error patterns
+    let error_rate = results.iter()
+        .filter(|r| !r.errors.is_empty())
+        .count() as f64 / results.len() as f64;
+
+    // Analyze resource usage
+    let resource_score = (test_env.cpu_utilization / 100.0 + 
+        test_env.max_memory as f64 / 4096.0) / 2.0;
+
+    // Calculate weighted score
+    score += latency_score * latency_weight;
+    score += error_rate * error_weight;
+    score += resource_score * resource_weight;
+
+    score.min(1.0)
 }
