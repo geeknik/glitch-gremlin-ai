@@ -4,9 +4,10 @@ use std::future::Future;
 use std::pin::Pin;
 use crate::job_processor::TestEnvironment;
 
-#[derive(Debug)]
-
 type BoxedFuture<T> = Pin<Box<dyn Future<Output = Result<T, Box<dyn Error>>> + Send + 'static>>;
+
+#[derive(Debug)]
+pub struct ChaosEngine;
 pub struct ChaosTestResult {
     pub status: TestStatus,
     pub logs: String,
