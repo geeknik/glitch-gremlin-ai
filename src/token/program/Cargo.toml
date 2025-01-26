@@ -28,6 +28,7 @@ tokio = { version = "1.0", features = ["full", "rt-multi-thread"] }
 solana-program-test = "1.18.26"
 solana-bpf-loader-program = "1.18.26"
 security-framework = "2.9.2"  # macOS security framework
+sandbox = "0.1.0"  # Cross-platform sandboxing
 
 [dev-dependencies]
 solana-program-test = "1.17.0" 
