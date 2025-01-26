@@ -114,10 +114,11 @@ pub async fn process_chaos_job(
 async fn setup_test_environment(target_program: &Pubkey) -> Result<TestEnvironment, Box<dyn Error + Send + Sync + 'static>> {
     // DESIGN.md 9.6.3 - Kernel-level memory and process isolation
     // Cross-platform sandboxing
-    let mut ctx = syscallz::Context::init(syscallz::Action::Allow).unwrap();
-    ctx.allow_syscall(syscallz::Sysno::rt_sigreturn).unwrap();
-    ctx.allow_syscall(syscallz::Sysno::exit).unwrap();
-    ctx.allow_syscall(syscallz::Sysno::read).unwrap();
+    let mut ctx = syscallz::Context::init().unwrap();
+    ctx.set_action_default(syscallz::Action::Allow).unwrap();
+    ctx.allow_syscall(1).unwrap(); // read
+    ctx.allow_syscall(60).unwrap(); // exit
+    ctx.allow_syscall(15).unwrap(); // rt_sigreturn
     ctx.load().unwrap();
 
     // Memory protection
@@ -166,6 +167,9 @@ struct TestParameters {
     concurrency_level: u8,
     max_latency: u64,
     error_threshold: u8,
+    memory_safety: u8,
+    page_quarantine: bool,
+    syscall_filter: Vec<String>,
 }
 
 async fn finalize_chaos_request(
@@ -210,6 +214,23 @@ pub struct TestEnvironment {
     pub test_accounts: Vec<Pubkey>,
     pub test_parameters: TestParameters,
     pub start_time: std::time::Instant,
+    pub avg_latency: u64,
+    pub max_memory: usize,
+    pub cpu_utilization: f64,
+}
+
+impl Default for TestEnvironment {
+    fn default() -> Self {
+        Self {
+            target_program: Pubkey::default(),
+            test_accounts: Vec::new(),
+            test_parameters: TestParameters::default(),
+            start_time: std::time::Instant::now(),
+            avg_latency: 0,
+            max_memory: 0,
+            cpu_utilization: 0.0,
+        }
+    }
 }
 
 impl Default for TestEnvironment {
