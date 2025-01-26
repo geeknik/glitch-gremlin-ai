@@ -143,9 +143,7 @@ struct ChaosParams {
 use serde::{Deserialize, Serialize};
 use serde_json::Error as JsonError;
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum TestType {
     Load,
@@ -194,9 +192,9 @@ fn parse_chaos_params(params: &str) -> Result<ChaosParams, Box<dyn Error>> {
     // Convert to internal ChaosParams
     Ok(ChaosParams {
         test_type: match input.test_type {
-            TestType::Load => TestType::LoadTest,
-            TestType::Fuzz => TestType::FuzzTest,
-            TestType::Exploit => TestType::ExploitTest,
+            TestType::Load => TestType::Load,
+            TestType::Fuzz => TestType::Fuzz,
+            TestType::Exploit => TestType::Exploit,
         },
         duration: input.duration,
         intensity: input.intensity,

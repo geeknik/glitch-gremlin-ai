@@ -8,8 +8,9 @@ license = "MIT"
 
 [dependencies]
 solana-sdk.workspace = true
+solana-program.workspace = true
 spl-token = { version = "3.2.0" }
-borsh = "0.10.3"
+borsh.workspace = true
 borsh-derive = "0.10.3"
 hex = "0.4"
 solana-client = "1.18.26"
@@ -23,4 +24,5 @@ mongodb.workspace = true
 redis.workspace = true
 tokio.workspace = true
 bson.workspace = true
+serde.workspace = true
 serde_json.workspace = true
