@@ -233,20 +233,6 @@ impl Default for TestEnvironment {
     }
 }
 
-impl Default for TestEnvironment {
-    fn default() -> Self {
-        Self {
-            target_program: Pubkey::default(),
-            test_accounts: Vec::new(),
-            test_parameters: TestParameters::default(),
-            start_time: std::time::Instant::now(),
-            avg_latency: 0,
-            max_memory: 0,
-            cpu_utilization: 0.0,
-        }
-    }
-}
-
 impl TestEnvironment {
     pub fn new(target_program: Pubkey) -> Self {
         Self {
@@ -254,6 +240,9 @@ impl TestEnvironment {
             test_accounts: Vec::new(),
             test_parameters: TestParameters::default(),
             start_time: std::time::Instant::now(),
+            avg_latency: 0,
+            max_memory: 0,
+            cpu_utilization: 0.0,
         }
     }
 }
@@ -333,4 +322,53 @@ mod tests {
         let result = process_chaos_job(&rpc_client, &program_id, job_data).await;
         assert!(result.is_err(), "Expected error for invalid job format");
     }
+}
+pub fn measure_cpu_timing() -> Vec<u8> {
+    let mut timing = Vec::with_capacity(32);
+    let start = std::time::Instant::now();
+    
+    // Perform CPU timing measurements
+    for _ in 0..1000 {
+        let _ = std::hint::black_box(1 + 1);
+    }
+    
+    let duration = start.elapsed();
+    timing.extend_from_slice(&duration.as_nanos().to_le_bytes());
+    timing.resize(32, 0);
+    timing
+}
+
+pub fn detect_virtualization(cpu_fingerprint: &[u8]) -> bool {
+    // Basic virtualization detection
+    if cpu_fingerprint.len() < 32 {
+        return true; // Assume virtualized if fingerprint is invalid
+    }
+
+    // Check timing consistency
+    let timing = u128::from_le_bytes(cpu_fingerprint[0..16].try_into().unwrap());
+    timing > 1_000_000 // Assume virtualized if timing is too high
+}
+
+pub fn validate_entropy(job_data: &[u8]) -> bool {
+    if job_data.len() < 32 {
+        return false;
+    }
+
+    // Calculate basic entropy score
+    let mut byte_counts = [0u32; 256];
+    for &byte in job_data {
+        byte_counts[byte as usize] += 1;
+    }
+
+    let mut entropy = 0.0;
+    let len = job_data.len() as f64;
+    for &count in &byte_counts {
+        if count > 0 {
+            let p = count as f64 / len;
+            entropy -= p * p.log2();
+        }
+    }
+
+    // Require reasonable entropy
+    entropy > 3.0
 }
