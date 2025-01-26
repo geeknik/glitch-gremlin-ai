@@ -16,7 +16,6 @@ mnemonic.txt
 **/*private*
 .env*
 .aider*
-.env*
 .env.local
 .env.development.local
 .env.test.local
@@ -26,6 +25,27 @@ mnemonic.txt
 .env.production
 .env.test
 .vscode/
+
+# Database credentials and config
+config/database.env*
+config/*.enc
+config/*.key
+config/*.secret
+config/credentials/
+mongodb.config
+redis.config
+**/*.uri
+**/*.connection
+**/*.credentials
+**/*_key*
+**/*_secret*
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*.jks
+**/*.keystore
+**/*.truststore
 .idea/
 *.swp
 *.swo

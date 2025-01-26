@@ -33,6 +33,17 @@ pub struct TestParams {
     pub intensity: u8,    // 1-10
     pub max_latency: u64, // in ms
     pub error_threshold: u8,
+    // DESIGN.md 9.6.3 - Resource limits
+    pub max_compute_units: u32,
+    pub memory_limit: u32,    // in MB
+    pub concurrent_tests: u8,
+    // DESIGN.md 9.1 - Geographic fault injection
+    pub required_regions: u8,
+    pub min_validator_diversity: u8,
+    // DESIGN.md 9.3 - Cryptoeconomic parameters
+    pub burn_percentage: u8,
+    pub insurance_fund_contribution: u8,
+    pub slashing_percentage: u8,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq)]

@@ -7,19 +7,21 @@ description = "Off-chain worker for Glitch Gremlin chaos testing"
 license = "MIT"
 
 [dependencies]
-solana-program = "1.18.26"
+solana-sdk.workspace = true
 spl-token = { version = "3.2.0" }
 borsh = "0.10.3"
 borsh-derive = "0.10.3"
-solana-sdk = "1.18.26"
 hex = "0.4"
 solana-client = "1.18.26"
 solana-program-test = "1.18.26"
-redis = { version = "0.23.0", features = ["tokio-comp"] }
-tokio = { version = "1.0", features = ["full"] }
 glitch-shared = { path = "../shared" }
-syscallz = { version = "0.17", features = ["linux"] }
+syscallz = "0.17"
 log = "0.4"
 thiserror = "1.0"
 libc = "0.2"
-perfcnt = "0.5.0"  # Corrected crate name (no hyphen)
+perfcnt = "0.5.0"
+mongodb.workspace = true
+redis.workspace = true
+tokio.workspace = true
+bson.workspace = true
+serde_json.workspace = true

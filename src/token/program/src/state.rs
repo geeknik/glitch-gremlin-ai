@@ -81,6 +81,17 @@ pub struct RateLimitConfig {
     pub dynamic_pricing_factor: u16,
     /// Minimum stake amount required
     pub min_stake_amount: u64,
+    // DESIGN.md 9.1 - Dynamic request pricing
+    pub base_fee: u64,
+    pub max_multiplier: u16,
+    pub cooldown_period: i64,
+    // DESIGN.md 9.3 - Burn redirect mechanism
+    pub burn_redirect_ratio: u8,    // Percentage to insurance fund
+    pub insurance_fund: Pubkey,
+    // DESIGN.md 9.6.1 - Request validation
+    pub min_entropy_bits: u8,
+    pub max_request_size: u32,
+    pub required_attestations: u8,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, Default)]
@@ -98,11 +109,6 @@ pub struct TestParams {
     pub concurrency_level: u8,
     pub max_latency: u64,
     pub error_threshold: u8,
-    // DESIGN.md 9.6.3 - Simulation containment
-    pub max_cpu_cycles: u64,
-    pub memory_limit_mb: u8,
-    pub max_network_ops: u32,
-    pub allowed_syscalls: Vec<String>,
     // Security parameters from DESIGN.md 9.6
     pub entropy_checks: bool,
     pub memory_safety: u8,
@@ -173,12 +179,22 @@ pub struct VoteRecord {
     pub voter_type: u8,
     /// Staked amount at time of voting
     pub staked_amount: u64,
+    // DESIGN.md 9.3 - Enhanced voting mechanics
+    pub lockup_duration: i64,
+    pub voting_power_multiplier: f64,
+    pub delegation_depth: u8,
+    // DESIGN.md 9.1 - Geographic diversity
+    pub validator_region: u8,
+    pub attestation_count: u8,
+    // DESIGN.md 9.6.2 - Cryptographic attestation
+    pub signature: [u8; 64],
+    pub attestation_proof: Vec<u8>,
 }
 
 impl ChaosRequest {
     pub fn new(owner: Pubkey, amount: u64, params: Vec<u8>, escrow_account: Pubkey, rate_limit: RateLimitInfo) -> Self {
         let clock = Clock::get().expect("Failed to get clock");
-        Self {
+        let request = Self {
             owner,
             amount,
             status: 0,
@@ -188,7 +204,18 @@ impl ChaosRequest {
             rate_limit,
             created_at: clock.unix_timestamp,
             completed_at: 0,
-        }
+        };
+
+        // Store in database
+        tokio::spawn(async move {
+            if let Ok(db) = DatabaseService::new().await {
+                if let Err(e) = db.store_chaos_request(&request).await {
+                    msg!("Failed to store chaos request: {}", e);
+                }
+            }
+        });
+
+        request
     }
 }
 
