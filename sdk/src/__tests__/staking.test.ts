@@ -1,5 +1,5 @@
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import Redis from 'ioredis-mock';
+import RedisMock from 'ioredis-mock';
 import { GlitchSDK } from '../sdk.js';
 import { 
     Keypair, 
@@ -19,7 +19,7 @@ import type { Redis as RedisType } from 'ioredis';
 
 jest.mock('ioredis', () => require('ioredis-mock'));
 
-let mockRedis: typeof Redis;
+let mockRedis: RedisMock;
 
 describe('Staking', () => {
     let sdk: GlitchSDK;
@@ -30,7 +30,7 @@ describe('Staking', () => {
             // Create fresh Redis mock for each test
             // Create a single shared Redis mock instance
             if (!(global as any).mockRedis) {
-                (global as any).mockRedis = new Redis({
+                (global as any).mockRedis = new RedisMock({
                     enableOfflineQueue: true,
                     lazyConnect: true
                 });
@@ -56,7 +56,8 @@ describe('Staking', () => {
                 getBlockTime: jest.fn(),
                 getBalanceAndContext: jest.fn(),
                 onAccountChange: jest.fn(),
-                removeAccountChangeListener: jest.fn()
+                removeAccountChangeListener: jest.fn(),
+                equals: jest.fn((other: Connection) => other === mockConnection)
             } as unknown as jest.Mocked<Connection>;
 
         wallet = Keypair.generate();
@@ -71,6 +72,7 @@ describe('Staking', () => {
             // Correctly typed mock setup
             heliusApiKey: 'test-key'
         });
+        (sdk as any).connection = mockConnection;
 
         // Mock rate limit checks to pass by default
         jest.spyOn(mockRedis as any, 'get').mockResolvedValue(null);

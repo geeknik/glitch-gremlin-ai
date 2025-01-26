@@ -1,5 +1,5 @@
 import { VulnerabilityType, VulnerabilityAnalysis, FuzzInput } from './types';
-import { ChaosGenerator } from './chaosGenerator';
+import { ChaosGenerator, ChaosConfig } from './chaosGenerator';
 import { MetricsCollector } from '../metrics/collector';
 import { Logger } from '../utils/logger';
 
@@ -58,8 +58,18 @@ export class Fuzzer {
     }
 
     public async generateFuzzInput(baseInput: FuzzInput, chaosLevel: number = 1): Promise<FuzzInput> {
+        if (baseInput === null) {
+            return { probability: NaN, data: Buffer.from([]), instruction: 0, metadata: {}, created: Date.now() };
+        }
         this.currentChaosLevel = chaosLevel;
-        return this.chaosGenerator.enhanceInput(baseInput, chaosLevel);
+        const fuzzInput = this.chaosGenerator.enhanceInput(baseInput, chaosLevel);
+
+        // Validate the generated input
+        if (!fuzzInput.hasOwnProperty('instruction') || !fuzzInput.hasOwnProperty('data') || !fuzzInput.hasOwnProperty('probability')) {
+            throw new Error('Generated fuzz input is missing required properties');
+        }
+
+        return fuzzInput;
     }
 
     public async runFuzzTest(

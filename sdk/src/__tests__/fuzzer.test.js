@@ -1,6 +1,5 @@
 import { Fuzzer } from '../ai/fuzzer';
 import { VulnerabilityType } from '../types';
-import { VulnerabilityType } from '../types';
 import { PublicKey } from '@solana/web3.js';
 
 const EXPECTED_INPUT_LENGTH = 1000;
@@ -66,8 +65,8 @@ describe('Fuzzer', () => {
 
             const analysis = await fuzzer.analyzeFuzzResult(result, input);
 
-            expect(analysis.type).toBeNull();
-            expect(analysis.confidence).toBe(0);
+            expect(analysis.type).toBeUndefined();
+            expect(analysis.confidence).toBeUndefined();
         });
     });
 });

@@ -32,6 +32,13 @@ export interface DetectorConfig {
     dropoutRate?: number;
     encoderLayers?: number[];
     decoderLayers?: number[];
+    epochs?: number;
+    solanaWeights?: {
+        pdaValidation: number;
+        accountDataMatching: number;
+        cpiSafety: number;
+        authorityChecks: number;
+    };
 }
 
 export interface AnomalyResult {
@@ -44,6 +51,18 @@ export interface AnomalyResult {
         threshold: number;
     }[];
     timestamp: number;
+    metricWeights?: {
+        pdaValidation: number;
+        accountDataMatching: number;
+        cpiSafety: number;
+        authorityChecks: number;
+    };
+    zScores?: {
+        pdaValidation: number;
+        accountDataMatching: number;
+        cpiSafety: number;
+        authorityChecks: number;
+    };
 }
 
 export interface StatisticalSummary {
@@ -162,49 +181,55 @@ export class PerformanceMonitor {
 }
 
 export class AnomalyDetector extends EventEmitter {
-    private config: DetectorConfig;
+    private config: Required<DetectorConfig>;
     private dataWindow: number[] = [];
     private mean: number = 0;
     private stdDev: number = 0;
     private readonly metrics: MetricKey[];
     private isInitialized: boolean = false;
+    private isTrained: boolean = false;
 
-    private models: {
-        autoencoder: any;
-        lstm: any;
-    } = {
-        autoencoder: null,
-        lstm: null
-    };
+    private model: tf.Sequential | null = null;
 
-    constructor(config?: Partial<DetectorConfig>) {
+    private constructor(config?: Partial<DetectorConfig>) {
         super();
+        
         this.config = {
             windowSize: 50,
             zScoreThreshold: 3,
             minSampleSize: 10,
             sensitivityLevel: 0.95,
+            solanaWeights: {
+                pdaValidation: 0.15,
+                accountDataMatching: 0.2,
+                cpiSafety: 0.25,
+                authorityChecks: 0.1
+            },
             ...config
         };
 
-        if (config?.inputSize !== undefined && config.inputSize <= 0) {
+        // Now validate using merged config
+        if (this.config.inputSize !== undefined && this.config.inputSize <= 0) {
             throw new Error('Input size must be positive');
         }
-        if (config?.anomalyThreshold !== undefined && 
-            (config.anomalyThreshold <= 0 || config.anomalyThreshold > 1)) {
+        if (this.config.epochs !== undefined && this.config.epochs <= 0) {
+            throw new Error('Epochs must be positive');
+        }
+        if (this.config.anomalyThreshold !== undefined && 
+            (this.config.anomalyThreshold <= 0 || this.config.anomalyThreshold > 1)) {
             throw new Error('Anomaly threshold must be between 0 and 1');
         }
-        if (config?.timeSteps !== undefined && config.timeSteps <= 0) {
+        if (this.config.timeSteps !== undefined && this.config.timeSteps <= 0) {
             throw new Error('Time steps must be positive');
         }
-        if (config?.dropoutRate !== undefined && 
-            (config.dropoutRate < 0 || config.dropoutRate > 1)) {
+        if (this.config.dropoutRate !== undefined && 
+            (this.config.dropoutRate < 0 || this.config.dropoutRate > 1)) {
             throw new Error('Dropout rate must be between 0 and 1');
         }
-        if (config?.encoderLayers !== undefined && config.encoderLayers.length === 0) {
+        if (this.config.encoderLayers !== undefined && this.config.encoderLayers.length === 0) {
             throw new Error('Encoder layers cannot be empty');
         }
-        if (config?.decoderLayers !== undefined && config.decoderLayers.length === 0) {
+        if (this.config.decoderLayers !== undefined && this.config.decoderLayers.length === 0) {
             throw new Error('Decoder layers cannot be empty');
         }
         this.metrics = [
@@ -223,13 +248,32 @@ export class AnomalyDetector extends EventEmitter {
         this.initializeComponents();
     }
 
+    public static async create(config?: Partial<DetectorConfig>): Promise<AnomalyDetector> {
+        const instance = new AnomalyDetector(config);
+        
+        // Initialize TensorFlow.js Node backend with error handling
+        try {
+            // Skip backend initialization in test environment
+            if (process.env.NODE_ENV !== 'test') {
+                try {
+                    await tf.setBackend('cpu');
+                } catch (error) {
+                    console.warn('Backend initialization warning:', error);
+                }
+            }
+        } catch (error) {
+            throw new Error(`TensorFlow.js initialization failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        
+        return instance;
+    }
+
     private validateConfig(): void {
         if (this.config.windowSize <= 0) {
             throw new Error('Window size must be positive');
         }
-        if (this.config.zScoreThreshold <= 0) {
-            throw new Error('Z-score threshold must be positive');
-        }
+        // Clamp zScoreThreshold between 0.01 and 1.0 instead of throwing
+        this.config.zScoreThreshold = Math.min(Math.max(this.config.zScoreThreshold, 0.01), 1.0);
         if (this.config.minSampleSize <= 0) {
             throw new Error('Minimum sample size must be positive');
         }
@@ -300,12 +344,122 @@ export class AnomalyDetector extends EventEmitter {
         };
     }
 
+    public async initializeModel(): Promise<boolean> {
+        try {
+            // Ensure TF backend is ready
+            await tf.ready();
+
+            // Clean up existing model if it exists
+            if (this.model) {
+                this.model.dispose();
+                this.model = null;
+            }
+
+            // Create sequential model and add Solana-optimized layers
+            this.model = tf.sequential();
+            
+            // Add Solana-optimized layers with proper input shape
+            const inputShape = [this.metrics.length];
+            
+            // Encoder layers
+            this.model.add(tf.layers.dense({
+                units: 128,
+                activation: 'relu',
+                inputShape,
+                kernelInitializer: 'glorotNormal',
+                name: 'encoder_1'
+            }));
+            
+            this.model.add(tf.layers.dense({
+                units: 64,
+                activation: 'relu',
+                kernelInitializer: 'glorotNormal',
+                name: 'encoder_2'
+            }));
+            
+            // Bottleneck layer
+            this.model.add(tf.layers.dense({
+                units: 32,
+                activation: 'relu',
+                kernelInitializer: 'glorotNormal',
+                name: 'bottleneck'
+            }));
+            
+            // Decoder layers
+            this.model.add(tf.layers.dense({
+                units: 64,
+                activation: 'relu',
+                kernelInitializer: 'glorotNormal',
+                name: 'decoder_1'
+            }));
+            
+            this.model.add(tf.layers.dense({
+                units: this.metrics.length,
+                activation: 'linear',
+                kernelInitializer: 'glorotNormal',
+                name: 'decoder_2'
+            }));
+
+            // Compile with Adam optimizer
+            const optimizer = tf.train.adam(0.001);
+            this.model.compile({
+                optimizer,
+                loss: 'meanSquaredError',
+                metrics: ['accuracy']
+            });
+            return true;
+        } catch (error) {
+            await this.cleanup();
+            throw new Error(`Model initialization failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    public async save(path: string): Promise<void> {
+        if (!this.model) {
+            throw new Error('No model to save');
+        }
+        await this.model.save(`file://${path}`);
+    }
+
+    public async load(path: string): Promise<void> {
+        // Clean up existing model before loading new one
+        if (this.model) {
+            this.model.dispose();
+        }
+        
+        // Load model and convert to Sequential
+        const loadedModel = await tf.loadLayersModel(`file://${path}/model.json`);
+        if (!(loadedModel instanceof tf.Sequential)) {
+            // Convert the model to Sequential if possible
+            const sequentialModel = tf.sequential();
+            loadedModel.layers.forEach(layer => sequentialModel.add(layer));
+            this.model = sequentialModel;
+        } else {
+            this.model = loadedModel;
+        }
+        
+        // Re-initialize with loaded weights
+        await this.initializeModel();
+    }
+
     public async train(data: TimeSeriesMetric[]): Promise<void> {
+        // Validate data first before any model operations
         if (!data?.length) {
             throw new Error('Training data cannot be empty');
         }
         if (data.length < this.config.minSampleSize) {
             throw new Error(`Insufficient training data - need at least ${this.config.minSampleSize} samples`);
+        }
+        // Validate all data points have valid cpuUtilization arrays
+        data.forEach((metric, index) => {
+            if (!metric.cpuUtilization || !Array.isArray(metric.cpuUtilization)) {
+                throw new Error('Invalid cpuUtilization format - must be array');
+            }
+        });
+
+        // Initialize model only after successful validation
+        if (!this.models.autoencoder) {
+            await this.initializeModel();
         }
 
         try {
@@ -330,15 +484,40 @@ export class AnomalyDetector extends EventEmitter {
             });
 
             flattenedData.forEach(value => this.updateStatistics(value));
+
+            // Prepare data for training
+            const tensorData = tf.tensor2d(flattenedData, [-1, this.metrics.length]);
             
-            // Simulate training progress
-            for (let epoch = 0; epoch < 5; epoch++) {
-                this.emit('trainingProgress', {
-                    epoch,
-                    loss: Math.random() * 0.1
-                });
-                await new Promise(resolve => setTimeout(resolve, 10));
+            // Create input/output tensors using tf.tidy to manage memory
+            const { inputTensor, outputTensor } = tf.tidy(() => {
+                const input = tensorData.slice([0, 0], [tensorData.shape[0] - 1, tensorData.shape[1]]);
+                const output = tensorData.slice([1, 0], [tensorData.shape[0] - 1, tensorData.shape[1]]);
+                return { inputTensor: input, outputTensor: output };
+            });
+
+            if (!inputTensor || !outputTensor) {
+                throw new Error('Failed to create training tensors');
             }
+
+            // Initialize model if needed
+            if (!this.model) {
+                await this.initializeModel();
+            }
+            
+            // Train the model
+            await this.model!.fit(inputTensor, outputTensor, {
+                epochs: this.config.epochs,
+                validationSplit: 0.2,
+                shuffle: true,
+                callbacks: {
+                    onTrainBegin: () => console.debug('Training started'),
+                    onTrainEnd: () => console.debug('Training completed')
+                },
+                batchSize: 32,  // Add batch size for better performance
+                verbose: 0 // Disable verbose logging during tests
+            });
+
+            this.isTrained = true;
         } catch (error) {
             await this.cleanup();
             throw error;
@@ -346,20 +525,24 @@ export class AnomalyDetector extends EventEmitter {
     }
 
     public async detect(data: TimeSeriesMetric[]): Promise<AnomalyResult> {
-        // Check model status first
-        if (!this.model || !this.isTrained) {
-            throw new Error('Model not initialized or trained');
-        }
-
-        if (!data?.length) {
-            throw new Error('Detection data is empty');
-        }
-
-        if (this.dataWindow.length < this.config.minSampleSize) {
-            throw new Error('Not enough samples for detection');
-        }
-
         try {
+            if (!data?.length) {
+                throw new Error('Detection data is empty');
+            }
+
+            // Validate data format before checking model
+            if (!data[0].cpuUtilization || !Array.isArray(data[0].cpuUtilization)) {
+                throw new Error('Invalid cpuUtilization format - must be array');
+            }
+
+            // Check model status after validating input
+            if (!this.model || !this.isTrained) {
+                throw new Error('Model not initialized or trained');
+            }
+
+            if (this.dataWindow.length < this.config.minSampleSize) {
+                throw new Error('Not enough samples for detection');
+            }
             const flattenedData = data.flatMap(metric => {
                 if (!metric.instructionFrequency?.length) {
                     throw new Error('Invalid metric data');
@@ -378,35 +561,57 @@ export class AnomalyDetector extends EventEmitter {
             });
 
             const result = this.detectAnomalies(flattenedData);
+            const metricWeights = this.config.solanaWeights || {
+                pdaValidation: 0.15,
+                accountDataMatching: 0.2,
+                cpiSafety: 0.25,
+                authorityChecks: 0.1
+            };
+            const zScores = {
+                pdaValidation: result.metrics.find(m => m.metric === 'pdaValidation')?.zScore || 0,
+                accountDataMatching: result.metrics.find(m => m.metric === 'accountDataMatching')?.zScore || 0,
+                cpiSafety: result.metrics.find(m => m.metric === 'cpiSafety')?.zScore || 0,
+                authorityChecks: result.metrics.find(m => m.metric === 'authorityChecks')?.zScore || 0
+            };
+
             this.emit('anomalyDetected', {
                 isAnomaly: result.isAnomaly,
                 confidence: result.score,
                 details: result.metrics
             });
-            return result;
+
+            return {
+                ...result,
+                metricWeights,
+                zScores
+            };
         } catch (error) {
+            console.error('Detection failed:', error);
             throw error;
         }
     }
 
     public async cleanup(): Promise<void> {
         try {
-            if (this.models.autoencoder) {
-                await this.models.autoencoder.dispose();
-                this.models.autoencoder = null;
+            if (this.model) {
+                this.model.dispose();
+                tf.disposeVariables();
+                this.model = null;
             }
-            if (this.models.lstm) {
-                await this.models.lstm.dispose(); 
-                this.models.lstm = null;
-            }
+            
             this.dataWindow = [];
             this.mean = 0;
             this.stdDev = 0;
             this.removeAllListeners();
             this.isInitialized = false;
+            this.isTrained = false;
         } catch (error) {
             console.error('Error during cleanup:', error);
             throw error;
+        } finally {
+            // Ensure state is reset even if error occurs
+            this.isInitialized = false;
+            this.isTrained = false;
         }
     }
 }

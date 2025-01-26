@@ -52,21 +52,16 @@ export class ReinforcementFuzzer {
         this.replayBuffer = [];
         this.epsilon = this.initialEpsilon;
         
-        // Initialize TensorFlow.js
-        tf.ready().then(() => {
-            try {
-                this.model = this.buildNetwork();
-                this.targetModel = this.buildNetwork();
-                this.updateTargetModel();
-            } catch (error) {
-                if (error instanceof Error) {
-                    throw new ModelBuildError(`Failed to build neural network: ${error.message}`);
-                }
-                throw new ModelBuildError('Failed to build neural network');
+        try {
+            this.model = this.buildNetwork();
+            this.targetModel = this.buildNetwork();
+            this.updateTargetModel();
+        } catch (error) {
+            if (error instanceof Error) {
+                throw new ModelBuildError(`Failed to build neural network: ${error.message}`);
             }
-        }).catch(error => {
-            throw new ModelBuildError(`Failed to initialize TensorFlow: ${error.message}`);
-        });
+            throw new ModelBuildError('Failed to build neural network');
+        }
     }
 
     /**

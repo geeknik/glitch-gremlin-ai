@@ -11,10 +11,10 @@ import {
     GovernanceConfig, 
     ProposalState,
     SDKConfig 
-} from './types';
-import { RedisQueueWorker } from './queue/redis-worker';
-import { GlitchError, ErrorCode, InsufficientFundsError } from './errors';
-import { GovernanceManager } from './governance';
+} from './types.js';
+import { RedisQueueWorker } from './queue/redis-worker.js';
+import { GlitchError, ErrorCode, InsufficientFundsError } from './errors.js';
+import { GovernanceManager } from './governance.js';
 
 /**
  * GlitchSDK provides the main interface for interacting with the Glitch Gremlin AI platform.
@@ -161,7 +161,11 @@ constructor(config: {
             ...defaultConfig,
             ...config.governanceConfig
         };
-        this.governanceManager = new GovernanceManager(this.connection);
+        this.governanceManager = new GovernanceManager(
+            this.connection,
+            this.programId,
+            this.governanceConfig
+        );
     }
     public static async create(config: {
         cluster?: string;
@@ -193,8 +197,8 @@ constructor(config: {
         if (process.env.NODE_ENV === 'test') {
             try {
                 // Use existing mock instance if available
-                const RedisMock = await import('ioredis-mock');
-                const redis = (global as any).mockRedis || new RedisMock.default({
+                const RedisMock = (await import('ioredis-mock')).default;
+                const redis = (global as any).mockRedis || new (RedisMock as any)({
                     host: 'localhost',
                     port: 6379,
                     enableOfflineQueue: true,
@@ -219,8 +223,8 @@ constructor(config: {
         } else {
             // Initialize Redis worker with provided config or default localhost config
             try {
-                const RedisClient = await import('ioredis');
-                const redis = new RedisClient.default({
+                const Redis = await import('ioredis');
+                const redis = new Redis.default({
                     ...redisConfig,
                     retryStrategy: redisConfig?.retryStrategy ?? ((times) => Math.min(times * 50, 2000)),
                     enableOfflineQueue: true,
@@ -238,8 +242,8 @@ constructor(config: {
 
         try {
             // Initialize Redis worker with provided config or default localhost config
-            const RedisClient = await import('ioredis');
-            const redis = new RedisClient.default({
+            const IoRedis = (await import('ioredis')).default;
+            const redis = new IoRedis({
                 ...redisConfig,
                 retryStrategy: redisConfig?.retryStrategy ?? ((times) => Math.min(times * 50, 2000)),
                 enableOfflineQueue: true,
@@ -355,26 +359,49 @@ constructor(config: {
         waitForCompletion: () => Promise<ChaosResult>;
     }> {
         // Validate parameters
+        if (params.intensity < 1 || params.intensity > 10) {
+            throw new GlitchError('Intensity must be between 1 and 10', ErrorCode.INVALID_AMOUNT);
+        }
         if (!params.targetProgram) {
             throw new GlitchError('Invalid program', ErrorCode.INVALID_PROGRAM_ADDRESS as unknown as ErrorCode);
         }
         if (!params.testType || !Object.values(TestType).includes(params.testType)) {
             throw new GlitchError('Invalid test type', ErrorCode.INVALID_PROGRAM);
         }
-        if (params.intensity < 1 || params.intensity > 10) {
-            throw new GlitchError('Intensity must be between 1 and 10', ErrorCode.INVALID_AMOUNT);
-        }
         if (params.duration < 60 || params.duration > 3600) {
             throw new GlitchError('Duration must be between 60 and 3600 seconds', ErrorCode.INVALID_AMOUNT);
+        }
+        if (params.securityLevel < 1 || params.securityLevel > 4) {
+            throw new GlitchError('Security level must be between 1 and 4', ErrorCode.INVALID_SECURITY_LEVEL);
+        }
+        if (!['sgx', 'kvm', 'wasm'].includes(params.executionEnvironment)) {
+            throw new GlitchError('Invalid execution environment', ErrorCode.INVALID_EXECUTION_ENVIRONMENT);
         }
 
         // Check rate limits using Redis
         const now = Date.now();
         const requestKey = `request:${this.wallet.publicKey.toString()}`;
 
-        // Check cooldown
+        // Ensure Redis client is connected
         const client = await this.queueWorker.getRawClient();
-        const lastRequest = await client.get(requestKey);
+        if (!client.connected) {
+            try {
+                await client.connect();
+            } catch (error) {
+                console.error('Failed to connect to Redis:', error);
+                throw new GlitchError('Rate limit check failed due to Redis connection issue', ErrorCode.RATE_LIMIT_EXCEEDED);
+            }
+        }
+
+        // Check cooldown
+        let lastRequest;
+        try {
+            lastRequest = await client.get(requestKey);
+        } catch (error) {
+            console.error('Failed to get last request time from Redis:', error);
+            throw new GlitchError('Rate limit check failed due to Redis operation issue', ErrorCode.RATE_LIMIT_EXCEEDED);
+        }
+
         if (lastRequest) {
             const timeSinceLastRequest = now - parseInt(lastRequest);
             if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
@@ -1055,7 +1082,7 @@ constructor(config: {
     private async hasVotedOnProposal(proposalId: string): Promise<boolean> {
         try {
             const voteAccount = await this.connection.getAccountInfo(
-                new PublicKey(proposalId + '-vote')
+                new PublicKey(proposalId + '-' + this.wallet.publicKey.toString())
             );
             return voteAccount !== null;
         } catch (error) {
@@ -1095,7 +1122,9 @@ constructor(config: {
                     targetProgram: '11111111111111111111111111111111',
                     testType: TestType.FUZZ,
                     duration: 300,
-                    intensity: 5
+                    intensity: 5,
+                    securityLevel: 0,
+                    executionEnvironment: 'sgx'
                 },
                 state: {
                     isActive,

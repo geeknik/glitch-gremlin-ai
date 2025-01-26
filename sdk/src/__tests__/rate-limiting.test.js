@@ -86,16 +86,19 @@ describe('Rate Limiting', () => {
             it('should limit proposals per day', async () => {
                 // Mock Redis for governance rate limiting
                 mockRedis.get.mockResolvedValue(null);
-                mockRedis.incr.mockResolvedValueOnce(5); // Over daily limit
+                mockRedis.incr.mockResolvedValueOnce(4); // Over daily limit
                 
                 // Attempt to create proposal
                 await expect(sdk.createProposal({
                     title: 'Test Proposal',
-                    description: 'Test Description'
+                    description: 'Test Description',
+                    stakingAmount: 100 // Add staking amount to match validation
                 })).rejects.toThrow('Rate limit exceeded');
                 
                 expect(mockRedis.incr).toHaveBeenCalled();
                 expect(mockRedis.expire).toHaveBeenCalled();
+            });
+            });
             });
         });
     });

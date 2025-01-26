@@ -3,7 +3,9 @@ import * as tf from '@tensorflow/tfjs-node';
 const createSequentialModel = (): tf.Sequential => {
   const model = {
     add: jest.fn().mockReturnThis(),
-    compile: jest.fn().mockReturnThis(),
+    compile: jest.fn().mockImplementation(function(this: any) {
+      return this; // Enable method chaining
+    }),
     predict: jest.fn().mockReturnValue({
       dataSync: jest.fn().mockReturnValue(new Float32Array([0.1, 0.2, 0.3])),
       array: jest.fn().mockResolvedValue([[0.1, 0.2, 0.3]]),
@@ -12,11 +14,16 @@ const createSequentialModel = (): tf.Sequential => {
     fit: jest.fn().mockResolvedValue({ 
       history: { 
         loss: [0.1],
-        accuracy: [0.9]
+        val_loss: [0.2]
       }
     }),
     save: jest.fn().mockResolvedValue(undefined),
-    dispose: jest.fn(),
+    dispose: jest.fn().mockImplementation(function() {
+        return Promise.resolve();
+    }),
+    compile: jest.fn().mockImplementation(function() {
+        return this;
+    }),
     getWeights: jest.fn().mockReturnValue([{
       dataSync: () => new Float32Array(10),
       dispose: jest.fn()

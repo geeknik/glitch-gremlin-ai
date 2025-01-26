@@ -15,34 +15,30 @@ import { GlitchSDK, TestType, ProposalState } from '../index.js';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import Redis from 'ioredis-mock';
 
-// Extend NodeJS.Global to include our __REDIS__ property for TypeScript
-declare global {
-  // eslint-disable-next-line no-var, vars-on-top
-  var __REDIS__: Redis;
-}
+// Add __REDIS__ to the global scope
+globalThis.__REDIS__ = undefined;
 
-// Define a type alias for redis mock methods that return a Promise
-type RedisMethod = jest.Mock<Promise<any>>;
+/** @type {Record<string, import('@jest/globals').Mock<Promise<any>>} */
+let mockMethods;
 
-// Define a record of mock methods at the module level so they are in scope everywhere
-let mockMethods: Record<string, RedisMethod>;
+/**
+ * @typedef {import('@jest/globals').Mock & {
+ *   mockResolvedValue: (value: any) => SolanaJestMock,
+ *   mockResolvedValueOnce: (value: any) => SolanaJestMock
+ * }} SolanaJestMock
+ */
 
-// Mock type definitions for Solana
-type SolanaJestMock = jest.Mock & {
-  mockResolvedValue: (value: any) => SolanaJestMock;
-  mockResolvedValueOnce: (value: any) => SolanaJestMock;
-};
-
-interface IMockConnection {
-  getAccountInfo: SolanaJestMock;
-  getBalance: SolanaJestMock;
-  getRecentBlockhash: SolanaJestMock;
-  sendTransaction: SolanaJestMock;
-  confirmTransaction: SolanaJestMock;
-  simulateTransaction: SolanaJestMock;
-  getVersion: SolanaJestMock;
-  getParsedTokenAccountsByOwner: SolanaJestMock;
-}
+/**
+ * @typedef {Object} IMockConnection
+ * @property {SolanaJestMock} getAccountInfo
+ * @property {SolanaJestMock} getBalance
+ * @property {SolanaJestMock} getRecentBlockhash
+ * @property {SolanaJestMock} sendTransaction
+ * @property {SolanaJestMock} confirmTransaction
+ * @property {SolanaJestMock} simulateTransaction
+ * @property {SolanaJestMock} getVersion
+ * @property {SolanaJestMock} getParsedTokenAccountsByOwner
+ */
 
 // A connection mock for Solana
 class MockConnection implements IMockConnection {

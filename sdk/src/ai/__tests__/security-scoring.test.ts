@@ -3,42 +3,37 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import * as tf from '@tensorflow/tfjs-node';
 import { mock, MockProxy } from 'jest-mock-extended';
 
-jest.mock('@tensorflow/tfjs-node', () => ({
-  tensor: jest.fn(),
-  sequential: jest.fn().mockImplementation(() => ({
-    add: jest.fn().mockImplementation(function(this: any) {
-      // Mock layer object
-      const layer = { 
-        apply: jest.fn(),
-        getWeights: jest.fn().mockReturnValue([]),
-        setWeights: jest.fn()
-      };
-      this.layers = this.layers || [];
-      this.layers.push(layer);
-      return this;
-    }),
-    compile: jest.fn(),
-    predict: jest.fn().mockResolvedValue({
-      data: jest.fn().mockResolvedValue(new Float32Array([0.5]))
-    }),
+jest.mock('@tensorflow/tfjs-node', () => {
+  const mockTensor = {
     dispose: jest.fn(),
-    fit: jest.fn().mockResolvedValue({}),
-    layers: []
-  } as unknown as tf.Sequential)),
-  layers: {
-    dense: jest.fn().mockImplementation((config: any) => ({
-      ...config,
-      apply: jest.fn(),
-      getWeights: jest.fn().mockReturnValue([]),
-      setWeights: jest.fn()
-    }))
-  },
-  train: {
-    adam: jest.fn()
-  }
-}));
+    dataSync: () => new Float32Array([0.5]),
+    arraySync: () => [0.5]
+  };
 
-const mockTf = jest.mocked(require('@tensorflow/tfjs-node')) as jest.Mocked<typeof tf>;
+  return {
+    getBackend: jest.fn().mockReturnValue('cpu'),
+    setBackend: jest.fn().mockResolvedValue(true),
+    ready: jest.fn().mockResolvedValue(undefined),
+    sequential: jest.fn().mockReturnValue({
+      add: jest.fn().mockReturnThis(),
+      compile: jest.fn(),
+      fit: jest.fn().mockResolvedValue({}),
+      predict: jest.fn().mockReturnValue(mockTensor),
+      dispose: jest.fn(),
+      layers: []
+    }),
+    layers: {
+      dense: jest.fn(),
+      dropout: jest.fn()
+    },
+    train: {
+      adam: jest.fn()
+    },
+    tensor: jest.fn().mockReturnValue(mockTensor),
+    tensor1d: jest.fn().mockReturnValue(mockTensor),
+    tensor2d: jest.fn().mockReturnValue(mockTensor)
+  };
+});
 
 describe('SecurityScoringModel', () => {
     let securityScoring: SecurityScoring;
@@ -47,35 +42,61 @@ describe('SecurityScoringModel', () => {
 
     beforeEach(() => {
         // Set up the mocks for tf methods
-        // Let the mock implementation handle object creation
-        mockTf.sequential.mockImplementation(() => ({
+        const tfMock = {
+            sequential: jest.fn().mockReturnValue({
+                add: jest.fn().mockReturnThis(),
+                compile: jest.fn(),
+                fit: jest.fn().mockResolvedValue({}),
+                predict: jest.fn().mockReturnValue({
+                    dataSync: () => new Float32Array([0.5]),
+                    dispose: jest.fn()
+                }),
+                dispose: jest.fn(),
+                layers: []
+            }),
+            layers: {
+                dense: jest.fn().mockReturnValue({
+                    apply: jest.fn()
+                })
+            },
+            train: {
+                adam: jest.fn()
+            },
+            tensor: jest.fn().mockReturnValue({
+                dispose: jest.fn(),
+                dataSync: () => new Float32Array([0.5])
+            })
+        };
+
+        // No need to assign mocks as they're handled in jest.setup.ts
+
+        // Use the shared mock implementation
+        const mockModel = {
             add: jest.fn().mockReturnThis(),
             compile: jest.fn(),
-            fit: jest.fn().mockResolvedValue({}),
+            fit: jest.fn().mockResolvedValue({ history: { loss: [0.1] } }),
             predict: jest.fn().mockReturnValue({
+                dataSync: () => new Float32Array([0.5]),
                 data: () => Promise.resolve(new Float32Array([0.5])),
                 dispose: jest.fn(),
                 shape: [1],
-                arraySync: () => [0.5],
-                rank: 1,
-                dtype: 'float32',
-                id: 1,
-                dataId: {},
-                size: 1
-            } as unknown as tf.Tensor),
+                arraySync: () => [[0.5]]
+            }),
             dispose: jest.fn(),
             layers: [],
-            optimizer: {}
-        } as unknown as tf.Sequential));
-        mockTf.tensor.mockReturnValue({
+            save: jest.fn().mockResolvedValue(undefined),
+            load: jest.fn().mockResolvedValue(undefined)
+        };
+
+        jest.spyOn(tf, 'sequential').mockReturnValue(mockModel);
+        const mockTensor = {
             dispose: jest.fn(),
             data: () => Promise.resolve(new Float32Array([0.5])),
             shape: [1],
-            size: 1,
-            rank: 1
-        } as unknown as tf.Tensor);
-        (mockTf.train.adam as jest.Mock).mockReturnValue({} as tf.Optimizer);
-        (mockTf.layers.dense as jest.Mock).mockReturnValue({} as tf.layers.Layer);
+            tensor: true,  // Required for type checking
+            arraySync: () => [0.5]
+        };
+        jest.spyOn(tf, 'tensor').mockReturnValue(mockTensor);
 
         connection = {
             getAccountInfo: jest.fn().mockImplementation(() => Promise.resolve({

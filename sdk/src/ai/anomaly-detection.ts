@@ -1,5 +1,21 @@
-import * as tf from '@tensorflow/tfjs-node';
-import { TimeSeriesMetric, ModelConfig, AnomalyResult, TrainingResult } from './types.js';
+import * as tf from '@tensorflow/tfjs-node-gpu';
+import type { TimeSeriesMetric, AnomalyResult } from './types.js';
+
+interface ModelConfig {
+    windowSize: number;
+    zScoreThreshold: number;
+    learningRate: number;
+    epochs: number;
+    minSampleSize: number;
+    threshold: number;
+}
+
+interface TrainingResult {
+    loss: number;
+    metrics: {
+        valLoss: number;
+    };
+}
 
 export class AnomalyDetector {
     private model: tf.Sequential | null = null;
@@ -8,12 +24,27 @@ export class AnomalyDetector {
     private initialized: boolean = false;
 
     constructor(config: Partial<ModelConfig> = {}, initializeModel: boolean = true) {
-        // First clamp threshold, then validate
-        const clampedConfig = {
-            ...config,
-            threshold: Math.max(0.01, Math.min(config.threshold ?? 0.8, 1.0))
+        // First validate raw values
+        if (config.windowSize !== undefined && config.windowSize <= 0) {
+            throw new Error('Window size must be positive');
+        }
+        if (config.learningRate !== undefined && config.learningRate <= 0) {
+            throw new Error('Learning rate must be positive');
+        }
+        if (config.zScoreThreshold !== undefined && config.zScoreThreshold <= 0) {
+            throw new Error('Z-score threshold must be positive');
+        }
+
+        // Then create validated config with clamped values
+        const validatedConfig = {
+            windowSize: config.windowSize ?? 10,
+            zScoreThreshold: Math.max(0.01, Math.min(config.zScoreThreshold ?? 0.8, 1.0)),
+            learningRate: config.learningRate ?? 0.001,
+            epochs: config.epochs ?? 10,
+            minSampleSize: config.minSampleSize ?? 3,
+            threshold: config.threshold ?? 0.8
         };
-        const validatedConfig = this.validateConfig(clampedConfig);
+
         this.config = validatedConfig;
         
         if (initializeModel) {
@@ -24,7 +55,7 @@ export class AnomalyDetector {
         }
     }
 
-    public isTrained(): boolean {
+    public isModelTrained(): boolean {
         return this.isTrained;
     }
 
@@ -32,23 +63,24 @@ export class AnomalyDetector {
         // Use already clamped values from constructor
         const validatedConfig = {
             windowSize: config.windowSize ?? 10,
-            threshold: config.threshold ?? 0.8,
+            zScoreThreshold: Math.max(0.01, Math.min(config.zScoreThreshold ?? 0.8, 1.0)),
             learningRate: config.learningRate ?? 0.001,
             epochs: config.epochs ?? 10,
-            minSampleSize: config.minSampleSize ?? 3
+            minSampleSize: config.minSampleSize ?? 3,
+            threshold: config.threshold ?? 0.8
         };
 
         if (validatedConfig.windowSize <= 0) {
             throw new Error('Window size must be positive');
-        }
-        if (validatedConfig.threshold <= 0 || validatedConfig.threshold >= 1) {
-            throw new Error('Threshold must be between 0 and 1');
         }
         if (validatedConfig.learningRate <= 0) {
             throw new Error('Learning rate must be positive');
         }
         if (validatedConfig.epochs <= 0) {
             throw new Error('Epochs must be positive');
+        }
+        if (validatedConfig.minSampleSize <= 0) {
+            throw new Error('Minimum sample size must be positive');
         }
 
         return validatedConfig;
@@ -59,23 +91,26 @@ export class AnomalyDetector {
         this.model = tf.sequential();
         this.isTrained = false;
 
-        // LSTM layer for sequence processing
-        this.model.add(tf.layers.lstm({
-            units: 64,
-            inputShape: [this.config.windowSize, 1],
-            returnSequences: true
+        // Input layer matching Solana metric dimensions
+        this.model.add(tf.layers.dense({
+            units: 128,
+            inputShape: [8], // 5 metrics (cpu + 4 Solana) with value + zScore
+            activation: 'relu'
         }));
         
         this.model.add(tf.layers.dropout({ rate: 0.2 }));
         
-        this.model.add(tf.layers.lstm({
+        // Hidden layer
+        this.model.add(tf.layers.dense({
             units: 32,
-            returnSequences: false
+            activation: 'relu'
         }));
         
-        this.model.add(tf.layers.dropout({ rate: 0.2 }));
-        
-        this.model.add(tf.layers.dense({ units: 1 }));
+        // Output layer
+        this.model.add(tf.layers.dense({
+            units: 10,
+            activation: 'linear'
+        }));
 
         this.model.compile({
             optimizer: tf.train.adam(this.config.learningRate),
@@ -87,18 +122,26 @@ export class AnomalyDetector {
 
     private preprocessData(data: TimeSeriesMetric[]): tf.Tensor2D {
         return tf.tidy(() => {
-            // Use CPU utilization as the primary metric
-            const values = data.map(d => {
-                if (!Array.isArray(d?.cpuUtilization)) {
-                    throw new Error('Invalid metric data - missing cpuUtilization');
-                }
-                return d.cpuUtilization[0];
-            });
-            const values_tensor = tf.tensor1d(values);
-            const moments = tf.moments(values_tensor);
-            const normalized = values_tensor.sub(moments.mean).div(tf.sqrt(moments.variance));
-            tf.dispose([values_tensor, moments.mean, moments.variance]);
-            return normalized.expandDims(1) as tf.Tensor2D;
+            // Process all metrics with Solana-specific weights
+            const features = data.map(d => [
+                ...(d.cpuUtilization || []),
+                ...(d.pdaValidation || []),
+                ...(d.accountDataMatching || []),
+                ...(d.cpiSafety || []),
+                ...(d.authorityChecks || [])
+            ].map(Number));
+
+            // Ensure uniform feature length
+            const featureLength = Math.max(...features.map(f => f.length));
+            const paddedFeatures = features.map(f => 
+                f.length === featureLength ? f : [...f, ...new Array(featureLength - f.length).fill(0)]
+            );
+
+            const tensor = tf.tensor2d(paddedFeatures);
+            const { mean, variance } = tf.moments(tensor, 0);
+            const normalized = tensor.sub(mean).div(variance.sqrt().add(1e-7));
+            
+            return normalized as tf.Tensor2D;
         });
     }
 
@@ -165,31 +208,24 @@ export class AnomalyDetector {
     }
 
     async detect(metric: TimeSeriesMetric): Promise<AnomalyResult> {
-        // 1. Check for model initialization and training status FIRST
         if (!this.model || !this.isTrained) {
             throw new Error('Model not initialized or trained');
         }
 
-        // Convert metric data to numbers
-        const cpuUtilization = metric.cpuUtilization.map(Number);
+        // Process all Solana-relevant metrics
+        const inputData = [
+            ...(metric.cpuUtilization || []),
+            ...(metric.pdaValidation || []),
+            ...(metric.accountDataMatching || []), 
+            ...(metric.cpiSafety || []),
+            ...(metric.authorityChecks || [])
+        ].map(Number);
 
-        // 2. Validate input data structure exists
-        if (!metric?.cpuUtilization) {
-            throw new Error('Invalid metric data - missing cpuUtilization');
-        }
-        if (!Array.isArray(metric.cpuUtilization)) {
-            throw new Error('Invalid cpuUtilization format - must be array');
-        }
-
-        // 3. Check data quantity requirements
-        if (metric.cpuUtilization.length < this.config.minSampleSize) {
+        if (inputData.length < this.config.minSampleSize) {
             throw new Error(`Insufficient data points - need at least ${this.config.minSampleSize}`);
         }
 
-        // Use first value from cpuUtilization array
-        const inputValue = metric.cpuUtilization[0];
-
-        const input = tf.tensor2d([[inputValue]]);
+        const input = tf.tensor2d([inputData]);
         try {
             const prediction = this.model.predict(input) as tf.Tensor;
             const [predicted, actual] = await Promise.all([
@@ -204,7 +240,19 @@ export class AnomalyDetector {
             return {
                 isAnomaly,
                 confidence,
-                details: `Prediction error: ${error.toFixed(4)}`
+                details: `Prediction error: ${error.toFixed(4)}`,
+                metricWeights: {
+                    pdaValidation: 0,
+                    accountDataMatching: 0,
+                    cpiSafety: 0,
+                    authorityChecks: 0
+                },
+                zScores: {
+                    pdaValidation: 0,
+                    accountDataMatching: 0,
+                    cpiSafety: 0,
+                    authorityChecks: 0
+                }
             };
         } finally {
             tf.dispose([input]);
@@ -213,25 +261,18 @@ export class AnomalyDetector {
 
     async save(path: string): Promise<void> {
         if (!this.model || !this.isTrained) {
-            throw new Error('Model not initialized');
+            throw new Error('Model not initialized or trained');
         }
-        // Mocked save operation
-        await new Promise(resolve => setTimeout(resolve, 10));
+        // Mock save operation
+        return Promise.resolve();
     }
 
     async load(path: string): Promise<void> {
-        try {
-            // Mocked load operation
-            this.model = tf.sequential();
-            this.model.compile({
-                optimizer: tf.train.adam(this.config.learningRate),
-                loss: 'meanSquaredError'
-            });
-            this.isTrained = true;
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            throw new Error(`Failed to load model: ${errorMessage}`);
+        if (!this.model) {
+            this.initializeModel();
         }
+        // Mock load operation
+        return Promise.resolve();
     }
 
     async cleanup(): Promise<void> {

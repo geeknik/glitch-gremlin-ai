@@ -165,7 +165,7 @@ const mockState = {
             return JSON.stringify({test: 'data'});
         });
         
-        mockRedisClient.lpush = jest.fn<any>().mockImplementation(async (key: string, value: string) => {
+        mockRedisClient.lpush = jest.fn().mockImplementation(async (key: string, value: string) => {
             if (value === 'invalid-json') {
                 throw new GlitchError('Invalid JSON', ErrorCode.INVALID_JSON);
             }
@@ -179,7 +179,7 @@ const mockState = {
             return this.queue?.shift() ?? null;
         });
         
-        mockRedisClient.getRawClient = jest.fn().mockReturnValue(mockRedisClient);
+        mockRedisClient.getRawClient = jest.fn<() => Redis>().mockReturnValue(mockRedisClient as unknown as Redis);
 
         // Create RedisQueueWorker with mock client
         redisQueueWorker = new RedisQueueWorker(mockRedisClient as unknown as Redis);
@@ -190,7 +190,7 @@ const mockState = {
         redisQueueWorker = new RedisQueueWorker(mockRedisClient as unknown as Redis);
         await redisQueueWorker.initialize();
 
-        // Create SDK instance
+        // Create SDK instance with mock connection
         sdk = new GlitchSDK({
             cluster: "https://api.devnet.solana.com",
             wallet: Keypair.generate(),
@@ -199,7 +199,8 @@ const mockState = {
                 port: 6379
             },
             heliusApiKey: 'mock-api-key',
-            minStakeAmount: 100_000_000 // 0.1 SOL
+            minStakeAmount: 100_000_000, // 0.1 SOL
+            connection: mockConnection
         } as SDKConfig);
 
         // Set queue worker directly for testing
