@@ -19,7 +19,6 @@ syscallz = "0.17"
 log = "0.4"
 thiserror = "1.0"
 libc = "0.2"
-perfcnt = "0.5.0"
 mongodb.workspace = true
 redis.workspace = true
 tokio.workspace = true
