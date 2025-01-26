@@ -52,11 +52,15 @@ mod tests {
 
     #[test]
     fn test_program_initialization() {
-        let program_id = Pubkey::new_unique();
-        let program_data = Keypair::new();
+        // ALICE and BOB test accounts from DESIGN.md 9.1
+        let program_id = id();
+        let alice = Keypair::new();
+        let bob = Keypair::new();
+        
         let mut accounts = vec![
-            AccountInfo::new(&program_data.pubkey(), false, false, &mut 0, &mut [], &program_id, false, Epoch::default())
-        ]);
+            AccountInfo::new(&alice.pubkey(), true, false, &mut 0, &mut [], &program_id, false, Epoch::default()),
+            AccountInfo::new(&bob.pubkey(), true, false, &mut 0, &mut [], &program_id, false, Epoch::default())
+        ];
 
         // DESIGN.md 9.1 - Geographic diversity enforcement
         let mut regions = std::collections::HashSet::new();
@@ -87,8 +91,26 @@ mod tests {
 
     #[test]
     fn test_multisig_verification() {
-        let signers = vec![Pubkey::new_unique(); 6]; // Only 6/10
+        // Test with ALICE and BOB from DESIGN.md 9.1
+        let signers = vec![
+            ALICE, ALICE, ALICE, ALICE, ALICE, ALICE, // 6x ALICE
+            BOB, BOB, BOB, BOB // 4x BOB
+        ];
+        
+        // Should fail geographic diversity check (only 2 regions)
         assert!(Processor::validate_multisig(&signers).is_err());
+        
+        // Valid 7/10 from 3+ regions (mocking region codes)
+        let valid_signers = vec![
+            Pubkey::new_from_array([0; 32]), // Region 0
+            Pubkey::new_from_array([1; 32]), // Region 1
+            Pubkey::new_from_array([2; 32]), // Region 2
+            Pubkey::new_from_array([0; 32]),
+            Pubkey::new_from_array([1; 32]),
+            Pubkey::new_from_array([2; 32]),
+            Pubkey::new_from_array([0; 32])
+        ];
+        assert!(Processor::validate_multisig(&valid_signers).is_ok());
     }
 
     #[test]

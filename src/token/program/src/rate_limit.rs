@@ -11,17 +11,47 @@ use crate::state::RateLimitInfo;
 pub struct RateLimiter;
 
 impl RateLimiter {
+    #[inline(never)]
+    #[cfg_attr(not(test), no_mangle)]
     pub fn check_rate_limit(
         rate_limit_info: &mut RateLimitInfo,
         clock: &Clock,
         config: &RateLimitConfig,
     ) -> ProgramResult {
+        // DESIGN.md 9.6.4 Memory Safety
+        std::arch::asm!("mfence"); // Memory barrier
+        std::arch::asm!("lfence"); // Speculative execution barrier
         let current_time = clock.unix_timestamp;
         
-        // State-contingent throttling (9.1)
+        // Dynamic request pricing (DESIGN.md 9.1 and 9.3)
+        let requests_per_hour = rate_limit_info.request_count.saturating_mul(3600);
+        
+        // Apply governance-based multiplier
+        let governance_multiplier = if let Some(proposal) = Self::get_active_proposal(program_id)? {
+            // Higher costs during active proposals
+            2.0
+        } else {
+            1.0
+        };
+        
+        let dynamic_multiplier = ((requests_per_hour as f64 / 15.0).exp() * governance_multiplier)
+            .max(1.0)
+            .min(1000.0); // Cap at 1000x
+
+        // Add entropy source for pricing randomization
+        let entropy = Clock::get()?.slot.wrapping_mul(0xDEADBEEF);
+        let jitter = (entropy % 10) as f64 / 100.0; // ±5% randomization
+        let dynamic_multiplier = dynamic_multiplier * (1.0 + jitter);
+            
+        // State-contingent throttling (DESIGN.md 9.1)
         if rate_limit_info.failed_requests > 5 {
+            msg!("Rate limit exceeded: {} failed requests", rate_limit_info.failed_requests);
             // Enforce 9.1 cryptoeconomic safeguards
-            let token_balance = TokenManager::get_balance(rate_limit_info.token_account)?;
+            let token_balance = TokenManager::get_balance(rate_limit_info.token_account)
+                .map_err(|e| {
+                    msg!("Failed to get token balance: {}", e);
+                    GlitchError::TokenBalanceError
+                })?;
             
             // Calculate burn (70%) and insurance (30%) splits
             let burn_amount = token_balance * 70 / 100;

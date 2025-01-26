@@ -4,21 +4,45 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use bellman::groth16;
 
 pub const GROTH16_PROOF_SIZE: usize = 192;
-pub const VK: &str = "placeholder_verification_key_for_development";
-const DILITHIUM_PUBKEY: &str = "d84a9b3d..."; // Actual public key from DESIGN.md 9.6.2
+pub const DILITHIUM_SIG_SIZE: usize = 2420; // CRYSTALS-Dilithium standard signature size
+pub const VK: &str = include_str!("../keys/verification_key.key"); // Load from file
+pub const DILITHIUM_PUBKEY: &[u8] = include_bytes!("../keys/dilithium.pub");
 
 // From DESIGN.md 9.6.4 - Memory safety checks
 #[inline(never)]
 #[cfg(not(test))]  // Only disable in non-test builds
 
+#[inline(never)]
+#[cfg_attr(not(test), no_mangle)]
 pub fn verify_groth16(
     proof: &[u8],
     public_inputs: &[u8],
     vk: &str
 ) -> Result<bool, ProgramError> {
-    // Deserialize proof and inputs
-    let mut proof_reader = proof;
-    let proof = groth16::Proof::<Bls12>::read(&mut proof_reader).map_err(|_| ProgramError::InvalidArgument)?;
+    // DESIGN.md 9.6.4 Memory safety
+    std::arch::asm!("mfence"); // Memory barrier
+    std::arch::asm!("lfence"); // Speculative execution barrier
+    
+    // DESIGN.md 9.6.2 - Verify both classical and post-quantum proofs
+    if proof.len() != GROTH16_PROOF_SIZE + DILITHIUM_SIG_SIZE {
+        return Err(ProgramError::InvalidArgument);
+    }
+    
+    // Split proof into classical and post-quantum parts
+    let (groth_proof, dilithium_sig) = proof.split_at(GROTH16_PROOF_SIZE);
+    
+    // Verify Dilithium signature first
+    if !verify_dilithium_signature(dilithium_sig, public_inputs, DILITHIUM_PUBKEY)? {
+        return Err(GlitchError::InvalidSignature.into());
+    }
+    
+    // Then verify classical proof with enhanced error handling
+    let mut proof_reader = groth_proof;
+    let proof = groth16::Proof::<Bls12>::read(&mut proof_reader)
+        .map_err(|e| {
+            msg!("Failed to read Groth16 proof: {}", e);
+            GlitchError::InvalidProof
+        })?;
     
     // Convert inputs to scalars
     let inputs = read_public_inputs(public_inputs)?;
