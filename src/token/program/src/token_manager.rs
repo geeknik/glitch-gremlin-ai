@@ -1,12 +1,14 @@
 use solana_program::{
-    account_info::AccountInfo,
+    account_info::{next_account_info, AccountInfo},
     entrypoint::ProgramResult,
     program_error::ProgramError,
     pubkey::Pubkey,
     program_pack::Pack,
+    program::invoke,
     msg
 };
 use spl_token::instruction::{burn, transfer};
+use std::str::FromStr;
 
 pub struct TokenManager;
 
@@ -16,7 +18,19 @@ impl TokenManager {
         Ok(account.amount)
     }
 
-    pub fn burn_tokens(token_account: &AccountInfo, amount: u64) -> ProgramResult {
+    pub fn validate_token_account(account: &AccountInfo, program_id: &Pubkey) -> ProgramResult {
+        if account.owner != program_id {
+            return Err(ProgramError::IncorrectProgramId);
+        }
+        Ok(())
+    }
+
+    pub fn burn_tokens(
+        token_account: &AccountInfo,
+        amount: u64,
+        account_info_iter: &mut std::slice::Iter<AccountInfo>,
+        program_id: &Pubkey
+    ) -> ProgramResult {
         // DESIGN.md 9.1 + 9.3 enhanced tokenomics
         let burn_amount = amount
             .checked_mul(70)
@@ -34,10 +48,6 @@ impl TokenManager {
         // DESIGN.md 9.1 - Validate insurance fund account
         let insurance_account_info = next_account_info(account_info_iter)?;
         Self::validate_token_account(insurance_account_info, program_id)?;
-
-        let insurance_amount = amount
-            .checked_sub(burn_amount)
-            .ok_or(ProgramError::ArithmeticOverflow)?;
 
         // Perform actual burn
         let burn_ix = burn(
@@ -61,7 +71,7 @@ impl TokenManager {
         destination: &Pubkey,
         amount: u64,
     ) -> ProgramResult {
-        let _transfer_ix = transfer(
+        let transfer_ix = transfer(
             &spl_token::id(),
             source.key,
             destination,
@@ -70,6 +80,7 @@ impl TokenManager {
             amount,
         )?;
 
+        invoke(&transfer_ix, &[source.clone()])?;
         msg!("Transferred {} tokens to {}", amount, destination);
         Ok(())
     }
