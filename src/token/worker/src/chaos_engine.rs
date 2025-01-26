@@ -2,7 +2,15 @@ use std::boxed::Box;
 use std::error::Error;
 use std::future::Future;
 use std::pin::Pin;
-use crate::job_processor::{TestEnvironment, ConcurrencyResult};
+use serde::{Deserialize, Serialize};
+use crate::job_processor::TestEnvironment;
+
+#[derive(Debug)]
+pub struct ConcurrencyResult {
+    pub success: bool,
+    pub latency: u64,
+    pub errors: Vec<String>,
+}
 
 type BoxedFuture<T> = Pin<Box<dyn Future<Output = Result<T, Box<dyn Error>>> + Send + 'static>>;
 pub struct ChaosTestResult {
@@ -137,23 +145,28 @@ use serde_json::Error as JsonError;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum TestType {
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum TestType {
     Load,
     Fuzz,
     Exploit,
+    Concurrency,
+    Mutation
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct ChaosParamsInput {
-    test_type: TestType,
-    duration: u64,
-    intensity: u8,
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ChaosParamsInput {
+    pub test_type: TestType,
+    pub duration: u64,
+    pub intensity: u8,
     #[serde(default = "default_concurrency")]
-    concurrency_level: u8,
+    pub concurrency_level: u8,
     #[serde(default = "default_latency")]
-    max_latency: u64,
+    pub max_latency: u64,
     #[serde(default = "default_error_threshold")]
-    error_threshold: u8,
+    pub error_threshold: u8,
 }
 
 fn default_concurrency() -> u8 { 3 }
