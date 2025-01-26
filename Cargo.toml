@@ -6,6 +6,9 @@ members = [
     "src/token/shared",
     "src/token/governance-worker"
 ]
+exclude = [
+    "deps/solana-sdk"
+]
 
 [workspace.dependencies]
 solana-sdk = { path = "deps/solana-sdk" }
