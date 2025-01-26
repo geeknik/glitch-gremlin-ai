@@ -23,8 +23,8 @@ serde = { version = "1.0", features = ["derive"] }
 borsh = "0.10.3"
 
 # Platform specific features
-[workspace.package.metadata]
-default-features = []
+[workspace]
+default-features = false
 features = ["linux"]
 
 [profile.release]
