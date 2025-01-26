@@ -18,11 +18,20 @@ pub enum GlitchError {
     #[error("Invalid signature")]
     InvalidSignature,
 
+    #[error("Insufficient stake amount")]
+    InsufficientStake,
+
+    #[error("Quorum not reached")]
+    QuorumNotReached,
+
+    #[error("Insufficient geographic diversity")]
+    InsufficientDiversity,
+
+    #[error("Invalid region")]
+    InvalidRegion,
+
     // Security-critical errors from DESIGN.md 9.1
     #[error("7/10 multisig verification required")]
-    // HumanVerificationRequired,  // Removed duplicate entry
-
-    #[error("Minimum 3 geographic regions required")]
     InsufficientMultisigSignatures,
 
     #[error("Program not initialized")]
