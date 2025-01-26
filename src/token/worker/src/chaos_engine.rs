@@ -125,19 +125,21 @@ async fn await_all(
     }
     Ok(results)
 }
-struct ConcurrencyResult {
-    success: bool,
-    latency: u64,
-    errors: Vec<String>,
+#[derive(Debug, Clone)]
+pub struct ConcurrencyResult {
+    pub success: bool,
+    pub latency: u64,
+    pub errors: Vec<String>,
 }
 
-struct ChaosParams {
-    test_type: TestType,
-    duration: u64,
-    intensity: u8,
-    concurrency_level: u8,
-    max_latency: u64,
-    error_threshold: u8,
+#[derive(Debug, Clone)]
+pub struct ChaosParams {
+    pub test_type: TestType,
+    pub duration: u64,
+    pub intensity: u8,
+    pub concurrency_level: u8,
+    pub max_latency: u64,
+    pub error_threshold: u8,
 }
 
 use serde::{Deserialize, Serialize};
