@@ -240,6 +240,9 @@ impl Default for TestEnvironment {
             test_accounts: Vec::new(),
             test_parameters: TestParameters::default(),
             start_time: std::time::Instant::now(),
+            avg_latency: 0,
+            max_memory: 0,
+            cpu_utilization: 0.0,
         }
     }
 }

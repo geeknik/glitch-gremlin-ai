@@ -2,15 +2,9 @@ use std::boxed::Box;
 use std::error::Error;
 use std::future::Future;
 use std::pin::Pin;
-use serde::{Deserialize, Serialize};
 use crate::job_processor::TestEnvironment;
 
 #[derive(Debug)]
-pub struct ConcurrencyResult {
-    pub success: bool,
-    pub latency: u64,
-    pub errors: Vec<String>,
-}
 
 type BoxedFuture<T> = Pin<Box<dyn Future<Output = Result<T, Box<dyn Error>>> + Send + 'static>>;
 pub struct ChaosTestResult {
