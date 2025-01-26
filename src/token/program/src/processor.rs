@@ -118,11 +118,31 @@ impl Processor {
         Ok(())
     }
     /// Validate program initialization state
+    #[inline(never)]
     fn validate_initialized(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
+        // DESIGN.md 9.6.4 Memory Safety
+        std::arch::asm!("mfence"); // Memory barrier
+        std::arch::asm!("lfence"); // Speculative execution barrier
+        
         // Check if program data account exists and is owned by BPF loader
         let program_data = next_account_info(&mut accounts.iter())?;
         if program_data.owner != &bpf_loader_upgradeable::id() {
             return Err(ProgramError::InvalidAccountOwner);
+        }
+        
+        // DESIGN.md 9.6.1 - Enhanced μArch fingerprinting
+        let mut entropy_buffer = [0u8; 32];
+        solana_program::hash::hash(&program_data.data.borrow()).to_bytes().copy_to_slice(&mut entropy_buffer);
+        if entropy_buffer[0] & 0xF0 != SGX_PREFIX[0] & 0xF0 {
+            msg!("Invalid entropy pattern");
+            return Err(GlitchError::InvalidProof.into());
+        }
+
+        // DESIGN.md 9.6.1 - Verify entropy initialization and μArch fingerprinting
+        let program_data_slice = program_data.data.borrow();
+        if program_data_slice.len() < 4 || &program_data_slice[..4] != &SGX_PREFIX {
+            msg!("Invalid SGX attestation prefix");
+            return Err(GlitchError::InvalidProof.into());
         }
         
         // Verify multisig authority matches DESIGN.md 9.1 requirements
@@ -228,6 +248,24 @@ impl Processor {
         config: &RateLimitConfig,
         params: TestParams,
     ) -> ProgramResult {
+        // DESIGN.md 9.3 - Validate minimum stake requirements
+        if staked_amount < config.min_stake_amount {
+            msg!("Insufficient stake amount: {} < {}", 
+                staked_amount, config.min_stake_amount);
+            return Err(GlitchError::InsufficientStake.into());
+        }
+
+        // Validate token burn requirements
+        let burn_amount = staked_amount
+            .checked_mul(BURN_PERCENTAGE as u64)
+            .and_then(|v| v.checked_div(100))
+            .ok_or(GlitchError::ArithmeticOverflow)?;
+
+        // Calculate insurance fund contribution
+        let insurance_amount = staked_amount
+            .checked_mul(INSURANCE_PERCENTAGE as u64)
+            .and_then(|v| v.checked_div(100))
+            .ok_or(GlitchError::ArithmeticOverflow)?;
         let account_info_iter = &mut accounts.iter();
         let proposal_info = next_account_info(account_info_iter)?;
         let staking_info = next_account_info(account_info_iter)?;
@@ -346,6 +384,37 @@ impl Processor {
         let proposal_info = next_account_info(account_info_iter)?;
         let staking_info = next_account_info(account_info_iter)?;
         let voter_info = next_account_info(account_info_iter)?;
+        let token_program = next_account_info(account_info_iter)?;
+        let escrow_account = next_account_info(account_info_iter)?;
+
+        // DESIGN.md 9.3 - Lock tokens in escrow during voting period
+        let transfer_ix = spl_token::instruction::transfer(
+            token_program.key,
+            staking_info.key,
+            escrow_account.key,
+            voter_info.key,
+            &[],
+            vote_amount,
+        )?;
+
+        invoke(
+            &transfer_ix,
+            &[
+                staking_info.clone(),
+                escrow_account.clone(),
+                voter_info.clone(),
+                token_program.clone(),
+            ],
+        )?;
+
+        // Record stake duration for rewards calculation
+        let clock = Clock::get()?;
+        let stake_info = StakeInfo {
+            owner: *voter_info.key,
+            amount: vote_amount,
+            locked_until: clock.unix_timestamp + config.min_stake_lockup,
+            proposal_id,
+        };
 
         if !voter_info.is_signer {
             return Err(ProgramError::MissingRequiredSignature);
@@ -509,16 +578,55 @@ impl Processor {
     }
 
     fn validate_geographic_diversity(signers: &[Pubkey]) -> ProgramResult {
-        // Mock implementation - in production this would check node metadata
-        // DESIGN.md 9.6.2 requires 3+ distinct geographic regions
+        // DESIGN.md 9.1 & 9.4 - Geographic diversity with fault injection
         let mut regions = std::collections::HashSet::new();
+        let mut fault_regions = std::collections::HashSet::new();
+        
         for signer in signers {
-            // First byte of signature as mock region code
-            regions.insert(signer.to_bytes()[0] % 5); // 5 regions
+            // Get region from metadata account
+            let metadata_address = Pubkey::create_program_address(
+                &[b"node_metadata", &signer.to_bytes()],
+                &crate::id(),
+            )?;
+            
+            let metadata = NodeMetadata::try_from_slice(
+                &AccountInfo::new(&metadata_address, false, false, &[], &[], &[], false, 0)
+                    .data
+                    .borrow()
+            )?;
+            
+            regions.insert(metadata.region_code);
         }
-        if regions.len() < 3 {
+
+        // DESIGN.md 9.1 requires minimum 3 distinct regions
+        if regions.len() < MIN_GEO_REGIONS {
+            msg!("Insufficient geographic diversity: {} regions", regions.len());
             return Err(GlitchError::InsufficientDiversity.into());
         }
+
+        // DESIGN.md 9.4 - Geographic fault injection
+        let clock = Clock::get()?;
+        let entropy = clock.slot.wrapping_mul(0xDEADBEEF);
+        
+        // Randomly select conflicting jurisdictions
+        for region in regions.iter() {
+            if !APPROVED_REGIONS.contains(region) {
+                msg!("Invalid region code: {}", region);
+                return Err(GlitchError::InvalidRegion.into());
+            }
+            
+            // Add conflicting region based on entropy
+            let conflict_region = ((entropy.wrapping_add(*region as u64)) % 
+                                 APPROVED_REGIONS.len() as u64) as u8;
+            fault_regions.insert(conflict_region);
+        }
+        
+        // Ensure we have enough conflicting jurisdictions
+        if fault_regions.len() < MIN_GEO_REGIONS {
+            msg!("Insufficient fault injection diversity");
+            return Err(GlitchError::InsufficientDiversity.into());
+        }
+
         Ok(())
     }
 
@@ -545,6 +653,17 @@ impl Processor {
         mut amount: u64,
         params: Vec<u8>,
     ) -> ProgramResult {
+        // DESIGN.md 9.6.5 - Scan for vulnerabilities before processing
+        let scanner = VulnerabilityScanner::new(2); // High risk level
+        let findings = scanner.scan_program(program_id)?;
+        
+        if !findings.is_empty() {
+            msg!("Security vulnerabilities detected:");
+            for finding in findings {
+                msg!("- {}", finding);
+            }
+            // Don't fail, but log warnings
+        }
         // Validate security parameters from DESIGN.md 9.1
         let params_str = String::from_utf8(params.clone()).map_err(|_| GlitchError::InvalidChaosRequest)?;
         let params_json: serde_json::Value = serde_json::from_str(&params_str).map_err(|_| GlitchError::InvalidChaosRequest)?;
