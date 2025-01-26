@@ -9,12 +9,14 @@ use solana_program::{
     sysvar::{rent::Rent, Sysvar},
     program::{invoke, invoke_signed},
     clock::Clock,
+    bpf_loader_upgradeable,
 };
 use crate::zk;
 use crate::token_manager::TokenManager;
 use crate::state::RateLimitConfig;
-use borsh::{BorshSerialize, BorshDeserialize};
+use borsh::{BorshSerialize, BorshDeserialize}; 
 use spl_token::state::Account as TokenAccount;
+use crate::error::GlitchError;
 use std::str::FromStr;
 use crate::{
     instruction::GlitchInstruction, 
