@@ -69,10 +69,10 @@ async fn run_load_test(
         cpu_peak: test_env.cpu_utilization,
         anomaly_score: calculate_anomaly_score(&results),
         entropy_checks: true,
-        page_faults: test_env.page_fault_count,
-        cache_misses: test_env.cache_miss_count,
-        branch_mispredicts: test_env.branch_mispredicts,
-        spectre_v2_mitigations: test_env.spectre_mitigations_enabled,
+        page_faults: 0, // Removed CPU-specific metrics
+        cache_misses: 0,
+        branch_mispredicts: 0,
+        spectre_v2_mitigations: false,
     };
     
     Ok(ChaosTestResult {
