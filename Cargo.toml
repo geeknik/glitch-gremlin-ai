@@ -11,6 +11,11 @@ exclude = [
 ]
 
 [workspace.dependencies]
+solana-program = "1.18.26"
+solana-sdk = "1.18.26"
+solana-program-test = "1.18.26"
+
+[workspace.dependencies]
 solana-sdk = "1.17"
 solana-program = "1.17"
 mongodb = { version = "2.8", features = ["tokio-runtime"] }
