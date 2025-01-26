@@ -31,6 +31,7 @@ solana-bpf-loader-program = "1.18.26"
 # Linux-specific dependencies
 [target.'cfg(target_os = "linux")'.dependencies]
 landlock = "0.2.0"
+libc = { version = "0.2", features = ["extra_traits"] }
 
 [dev-dependencies]
 solana-program-test = "1.17.0" 
