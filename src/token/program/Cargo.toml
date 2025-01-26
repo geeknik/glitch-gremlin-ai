@@ -8,9 +8,9 @@ repository = "https://github.com/your-org/glitch-gremlin-ai"
 authors = ["Your Name <your.email@example.com>"]
 
 [dependencies]
-solana-program = { version = "=1.18.26", features = ["no-entrypoint"] }
+solana-program = "=1.18.26"
 strum = { version = "0.25", features = ["derive"] }
-solana-sdk = { version = "=1.18.26", features = ["full"] }
+solana-sdk = "=1.18.26"
 glitch-shared = { path = "../shared" }
 borsh = "=0.10.3" 
 borsh-derive = "=0.10.3"

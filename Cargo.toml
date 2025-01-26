@@ -11,8 +11,8 @@ exclude = [
 ]
 
 [workspace.dependencies]
-solana-program = { version = "1.18.26", features = ["no-entrypoint"] }
-solana-sdk = { version = "1.18.26", features = ["full"] }
+solana-program = "1.18.26"
+solana-sdk = "1.18.26"
 solana-program-test = "1.18.26"
 mongodb = { version = "2.8", features = ["tokio-runtime"], default-features = false }
 redis = { version = "0.23.0", features = ["tokio-comp"] }
