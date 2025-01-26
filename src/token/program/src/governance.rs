@@ -1,7 +1,7 @@
 use borsh::{BorshSerialize, BorshDeserialize};
 use solana_program::pubkey::Pubkey;
 
-#[derive(BorshSerialize, BorshDeserialize, Debug)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
 pub struct GovernanceProposal {
     /// Unique ID of the proposal
     pub id: u64,
@@ -24,6 +24,24 @@ pub struct GovernanceProposal {
     pub escrow_account: Option<Pubkey>,
     /// Test parameters
     pub test_params: TestParams,
+    /// Execution time
+    pub execution_time: i64,
+    /// Security level
+    pub security_level: u8,
+    /// Multisig signers
+    pub multisig_signers: Vec<Pubkey>,
+    /// Required signatures
+    pub required_signatures: u8,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq)]
+pub enum ProposalStatus {
+    Pending,
+    Active,
+    Approved,
+    Rejected,
+    Executed,
+    Failed
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]

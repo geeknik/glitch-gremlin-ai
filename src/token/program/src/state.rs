@@ -1,7 +1,9 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use solana_program::pubkey::Pubkey;
-use solana_program::sysvar::clock::Clock;
-use solana_program::sysvar::Sysvar;
+use solana_program::{
+    pubkey::Pubkey,
+    sysvar::{clock::Clock, Sysvar},
+    msg,
+};
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
 pub struct ChaosRequest {
