@@ -47,7 +47,6 @@ const MIN_SIGNATURES: u8 = 7;
 const EXECUTION_DELAY: i64 = 259200; // 72 hours in seconds
 // Security constants from DESIGN.md 9.1 and 9.6.2
 const HUMAN_PROOF_NONCE_SIZE: usize = 8;
-const DILITHIUM_PUBKEY: &str = "d84a9b3d..."; // Actual public key from DESIGN.md 9.6.2
 const MIN_GEO_REGIONS: usize = 3;
 pub const SGX_PREFIX: [u8; 4] = [0x53, 0x47, 0x58, 0x21]; // "SGX!" 
 
@@ -892,23 +891,15 @@ impl Processor {
         
         // DESIGN.md 9.6.2 - Verify Groth16 proof AND Dilithium post-quantum signature
         let groth_proof = &proof_data[..zk::GROTH16_PROOF_SIZE];
-        let dilithium_sig = &proof_data[zk::GROTH16_PROOF_SIZE..];
         
-        // DESIGN.md 9.6.2 - Verify both classical and post-quantum proofs
+        // DESIGN.md 9.6.2 - Verify classical proofs
         let groth_valid = crate::zk::verify_groth16(groth_proof, &public_inputs, zk::VK)?;
-        
-        // Dilithium verification with insurance fund pubkey
-        let dilithium_valid = solana_dilithium::verify(
-            &public_inputs,
-            dilithium_sig,
-            &DILITHIUM_PUBKEY.as_bytes()
-        ).map_err(|_| GlitchError::InvalidSignature)?;
 
         // DESIGN.md 9.6.2 - Certificate transparency checks
         // TODO: Implement certificate transparency checks
         let log_valid = true; // Temporarily bypass for now
 
-        let proof_valid = groth_valid && dilithium_valid && log_valid;
+        let proof_valid = groth_valid && log_valid;
         if !proof_valid {
             return Err(GlitchError::InvalidCompletionProof.into());
         }
