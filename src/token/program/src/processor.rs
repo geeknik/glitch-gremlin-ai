@@ -751,7 +751,12 @@ impl Processor {
         amount = amount.checked_sub(burn_amount)
             .ok_or(GlitchError::ArithmeticOverflow)?;
             
-        TokenManager::burn_tokens(&accounts[1], burn_amount)?;
+        TokenManager::burn_tokens(
+            &accounts[1],
+            burn_amount,
+            &mut accounts.iter(),
+            program_id
+        )?;
 
         // State-contingent throttling
         // DESIGN.md 9.1 state-contingent throttling
@@ -777,7 +782,7 @@ impl Processor {
             
             // Require human verification
             let proof_account = next_account_info(&mut accounts.iter())?;
-            if !Self::validate_human_proof(proof_account) {
+            if let Err(_) = Self::validate_human_proof(proof_account) {
                 return Err(GlitchError::HumanVerificationRequired.into());
             }
         }

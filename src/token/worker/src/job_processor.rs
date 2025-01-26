@@ -116,9 +116,9 @@ async fn setup_test_environment(target_program: &Pubkey) -> Result<TestEnvironme
     // Cross-platform sandboxing
     let mut ctx = syscallz::Context::init().unwrap();
     ctx.set_action_default(syscallz::Action::Allow).unwrap();
-    ctx.allow_syscall(1).unwrap(); // read
-    ctx.allow_syscall(60).unwrap(); // exit
-    ctx.allow_syscall(15).unwrap(); // rt_sigreturn
+    ctx.allow_syscall(Sysno::read).unwrap(); // read
+    ctx.allow_syscall(Sysno::exit).unwrap(); // exit
+    ctx.allow_syscall(Sysno::rt_sigreturn).unwrap(); // rt_sigreturn
     ctx.load().unwrap();
 
     // Memory protection
