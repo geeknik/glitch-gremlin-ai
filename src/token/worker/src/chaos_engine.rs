@@ -132,21 +132,63 @@ struct ChaosParams {
     error_threshold: u8,
 }
 
-#[allow(dead_code)]
+use serde::{Deserialize, Serialize};
+use serde_json::Error as JsonError;
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 enum TestType {
-    LoadTest,
-    FuzzTest,
-    ExploitTest,
+    Load,
+    Fuzz,
+    Exploit,
 }
 
-fn parse_chaos_params(_params: &str) -> Result<ChaosParams, Box<dyn Error>> {
-    // TODO: Implement actual parameter parsing
+#[derive(Debug, Serialize, Deserialize)]
+struct ChaosParamsInput {
+    test_type: TestType,
+    duration: u64,
+    intensity: u8,
+    #[serde(default = "default_concurrency")]
+    concurrency_level: u8,
+    #[serde(default = "default_latency")]
+    max_latency: u64,
+    #[serde(default = "default_error_threshold")]
+    error_threshold: u8,
+}
+
+fn default_concurrency() -> u8 { 3 }
+fn default_latency() -> u64 { 1000 }
+fn default_error_threshold() -> u8 { 2 }
+
+fn parse_chaos_params(params: &str) -> Result<ChaosParams, Box<dyn Error>> {
+    // Parse JSON parameters
+    let input: ChaosParamsInput = serde_json::from_str(params)
+        .map_err(|e| format!("Invalid parameter format: {}", e))?;
+    
+    // Validate parameters
+    if input.duration < 60 || input.duration > 3600 {
+        return Err("Duration must be between 60 and 3600 seconds".into());
+    }
+    
+    if input.intensity < 1 || input.intensity > 10 {
+        return Err("Intensity must be between 1 and 10".into());
+    }
+
+    if input.concurrency_level < 1 || input.concurrency_level > 20 {
+        return Err("Concurrency level must be between 1 and 20".into());
+    }
+
+    // Convert to internal ChaosParams
     Ok(ChaosParams {
-        test_type: TestType::LoadTest,
-        duration: 60,
-        intensity: 5,
-        concurrency_level: 3,
-        max_latency: 1000,
-        error_threshold: 2
+        test_type: match input.test_type {
+            TestType::Load => TestType::LoadTest,
+            TestType::Fuzz => TestType::FuzzTest,
+            TestType::Exploit => TestType::ExploitTest,
+        },
+        duration: input.duration,
+        intensity: input.intensity,
+        concurrency_level: input.concurrency_level,
+        max_latency: input.max_latency,
+        error_threshold: input.error_threshold,
     })
 }
