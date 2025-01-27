@@ -18,3 +18,14 @@ borsh = "0.10.3"
 borsh-derive = "0.10.3"
 
 [dev-dependencies]
+[package]
+name = "glitch-shared"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+solana-program = "1.18.26"
+solana-program-test = "1.18.26" 
+solana-sdk = "1.18.26"
+borsh = "0.10.3"
+spl-token = { version = "3.5.0", features = ["no-entrypoint"] }

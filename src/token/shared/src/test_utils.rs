@@ -5,6 +5,8 @@ use solana_sdk::{
     pubkey::Pubkey, 
     signature::Keypair,
 };
+use spl_token;
+use crate::processor::process_instruction;
 
 // Program ID for tests (matches DESIGN.md 9.1 deployment address)
 pub fn id() -> Pubkey {
