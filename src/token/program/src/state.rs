@@ -230,9 +230,8 @@ impl ChaosRequest {
             &std::process::id().to_le_bytes()
         ]);
         
-        // DESIGN.md 9.6.4 - Memory safety barriers
-        std::arch::asm!("mfence");
-        std::arch::asm!("lfence");
+        // Cross-platform memory barrier
+        std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);
         
         let request = Self {
             owner,
