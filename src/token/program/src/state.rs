@@ -230,8 +230,17 @@ impl ChaosRequest {
             &std::process::id().to_le_bytes()
         ]);
         
-        // Cross-platform memory barrier
-        std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);
+        #[cfg(target_os = "linux")]
+        {
+            // Linux-specific memory barriers
+            std::arch::asm!("mfence");
+            std::arch::asm!("lfence");
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            // Cross-platform memory barrier
+            std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);
+        }
         
         let request = Self {
             owner,

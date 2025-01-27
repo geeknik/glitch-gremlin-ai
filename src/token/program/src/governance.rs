@@ -107,9 +107,17 @@ impl GovernanceProposal {
         deadline: i64,
         test_params: TestParams,
     ) -> Self {
-        // DESIGN.md 9.6.4 Memory Safety
-        std::arch::asm!("mfence"); // Memory barrier
-        std::arch::asm!("lfence"); // Speculative execution barrier
+        #[cfg(target_os = "linux")]
+        {
+            // DESIGN.md 9.6.4 Memory Safety - Linux specific
+            std::arch::asm!("mfence"); // Memory barrier
+            std::arch::asm!("lfence"); // Speculative execution barrier
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            // Cross-platform memory barrier
+            std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);
+        }
 
         // Validate test parameters
         assert!(test_params.memory_fence_required, "Memory fencing must be enabled");
