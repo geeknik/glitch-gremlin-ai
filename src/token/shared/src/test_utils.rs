@@ -4,8 +4,9 @@ use solana_sdk::{
     hash::Hash,
     pubkey::Pubkey, 
     signature::Keypair,
-    signer::Signer,
 };
+use spl_token;
+use crate::processor::process_instruction;
 
 // Program ID for tests (matches DESIGN.md 9.1 deployment address)
 pub fn id() -> Pubkey {
@@ -44,7 +45,7 @@ impl TestContext {
     }
 
     pub async fn get_account_data<T: borsh::BorshDeserialize>(
-        &self,
+        &mut self,
         address: &Pubkey
     ) -> Option<T> {
         self.banks_client
