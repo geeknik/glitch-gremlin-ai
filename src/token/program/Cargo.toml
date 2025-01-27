@@ -67,4 +67,4 @@ no-entrypoint = []
 no-log = []
 test-bpf = []
 test-utils = []
-with_landlock = { version = "0.2.0", optional = true }
+with_landlock = ["landlock"]
