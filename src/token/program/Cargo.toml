@@ -62,7 +62,7 @@ rustflags = [
 crate-type = ["cdylib", "lib"]
 
 [features]
-default = ["with_landlock"]
+default = []
 no-entrypoint = []
 no-log = []
 test-bpf = []
