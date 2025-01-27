@@ -5,13 +5,18 @@ use solana_sdk::{
     pubkey::Pubkey, 
     signature::Keypair,
 };
-// Program ID for tests (matches the actual program ID)
+// Program ID for tests (matches DESIGN.md 9.1 deployment address)
 pub fn id() -> Pubkey {
-    Pubkey::from_str("GlitchGremlinProgram11111111111111111111").unwrap()
+    Pubkey::from_str("GGremN5xG5gx3VQ8CqpVX1EdfxQt5u4ij1fF8GGR8zf").unwrap()
 }
 
+// Test account constants from DESIGN.md 9.1
+pub const ALICE: Pubkey = Pubkey::new_from_array([1; 32]);
+pub const BOB: Pubkey = Pubkey::new_from_array([2; 32]);
+
 pub async fn program_test() -> (BanksClient, Keypair, Hash) {
-    let program_id = Pubkey::new_unique();
+    // Use actual program ID from DESIGN.md
+    let program_id = id();
     // Dummy processor function with correct signature for ProgramTest
     #[allow(unused_variables)]
     fn dummy_processor<'a>(
