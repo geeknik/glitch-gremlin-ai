@@ -22,10 +22,9 @@ serde_json = "1.0.137"
 serde = { version = "1.0", features = ["derive"] }
 borsh = "0.10.3"
 
-# Platform specific features
-[workspace]
-default-features = false
-features = ["linux"]
+[workspace.features]
+default = []
+linux = []
 
 [profile.release]
 lto = true
