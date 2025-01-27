@@ -22,11 +22,15 @@ serde_json = "1.0.137"
 serde = { version = "1.0", features = ["derive"] }
 borsh = "0.10.3"
 
-[workspace.features]
-default = []
-linux = []
-
 [profile.release]
 lto = true
 codegen-units = 1
 opt-level = 3
+
+[profile.test]
+opt-level = 3
+debug = true
+debug-assertions = true
+overflow-checks = true
+lto = false
+incremental = true

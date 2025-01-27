@@ -1,5 +1,5 @@
 [package]
-name = "glitch-gremlin-program"
+name = "glitch-gremlin"
 version = "0.1.0"
 edition = "2021"
 description = "Glitch Gremlin AI Solana Program"
