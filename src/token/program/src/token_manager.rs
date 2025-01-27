@@ -38,11 +38,11 @@ impl TokenManager {
             .ok_or(ProgramError::ArithmeticOverflow)?;
             
         // Insurance fund transfer with overflow protection
-        let insurance_amount = amount.checked_sub(burn_amount)
+        let _insurance_amount = amount.checked_sub(burn_amount)
             .ok_or(ProgramError::ArithmeticOverflow)?;
             
         // Transfer to insurance fund address
-        let insurance_account = Pubkey::from_str("insurancEFund1111111111111111111111111111111")
+        let _insurance_account = Pubkey::from_str("insurancEFund1111111111111111111111111111111")
             .map_err(|_| ProgramError::InvalidArgument)?;
         
         // DESIGN.md 9.1 - Validate insurance fund account

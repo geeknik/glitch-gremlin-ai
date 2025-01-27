@@ -26,12 +26,26 @@ pub struct GovernanceProposal {
     pub test_params: TestParams,
     /// Execution time
     pub execution_time: i64,
+    /// Execution delay in seconds
+    pub execution_delay: i64,
+    /// Required quorum percentage
+    pub quorum: u64,
     /// Security level
     pub security_level: u8,
     /// Multisig signers
     pub multisig_signers: Vec<Pubkey>,
     /// Required signatures
     pub required_signatures: u8,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, Copy, PartialEq)]
+pub enum ProposalStatus {
+    Pending,
+    Active,
+    Approved,
+    Rejected,
+    Executed,
+    Failed
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq)]
