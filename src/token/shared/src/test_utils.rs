@@ -4,7 +4,9 @@ use solana_sdk::{
     hash::Hash,
     pubkey::Pubkey, 
     signature::Keypair,
+    signer::Signer,
 };
+
 // Program ID for tests (matches DESIGN.md 9.1 deployment address)
 pub fn id() -> Pubkey {
     Pubkey::from_str("GGremN5xG5gx3VQ8CqpVX1EdfxQt5u4ij1fF8GGR8zf").unwrap()
@@ -14,26 +16,46 @@ pub fn id() -> Pubkey {
 pub const ALICE: Pubkey = Pubkey::new_from_array([1; 32]);
 pub const BOB: Pubkey = Pubkey::new_from_array([2; 32]);
 
-pub async fn program_test() -> (BanksClient, Keypair, Hash) {
-    // Use actual program ID from DESIGN.md
-    let program_id = id();
-    // Dummy processor function with correct signature for ProgramTest
-    #[allow(unused_variables)]
-    fn dummy_processor<'a>(
-        _vm: *mut solana_program_test::EbpfVm<'a, solana_program_test::InvokeContext<'static>>,
-        _arg1: u64,
-        _arg2: u64,
-        _arg3: u64,
-        _arg4: u64,
-        _arg5: u64,
-    ) -> () {
-        // No return value needed
+pub struct TestContext {
+    pub banks_client: BanksClient,
+    pub payer: Keypair,
+    pub last_blockhash: Hash,
+}
+
+impl TestContext {
+    pub async fn new() -> Self {
+        let program_id = id();
+        let mut program_test = ProgramTest::new(
+            "glitch_gremlin",
+            program_id,
+            processor!(process_instruction),
+        );
+
+        // Add required programs
+        program_test.add_program("spl_token", spl_token::id(), None);
+        
+        let (banks_client, payer, last_blockhash) = program_test.start().await;
+        
+        Self {
+            banks_client,
+            payer,
+            last_blockhash,
+        }
     }
 
-    let program_test = ProgramTest::new(
-        "glitch_gremlin",
-        program_id,
-        Some(dummy_processor as for<'a> fn(*mut solana_program_test::EbpfVm<'a, solana_program_test::InvokeContext<'static>>, u64, u64, u64, u64, u64) -> ()),
-    );
-    program_test.start().await
+    pub async fn get_account_data<T: borsh::BorshDeserialize>(
+        &self,
+        address: &Pubkey
+    ) -> Option<T> {
+        self.banks_client
+            .get_account(*address)
+            .await
+            .unwrap()
+            .map(|account| T::try_from_slice(&account.data).unwrap())
+    }
+}
+
+pub async fn program_test() -> (BanksClient, Keypair, Hash) {
+    let ctx = TestContext::new().await;
+    (ctx.banks_client, ctx.payer, ctx.last_blockhash)
 }

@@ -170,71 +170,7 @@ async fn test_rate_limiting() {
         if err == GlitchError::RateLimitExceeded as u32)));
 }
 
-pub struct TestContext {
-    pub banks_client: BanksClient,
-    pub payer: Keypair,
-    pub recent_blockhash: Hash,
-    pub program_id: Pubkey,
-}
-
-impl TestContext {
-    pub async fn new() -> Self {
-        let program_id = Pubkey::new_unique();
-        let program_test = ProgramTest::new(
-            "glitch_gremlin",
-            program_id,
-            processor!(process_instruction),
-        );
-        let (banks_client, payer, recent_blockhash) = program_test.start().await;
-        Self {
-            banks_client,
-            payer,
-            recent_blockhash,
-            program_id,
-        }
-    }
-
-    pub async fn create_chaos_request_account(&mut self) -> (Keypair, u64) {
-        let rent = self.banks_client.get_rent().await.unwrap();
-        let chaos_request = Keypair::new();
-        
-        // Calculate account size using actual data
-        let test_request = ChaosRequest {
-            owner: Pubkey::new_unique(),
-            amount: 1000,
-            status: 0,
-            params: vec![1, 2, 3],
-            result_ref: String::new(),
-            escrow_account: Pubkey::new_unique(),
-            rate_limit: RateLimitInfo {
-                last_request: 0,
-                request_count: 0,
-                window_start: 0,
-            },
-        };
-        let account_size = test_request.try_to_vec().unwrap().len();
-        let account_rent = rent.minimum_balance(account_size);
-        
-        let create_account_ix = system_instruction::create_account(
-            &self.payer.pubkey(),
-            &chaos_request.pubkey(),
-            account_rent,
-            account_size as u64,
-            &self.program_id,
-        );
-
-        let transaction = Transaction::new_signed_with_payer(
-            &[create_account_ix],
-            Some(&self.payer.pubkey()),
-            &[&self.payer, &chaos_request],
-            self.recent_blockhash,
-        );
-
-        self.banks_client.process_transaction(transaction).await.unwrap();
-        
-        (chaos_request, account_rent)
-    }
-}
+use crate::test_utils::TestContext;
 
 #[tokio::test]
 async fn test_initialize_chaos_request() {
