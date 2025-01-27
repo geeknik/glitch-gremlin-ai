@@ -10,6 +10,19 @@ exclude = [
     "deps/solana-sdk"
 ]
 
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+
+[profile.test]
+opt-level = 3
+debug = true
+debug-assertions = true
+overflow-checks = true
+lto = false
+incremental = true
+
 [workspace.dependencies]
 solana-program = "1.18.26"
 solana-sdk = "1.18.26"

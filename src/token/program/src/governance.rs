@@ -48,16 +48,6 @@ pub enum ProposalStatus {
     Failed
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq)]
-pub enum ProposalStatus {
-    Pending,
-    Active,
-    Approved,
-    Rejected,
-    Executed,
-    Failed
-}
-
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
 pub struct TestParams {
     pub test_type: String, // FUZZ, LOAD, EXPLOIT, CONCURRENCY
@@ -105,14 +95,6 @@ pub enum FuzzingStrategy {
     Guided,
     Evolutionary,
     Reinforcement
-}
-
-#[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq)]
-pub enum ProposalStatus {
-    Pending,
-    Approved,
-    Rejected,
-    Executed,
 }
 
 impl GovernanceProposal {
