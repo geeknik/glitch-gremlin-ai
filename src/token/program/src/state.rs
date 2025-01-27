@@ -230,13 +230,18 @@ impl ChaosRequest {
             &std::process::id().to_le_bytes()
         ]);
         
-        #[cfg(target_os = "linux")]
+        #[cfg(feature = "with_landlock")]
         {
-            // Linux-specific memory barriers
+            // Linux-specific memory barriers with Landlock
             std::arch::asm!("mfence");
             std::arch::asm!("lfence");
+            
+            // Initialize Landlock ruleset
+            if let Ok(ruleset) = landlock::create_ruleset() {
+                let _ = ruleset.restrict_self();
+            }
         }
-        #[cfg(not(target_os = "linux"))]
+        #[cfg(not(feature = "with_landlock"))]
         {
             // Cross-platform memory barrier
             std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);

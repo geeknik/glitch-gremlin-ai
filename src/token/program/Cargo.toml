@@ -27,9 +27,14 @@ serde_json = "1.0"
 tokio = { version = "1.0", features = ["full", "rt-multi-thread"] }
 solana-program-test = "1.18.26"
 solana-bpf-loader-program = "1.18.26"
+landlock = { version = "0.2.0", optional = true }
 
-[target.'cfg(target_os = "linux")'.dependencies]
-landlock = "0.2.0"
+[features]
+default = []
+with_landlock = ["landlock"]
+
+[target.'cfg(target_os = "linux")'.features]
+default = ["with_landlock"]
 
 [dev-dependencies]
 solana-program-test = "1.18.26"
