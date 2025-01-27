@@ -220,8 +220,12 @@ impl ChaosRequest {
             // Additional entropy sources from DESIGN.md 9.6.1
             &clock.epoch.to_le_bytes(),
             &clock.leader_schedule_epoch.to_le_bytes(),
-            // Hardware entropy
-            &std::arch::x86_64::_rdrand64_step().unwrap_or(0).to_le_bytes(),
+            // Hardware entropy from system time
+            &std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+                .to_le_bytes()[0..8],
             // Process entropy
             &std::process::id().to_le_bytes()
         ]);

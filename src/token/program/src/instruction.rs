@@ -1,12 +1,10 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{
     program_error::ProgramError,
-    pubkey::Pubkey
-};
-use solana_program::{
-    instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,
-    system_program,
+    instruction::{AccountMeta, Instruction},
+    system_instruction,
+    program_pack::Pack,
 };
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq)]
 pub enum GlitchInstruction {
