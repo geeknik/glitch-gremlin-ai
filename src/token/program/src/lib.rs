@@ -4,6 +4,15 @@ use solana_program::{
     entrypoint::ProgramResult,
     pubkey::Pubkey,
     declare_id,
+    program_error::ProgramError,
+    msg,
+};
+use borsh::BorshDeserialize;
+use crate::{
+    instruction::GlitchInstruction,
+    processor::Processor,
+    error::GlitchError,
+    state::RateLimitInfo,
 };
 
 declare_id!("GGremN5xG5gx3VQ8CqpVX1EdfxQt5u4ij1fF8GGR8zf");
@@ -26,22 +35,138 @@ pub mod error;
 pub mod instruction;
 pub mod processor;
 pub mod state;
-pub mod governance;
 pub mod token_manager;
+pub mod database;
+pub mod governance;
 pub mod zk;
-
-use crate::processor::Processor;
+pub mod security;
+pub mod reporting;
+pub mod validation;
 
 // Declare and export the program's entrypoint
 entrypoint!(process_instruction);
 
 // Program entrypoint implementation
-pub fn process_instruction(
+pub fn process_instruction<'a>(
     program_id: &Pubkey,
-    accounts: &[AccountInfo],
+    accounts: &'a [AccountInfo<'a>],
     instruction_data: &[u8],
 ) -> ProgramResult {
-    Processor::process(program_id, accounts, instruction_data)
+    msg!("Glitch program entrypoint");
+
+    if instruction_data.is_empty() {
+        msg!("Error: Empty instruction data");
+        return Err(GlitchError::InvalidInstruction.into());
+    }
+
+    let instruction = GlitchInstruction::unpack(instruction_data)
+        .map_err(|_| ProgramError::InvalidInstructionData)?;
+
+    match instruction {
+        GlitchInstruction::CreateProposal {
+            id,
+            description,
+            target_program,
+            staked_amount,
+            deadline,
+            test_params,
+        } => {
+            msg!("Processing create proposal");
+            Processor::process_create_proposal(
+                program_id,
+                accounts,
+                id,
+                description,
+                target_program,
+                staked_amount,
+                deadline,
+                &RateLimitInfo::default(),
+                test_params.into(),
+            )
+        }
+        GlitchInstruction::Vote {
+            proposal_id,
+            vote_for,
+            vote_amount,
+        } => {
+            msg!("Instruction: Vote");
+            Processor::process_vote(
+                program_id,
+                accounts,
+                proposal_id,
+                vote_for,
+                vote_amount,
+            )
+        }
+        GlitchInstruction::ExecuteProposal {
+            proposal_id,
+            multisig_signatures,
+            geographic_proofs,
+        } => {
+            msg!("Instruction: Execute Proposal");
+            Processor::process_execute_proposal(
+                program_id,
+                accounts,
+                proposal_id,
+                multisig_signatures,
+                geographic_proofs,
+            )
+        }
+        GlitchInstruction::SubmitTestResults {
+            request_id,
+            results,
+            validator_signature,
+            geographic_proof,
+        } => {
+            msg!("Instruction: Submit Test Results");
+            Processor::process_submit_test_results(
+                program_id,
+                accounts,
+                request_id,
+                results,
+                validator_signature,
+                geographic_proof,
+            )
+        }
+        GlitchInstruction::UpdateTestParams { new_params } => {
+            msg!("Processing update test params");
+            Processor::process_update_test_params(program_id, accounts, new_params.into())
+        }
+        GlitchInstruction::EmergencyPause { reason } => {
+            Processor::process_emergency_pause(program_id, accounts, reason)
+        }
+        GlitchInstruction::EmergencyResume { reason } => {
+            Processor::process_emergency_resume(program_id, accounts, reason)
+        }
+        GlitchInstruction::InitializeRequest {
+            amount,
+            test_params,
+            security_level,
+            attestation_required: _,
+        } => {
+            msg!("Processing initialize request");
+            Processor::process_initialize_request(program_id, accounts, amount, test_params.into(), security_level)
+        }
+        GlitchInstruction::FinalizeChaosRequest {
+            status,
+            validator_signatures,
+            geographic_proofs,
+            attestation_proof,
+            sgx_quote,
+            performance_metrics,
+        } => {
+            Processor::process_finalize_request(
+                program_id,
+                accounts,
+                status,
+                validator_signatures,
+                geographic_proofs,
+                attestation_proof,
+                sgx_quote,
+                performance_metrics,
+            )
+        }
+    }
 }
 
 #[cfg(test)]
@@ -130,5 +255,10 @@ mod tests {
         );
         
         assert!(Processor::validate_entropy(&account).is_ok());
+    }
+
+    #[test]
+    fn test_process_instruction() {
+        // TODO: Add comprehensive tests
     }
 }

@@ -15,8 +15,8 @@ pub async fn process_governance_queue(
 ) -> Result<(), Box<dyn Error>> {
     let proposals = get_active_proposals(client, program_id)?;
 
-    for proposal in proposals {
-        process_proposal(client, program_id, &proposal).await?;
+    for proposal in proposals.iter() {
+        process_proposal(client, program_id, proposal).await?;
     }
 
     Ok(())

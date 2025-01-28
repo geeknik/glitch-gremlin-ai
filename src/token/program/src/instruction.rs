@@ -1,209 +1,335 @@
-use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{
     program_error::ProgramError,
     pubkey::Pubkey,
-    instruction::{AccountMeta, Instruction},
-    system_instruction,
-    program_pack::Pack,
+    instruction::{Instruction, AccountMeta},
+    msg,
 };
-#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq)]
+use borsh::{BorshDeserialize, BorshSerialize};
+use crate::state;
+use strum_macros::{Display, EnumString};
+
+// Re-export state types for public use
+pub use crate::state::{SecurityLevel, TestParams, ValidationMode};
+
+#[derive(Clone, Debug, BorshSerialize, BorshDeserialize, Display, EnumString)]
+#[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
+pub enum TestType {
+    #[strum(serialize = "EXPLOIT")]
+    Exploit,
+    #[strum(serialize = "FUZZ")]
+    Fuzz,
+    #[strum(serialize = "LOAD")]
+    Load,
+    #[strum(serialize = "CONCURRENCY")]
+    Concurrency,
+    #[strum(serialize = "MUTATION")]
+    Mutation,
+}
+
+#[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
+pub struct GlitchInstructionData {
+    pub variant: u8,
+    pub data: Vec<u8>,
+}
+
+#[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
 pub enum GlitchInstruction {
-    /// Initialize a new chaos request
+    /// Create a new governance proposal
     /// 
     /// Accounts expected:
-    /// 1. `[writable]` The chaos request account
-    /// 2. `[writable]` The token account to debit
-    /// 3. `[signer]` The request owner
-    /// 4. `[]` The rate limit account
-    InitializeChaosRequest {
-        /// Amount of tokens to lock
-        amount: u64,
-        /// Parameters for the chaos test
-        params: Vec<u8>,
-    },
-
-    /// Finalize a chaos request
-    /// 
-    /// Accounts expected:
-    /// 1. `[writable]` The chaos request account
-    /// 2. `[signer]` The authorized finalizer
-    FinalizeChaosRequest {
-        /// Result status code
-        status: u8,
-        /// Reference to results (e.g. IPFS hash)
-        result_ref: Vec<u8>, // Changed from String to Vec<u8> for better Borsh compatibility
-    },
-
-    /// Create a governance proposal
-    /// 
-    /// Accounts expected:
-    /// 1. `[writable]` The proposal account
+    /// 0. `[writable]` The proposal account
+    /// 1. `[signer]` The proposer
     /// 2. `[writable]` The staking account
-    /// 3. `[signer]` The proposer
+    /// 3. `[]` The target program
     CreateProposal {
-        /// Unique proposal ID
         id: u64,
-        /// Description of the proposal
         description: String,
-        /// Target program to test
         target_program: Pubkey,
-        /// Amount of tokens staked
         staked_amount: u64,
-        /// Voting deadline (Unix timestamp)
         deadline: i64,
+        test_params: TestParams,
     },
 
-    /// Vote on a governance proposal
+    /// Vote on a proposal
     /// 
     /// Accounts expected:
-    /// 1. `[writable]` The proposal account
-    /// 2. `[writable]` The voter's staking account
-    /// 3. `[signer]` The voter
+    /// 0. `[writable]` The proposal account
+    /// 1. `[signer]` The voter
     Vote {
-        /// Proposal ID to vote on
         proposal_id: u64,
-        /// Whether voting for or against
         vote_for: bool,
-        /// Amount of tokens to vote with
         vote_amount: u64,
     },
 
     /// Execute an approved proposal
     /// 
     /// Accounts expected:
-    /// 1. `[writable]` The proposal account
-    /// 2. `[signer]` The executor
+    /// 0. `[writable]` The proposal account
+    /// 1. `[signer]` The executor
     ExecuteProposal {
-        /// Proposal ID to execute
         proposal_id: u64,
+        multisig_signatures: Vec<[u8; 64]>,
+        geographic_proofs: Vec<Vec<u8>>,
+    },
+
+    /// Submit test results
+    /// 
+    /// Accounts expected:
+    /// 0. `[writable]` The chaos request account
+    /// 1. `[signer]` The validator
+    SubmitTestResults {
+        request_id: u64,
+        results: Vec<u8>,
+        validator_signature: [u8; 64],
+        geographic_proof: Vec<u8>,
+    },
+
+    /// Initialize a new chaos testing request
+    /// 
+    /// Accounts expected:
+    /// 0. `[writable]` Chaos request account
+    /// 1. `[signer]` Owner account
+    /// 2. `[writable]` Escrow account
+    /// 3. `[]` Target program
+    /// 4. `[]` Token program
+    InitializeRequest {
+        amount: u64,
+        test_params: TestParams,
+        security_level: SecurityLevel,
+        attestation_required: bool,
+    },
+
+    /// Update test parameters
+    UpdateTestParams {
+        new_params: TestParams,
+    },
+
+    /// Emergency halt execution
+    EmergencyPause {
+        reason: String,
+    },
+
+    /// Emergency resume execution
+    EmergencyResume {
+        reason: String,
+    },
+
+    /// Finalize a chaos request
+    FinalizeChaosRequest {
+        status: u8,
+        validator_signatures: Vec<[u8; 64]>,
+        geographic_proofs: Vec<Vec<u8>>,
+        attestation_proof: Option<Vec<u8>>,
+        sgx_quote: Option<Vec<u8>>,
+        performance_metrics: Option<Vec<u8>>,
     },
 }
 
 impl GlitchInstruction {
+    pub fn pack(&self) -> Vec<u8> {
+        borsh::to_vec(self).unwrap()
+    }
+
     pub fn unpack(input: &[u8]) -> Result<Self, ProgramError> {
-        let (&tag, rest) = input.split_first().ok_or(ProgramError::InvalidInstructionData)?;
+        borsh::BorshDeserialize::try_from_slice(input)
+            .map_err(|_| ProgramError::InvalidInstructionData)
+    }
 
-        Ok(match tag {
-            0 => {
-                let amount = rest
-                    .get(..8)
-                    .and_then(|slice| slice.try_into().ok())
-                    .map(u64::from_le_bytes)
-                    .ok_or(ProgramError::InvalidInstructionData)?;
-                
-                let params = rest[8..].to_vec();
-                
-                Self::InitializeChaosRequest {
-                    amount,
-                    params,
-                }
-            }
-            1 => {
-                let status = rest
-                    .get(0)
-                    .ok_or(ProgramError::InvalidInstructionData)?;
-                
-                let result_ref = rest[1..].to_vec();
-
-                Self::FinalizeChaosRequest {
-                    status: *status,
-                    result_ref,
-                }
-            }
-            2 => {
-                let (id, rest) = rest.split_at(8);
-                let id = u64::from_le_bytes(id.try_into().unwrap());
-                
-                let (description_len, rest) = rest.split_at(4);
-                let description_len = u32::from_le_bytes(description_len.try_into().unwrap()) as usize;
-                
-                let description = String::from_utf8(rest[..description_len].to_vec())
-                    .map_err(|_| ProgramError::InvalidInstructionData)?;
-                
-                let rest = &rest[description_len..];
-                let target_program = Pubkey::new(&rest[..32]);
-                let staked_amount = u64::from_le_bytes(rest[32..40].try_into().unwrap());
-                let deadline = i64::from_le_bytes(rest[40..48].try_into().unwrap());
-                let multisig_signers = rest[48..48+(32*10)]
-                    .chunks(32)
-                    .map(Pubkey::new)
-                    .collect::<Result<Vec<_>,_>>()?;
-                let required_signatures = rest[48+(32*10)];
-                let multisig_signers = rest[48..48+(32*10)]
-                    .chunks(32)
-                    .map(|chunk| Pubkey::new(chunk))
-                    .collect::<Result<Vec<_>, _>>()?;
-                let required_signatures = rest[48+(32*10)];
-                
-                Self::CreateProposal {
-                    id,
-                    description,
-                    target_program,
-                    staked_amount,
-                    deadline,
-                    multisig_signers: multisig_signers.try_into().map_err(|_| ProgramError::InvalidInstructionData)?,
-                    required_signatures,
-                }
-            }
-            3 => {
-                let proposal_id = u64::from_le_bytes(rest[..8].try_into().unwrap());
-                let vote_for = rest[8] != 0;
-                let vote_amount = u64::from_le_bytes(rest[9..17].try_into().unwrap());
-                
-                Self::Vote {
-                    proposal_id,
-                    vote_for,
-                    vote_amount,
-                }
-            }
-            4 => {
-                let proposal_id = u64::from_le_bytes(rest[..8].try_into().unwrap());
-                
-                Self::ExecuteProposal {
-                    proposal_id,
-                }
-            }
-            _ => return Err(ProgramError::InvalidInstructionData),
+    pub fn create_instruction(
+        program_id: &Pubkey,
+        accounts: Vec<AccountMeta>,
+        instruction: Self,
+    ) -> Result<Instruction, ProgramError> {
+        let data = borsh::to_vec(&instruction)
+            .map_err(|_| ProgramError::InvalidInstructionData)?;
+        
+        Ok(Instruction {
+            program_id: *program_id,
+            accounts,
+            data,
         })
     }
-}
 
-/// Governance instructions
-impl GlitchInstruction {
+    pub fn initialize_chaos_request(
+        program_id: &Pubkey,
+        request_owner: &Pubkey,
+        chaos_request: &Pubkey,
+        token_account: &Pubkey,
+        escrow_account: &Pubkey,
+        target_program: &Pubkey,
+        amount: u64,
+        test_params: TestParams,
+        security_level: SecurityLevel,
+        attestation_required: bool,
+    ) -> Result<Instruction, ProgramError> {
+        let instruction = Self::InitializeRequest {
+            amount,
+            test_params,
+            security_level,
+            attestation_required,
+        };
+
+        let accounts = vec![
+            AccountMeta::new(*chaos_request, false),
+            AccountMeta::new(*token_account, false),
+            AccountMeta::new(*escrow_account, false),
+            AccountMeta::new(*request_owner, true),
+            AccountMeta::new_readonly(*target_program, false),
+        ];
+
+        Self::create_instruction(program_id, accounts, instruction)
+    }
+
     pub fn create_proposal(
+        program_id: &Pubkey,
         id: u64,
         description: String,
         target_program: Pubkey,
         staked_amount: u64,
         deadline: i64,
-    ) -> Self {
-        Self::CreateProposal {
+        test_params: TestParams,
+        accounts: Vec<AccountMeta>,
+    ) -> Result<Instruction, ProgramError> {
+        let instruction = GlitchInstruction::CreateProposal {
             id,
             description,
             target_program,
             staked_amount,
             deadline,
-        }
+            test_params,
+        };
+        
+        Self::create_instruction(program_id, accounts, instruction)
     }
 
     pub fn vote(
+        program_id: &Pubkey,
         proposal_id: u64,
         vote_for: bool,
         vote_amount: u64,
-    ) -> Self {
-        Self::Vote {
+        voter: &Pubkey,
+        proposal: &Pubkey,
+    ) -> Result<Instruction, ProgramError> {
+        let instruction = GlitchInstruction::Vote {
             proposal_id,
             vote_for,
             vote_amount,
-        }
+        };
+
+        let accounts = vec![
+            AccountMeta::new(*voter, true),
+            AccountMeta::new(*proposal, false),
+        ];
+
+        Self::create_instruction(program_id, accounts, instruction)
     }
 
     pub fn execute_proposal(
+        program_id: &Pubkey,
         proposal_id: u64,
-    ) -> Self {
-        Self::ExecuteProposal {
+        multisig_signatures: Vec<[u8; 64]>,
+        geographic_proofs: Vec<Vec<u8>>,
+        executor: &Pubkey,
+        proposal: &Pubkey,
+    ) -> Result<Instruction, ProgramError> {
+        let instruction = GlitchInstruction::ExecuteProposal {
             proposal_id,
-        }
+            multisig_signatures,
+            geographic_proofs,
+        };
+
+        let accounts = vec![
+            AccountMeta::new(*executor, true),
+            AccountMeta::new(*proposal, false),
+        ];
+
+        Self::create_instruction(program_id, accounts, instruction)
+    }
+
+    pub fn submit_test_results(
+        program_id: &Pubkey,
+        request_id: u64,
+        results: Vec<u8>,
+        validator_signature: [u8; 64],
+        geographic_proof: Vec<u8>,
+        validator: &Pubkey,
+        request: &Pubkey,
+    ) -> Result<Instruction, ProgramError> {
+        let instruction = GlitchInstruction::SubmitTestResults {
+            request_id,
+            results,
+            validator_signature,
+            geographic_proof,
+        };
+
+        let accounts = vec![
+            AccountMeta::new(*validator, true),
+            AccountMeta::new(*request, false),
+        ];
+
+        Self::create_instruction(program_id, accounts, instruction)
+    }
+
+    pub fn update_test_params(
+        program_id: &Pubkey,
+        new_params: TestParams,
+        authority: &Pubkey,
+    ) -> Result<Instruction, ProgramError> {
+        let instruction = GlitchInstruction::UpdateTestParams {
+            new_params,
+        };
+
+        let accounts = vec![
+            AccountMeta::new(*authority, true),
+        ];
+
+        Self::create_instruction(program_id, accounts, instruction)
+    }
+
+    pub fn emergency_pause(
+        program_id: &Pubkey,
+        reason: String,
+        authority: &Pubkey,
+    ) -> Result<Instruction, ProgramError> {
+        let instruction = GlitchInstruction::EmergencyPause {
+            reason,
+        };
+
+        let accounts = vec![
+            AccountMeta::new(*authority, true),
+        ];
+
+        Self::create_instruction(program_id, accounts, instruction)
+    }
+
+    pub fn emergency_resume(
+        program_id: &Pubkey,
+        reason: String,
+        authority: &Pubkey,
+    ) -> Result<Instruction, ProgramError> {
+        let instruction = GlitchInstruction::EmergencyResume {
+            reason,
+        };
+
+        let accounts = vec![
+            AccountMeta::new(*authority, true),
+        ];
+
+        Self::create_instruction(program_id, accounts, instruction)
+    }
+
+    pub fn validate_security_requirements(
+        security_level: SecurityLevel,
+        test_params: &TestParams,
+    ) -> Result<(), ProgramError> {
+        // First validate hardware requirements
+        security_level.validate_hardware_requirements()?;
+        
+        // Then validate test parameters against security level requirements
+        security_level.validate_test_params(test_params)?;
+
+        msg!("Security requirements validated successfully for {:?} level", security_level);
+        Ok(())
     }
 }
 
@@ -245,6 +371,55 @@ pub enum GovernanceInstruction {
     },
 }
 
+// Add a custom validation trait for TestParams
+pub trait TestParamsValidation {
+    fn validate_and_convert(params: TestParams) -> Result<state::TestParams, ProgramError>;
+}
+
+impl TestParamsValidation for state::TestParams {
+    fn validate_and_convert(params: TestParams) -> Result<Self, ProgramError> {
+        // Enhanced validation with detailed error messages
+        if params.min_coverage > 100 {
+            msg!("Invalid coverage percentage: must be between 0-100");
+            return Err(ProgramError::InvalidArgument);
+        }
+        if params.max_vulnerability_density == 0 {
+            msg!("Invalid vulnerability density: must be greater than 0");
+            return Err(ProgramError::InvalidArgument);
+        }
+        if params.min_validators == 0 {
+            msg!("Invalid validator count: must be greater than 0");
+            return Err(ProgramError::InvalidArgument);
+        }
+        if params.min_geographic_regions == 0 {
+            msg!("Invalid geographic regions: must be greater than 0");
+            return Err(ProgramError::InvalidArgument);
+        }
+        if params.test_duration == 0 {
+            msg!("Invalid test duration: must be greater than 0");
+            return Err(ProgramError::InvalidArgument);
+        }
+        if params.max_duration_seconds < params.test_duration {
+            msg!("Invalid max duration: must be greater than test duration");
+            return Err(ProgramError::InvalidArgument);
+        }
+
+        Ok(state::TestParams {
+            security_level: params.security_level,
+            test_duration: params.test_duration,
+            min_coverage: params.min_coverage,
+            max_vulnerability_density: params.max_vulnerability_density,
+            max_duration_seconds: params.max_duration_seconds,
+            min_validators: params.min_validators,
+            min_stake_required: params.min_stake_required,
+            min_geographic_regions: params.min_geographic_regions,
+            attestation_required: params.attestation_required,
+            memory_fence_required: params.memory_fence_required,
+            entropy_checks: params.entropy_checks,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -254,18 +429,22 @@ mod tests {
     
     #[test]
     fn test_serialize_initialize_chaos_request() {
-        let instruction = GlitchInstruction::InitializeChaosRequest {
+        let instruction = GlitchInstruction::InitializeRequest {
             amount: 1000,
-            params: vec![1, 2, 3],
+            test_params: TestParams::default(),
+            security_level: SecurityLevel::High,
+            attestation_required: true,
         };
         
         let serialized = instruction.try_to_vec().unwrap();
         let deserialized = GlitchInstruction::try_from_slice(&serialized).unwrap();
         
         match deserialized {
-            GlitchInstruction::InitializeChaosRequest { amount, params } => {
+            GlitchInstruction::InitializeRequest { amount, test_params, security_level, attestation_required } => {
                 assert_eq!(amount, 1000);
-                assert_eq!(params, vec![1, 2, 3]);
+                assert_eq!(test_params, TestParams::default());
+                assert_eq!(security_level, SecurityLevel::High);
+                assert_eq!(attestation_required, true);
             }
             _ => panic!("Wrong instruction variant"),
         }
@@ -276,15 +455,23 @@ mod tests {
         let instruction = GlitchInstruction::FinalizeChaosRequest {
             status: 1,
             result_ref: b"test".to_vec(),
+            attestation_proof: None,
+            validator_signatures: vec![[0; 64]; 3],
+            sgx_quote: None,
+            performance_metrics: None,
         };
         
         let serialized = instruction.try_to_vec().unwrap();
         let deserialized = GlitchInstruction::try_from_slice(&serialized).unwrap();
         
         match deserialized {
-            GlitchInstruction::FinalizeChaosRequest { status, result_ref } => {
+            GlitchInstruction::FinalizeChaosRequest { status, result_ref, attestation_proof, validator_signatures, sgx_quote, performance_metrics } => {
                 assert_eq!(status, 1);
                 assert_eq!(result_ref, b"test");
+                assert_eq!(attestation_proof, None);
+                assert_eq!(validator_signatures, vec![[0; 64]; 3]);
+                assert_eq!(sgx_quote, None);
+                assert_eq!(performance_metrics, None);
             }
             _ => panic!("Wrong instruction variant"),
         }
@@ -316,7 +503,8 @@ mod tests {
             description: "Test proposal".to_string(),
             target_program: Pubkey::new_unique(),
             staked_amount: 1000,
-            deadline: 1234567890,
+            deadline: 0,
+            test_params: TestParams::default(),
         }
         .try_to_vec()
         .unwrap();

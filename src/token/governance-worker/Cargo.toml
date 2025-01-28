@@ -1,19 +1,36 @@
 [package]
-name = "glitch-governance-worker"
+name = "glitch-gremlin-governance-worker"
 version = "0.1.0"
 edition = "2021"
+description = "Governance worker service for Glitch Gremlin"
+license = "Apache-2.0"
 
 [dependencies]
-borsh = "0.10.3"
-borsh-derive = "0.10.3"
-solana-sdk.workspace = true
+tokio = { workspace = true }
 solana-client = "1.18.26"
-thiserror = "1.0"
-serde = { version = "1.0", features = ["derive"] }
-chrono = "0.4"
-log = "0.4.20"
-mongodb.workspace = true
-redis.workspace = true
-tokio.workspace = true
-bson.workspace = true
-serde_json.workspace = true
+solana-sdk = { workspace = true }
+solana-program = { workspace = true }
+borsh = { workspace = true, features = ["derive"] }
+borsh-derive = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+glitch-gremlin-program = { path = "../program" }
+glitch-gremlin-shared = { path = "../shared", features = ["governance"] }
+glitch-gremlin-governance-program = { path = "../governance-program" }
+thiserror = "1.0.56"
+log = { version = "0.4", features = ["max_level_trace", "release_max_level_info"] }
+env_logger = "0.10"
+spl-token = { version = "4.0", features = ["no-entrypoint"] }
+hex = "0.4"
+mongodb = { workspace = true }
+redis = { workspace = true }
+bson = { workspace = true }
+rand = { version = "0.8", features = ["std", "std_rng"] }
+futures = { version = "0.3", features = ["std", "async-await"] }
+futures-util = { version = "0.3", features = ["sink"] }
+strum = { version = "0.25", features = ["derive"] }
+
+[dev-dependencies]
+tokio-test = "=0.4"
+solana-program-test = { workspace = true }
+criterion = { version = "=0.5", features = ["async_tokio"] }

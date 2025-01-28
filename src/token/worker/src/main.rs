@@ -3,6 +3,8 @@ use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
 use std::{thread, time::Duration};
 use crate::job_processor::process_chaos_job;
+use tokio::runtime::Runtime;
+use std::sync::Arc;
 
 mod job_processor;
 mod chaos_engine;
@@ -11,6 +13,14 @@ mod instruction;
 const REDIS_URL: &str = "redis://r.glitchgremlin.ai/";
 const RPC_URL: &str = "https://api.mainnet-beta.solana.com";
 const PROGRAM_ID: &str = "GremLin1111111111111111111111111111111111111";
+
+pub fn initialize_runtime() -> Result<Runtime, WorkerError> {
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(4)
+        .enable_all()
+        .build()
+        .map_err(|e| WorkerError::SecurityError(e.to_string()))
+}
 
 #[tokio::main]
 async fn main() {

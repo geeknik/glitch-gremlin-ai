@@ -1,21 +1,59 @@
 [package]
-name = "glitch-shared"
+name = "glitch-gremlin-shared"
 version = "0.1.0"
 edition = "2021"
-authors = ["Glitch Gremlin Team"]
-description = "Shared utilities for Glitch Gremlin"
-license = "MIT"
+description = "Shared utilities and types for Glitch Gremlin"
+license = "Apache-2.0"
 
-[lib]
-name = "glitch_shared"
-path = "src/lib.rs"
+[features]
+default = []
+governance = ["dep:mongodb", "dep:redis", "redis?/async-std-comp"]
+metrics = ["dep:prometheus", "prometheus?/process"]
+telemetry = [
+    "dep:opentelemetry",
+    "dep:tracing",
+    "dep:tracing-subscriber",
+    "dep:tracing-futures",
+    "opentelemetry?/metrics",
+    "tracing?/log",
+    "tracing-subscriber?/env-filter"
+]
+error-context = ["dep:backtrace", "dep:eyre"]
 
 [dependencies]
-solana-program = "1.18.26"
-solana-sdk = "1.18.26" 
-solana-program-test = "1.18.26"
-borsh = "0.10.3"
-borsh-derive = "0.10.3"
-spl-token = { version = "3.5.0", features = ["no-entrypoint"] }
+solana-program = { workspace = true }
+solana-sdk = { workspace = true }
+borsh = { workspace = true, features = ["derive", "std", "rc"] }
+borsh-derive = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = "1.0.56"
+strum = { version = "=0.25", features = ["derive", "strum_macros"] }
+tokio = { workspace = true, features = ["full", "sync"] }
+futures = { version = "=0.3", features = ["std", "async-await", "executor"] }
+log = { version = "=0.4", features = ["max_level_trace", "release_max_level_info", "serde"] }
+getrandom = { version = "0.2", features = ["std", "rdrand"] }
+
+# Error handling enhancements
+backtrace = { version = "0.3", optional = true }
+eyre = { version = "0.6", optional = true }
+
+# Optional dependencies based on features
+mongodb = { workspace = true, optional = true }
+redis = { workspace = true, optional = true }
+prometheus = { version = "=0.13", optional = true, features = ["process"] }
+opentelemetry = { version = "=0.20", optional = true, features = ["metrics", "trace"] }
+tracing = { workspace = true, optional = true }
+tracing-subscriber = { workspace = true, optional = true }
+tracing-futures = { workspace = true, optional = true }
 
 [dev-dependencies]
+solana-program-test = { workspace = true }
+tokio-test = "=0.4"
+criterion = { version = "=0.5", features = ["async_tokio", "html_reports"] }
+assert_matches = "1.5"
+pretty_assertions = "1.4"
+
+[lib]
+name = "glitch_gremlin_shared"
+path = "src/lib.rs"

@@ -1,65 +1,73 @@
 [package]
-name = "glitch-gremlin"
+name = "glitch-gremlin-program"
 version = "0.1.0"
 edition = "2021"
-description = "Glitch Gremlin AI Solana Program"
-license = "MIT"
-repository = "https://github.com/your-org/glitch-gremlin-ai"
-authors = ["Your Name <your.email@example.com>"]
-
-[dependencies]
-solana-program = "=1.18.26"
-strum = { version = "0.25", features = ["derive"] }
-solana-sdk = "=1.18.26"
-glitch-shared = { path = "../shared" }
-borsh = "=0.10.3" 
-borsh-derive = "=0.10.3"
-spl-token = { version = "=3.5.0", features = ["no-entrypoint"] }
-thiserror = "=1.0.56"
-arrayref = "=0.3.7"
-bls12_381 = "0.7.0"
-bellman = "0.12.0"
-pairing = "0.23.0"
-byteorder = "1.4.3"
-solana-zk-token-sdk = "1.18.26"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-tokio = { version = "1.0", features = ["full", "rt-multi-thread"] }
-solana-program-test = "1.18.26"
-solana-bpf-loader-program = "1.18.26"
-
-[dev-dependencies]
-solana-program-test = "1.18.26"
-solana-sdk = "1.18.26"
-tokio = { version = "1.14", features = ["full"] }
-assert_matches = "1.5.0"
-
-[profile.release]
-lto = true
-codegen-units = 1
-opt-level = 3
-
-[package.metadata.sbf-settings]
-sbf-tools-version = "1.30"
-sbf-sdk-version = "1.18.26"
-toolchain = "sbf-solana-solana"
-
-[target.sbf-solana-solana]
-rustflags = [
-    "-C", "link-arg=-z",
-    "-C", "link-arg=notext",
-    "-C", "link-arg=-Tbpfelldbg",
-    "-C", "link-arg=-shared",
-    "-C", "link-arg=--Bdynamic",
-    "-C", "link-arg=-Ldeps/solana-sdk/sbf-solana-solana/rust/lib/rustlib/sbf-solana-solana/lib"
-]
-
-[lib]
-crate-type = ["cdylib", "lib"]
+description = "Chaos engineering program for Solana"
+license = "Apache-2.0"
 
 [features]
-default = []
+default = ["quantum-resistant"]
 no-entrypoint = []
-no-log = []
 test-bpf = []
-test-utils = []
+quantum-resistant = ["dep:crystals-dilithium"]
+hardware-security = [
+    "dep:sgx_types",
+    "dep:sgx-isa",
+    "getrandom/rdrand",
+    "rand/std_rng"
+]
+full-security = ["quantum-resistant", "hardware-security"]
+error-context = ["dep:backtrace", "dep:eyre"]
+
+[dependencies]
+solana-program = { workspace = true }
+borsh = { workspace = true, features = ["derive"] }
+borsh-derive = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = "1.0.56"
+num-derive = "0.4"
+num-traits = "0.2"
+spl-token = { version = "4.0", features = ["no-entrypoint"] }
+strum = { version = "0.25", features = ["derive", "strum_macros"] }
+strum_macros = "0.25"
+ed25519-dalek = { version = "1.0", features = ["serde", "u64_backend"] }
+bls12_381 = { version = "0.8", features = ["groups", "pairings", "experimental"] }
+byteorder = { version = "1.5.0", features = ["std"] }
+bellman = { version = "0.14", features = ["groth16", "multicore"] }
+sha2 = { version = "0.10", features = ["oid", "compress", "asm"] }
+base64 = { version = "0.13", features = ["std"] }
+
+# Error handling enhancements
+backtrace = { version = "0.3", optional = true }
+eyre = { version = "0.6", optional = true }
+
+# Optional security dependencies
+crystals-dilithium = { version = "1.0.0", optional = true }
+sgx_types = { version = "1.1.2", optional = true }
+sgx-isa = { version = "0.4.0", optional = true }
+
+# System dependencies
+libc = { version = "0.2", features = ["extra_traits", "const-extern-fn"] }
+rand = { version = "0.8", features = ["std", "getrandom"] }
+getrandom = { version = "0.2", features = ["std"] }
+
+[dev-dependencies]
+solana-program-test = { workspace = true }
+solana-sdk = { workspace = true }
+solana-validator = { workspace = true }
+solana-cli-config = { workspace = true }
+tokio = { workspace = true }
+
+[lib]
+name = "glitch_gremlin_program"
+crate-type = ["cdylib", "lib"]
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[target.'cfg(not(target_os = "solana"))'.dependencies]
+solana-program = { version = "=1.18.26" }
+
+[target.sbf-solana-solana.dependencies]
+solana-program = { version = "=1.18.26" }
