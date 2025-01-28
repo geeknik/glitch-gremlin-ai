@@ -11,6 +11,7 @@ interface RequestLimit {
 interface RequestLimits {
     [key: string]: RequestLimit;
 }
+
 export class RedisQueueWorker implements RedisConfig {
     protected redis: RedisType;
     public host: string = 'r.glitchgremlin.ai';
@@ -23,11 +24,12 @@ export class RedisQueueWorker implements RedisConfig {
     private readonly rateLimitKey = 'glitch:chaos:ratelimit';
     private readonly limitTrackerKey = 'glitch:chaos:limittracker';
     private readonly requestCountKey = 'glitch:chaos:requestcount';
+    private readonly resultTTL = 3600; // 1 hour TTL for results
     
     private readonly requestLimits: RequestLimits = {
-        DEFAULT: { maxRequests: 100, window: 3600 },
-        FUZZING: { maxRequests: 50, window: 1800 },
-        SECURITY: { maxRequests: 30, window: 1800 }
+        DEFAULT: { maxRequests: 50, window: 3600 }, // Reduced from 100 to 50
+        FUZZ: { maxRequests: 30, window: 1800 }, // Reduced from 50 to 30
+        SECURITY: { maxRequests: 20, window: 1800 }  // Reduced from 30 to 20
     };
 
     /**
@@ -48,15 +50,15 @@ export class RedisQueueWorker implements RedisConfig {
             connectTimeout: 5000,
             maxRetriesPerRequest: 3,
             retryStrategy: (times: number): number | null => {
-                if (times > 5) return null; // Stop retrying after 5 attempts
-                return Math.min(times * 100, 3000); // Exponential backoff up to 3s
+                if (times > 5) return null;
+                return Math.min(times * 100, 3000);
             },
             enableOfflineQueue: true,
             lazyConnect: true,
             reconnectOnError: (err: Error) => {
                 const targetError = 'READONLY';
                 if (err.message.includes(targetError)) {
-                    return true; // Reconnect for READONLY error
+                    return true;
                 }
                 return false;
             }
@@ -83,12 +85,18 @@ export class RedisQueueWorker implements RedisConfig {
         const limit = this.requestLimits[requestType] || this.requestLimits.DEFAULT;
         const key = `${this.rateLimitKey}:${requestType}`;
         
+        const multi = this.redis.multi();
+        multi.incr(key);
+        multi.expire(key, limit.window);
+        
         try {
-            const current = await this.redis.incr(key);
-            if (current === 1) {
-                await this.redis.expire(key, limit.window);
-            }
-            return current <= limit.maxRequests;
+            const results = await multi.exec();
+            if (!results) return false;
+            
+            const [incrErr, count] = results[0];
+            if (incrErr) throw incrErr;
+            
+            return (count as number) <= limit.maxRequests;
         } catch (err) {
             console.error('Rate limit check failed:', err);
             return false;
@@ -165,9 +173,15 @@ export class RedisQueueWorker implements RedisConfig {
     }
 
     async storeResult(requestId: string, result: ChaosResult): Promise<void> {
-        await this.redis.hset(this.resultKey, requestId, JSON.stringify(result));
-        // Set expiry to 24 hours
-        await this.redis.expire(this.resultKey, 86400);
+        const multi = this.redis.multi();
+        multi.hset(this.resultKey, requestId, JSON.stringify(result));
+        multi.expire(this.resultKey, this.resultTTL);
+        
+        try {
+            await multi.exec();
+        } catch (err) {
+            throw new GlitchError(`Failed to store result: ${err instanceof Error ? err.message : String(err)}`, 2008);
+        }
     }
 
     async getResult(requestId: string): Promise<ChaosResult | null> {
