@@ -3,11 +3,20 @@ use {
     anchor_lang::{prelude::*, solana_program::clock::Clock},
     anchor_spl::token::{self, Token},
     governance::{
-        chaos::testing::{ChaosTest, ChaosTestContext, ChaosTestResult, Finding, FindingSeverity, FindingCategory},
-        state::ChaosParameters,
+        chaos::{
+            test_runner::ChaosTestRunner,
+            Finding, FindingSeverity, FindingCategory,
+            ChaosTestResult,
+        },
+        monitoring::SecurityMetrics,
     },
     solana_program_test::*,
     solana_sdk::{signature::Keypair, signer::Signer},
+    solana_program::{
+        instruction::Instruction,
+        program_error::ProgramError,
+        pubkey::Pubkey,
+    },
 };
 
 #[tokio::test]
@@ -213,4 +222,128 @@ async fn test_finding_recording() {
     assert_eq!(result.findings.len(), 2);
     assert_eq!(result.findings[0].severity, FindingSeverity::Critical);
     assert_eq!(result.findings[1].category, FindingCategory::PerformanceIssue);
+}
+
+#[tokio::test]
+async fn test_chaos_runner_metrics() {
+    let program_id = Pubkey::new_unique();
+    let mut runner = ChaosTestRunner::new(program_id);
+    
+    // Test successful execution
+    let instruction = Instruction {
+        program_id,
+        accounts: vec![],
+        data: vec![],
+    };
+    
+    let result = runner.execute_test(instruction.clone(), vec![]).await;
+    assert!(result.is_ok());
+    
+    let metrics = runner.get_metrics();
+    assert_eq!(metrics.total_executions, 1);
+    assert_eq!(metrics.failed_executions, 0);
+}
+
+#[tokio::test]
+async fn test_security_metrics_arithmetic() {
+    let mut metrics = SecurityMetrics::new();
+    
+    // Test vote recording
+    let voter = Pubkey::new_unique();
+    assert!(metrics.record_vote(voter).is_ok());
+    assert_eq!(metrics.total_votes, 1);
+    assert!(metrics.unique_voters.contains(&voter));
+    
+    // Test treasury operation recording
+    assert!(metrics.record_treasury_operation(true, 1000).is_ok());
+    assert_eq!(metrics.treasury_operations.successful_operations, 1);
+    assert_eq!(metrics.treasury_operations.total_volume, 1000);
+}
+
+#[tokio::test]
+async fn test_finding_generation() {
+    let program_id = Pubkey::new_unique();
+    let finding = Finding::new(
+        program_id,
+        "Test finding".to_string(),
+        FindingSeverity::High,
+    );
+    
+    assert_eq!(finding.program_id, program_id);
+    assert_eq!(finding.severity, FindingSeverity::High);
+    assert_eq!(finding.details, "Test finding");
+}
+
+#[tokio::test]
+async fn test_execution_anomalies() {
+    let program_id = Pubkey::new_unique();
+    let mut runner = ChaosTestRunner::new(program_id);
+    
+    // Test high cost execution
+    let instruction = Instruction {
+        program_id,
+        accounts: vec![],
+        data: vec![0; 1000], // Large data to simulate high cost
+    };
+    
+    let result = runner.execute_test(instruction, vec![]).await;
+    assert!(result.is_ok());
+    
+    let (finding, _) = result.unwrap();
+    assert!(finding.is_some());
+    
+    let finding = finding.unwrap();
+    assert_eq!(finding.severity, FindingSeverity::High);
+}
+
+#[tokio::test]
+async fn test_error_analysis() {
+    let program_id = Pubkey::new_unique();
+    let mut runner = ChaosTestRunner::new(program_id);
+    
+    // Test invalid account data error
+    let instruction = Instruction {
+        program_id,
+        accounts: vec![],
+        data: vec![],
+    };
+    
+    let result = runner.execute_test(instruction, vec![]).await;
+    assert!(result.is_err());
+    
+    let metrics = runner.get_metrics();
+    assert_eq!(metrics.failed_executions, 1);
+}
+
+#[tokio::test]
+async fn test_arithmetic_overflow_protection() {
+    let mut metrics = SecurityMetrics::new();
+    
+    // Test overflow protection in vote recording
+    for _ in 0..u64::MAX {
+        if metrics.record_vote(Pubkey::new_unique()).is_err() {
+            // Should error on overflow
+            return;
+        }
+    }
+    
+    panic!("Overflow protection failed");
+}
+
+#[tokio::test]
+async fn test_chaos_test_result_generation() {
+    let program_id = Pubkey::new_unique();
+    let mut runner = ChaosTestRunner::new(program_id);
+    
+    let instruction = Instruction {
+        program_id,
+        accounts: vec![],
+        data: vec![],
+    };
+    
+    let result = runner.execute_test(instruction, vec![]).await;
+    assert!(result.is_ok());
+    
+    let metrics = runner.get_metrics();
+    assert!(metrics.total_executions > 0);
 } 

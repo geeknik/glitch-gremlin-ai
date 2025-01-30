@@ -5,8 +5,12 @@ use solana_program::pubkey::Pubkey;
 use solana_program::{
     program::invoke_signed,
     system_instruction,
+    account_info::AccountInfo,
+    program_error::ProgramError,
+    sysvar::Sysvar,
 };
 use std::str::FromStr;
+use std::collections::HashMap;
 
 pub mod chaos;
 pub mod monitoring;
@@ -723,12 +727,12 @@ pub struct Proposal {
     pub stake_mint: Pubkey,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq)]
 pub enum ProposalState {
     Draft,
     Active,
     Succeeded,
-    Defeated,
+    Failed,
     Executed,
     Cancelled,
 }

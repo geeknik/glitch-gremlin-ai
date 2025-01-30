@@ -13,18 +13,24 @@ use solana_program::rpc_client::RpcClient;
 use solana_program::rpc_client::RpcProgramAccountsConfig;
 use solana_program::rpc_client::RpcAccountInfoConfig;
 use solana_program::rpc_client::UiAccountEncoding;
-use solana_program::commitment_config::CommitmentConfig;
 use solana_client::{
     rpc_client::RpcClient,
     rpc_config::{RpcProgramAccountsConfig, RpcAccountInfoConfig},
     rpc_filter::{RpcFilterType, Memcmp, MemcmpEncodedBytes},
 };
+use solana_sdk::commitment_config::CommitmentConfig;
+use crate::state::{StakeAccount, StakeOperation, StakeOperationType};
+use crate::error::{GovernanceError, Result, ErrorContext, create_error_context};
+use anchor_lang::Discriminator;
 
 const ANOMALY_THRESHOLD_LAMPORTS: u64 = 1_000_000; // 0.001 SOL
-const HIGH_COST_THRESHOLD: u64 = 10_000_000; // 0.01 SOL
+const HIGH_COST_THRESHOLD: u64 = 200_000; // Lamports
 const CRITICAL_COST_THRESHOLD: u64 = 100_000_000; // 0.1 SOL
 const MAX_CONCURRENT_TXS: u64 = 5;
 const CONCURRENT_TX_WINDOW_SECS: i64 = 2;
+const STAKE_CONCENTRATION_THRESHOLD: f64 = 0.5; // 50%
+const CONCURRENT_TXS_THRESHOLD: u64 = 100;
+const SUSPICIOUS_VOTE_PATTERN_THRESHOLD: u64 = 10;
 
 pub fn collect_test_results(
     target_program: &Pubkey,
@@ -377,21 +383,26 @@ fn check_proposal_state_consistency(program_id: &Pubkey) -> Result<Option<String
 }
 
 fn get_all_proposals(program_id: &Pubkey) -> Result<Vec<Proposal>> {
-    let mut proposals = Vec::new();
+    let rpc_client = RpcClient::new_with_commitment(
+        std::env::var("RPC_URL").unwrap_or_else(|_| "http://localhost:8899".to_string()),
+        CommitmentConfig::confirmed(),
+    );
+
+    let config = RpcProgramAccountsConfig {
+        filters: Some(vec![RpcFilterType::Memcmp(Memcmp::new_raw_bytes(0, vec![2]))]),
+        account_config: RpcAccountInfoConfig {
+            encoding: Some(solana_account_decoder::UiAccountEncoding::Base64),
+            commitment: Some(CommitmentConfig::confirmed()),
+            ..RpcAccountInfoConfig::default()
+        },
+        ..RpcProgramAccountsConfig::default()
+    };
+
+    let accounts = rpc_client.get_program_accounts_with_config(program_id, config)?;
     
-    // Get program accounts filtered for Proposal type
-    let accounts = solana_program::program_pack::Pack::unpack_unchecked(
-        &program_id.to_bytes(),
-        &[0; 32], // Filter for Proposal discriminator
-    )?;
-    
-    for (_, account) in accounts {
-        if let Ok(proposal) = Proposal::try_from_slice(&account.data) {
-            proposals.push(proposal);
-        }
-    }
-    
-    Ok(proposals)
+    accounts.into_iter()
+        .filter_map(|(_, account)| Proposal::try_deserialize(&mut &account.data[..]).ok())
+        .collect::<Vec<_>>()
 }
 
 fn get_proposal_votes(proposal_id: &Pubkey) -> Result<Vec<Vote>> {
@@ -449,40 +460,34 @@ struct StakePool {
     total_staked: u64,
 }
 
-pub fn get_program_accounts(
-    program_id: &Pubkey,
-    filters: &[RpcFilterType],
-) -> Result<Vec<(Pubkey, AccountInfo)>> {
-    let rpc_client = RpcClient::new(RPC_URL.to_string());
+pub fn get_program_accounts<'a>(
+    program_id: &'a Pubkey,
+    filters: &'a [RpcFilterType],
+) -> Result<Vec<(Pubkey, AccountInfo<'a>)>> {
+    let rpc_client = RpcClient::new(std::env::var("RPC_URL").unwrap_or_else(|_| "http://localhost:8899".to_string()));
     let config = RpcProgramAccountsConfig {
         filters: Some(filters.to_vec()),
         account_config: RpcAccountInfoConfig {
             encoding: Some(UiAccountEncoding::Base64),
-            data_slice: None,
             commitment: Some(CommitmentConfig::confirmed()),
+            ..Default::default()
         },
-        with_context: Some(true),
+        ..Default::default()
     };
 
-    let accounts = rpc_client
-        .get_program_accounts_with_config(program_id, config)?
-        .into_iter()
-        .map(|(pubkey, account)| {
-            let account_info = AccountInfo::new(
-                &pubkey,
-                false,
-                false,
-                &mut account.lamports,
-                &mut account.data,
-                &program_id,
-                account.executable,
-                account.rent_epoch,
-            );
-            Ok((pubkey, account_info))
-        })
-        .collect::<Result<Vec<_>>>()?;
-
-    Ok(accounts)
+    let accounts = rpc_client.get_program_accounts_with_config(program_id, config)?;
+    Ok(accounts.into_iter().map(|(pubkey, account)| {
+        (pubkey, AccountInfo::new(
+            &pubkey,
+            false,
+            false,
+            &mut account.lamports,
+            &mut account.data,
+            &account.owner,
+            account.executable,
+            account.rent_epoch,
+        ))
+    }).collect())
 }
 
 pub async fn check_account_consistency(program_id: &Pubkey) -> Result<Option<Finding>> {
@@ -570,53 +575,44 @@ fn check_vote_tally_consistency(program_id: &Pubkey) -> Result<Option<String>> {
 
 fn check_stake_consistency(program_id: &Pubkey) -> Result<Option<String>> {
     let mut inconsistencies = Vec::new();
-    
-    // Get total staked amount from stake pool
     let total_staked = get_total_staked_tokens(program_id)?;
-    
-    // Get all individual stake accounts
     let stake_accounts = get_all_stake_accounts(program_id)?;
     let mut calculated_total = 0;
-    
-    // Calculate total from individual stakes
+
     for stake in stake_accounts {
         calculated_total = calculated_total.checked_add(stake.amount)
             .ok_or(ProgramError::ArithmeticOverflow)?;
-            
-        // Check stake account constraints
+
         if stake.amount == 0 {
             inconsistencies.push(format!(
                 "Empty stake account found for staker {}",
-                stake.staker
+                stake.owner
             ));
         }
-        
-        // Check lockup period
+
         let clock = Clock::get()?;
         if stake.locked_until > clock.unix_timestamp {
-            // Verify stake is actually locked
             if !stake.is_locked {
                 inconsistencies.push(format!(
                     "Stake for {} should be locked until {} but is not marked as locked",
-                    stake.staker, stake.locked_until
+                    stake.owner, stake.locked_until
                 ));
             }
         } else if stake.is_locked {
             inconsistencies.push(format!(
                 "Stake for {} is marked as locked but lockup period has expired",
-                stake.staker
+                stake.owner
             ));
         }
     }
-    
-    // Compare total staked amount
+
     if calculated_total != total_staked {
         inconsistencies.push(format!(
             "Total stake mismatch: pool total={}, calculated total={}",
             total_staked, calculated_total
         ));
     }
-    
+
     if inconsistencies.is_empty() {
         Ok(None)
     } else {
@@ -640,29 +636,127 @@ fn get_voter_stake(program_id: &Pubkey, voter: &Pubkey) -> Result<u64> {
 }
 
 fn get_all_stake_accounts(program_id: &Pubkey) -> Result<Vec<StakeAccount>> {
-    let mut stakes = Vec::new();
-    
-    // Filter for stake accounts using discriminator
-    let accounts = solana_program::program_pack::Pack::unpack_unchecked(
-        &program_id.to_bytes(),
-        &[2; 32], // Filter for Stake discriminator
-    )?;
-    
-    for (_, account) in accounts {
-        if let Ok(stake) = StakeAccount::try_from_slice(&account.data) {
-            stakes.push(stake);
-        }
-    }
-    
-    Ok(stakes)
+    let rpc_client = RpcClient::new_with_commitment(
+        std::env::var("RPC_URL").unwrap_or_else(|_| "http://localhost:8899".to_string()),
+        CommitmentConfig::confirmed(),
+    );
+
+    let config = RpcProgramAccountsConfig {
+        filters: Some(vec![RpcFilterType::Memcmp(Memcmp::new_raw_bytes(0, vec![1]))]),
+        account_config: RpcAccountInfoConfig {
+            encoding: Some(solana_account_decoder::UiAccountEncoding::Base64),
+            commitment: Some(CommitmentConfig::confirmed()),
+            ..RpcAccountInfoConfig::default()
+        },
+        ..RpcProgramAccountsConfig::default()
+    };
+
+    let accounts = rpc_client.get_program_accounts_with_config(program_id, config)?;
+    Ok(accounts.into_iter()
+        .filter_map(|(_, account)| StakeAccount::try_deserialize(&mut &account.data[..]).ok())
+        .collect::<Vec<_>>())
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize)]
-struct StakeAccount {
-    staker: Pubkey,
-    amount: u64,
-    locked_until: i64,
-    is_locked: bool,
+#[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
+#[account]
+pub struct StakeAccount {
+    pub owner: Pubkey,
+    pub amount: u64,
+    pub last_update: i64,
+    pub is_locked: bool,
+    pub locked_until: i64,
+}
+
+// Constants for stake validation
+pub const MIN_STAKE_DURATION: i64 = 7 * 24 * 60 * 60; // 7 days
+pub const MAX_STAKE_DURATION: i64 = 365 * 24 * 60 * 60; // 1 year
+pub const MIN_STAKE_AMOUNT: u64 = 1_000_000; // 1 SOL in lamports
+
+impl StakeAccount {
+    pub const DISCRIMINATOR: [u8; 8] = [83, 84, 65, 75, 69, 65, 67, 84]; // "STAKEACT"
+
+    pub fn validate(&self) -> Result<()> {
+        require!(
+            self.amount >= MIN_STAKE_AMOUNT,
+            GovernanceError::InsufficientStake
+        );
+        
+        if self.is_locked {
+            let lock_duration = self.get_lock_duration()
+                .ok_or(GovernanceError::InvalidProgramState)?;
+                
+            require!(
+                lock_duration >= MIN_STAKE_DURATION && lock_duration <= MAX_STAKE_DURATION,
+                GovernanceError::InvalidLockDuration
+            );
+        }
+        Ok(())
+    }
+
+    pub fn can_withdraw(&self) -> Result<bool> {
+        if !self.is_locked {
+            return Ok(true);
+        }
+        
+        let current_time = Clock::get()?.unix_timestamp;
+        Ok(current_time >= self.locked_until)
+    }
+
+    pub fn update_stake(&mut self, new_amount: u64) -> Result<()> {
+        require!(new_amount >= MIN_STAKE_AMOUNT, GovernanceError::InsufficientStake);
+        
+        self.amount = new_amount;
+        self.last_update = Clock::get()?.unix_timestamp;
+        Ok(())
+    }
+
+    pub fn lock_stake(&mut self, duration: i64) -> Result<()> {
+        require!(
+            duration >= MIN_STAKE_DURATION && duration <= MAX_STAKE_DURATION,
+            GovernanceError::InvalidLockDuration
+        );
+
+        let current_time = Clock::get()?.unix_timestamp;
+        self.is_locked = true;
+        self.locked_until = current_time + duration;
+        self.last_update = current_time;
+        Ok(())
+    }
+
+    pub fn get_lock_duration(&self) -> Option<i64> {
+        if self.is_locked {
+            Clock::get().ok().map(|clock| {
+                self.locked_until.saturating_sub(clock.unix_timestamp)
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn try_deserialize(data: &[u8]) -> Result<Self> {
+        if data.len() < 8 || data[..8] != Self::DISCRIMINATOR {
+            return Err(GovernanceError::InvalidProgramState);
+        }
+        
+        let account: Self = AnchorDeserialize::deserialize(&mut &data[8..])
+            .map_err(|_| GovernanceError::InvalidProgramState)?;
+            
+        account.validate()?;
+        Ok(account)
+    }
+}
+
+// Error codes specific to stake operations
+#[error_code]
+pub enum StakeError {
+    #[msg("Insufficient stake amount")]
+    InsufficientStake,
+    #[msg("Invalid lock duration")]
+    InvalidLockDuration,
+    #[msg("Stake is currently locked")]
+    StakeLocked,
+    #[msg("Unauthorized stake operation")]
+    UnauthorizedOperation,
 }
 
 fn check_unauthorized_modifications(program_id: &Pubkey) -> Result<Option<String>> {
@@ -703,105 +797,285 @@ fn check_vote_modifications(program_id: &Pubkey) -> Result<Option<String>> {
 }
 
 fn check_stake_modifications(program_id: &Pubkey) -> Result<Option<String>> {
-    // Check for unauthorized stake changes
-    // This is a placeholder for the actual implementation
+    let rpc_client = RpcClient::new(std::env::var("RPC_URL").unwrap_or_else(|_| "http://localhost:8899".to_string()));
+    let stake_accounts = get_stake_accounts(&rpc_client, program_id)?;
+
+    for stake in stake_accounts {
+        if stake.is_locked {
+            let lock_duration = stake.get_lock_duration().unwrap_or(0);
+            if lock_duration > MAX_STAKE_DURATION {
+                return Ok(Some(format!("Stake account {} has an invalid lock duration", stake.owner)));
+            }
+        }
+    }
+
     Ok(None)
 }
 
-pub async fn monitor_proposal_execution(
+fn get_stake_accounts(rpc_client: &RpcClient, program_id: &Pubkey) -> Result<Vec<StakeAccount>> {
+    let config = RpcProgramAccountsConfig {
+        filters: Some(vec![
+            RpcFilterType::Memcmp(Memcmp::new(
+                0,
+                MemcmpEncodedBytes::Base58(bs58::encode(&StakeAccount::DISCRIMINATOR).into_string()),
+                None
+            )),
+        ]),
+        account_config: RpcAccountInfoConfig {
+            encoding: Some(UiAccountEncoding::Base64),
+            commitment: Some(CommitmentConfig::confirmed()),
+            ..Default::default()
+        },
+        with_context: Some(true),
+    };
+
+    let accounts = rpc_client
+        .get_program_accounts_with_config(program_id, config)
+        .map_err(|_| GovernanceError::ClientError)
+        .with_context("Failed to fetch stake accounts")?;
+
+    accounts
+        .into_iter()
+        .filter_map(|(_, account)| {
+            StakeAccount::try_deserialize(&account.data).ok()
+        })
+        .collect::<Vec<_>>()
+        .pipe(Ok)
+}
+
+pub async fn monitor_execution_anomalies(
     program_id: &Pubkey,
-    proposal: &Proposal,
-    accounts: &[AccountInfo],
+    findings: &mut Vec<Finding>
 ) -> Result<()> {
-    // Check for potential security issues
-    if let Some(finding) = check_execution_anomalies(proposal, accounts).await? {
-        msg!("Found potential vulnerability: {:?}", finding);
+    let rpc_client = RpcClient::new_with_commitment(
+        std::env::var("RPC_URL").unwrap_or_else(|_| "http://localhost:8899".to_string()),
+        CommitmentConfig::confirmed(),
+    );
+
+    // Monitor transaction costs
+    let recent_txs = rpc_client.get_signatures_for_address(program_id)?;
+    let mut total_cost = 0u64;
+    let mut high_cost_txs = 0u64;
+    let mut tx_patterns = HashMap::new();
+
+    for sig_info in recent_txs {
+        if let Ok(tx) = rpc_client.get_transaction(&sig_info.signature, None) {
+            let cost = tx.meta.unwrap().fee;
+            total_cost = total_cost.checked_add(cost)
+                .ok_or_else(|| ProgramError::from(ErrorCode::ArithmeticOverflow))?;
+            
+            // Analyze transaction patterns
+            let accounts = tx.transaction.message.account_keys;
+            for (i, account) in accounts.iter().enumerate() {
+                tx_patterns.entry(account)
+                    .and_modify(|e: &mut Vec<(u64, i64)>| e.push((cost, sig_info.block_time.unwrap_or(0))))
+                    .or_insert_with(|| vec![(cost, sig_info.block_time.unwrap_or(0))]);
+            }
+            
+            if cost > HIGH_COST_THRESHOLD {
+                high_cost_txs += 1;
+                let mut finding = Finding::new(
+                    "High Transaction Cost".to_string(),
+                    format!("Transaction cost of {} lamports exceeds threshold", cost),
+                    FindingSeverity::High,
+                    FindingCategory::PerformanceIssue,
+                    *program_id,
+                    Some(sig_info.signature.to_string()),
+                );
+                finding.add_metadata("cost".to_string(), cost.to_string());
+                finding.add_metadata("threshold".to_string(), HIGH_COST_THRESHOLD.to_string());
+                findings.push(finding);
+            }
+        }
+    }
+
+    // Analyze transaction patterns for potential attacks
+    for (account, patterns) in tx_patterns {
+        if patterns.len() > SUSPICIOUS_VOTE_PATTERN_THRESHOLD {
+            let mut finding = Finding::new(
+                "Suspicious Transaction Pattern".to_string(),
+                format!("Account {} shows high frequency transaction pattern", account),
+                FindingSeverity::High,
+                FindingCategory::SecurityVulnerability,
+                *program_id,
+                None,
+            );
+            finding.add_affected_account(account);
+            finding.add_metadata("transaction_count".to_string(), patterns.len().to_string());
+            finding.with_remediation("Implement rate limiting for transactions per account".to_string());
+            findings.push(finding);
+        }
+    }
+
+    // Check for stake concentration
+    if let Ok(stake_accounts) = get_stake_accounts(&rpc_client, program_id) {
+        let total_stake: u64 = stake_accounts.iter()
+            .map(|s| s.amount)
+            .sum();
+        
+        for stake_account in stake_accounts {
+            let stake_percentage = (stake_account.amount as f64 / total_stake as f64) * 100.0;
+            if stake_percentage > STAKE_CONCENTRATION_THRESHOLD {
+                let mut finding = Finding::new(
+                    "High Stake Concentration".to_string(),
+                    format!("Account holds {:.2}% of total stake", stake_percentage),
+                    FindingSeverity::High,
+                    FindingCategory::SecurityVulnerability,
+                    *program_id,
+                    None,
+                );
+                finding.add_affected_account(stake_account.owner);
+                finding.with_remediation("Consider implementing stake concentration limits".to_string());
+                findings.push(finding);
+            }
+        }
     }
 
     Ok(())
 }
 
-async fn check_execution_anomalies(
-    proposal: &Proposal,
-    accounts: &[AccountInfo],
-) -> Result<Option<Finding>> {
-    // Check for various anomalies
-    if let Some(finding) = check_account_permissions(accounts)? {
-        return Ok(Some(finding));
-    }
-
-    if let Some(finding) = check_state_consistency(proposal.program_id)? {
-        return Ok(Some(finding));
-    }
-
-    Ok(None)
-}
-
-pub fn check_account_permissions(accounts: &[AccountInfo]) -> Result<Option<Finding>> {
-    for account in accounts {
-        if let Ok(proposal) = Proposal::try_deserialize(&mut &account.data[..]) {
-            // Check proposal permissions
-            if !verify_proposal_permissions(&proposal) {
-                return Ok(Some(Finding::new(
-                    FindingCategory::SecurityVulnerability,
-                    FindingSeverity::High,
-                    *account.key,
-                    format!("Suspicious proposal permissions detected for account {}", account.key),
+pub async fn monitor_state_consistency(
+    program_id: &Pubkey,
+    findings: &mut Vec<Finding>
+) -> Result<()> {
+    // Check proposal state consistency
+    let proposals = get_proposals(program_id)?;
+    for proposal in proposals {
+        // Check for stale proposals
+        if proposal.state == ProposalState::Active {
+            let current_time = Clock::get()?.unix_timestamp;
+            if current_time > proposal.end_time {
+                let mut finding = Finding::new(
+                    "Stale Proposal State".to_string(),
+                    format!("Proposal {} remains active after end time", proposal.title),
+                    FindingSeverity::Medium,
+                    FindingCategory::DataInconsistency,
+                    *program_id,
                     None,
-                )));
+                );
+                finding.add_metadata("proposal_id".to_string(), proposal.proposal_id.to_string());
+                finding.add_metadata("end_time".to_string(), proposal.end_time.to_string());
+                findings.push(finding);
             }
         }
+
+        // Check vote counts
+        let total_votes = proposal.yes_votes.checked_add(proposal.no_votes)
+            .ok_or_else(|| ProgramError::from(ErrorCode::ArithmeticOverflow))?;
         
-        if let Ok(vote) = Vote::try_deserialize(&mut &account.data[..]) {
-            // Check vote permissions
-            if !verify_vote_permissions(&vote) {
-                return Ok(Some(Finding::new(
-                    FindingCategory::SecurityVulnerability,
-                    FindingSeverity::High,
-                    *account.key,
-                    format!("Suspicious vote permissions detected for account {}", account.key),
-                    None,
-                )));
+        if total_votes > proposal.total_stake_snapshot {
+            let mut finding = Finding::new(
+                "Invalid Vote Count".to_string(),
+                format!("Total votes exceed snapshot of total stake for proposal {}", proposal.title),
+                FindingSeverity::Critical,
+                FindingCategory::DataInconsistency,
+                *program_id,
+                None,
+            );
+            finding.add_metadata("total_votes".to_string(), total_votes.to_string());
+            finding.add_metadata("total_stake".to_string(), proposal.total_stake_snapshot.to_string());
+            finding.with_remediation("Implement strict vote counting validation".to_string());
+            findings.push(finding);
+        }
+    }
+
+    Ok(())
+}
+
+pub async fn monitor_manipulation_attempts(
+    program_id: &Pubkey,
+    findings: &mut Vec<Finding>
+) -> Result<()> {
+    let rpc_client = RpcClient::new_with_commitment(
+        std::env::var("RPC_URL").unwrap_or_else(|_| "http://localhost:8899".to_string()),
+        CommitmentConfig::confirmed(),
+    );
+
+    // Monitor rapid stake changes
+    let recent_txs = rpc_client.get_signatures_for_address(program_id)?;
+    let mut stake_changes = std::collections::HashMap::new();
+
+    for sig_info in recent_txs {
+        if let Ok(tx) = rpc_client.get_transaction(&sig_info.signature, None) {
+            for account_key in tx.transaction.message.account_keys {
+                if let Ok(stake_account) = get_stake_account(&account_key) {
+                    let entry = stake_changes.entry(account_key)
+                        .or_insert_with(Vec::new);
+                    entry.push((stake_account.amount, sig_info.block_time.unwrap_or(0)));
+                }
             }
         }
     }
-    
-    Ok(None)
-}
 
-fn verify_proposal_permissions(proposal: &Proposal) -> bool {
-    // Add your proposal permission verification logic here
-    true
-}
-
-fn verify_vote_permissions(vote: &Vote) -> bool {
-    // Add your vote permission verification logic here
-    true
-}
-
-pub fn check_state_consistency(program_id: &Pubkey) -> Result<Option<Finding>> {
-    let accounts = get_program_accounts(program_id)?;
-    let mut total_stake: u64 = 0;
-
-    for (pubkey, account) in accounts {
-        if let Ok(stake) = Vote::try_deserialize(&mut &account.data[..]) {
-            total_stake = total_stake.checked_add(stake.amount)
-                .ok_or(ProgramError::ArithmeticOverflow)?;
+    // Analyze stake change patterns
+    for (account, changes) in stake_changes {
+        if changes.len() > SUSPICIOUS_VOTE_PATTERN_THRESHOLD {
+            findings.push(Finding::new(
+                "Suspicious Stake Activity".to_string(),
+                format!("Account {} made {} stake changes in a short period", account, changes.len()),
+                FindingSeverity::High,
+                *program_id,
+                None,
+            ));
         }
     }
 
-    // Check for state inconsistencies
-    if let Some(inconsistency) = check_data_consistency(program_id)? {
-        return Ok(Some(Finding::new(
-            FindingCategory::DataInconsistency,
-            FindingSeverity::High,
-            *program_id,
-            format!("State inconsistency detected: {}", inconsistency),
-            None,
-        )));
-    }
+    Ok(())
+}
 
-    Ok(None)
+fn get_stake_accounts(program_id: &Pubkey) -> Result<Vec<StakeAccount>> {
+    let rpc_client = RpcClient::new_with_commitment(
+        std::env::var("RPC_URL").unwrap_or_else(|_| "http://localhost:8899".to_string()),
+        CommitmentConfig::confirmed(),
+    );
+
+    let config = RpcProgramAccountsConfig {
+        filters: Some(vec![RpcFilterType::Memcmp(Memcmp::new_raw_bytes(0, StakeAccount::DISCRIMINATOR.to_vec()))]),
+        account_config: RpcAccountInfoConfig {
+            encoding: Some(solana_account_decoder::UiAccountEncoding::Base64),
+            commitment: Some(CommitmentConfig::confirmed()),
+            ..RpcAccountInfoConfig::default()
+        },
+        ..RpcProgramAccountsConfig::default()
+    };
+
+    let accounts = rpc_client.get_program_accounts_with_config(program_id, config)?;
+    Ok(accounts.into_iter()
+        .filter_map(|(_, account)| StakeAccount::try_deserialize(&mut &account.data[..]).ok())
+        .collect::<Vec<_>>())
+}
+
+fn get_stake_account(account_key: &Pubkey) -> Result<StakeAccount> {
+    let rpc_client = RpcClient::new_with_commitment(
+        std::env::var("RPC_URL").unwrap_or_else(|_| "http://localhost:8899".to_string()),
+        CommitmentConfig::confirmed(),
+    );
+
+    let account = rpc_client.get_account(account_key)?;
+    Ok(StakeAccount::try_deserialize(&mut &account.data[..])?)
+}
+
+fn get_proposals(program_id: &Pubkey) -> Result<Vec<Proposal>> {
+    let rpc_client = RpcClient::new_with_commitment(
+        std::env::var("RPC_URL").unwrap_or_else(|_| "http://localhost:8899".to_string()),
+        CommitmentConfig::confirmed(),
+    );
+
+    let config = RpcProgramAccountsConfig {
+        filters: Some(vec![RpcFilterType::Memcmp(Memcmp::new_raw_bytes(0, vec![2]))]),
+        account_config: RpcAccountInfoConfig {
+            encoding: Some(solana_account_decoder::UiAccountEncoding::Base64),
+            commitment: Some(CommitmentConfig::confirmed()),
+            ..RpcAccountInfoConfig::default()
+        },
+        ..RpcProgramAccountsConfig::default()
+    };
+
+    let accounts = rpc_client.get_program_accounts_with_config(program_id, config)?;
+    
+    accounts.into_iter()
+        .filter_map(|(_, account)| Proposal::try_deserialize(&mut &account.data[..]).ok())
+        .collect::<Vec<_>>()
 }
 
 pub struct ChaosMonitor {
@@ -841,12 +1115,22 @@ pub async fn check_state_consistency(program_id: &Pubkey) -> Result<Option<Findi
         }
     }
 
-    // Add your consistency checks here
+    // Check for state inconsistencies
+    if let Some(inconsistency) = check_data_consistency(program_id)? {
+        return Ok(Some(Finding::new(
+            FindingCategory::DataInconsistency,
+            FindingSeverity::High,
+            *program_id,
+            format!("State inconsistency detected: {}", inconsistency),
+            None,
+        )));
+    }
+
     Ok(None)
 }
 
 pub async fn check_account_consistency(program_id: &Pubkey) -> Result<Option<Finding>> {
-    let proposal_filter = MemcmpFilter {
+    let proposal_filter = Memcmp {
         offset: 0,
         bytes: MemcmpEncodedBytes::Base58(proposal_discriminator().to_vec()),
         encoding: None,
@@ -992,4 +1276,292 @@ fn calculate_approval_percentage(proposal: &Proposal) -> u8 {
         .count() as u64;
     
     ((approval_votes * 100) / total_votes) as u8
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FindingSeverity {
+    Critical,
+    High,
+    Medium,
+    Low,
+    Info,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FindingCategory {
+    SecurityVulnerability,
+    PerformanceIssue,
+    DataInconsistency,
+    ConcurrencyIssue,
+    LogicError,
+    ResourceExhaustion,
+    UnauthorizedAccess,
+    StateManipulation,
+}
+
+#[derive(Debug)]
+pub struct Finding {
+    pub title: String,
+    pub description: String,
+    pub severity: FindingSeverity,
+    pub category: FindingCategory,
+    pub program_id: Pubkey,
+    pub transaction_signature: Option<String>,
+    pub timestamp: i64,
+    pub affected_accounts: Vec<Pubkey>,
+    pub metadata: HashMap<String, String>,
+    pub remediation: Option<String>,
+}
+
+impl Finding {
+    pub fn new(
+        title: String,
+        description: String,
+        severity: FindingSeverity,
+        category: FindingCategory,
+        program_id: Pubkey,
+        transaction_signature: Option<String>,
+    ) -> Self {
+        Self {
+            title,
+            description,
+            severity,
+            category,
+            program_id,
+            transaction_signature,
+            timestamp: Clock::get().unwrap_or_default().unix_timestamp,
+            affected_accounts: Vec::new(),
+            metadata: HashMap::new(),
+            remediation: None,
+        }
+    }
+
+    pub fn with_remediation(mut self, remediation: String) -> Self {
+        self.remediation = Some(remediation);
+        self
+    }
+
+    pub fn add_affected_account(&mut self, account: Pubkey) {
+        if !self.affected_accounts.contains(&account) {
+            self.affected_accounts.push(account);
+        }
+    }
+
+    pub fn add_metadata(&mut self, key: String, value: String) {
+        self.metadata.insert(key, value);
+    }
+
+    pub fn is_critical(&self) -> bool {
+        self.severity == FindingSeverity::Critical
+    }
+
+    pub fn requires_immediate_action(&self) -> bool {
+        matches!(self.severity, FindingSeverity::Critical | FindingSeverity::High)
+    }
+}
+
+#[error_code]
+pub enum MonitoringError {
+    #[msg("Arithmetic overflow occurred during calculation")]
+    ArithmeticOverflow,
+    
+    #[msg("Invalid stake amount detected")]
+    InvalidStakeAmount,
+    
+    #[msg("Invalid vote count detected")]
+    InvalidVoteCount,
+    
+    #[msg("State inconsistency detected")]
+    StateInconsistency,
+    
+    #[msg("Unauthorized modification detected")]
+    UnauthorizedModification,
+    
+    #[msg("Resource exhaustion detected")]
+    ResourceExhaustion,
+    
+    #[msg("Rate limit exceeded")]
+    RateLimitExceeded,
+    
+    #[msg("Invalid lock state")]
+    InvalidLockState,
+    
+    #[msg("High stake concentration detected")]
+    HighStakeConcentration,
+}
+
+impl From<MonitoringError> for ProgramError {
+    fn from(e: MonitoringError) -> Self {
+        ProgramError::Custom(e as u32)
+    }
+}
+
+pub struct SecurityMetrics {
+    pub total_transactions: u64,
+    pub high_cost_transactions: u64,
+    pub failed_transactions: u64,
+    pub unique_users: std::collections::HashSet<Pubkey>,
+    pub transaction_costs: Vec<u64>,
+    pub stake_distribution: HashMap<Pubkey, u64>,
+    pub last_update: i64,
+    pub anomaly_count: u64,
+    pub exploit_attempts: HashMap<String, u64>,
+    pub unique_attackers: HashSet<Pubkey>,
+    pub active_proposals: u64,
+    pub vote_manipulation_attempts: u64,
+    pub execution_manipulation_attempts: u64,
+    pub state_manipulation_attempts: u64,
+}
+
+impl SecurityMetrics {
+    pub fn new() -> Self {
+        Self {
+            total_transactions: 0,
+            high_cost_transactions: 0,
+            failed_transactions: 0,
+            unique_users: HashSet::new(),
+            transaction_costs: Vec::new(),
+            stake_distribution: HashMap::new(),
+            last_update: Clock::get().unwrap_or_default().unix_timestamp,
+            anomaly_count: 0,
+            exploit_attempts: HashMap::new(),
+            unique_attackers: HashSet::new(),
+            active_proposals: 0,
+            vote_manipulation_attempts: 0,
+            execution_manipulation_attempts: 0,
+            state_manipulation_attempts: 0,
+        }
+    }
+
+    pub fn record_transaction(&mut self, cost: u64, user: Pubkey, success: bool) -> Result<()> {
+        self.total_transactions = self.total_transactions
+            .checked_add(1)
+            .with_error_details(|| create_error_context("Transaction Recording", "Failed to increment total transactions"))?;
+            
+        if cost > HIGH_COST_THRESHOLD {
+            self.high_cost_transactions = self.high_cost_transactions
+                .checked_add(1)
+                .with_error_details(|| create_error_context("Transaction Recording", "Failed to increment high cost transactions"))?;
+        }
+        
+        if !success {
+            self.failed_transactions = self.failed_transactions
+                .checked_add(1)
+                .with_error_details(|| create_error_context("Transaction Recording", "Failed to increment failed transactions"))?;
+        }
+        
+        self.unique_users.insert(user);
+        self.transaction_costs.push(cost);
+        self.last_update = Clock::get()
+            .map(|clock| clock.unix_timestamp)
+            .with_error_details(|| create_error_context("Transaction Recording", "Failed to get current timestamp"))?;
+        
+        Ok(())
+    }
+
+    pub fn record_exploit_attempt(&mut self, attack_type: &str, attacker: Pubkey) -> Result<()> {
+        let count = self.exploit_attempts.entry(attack_type.to_string()).or_insert(0);
+        *count = count
+            .checked_add(1)
+            .with_error_details(|| create_error_context("Exploit Recording", "Failed to increment exploit attempts"))?;
+            
+        self.unique_attackers.insert(attacker);
+        self.anomaly_count = self.anomaly_count
+            .checked_add(1)
+            .with_error_details(|| create_error_context("Exploit Recording", "Failed to increment anomaly count"))?;
+            
+        Ok(())
+    }
+
+    pub fn record_manipulation_attempt(&mut self, manipulation_type: ManipulationType) -> Result<()> {
+        match manipulation_type {
+            ManipulationType::Vote => {
+                self.vote_manipulation_attempts = self.vote_manipulation_attempts
+                    .checked_add(1)
+                    .with_error_details(|| create_error_context("Manipulation Recording", "Failed to increment vote manipulation attempts"))?;
+            }
+            ManipulationType::Execution => {
+                self.execution_manipulation_attempts = self.execution_manipulation_attempts
+                    .checked_add(1)
+                    .with_error_details(|| create_error_context("Manipulation Recording", "Failed to increment execution manipulation attempts"))?;
+            }
+            ManipulationType::State => {
+                self.state_manipulation_attempts = self.state_manipulation_attempts
+                    .checked_add(1)
+                    .with_error_details(|| create_error_context("Manipulation Recording", "Failed to increment state manipulation attempts"))?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn calculate_risk_score(&self) -> Result<u64> {
+        let base_score = self.anomaly_count
+            .checked_mul(10)
+            .with_error_details(|| create_error_context("Risk Calculation", "Failed to calculate base risk score"))?;
+
+        let manipulation_score = self.vote_manipulation_attempts
+            .checked_add(self.execution_manipulation_attempts)
+            .and_then(|sum| sum.checked_add(self.state_manipulation_attempts))
+            .with_error_details(|| create_error_context("Risk Calculation", "Failed to calculate manipulation score"))?;
+
+        let weighted_manipulation_score = manipulation_score
+            .checked_mul(20)
+            .with_error_details(|| create_error_context("Risk Calculation", "Failed to calculate weighted manipulation score"))?;
+
+        base_score
+            .checked_add(weighted_manipulation_score)
+            .with_error_details(|| create_error_context("Risk Calculation", "Failed to calculate final risk score"))
+    }
+
+    pub fn should_trigger_circuit_breaker(&self) -> Result<bool> {
+        let risk_score = self.calculate_risk_score()?;
+        let failure_rate = if self.total_transactions > 0 {
+            (self.failed_transactions as f64 / self.total_transactions as f64) * 100.0
+        } else {
+            0.0
+        };
+
+        // Enhanced circuit breaker logic with multiple conditions
+        Ok(
+            risk_score > 100 || 
+            failure_rate > 20.0 ||
+            self.high_cost_transactions > self.total_transactions / 2 ||
+            self.unique_attackers.len() > 5
+        )
+    }
+
+    pub fn get_security_stats(&self) -> SecurityStats {
+        SecurityStats {
+            total_transactions: self.total_transactions,
+            failed_transactions: self.failed_transactions,
+            high_cost_transactions: self.high_cost_transactions,
+            unique_users: self.unique_users.len() as u64,
+            unique_attackers: self.unique_attackers.len() as u64,
+            total_manipulation_attempts: self.vote_manipulation_attempts
+                .saturating_add(self.execution_manipulation_attempts)
+                .saturating_add(self.state_manipulation_attempts),
+            last_update: self.last_update,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SecurityStats {
+    pub total_transactions: u64,
+    pub failed_transactions: u64,
+    pub high_cost_transactions: u64,
+    pub unique_users: u64,
+    pub unique_attackers: u64,
+    pub total_manipulation_attempts: u64,
+    pub last_update: i64,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum ManipulationType {
+    Vote,
+    Execution,
+    State,
 } 
+
+
+

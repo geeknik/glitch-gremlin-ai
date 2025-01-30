@@ -16,12 +16,9 @@ use crate::monitoring::{SecurityAlert, AlertLevel};
 /// Security dashboard for monitoring governance programs
 #[derive(Debug)]
 pub struct SecurityDashboard {
-    pub program_id: Pubkey,
-    pub rrd_path: String,
-    pub metrics_rrd: Option<RoundRobinDatabase>,
     pub metrics: SecurityMetrics,
-    pub alerts: Vec<SecurityAlert>,
-    pub last_update: i64,
+    pub programs: HashMap<Pubkey, ProgramMonitor>,
+    pub rrd_path: String,
 }
 
 struct ProgramMonitor {
@@ -30,17 +27,17 @@ struct ProgramMonitor {
     checker: Arc<RwLock<GovernanceChecker>>,
     health_history: Vec<HealthCheck>,
     metrics_history: Vec<SecurityMetrics>,
+    last_update: i64,
+    alert_level: AlertLevel,
+    findings: Vec<Finding>,
 }
 
 impl SecurityDashboard {
     pub fn new(program_id: Pubkey, rrd_path: String) -> Result<Self> {
         Ok(Self {
-            program_id,
-            rrd_path,
-            metrics_rrd: None,
             metrics: SecurityMetrics::default(),
-            alerts: Vec::new(),
-            last_update: Clock::get()?.unix_timestamp,
+            programs: HashMap::new(),
+            rrd_path,
         })
     }
 
@@ -59,6 +56,9 @@ impl SecurityDashboard {
             checker,
             health_history: Vec::new(),
             metrics_history: Vec::new(),
+            last_update: Clock::get()?.unix_timestamp,
+            alert_level: AlertLevel::Normal,
+            findings: Vec::new(),
         });
 
         Ok(())
@@ -67,7 +67,7 @@ impl SecurityDashboard {
     /// Start monitoring all programs
     pub async fn start_monitoring(&mut self) -> Result<()> {
         // Initialize monitoring
-        self.last_update = Clock::get()?.unix_timestamp;
+        self.metrics.timestamp = Clock::get()?.unix_timestamp;
         Ok(())
     }
 
@@ -158,8 +158,6 @@ impl SecurityDashboard {
 
     /// Generate dashboard view
     pub fn generate_dashboard_view(&self) -> DashboardView {
-        let current_time = Clock::get().unwrap_or_default().unix_timestamp;
-        
         DashboardView {
             total_proposals: self.metrics.total_proposals,
             active_proposals: self.metrics.active_proposals,
@@ -169,8 +167,8 @@ impl SecurityDashboard {
             vote_manipulation_attempts: self.metrics.vote_manipulations,
             execution_manipulation_attempts: self.metrics.execution_manipulations,
             state_manipulation_attempts: self.metrics.state_manipulations,
-            proposal_execution_stats: self.metrics.proposal_execution_times.clone(),
-            treasury_operations_stats: self.metrics.treasury_operations.clone(),
+            proposal_execution_stats: self.metrics.proposal_execution_stats.clone(),
+            treasury_stats: self.metrics.treasury_operations.clone(),
         }
     }
 
@@ -195,26 +193,37 @@ impl SecurityDashboard {
 
         // Calculate proposal execution stats
         let proposal_execution_stats = ProposalExecutionStats {
-            avg_execution_time: execution_times.iter().sum::<i64>() as f64 / execution_times.len() as f64,
-            max_execution_time: *execution_times.iter().max().unwrap_or(&0),
-            min_execution_time: *execution_times.iter().min().unwrap_or(&0),
-            execution_time_distribution: self.calculate_time_distribution(&execution_times),
+            total_executions: execution_times.len() as u64,
+            successful_executions: execution_times.iter().filter(|&&x| x > 0).count() as u64,
+            failed_executions: execution_times.iter().filter(|&&x| x < &0).count() as u64,
+            average_time: execution_times.iter().sum::<i64>() as f64 / execution_times.len() as f64,
+            max_time: *execution_times.iter().max().unwrap_or(&0),
+            min_time: *execution_times.iter().min().unwrap_or(&0),
+            execution_times: execution_times.clone(),
         };
 
         // Calculate treasury stats
         let treasury_stats = TreasuryStats {
             total_operations: treasury_operations.iter().sum(),
+            successful_operations: treasury_operations.iter().filter(|&&x| x > 0).count() as u64,
+            failed_operations: treasury_operations.iter().filter(|&&x| x < &0).count() as u64,
             total_volume: 0, // Would need actual volume data
-            largest_operation: 0, // Would need actual operation size data
-            operation_distribution: HashMap::new(), // Would need operation type data
+            largest_operation: treasury_operations.iter().max().cloned().unwrap_or(0),
+            operation_distribution: treasury_operations.iter().fold(HashMap::new(), |mut dist, &x| {
+                *dist.entry(if x > 0 { "successful" } else { "failed" }).or_insert(0) += 1;
+                dist
+            }),
         };
 
         MetricsView {
+            active_proposals: self.metrics.active_proposals,
+            execution_success_rate: self.metrics.execution_success_rate,
+            failed_transactions: self.metrics.failed_transactions,
+            treasury_stats: treasury_stats,
             vote_manipulation_attempts,
             execution_manipulation_attempts,
             state_manipulation_attempts,
-            proposal_execution_stats,
-            treasury_operations_stats: treasury_stats,
+            proposal_execution_stats: proposal_execution_stats,
         }
     }
 
@@ -236,36 +245,8 @@ impl SecurityDashboard {
         distribution
     }
 
-    pub async fn update_metrics(&mut self, metrics: &SecurityMetrics) -> Result<()> {
+    pub fn update_metrics(&mut self, metrics: &SecurityMetrics) -> Result<()> {
         self.metrics = metrics.clone();
-        self.last_update = Clock::get()?.unix_timestamp;
-        self.process_alerts()?;
-        Ok(())
-    }
-
-    fn process_alerts(&mut self) -> Result<()> {
-        // Process high transaction failure rate
-        if self.metrics.failed_transactions > 100 {
-            self.alerts.push(SecurityAlert {
-                message: "High transaction failure rate detected".to_string(),
-                level: AlertLevel::High,
-                timestamp: Clock::get()?.unix_timestamp,
-                program_id: self.program_id,
-                details: format!("Failed transactions: {}", self.metrics.failed_transactions),
-            });
-        }
-
-        // Process vote manipulation attempts
-        if self.metrics.vote_manipulations > 0 {
-            self.alerts.push(SecurityAlert {
-                message: "Vote manipulation attempts detected".to_string(),
-                level: AlertLevel::Critical,
-                timestamp: Clock::get()?.unix_timestamp,
-                program_id: self.program_id,
-                details: format!("Vote manipulations: {}", self.metrics.vote_manipulations),
-            });
-        }
-
         Ok(())
     }
 
@@ -274,16 +255,11 @@ impl SecurityDashboard {
             active_proposals: self.metrics.active_proposals,
             execution_success_rate: self.metrics.execution_success_rate,
             failed_transactions: self.metrics.failed_transactions,
-            proposal_execution_stats: ProposalExecutionStats {
-                total_executed: 0, // Will be implemented
-                successful_executions: 0,
-                failed_executions: 0,
-                average_execution_time: 0.0,
-            },
-            treasury_stats: TreasuryStats {
-                successful_operations: 0,
-                failed_operations: 0,
-            },
+            treasury_stats: self.metrics.treasury_operations.clone(),
+            vote_manipulation_attempts: self.metrics.vote_manipulations,
+            execution_manipulation_attempts: self.metrics.execution_manipulations,
+            state_manipulation_attempts: self.metrics.state_manipulations,
+            proposal_execution_stats: self.metrics.proposal_execution_stats.clone(),
         }
     }
 }
@@ -344,43 +320,146 @@ pub struct DashboardView {
     pub execution_manipulation_attempts: u64,
     pub state_manipulation_attempts: u64,
     pub proposal_execution_stats: ProposalExecutionStats,
-    pub treasury_operations_stats: TreasuryStats,
+    pub treasury_stats: TreasuryStats,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct SecurityMetrics {
-    pub failed_transactions: u64,
-    pub vote_manipulations: u64,
     pub total_proposals: u64,
+    pub active_proposals: u64,
     pub total_votes: u64,
     pub unique_voters: HashSet<Pubkey>,
-    pub treasury_operations: u64,
+    pub proposal_execution_stats: ProposalExecutionStats,
+    pub treasury_operations: TreasuryStats,
+    pub failed_transactions: u64,
     pub execution_success_rate: f64,
-    pub timestamp: i64,
-    pub exploit_attempts: HashMap<String, u64>,
-    pub state_manipulations: u64,
+    pub vote_manipulations: u64,
     pub execution_manipulations: u64,
-    pub proposal_execution_times: Vec<i64>,
-    pub active_proposals: u64,
+    pub state_manipulations: u64,
+    pub timestamp: i64,
+    
+    // New security fields
+    pub exploit_attempts: HashMap<String, u64>,
+    pub unique_attackers: HashSet<Pubkey>,
+    pub anomaly_count: u64,
+    pub last_breach_attempt: Option<i64>,
+    pub high_risk_operations: Vec<RiskOperation>,
+    pub circuit_breaker_triggered: bool,
 }
 
-impl Default for SecurityMetrics {
-    fn default() -> Self {
-        Self {
-            failed_transactions: 0,
-            vote_manipulations: 0,
-            total_proposals: 0,
-            total_votes: 0,
-            unique_voters: HashSet::new(),
-            treasury_operations: 0,
-            execution_success_rate: 0.0,
-            timestamp: 0,
-            exploit_attempts: HashMap::new(),
-            state_manipulations: 0,
-            execution_manipulations: 0,
-            proposal_execution_times: Vec::new(),
-            active_proposals: 0,
+impl SecurityMetrics {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn record_execution(&mut self, success: bool, execution_time: i64) -> Result<()> {
+        if success {
+            self.proposal_execution_stats.execution_times.push(execution_time);
+            self.proposal_execution_stats.successful_executions = self.proposal_execution_stats.successful_executions
+                .checked_add(1)
+                .ok_or(ProgramError::ArithmeticOverflow)?;
+        } else {
+            self.proposal_execution_stats.failed_executions = self.proposal_execution_stats.failed_executions
+                .checked_add(1)
+                .ok_or(ProgramError::ArithmeticOverflow)?;
         }
+        
+        self.proposal_execution_stats.total_executions = self.proposal_execution_stats.total_executions
+            .checked_add(1)
+            .ok_or(ProgramError::ArithmeticOverflow)?;
+            
+        // Update average time
+        if !self.proposal_execution_stats.execution_times.is_empty() {
+            self.proposal_execution_stats.average_time = self.proposal_execution_stats.execution_times.iter()
+                .sum::<i64>() as f64 / self.proposal_execution_stats.execution_times.len() as f64;
+        }
+        
+        Ok(())
+    }
+
+    pub fn record_treasury_operation(&mut self, amount: u64, success: bool) -> Result<()> {
+        self.treasury_operations.total_operations = self.treasury_operations.total_operations
+            .checked_add(1)
+            .ok_or(ProgramError::ArithmeticOverflow)?;
+            
+        if success {
+            self.treasury_operations.successful_operations = self.treasury_operations.successful_operations
+                .checked_add(1)
+                .ok_or(ProgramError::ArithmeticOverflow)?;
+        } else {
+            self.treasury_operations.failed_operations = self.treasury_operations.failed_operations
+                .checked_add(1)
+                .ok_or(ProgramError::ArithmeticOverflow)?;
+        }
+        
+        self.treasury_operations.total_volume = self.treasury_operations.total_volume
+            .checked_add(amount)
+            .ok_or(ProgramError::ArithmeticOverflow)?;
+            
+        if amount > self.treasury_operations.largest_operation {
+            self.treasury_operations.largest_operation = amount;
+        }
+        
+        Ok(())
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        // Validate execution success rate is within bounds
+        if self.execution_success_rate < 0.0 || self.execution_success_rate > 1.0 {
+            return Err(GovernanceError::InvalidMetrics)
+                .with_context("Metrics Validation", "Invalid execution success rate");
+        }
+
+        // Check for suspicious manipulation counts
+        let total_manipulations = self.vote_manipulations
+            .checked_add(self.execution_manipulations)
+            .and_then(|sum| sum.checked_add(self.state_manipulations))
+            .ok_or(GovernanceError::ArithmeticOverflow)
+            .with_context("Metrics Validation", "Manipulation count overflow")?;
+
+        if total_manipulations > MANIPULATION_THRESHOLD * 3 {
+            msg!("Critical: High manipulation attempts detected: {}", total_manipulations);
+            self.circuit_breaker_triggered = true;
+        }
+
+        // Validate timestamp
+        let current_time = Clock::get()?.unix_timestamp;
+        if self.timestamp > current_time {
+            return Err(GovernanceError::InvalidMetrics)
+                .with_context("Metrics Validation", "Future timestamp detected");
+        }
+
+        Ok(())
+    }
+
+    pub fn record_exploit_attempt(&mut self, attack_type: &str, attacker: Pubkey) -> Result<()> {
+        let count = self.exploit_attempts
+            .entry(attack_type.to_string())
+            .or_insert(0);
+            
+        *count = count
+            .checked_add(1)
+            .ok_or(GovernanceError::ArithmeticOverflow)
+            .with_context("Exploit Recording", "Failed to increment exploit count")?;
+            
+        self.unique_attackers.insert(attacker);
+        self.anomaly_count = self.anomaly_count
+            .checked_add(1)
+            .ok_or(GovernanceError::ArithmeticOverflow)
+            .with_context("Exploit Recording", "Failed to increment anomaly count")?;
+            
+        self.last_breach_attempt = Some(Clock::get()?.unix_timestamp);
+        
+        // Record high risk operation
+        self.high_risk_operations.push(RiskOperation {
+            timestamp: Clock::get()?.unix_timestamp,
+            operation_type: attack_type.to_string(),
+            risk_level: AlertLevel::Critical,
+            affected_accounts: vec![attacker],
+            transaction_signature: None,
+        });
+        
+        Ok(())
     }
 }
 
@@ -422,13 +501,16 @@ impl Default for SecuritySummary {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct MetricsView {
     pub active_proposals: u64,
     pub execution_success_rate: f64,
     pub failed_transactions: u64,
-    pub proposal_execution_stats: ProposalExecutionStats,
     pub treasury_stats: TreasuryStats,
+    pub vote_manipulation_attempts: u64,
+    pub execution_manipulation_attempts: u64,
+    pub state_manipulation_attempts: u64,
+    pub proposal_execution_stats: ProposalExecutionStats,
 }
 
 impl Default for MetricsView {
@@ -437,8 +519,11 @@ impl Default for MetricsView {
             active_proposals: 0,
             execution_success_rate: 0.0,
             failed_transactions: 0,
-            proposal_execution_stats: ProposalExecutionStats::default(),
             treasury_stats: TreasuryStats::default(),
+            vote_manipulation_attempts: 0,
+            execution_manipulation_attempts: 0,
+            state_manipulation_attempts: 0,
+            proposal_execution_stats: ProposalExecutionStats::default(),
         }
     }
 }
@@ -449,37 +534,45 @@ impl MetricsView {
             active_proposals: metrics.active_proposals,
             execution_success_rate: metrics.execution_success_rate,
             failed_transactions: metrics.failed_transactions,
-            proposal_execution_stats: ProposalExecutionStats {
-                total_executed: metrics.proposal_execution_stats.total_executed,
-                successful_executions: metrics.proposal_execution_stats.successful_executions,
-                failed_executions: metrics.proposal_execution_stats.failed_executions,
-                average_execution_time: metrics.proposal_execution_stats.average_execution_time,
-            },
-            treasury_stats: TreasuryStats {
-                total_operations: metrics.treasury_operations_stats.total_operations,
-                successful_operations: metrics.treasury_operations_stats.successful_operations,
-                failed_operations: metrics.treasury_operations_stats.failed_operations,
-                total_volume: metrics.treasury_operations_stats.total_volume,
-            },
+            treasury_stats: metrics.treasury_operations.clone(),
+            vote_manipulation_attempts: metrics.vote_manipulations,
+            execution_manipulation_attempts: metrics.execution_manipulations,
+            state_manipulation_attempts: metrics.state_manipulations,
+            proposal_execution_stats: metrics.proposal_execution_stats.clone(),
         }
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct ProposalExecutionStats {
-    pub total_executed: u64,
+    pub total_executions: u64,
     pub successful_executions: u64,
     pub failed_executions: u64,
-    pub average_execution_time: f64,
+    pub average_time: f64,
+    pub max_time: i64,
+    pub min_time: i64,
+    pub execution_times: Vec<i64>,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct TreasuryStats {
     pub total_operations: u64,
     pub successful_operations: u64,
     pub failed_operations: u64,
     pub total_volume: u64,
+    pub largest_operation: u64,
+    pub operation_distribution: HashMap<String, u64>,
 }
 
-const FAILED_TX_THRESHOLD: u64 = 100;
-const MANIPULATION_THRESHOLD: u64 = 10; 
+#[derive(Debug, Clone)]
+pub struct RiskOperation {
+    pub timestamp: i64,
+    pub operation_type: String,
+    pub risk_level: AlertLevel,
+    pub affected_accounts: Vec<Pubkey>,
+    pub transaction_signature: Option<String>,
+}
+
+const FAILED_TX_THRESHOLD: u64 = 10;
+const MANIPULATION_THRESHOLD: u64 = 5; 
+const MANIPULATION_THRESHOLD: u64 = 5; 

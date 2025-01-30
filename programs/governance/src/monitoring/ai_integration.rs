@@ -1,4 +1,8 @@
-use serde::{Serialize, Deserialize};
+use anchor_lang::prelude::*;
+use crate::error::{GovernanceError, Result};
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use std::collections::HashMap;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 
@@ -44,19 +48,107 @@ pub struct TestRecommendation {
     pub resource_requirements: HashMap<String, u64>,
 }
 
+#[derive(Debug)]
 pub struct GroqAIIntegration {
-    client: reqwest::Client,
+    client: Client,
     api_key: String,
+    base_url: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AIAnalysisRequest {
+    pub transaction_data: String,
+    pub context: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AIAnalysisResponse {
+    pub risk_score: f64,
+    pub findings: Vec<String>,
+    pub recommendations: Vec<String>,
 }
 
 impl GroqAIIntegration {
-    pub async fn new(api_key: String) -> Result<Self, Box<dyn std::error::Error>> {
-        let client = reqwest::Client::new();
-        
+    pub fn new(api_key: String) -> Result<Self> {
+        let client = Client::builder()
+            .timeout(Duration::from_secs(30))
+            .build()
+            .map_err(|_| GovernanceError::ClientError)?;
+
         Ok(Self {
             client,
             api_key,
+            base_url: "https://api.groq.com/v1".to_string(),
         })
+    }
+
+    pub async fn analyze_transaction(&self, tx_data: &str) -> Result<AIAnalysisResponse> {
+        let request = AIAnalysisRequest {
+            transaction_data: tx_data.to_string(),
+            context: "governance_analysis".to_string(),
+        };
+
+        let response = self.client
+            .post(&format!("{}/analyze", self.base_url))
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .json(&request)
+            .send()
+            .await
+            .map_err(|_| GovernanceError::ClientError)?;
+
+        if !response.status().is_success() {
+            return Err(GovernanceError::ClientError);
+        }
+
+        response.json::<AIAnalysisResponse>()
+            .await
+            .map_err(|_| GovernanceError::ClientError)
+    }
+
+    pub async fn detect_anomalies(&self, metrics: &str) -> Result<Vec<String>> {
+        let request = AIAnalysisRequest {
+            transaction_data: metrics.to_string(),
+            context: "anomaly_detection".to_string(),
+        };
+
+        let response = self.client
+            .post(&format!("{}/detect_anomalies", self.base_url))
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .json(&request)
+            .send()
+            .await
+            .map_err(|_| GovernanceError::ClientError)?;
+
+        if !response.status().is_success() {
+            return Err(GovernanceError::ClientError);
+        }
+
+        response.json::<Vec<String>>()
+            .await
+            .map_err(|_| GovernanceError::ClientError)
+    }
+
+    pub async fn get_security_recommendations(&self, context: &str) -> Result<Vec<String>> {
+        let request = AIAnalysisRequest {
+            transaction_data: "".to_string(),
+            context: context.to_string(),
+        };
+
+        let response = self.client
+            .post(&format!("{}/recommendations", self.base_url))
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .json(&request)
+            .send()
+            .await
+            .map_err(|_| GovernanceError::ClientError)?;
+
+        if !response.status().is_success() {
+            return Err(GovernanceError::ClientError);
+        }
+
+        response.json::<Vec<String>>()
+            .await
+            .map_err(|_| GovernanceError::ClientError)
     }
 
     pub async fn get_test_recommendation(
