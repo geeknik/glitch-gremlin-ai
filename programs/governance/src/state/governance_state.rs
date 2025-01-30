@@ -1,80 +1,41 @@
-use solana_program::pubkey::Pubkey;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use super::governance::{Proposal, ProposalStatus, ProposalAction, GovernanceParams, VoteRecord};
-use anchor_lang::prelude::*;
+use {
+    anchor_lang::prelude::*,
+    std::collections::HashMap,
+    crate::error::GovernanceError,
+    crate::state::proposal::{Proposal, ProposalStatus, ProposalAction, VoteRecord},
+    crate::state::governance::GovernanceParams,
+};
 
 /// Governance metrics and state
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct GovernanceMetrics {
-    pub total_staked: u64,        // 8.5M in the example
-    pub staker_count: u32,        // 2,456 in the example
-    pub active_proposals: u32,    // 7 in the example
-    pub total_proposals: u32,
-    pub treasury_balance: u64,    // 2.1M in the example
-    pub total_votes_cast: u64,
-    pub unique_voters: u32,
-    pub quorum_percentage: u8,    // 15% in the example
+    pub total_stake: u64,
+    pub active_stake: u64,
+    pub total_proposals: u64,
+    pub active_proposals: u64,
+    pub total_votes: u64,
+    pub unique_voters: u64,
+    pub quorum_percentage: u8,
+    pub approval_threshold: u8,
+    pub treasury_balance: u64,
+    pub chaos_events: u64,
 }
 
 impl Default for GovernanceMetrics {
     fn default() -> Self {
         Self {
-            total_staked: 0,
-            staker_count: 0,
-            active_proposals: 0,
+            total_stake: 0,
+            active_stake: 0,
             total_proposals: 0,
-            treasury_balance: 0,
-            total_votes_cast: 0,
+            active_proposals: 0,
+            total_votes: 0,
             unique_voters: 0,
-            quorum_percentage: 10,
+            quorum_percentage: 0,
+            approval_threshold: 0,
+            treasury_balance: 0,
+            chaos_events: 0,
         }
     }
-}
-
-/// Active proposal information
-#[derive(Debug)]
-pub struct Proposal {
-    pub id: u64,
-    pub proposer: Pubkey,
-    pub title: String,
-    pub description: String,
-    pub action: ProposalAction,
-    pub status: ProposalStatus,
-    pub created_at: i64,
-    pub voting_ends_at: i64,
-    pub executed_at: Option<i64>,
-    pub yes_votes: u64,
-    pub no_votes: u64,
-    pub vote_records: HashMap<Pubkey, VoteRecord>,
-    pub category: String,
-    pub time_remaining: i64,
-    pub min_stake: u64,
-    pub votes: u64,
-    pub quorum_progress: u8,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ProposalCategory {
-    ProtocolParameter,
-    ChaosTestCampaign,
-    Treasury,
-    Governance,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ProposalStatus {
-    Active,
-    Ended,
-    Executed,
-    Cancelled,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VoteCount {
-    pub yes: u64,
-    pub no: u64,
-    pub abstain: u64,
 }
 
 /// Governance state manager
@@ -86,8 +47,8 @@ pub struct GovernanceState {
     pub params: GovernanceParams,
     pub metrics: GovernanceMetrics,
     pub proposals: HashMap<Pubkey, Proposal>,
-    pub vote_records: HashMap<Pubkey, VoteRecord>,
-    pub last_proposal_id: u64,
+    pub emergency_halt_active: bool,
+    pub last_metrics_update: i64,
 }
 
 impl GovernanceState {
@@ -96,11 +57,11 @@ impl GovernanceState {
         8 + // discriminator
         1 + // is_initialized
         32 + // authority
-        std::mem::size_of::<GovernanceParams>() +
-        std::mem::size_of::<GovernanceMetrics>() +
-        // Proposals and vote records are stored in separate accounts
-        8 + // last_proposal_id
-        256 // padding for future upgrades
+        200 + // params (approximate)
+        200 + // metrics (approximate)
+        1000 + // proposals (approximate)
+        1 + // emergency_halt_active
+        8 // last_metrics_update
     }
 
     pub fn new(authority: Pubkey) -> Self {
@@ -110,28 +71,78 @@ impl GovernanceState {
             params: GovernanceParams::default(),
             metrics: GovernanceMetrics::default(),
             proposals: HashMap::new(),
-            vote_records: HashMap::new(),
-            last_proposal_id: 0,
+            emergency_halt_active: false,
+            last_metrics_update: 0,
         }
     }
 
+    pub fn is_halted(&self) -> bool {
+        self.emergency_halt_active
+    }
+
     pub fn update_metrics(&mut self) -> Result<()> {
-        let mut metrics = GovernanceMetrics::default();
+        let clock = Clock::get()?;
+        
+        // Update metrics only if enough time has passed
+        if clock.unix_timestamp - self.last_metrics_update < 60 {
+            return Ok(());
+        }
 
-        // Update proposal counts
-        metrics.total_proposals = self.proposals.len() as u32;
-        metrics.active_proposals = self.proposals.values()
+        self.metrics.active_proposals = self.proposals.values()
             .filter(|p| matches!(p.status, ProposalStatus::Active))
-            .count() as u32;
+            .count() as u64;
 
-        // Update vote metrics
-        metrics.total_votes_cast = self.vote_records.len() as u64;
-        metrics.unique_voters = self.vote_records.values()
-            .map(|v| v.voter)
+        self.metrics.total_votes = self.proposals.values()
+            .map(|p| p.votes.len() as u64)
+            .sum();
+
+        self.metrics.unique_voters = self.proposals.values()
+            .flat_map(|p| p.votes.keys())
             .collect::<std::collections::HashSet<_>>()
-            .len() as u32;
+            .len() as u64;
 
-        self.metrics = metrics;
+        self.last_metrics_update = clock.unix_timestamp;
+        Ok(())
+    }
+
+    pub fn get_proposal(&self, key: &Pubkey) -> Result<&Proposal> {
+        self.proposals.get(key)
+            .ok_or_else(|| error!(GovernanceError::ProposalNotFound))
+    }
+
+    pub fn get_proposal_mut(&mut self, key: &Pubkey) -> Result<&mut Proposal> {
+        self.proposals.get_mut(key)
+            .ok_or_else(|| error!(GovernanceError::ProposalNotFound))
+    }
+
+    pub fn has_active_votes(&self, voter: &Pubkey) -> bool {
+        self.proposals.values()
+            .any(|p| p.status == ProposalStatus::Active && p.votes.contains_key(voter))
+    }
+
+    pub fn validate_proposal_parameters(
+        &self,
+        voting_period: i64,
+        execution_delay: u64,
+        quorum: u8,
+        threshold: u8,
+    ) -> Result<()> {
+        require!(
+            voting_period >= self.params.min_voting_period && 
+            voting_period <= self.params.max_voting_period,
+            GovernanceError::InvalidVotingPeriod
+        );
+
+        require!(
+            quorum >= self.params.min_quorum && quorum <= 100,
+            GovernanceError::InvalidQuorum
+        );
+
+        require!(
+            threshold >= self.params.min_threshold && threshold <= 100,
+            GovernanceError::InvalidThreshold
+        );
+
         Ok(())
     }
 
@@ -175,48 +186,34 @@ impl GovernanceState {
     pub fn create_proposal(
         &mut self,
         proposer: Pubkey,
-        title: String,
         description: String,
+        link: Option<String>,
         action: ProposalAction,
+        voting_ends_at: i64,
+        execution_delay: u64,
     ) -> Result<Pubkey> {
-        require!(
-            self.is_initialized,
-            ErrorCode::UninitializedAccount
-        );
+        require!(self.is_initialized, GovernanceError::UninitializedAccount);
 
-        let proposal_id = self.last_proposal_id.checked_add(1)
-            .ok_or(ErrorCode::ArithmeticError)?;
-
-        let proposal = Proposal {
-            id: proposal_id,
+        let proposal = Proposal::new(
             proposer,
-            title,
             description,
+            link,
+            execution_delay,
             action,
-            status: ProposalStatus::Draft,
-            created_at: Clock::get()?.unix_timestamp,
-            voting_ends_at: 0, // Set when activated
-            executed_at: None,
-            yes_votes: 0,
-            no_votes: 0,
-            vote_records: HashMap::new(),
-            category: String::new(),
-            time_remaining: 0,
-            min_stake: 0,
-            votes: 0,
-            quorum_progress: 0,
-        };
+            voting_ends_at,
+        );
 
         let proposal_address = Pubkey::find_program_address(
             &[
                 b"proposal".as_ref(),
-                proposal_id.to_le_bytes().as_ref(),
+                proposal.created_at.to_le_bytes().as_ref(),
+                proposer.as_ref(),
             ],
             &crate::ID,
         ).0;
 
         self.proposals.insert(proposal_address, proposal);
-        self.last_proposal_id = proposal_id;
+        self.metrics.total_proposals = self.metrics.total_proposals.saturating_add(1);
         
         Ok(proposal_address)
     }
@@ -248,43 +245,45 @@ impl GovernanceState {
         &mut self,
         proposal_address: Pubkey,
         voter: Pubkey,
-        side: bool,
-        voting_power: u64,
+        vote: bool,
+        stake_weight: u64,
     ) -> Result<()> {
-        let proposal = self.proposals.get_mut(&proposal_address)
-            .ok_or(ErrorCode::ProposalNotFound)?;
+        let proposal = self.get_proposal_mut(&proposal_address)?;
 
         require!(
-            proposal.status == ProposalStatus::Active,
-            ErrorCode::InvalidProposalState
+            proposal.is_active(),
+            GovernanceError::InvalidProposalState
+        );
+
+        require!(
+            !proposal.votes.contains_key(&voter),
+            GovernanceError::AlreadyVoted
         );
 
         let now = Clock::get()?.unix_timestamp;
         require!(
             now <= proposal.voting_ends_at,
-            ErrorCode::VotingEnded
+            GovernanceError::VotingPeriodEnded
         );
 
         let vote_record = VoteRecord::new(
             voter,
-            proposal_address,
-            side,
-            voting_power,
+            vote,
+            stake_weight,
             now,
         );
 
-        if side {
-            proposal.yes_votes = proposal.yes_votes.checked_add(voting_power)
-                .ok_or(ErrorCode::ArithmeticError)?;
+        if vote {
+            proposal.for_votes = proposal.for_votes.checked_add(stake_weight)
+                .ok_or_else(|| error!(GovernanceError::ArithmeticOverflow))?;
         } else {
-            proposal.no_votes = proposal.no_votes.checked_add(voting_power)
-                .ok_or(ErrorCode::ArithmeticError)?;
+            proposal.against_votes = proposal.against_votes.checked_add(stake_weight)
+                .ok_or_else(|| error!(GovernanceError::ArithmeticOverflow))?;
         }
 
-        proposal.vote_records.insert(voter, vote_record.clone());
-        self.vote_records.insert(voter, vote_record);
-
+        proposal.votes.insert(voter, vote_record);
         self.update_metrics()?;
+
         Ok(())
     }
 

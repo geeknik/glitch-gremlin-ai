@@ -15,6 +15,32 @@ pub use stake_account::*;
 pub mod governance;
 pub mod governance_state;
 pub mod stake_account;
+pub mod proposal;
+
+// Re-export specific types with clear namespacing
+pub use proposal::{
+    Proposal,
+    ProposalStatus,
+    ProposalAction,
+    VoteRecord,
+};
+
+pub use governance_state::{
+    GovernanceMetrics,
+    GovernanceState,
+};
+
+pub use governance::{
+    GovernanceParams,
+    ProposalVotingState,
+    ProposalMetadata,
+};
+
+pub use stake_account::{
+    StakeAccount,
+    StakeOperation,
+    StakeOperationType,
+};
 
 // Common types used across modules
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -66,47 +92,6 @@ pub struct VoteMetadata {
 }
 
 #[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct Proposal {
-    pub is_initialized: bool,
-    pub proposal_id: u64,
-    pub proposer: Pubkey,
-    pub title: String,
-    pub description: String,
-    pub state: ProposalState,
-    pub start_time: i64,
-    pub end_time: i64,
-    pub execution_time: Option<i64>,
-    pub total_yes_votes: u64,
-    pub total_no_votes: u64,
-    pub total_abstain_votes: u64,
-    pub executed: bool,
-    pub votes: HashMap<Pubkey, Vote>,
-    pub execution_params: Option<ProposalExecutionParams>,
-    pub metadata: Option<ProposalMetadata>,
-    pub quorum_votes: u64,
-    pub vote_threshold: u64,
-    pub vote_tipping: VoteTipping,
-    pub max_voting_time: i64,
-    pub vote_weight_source: VoteWeightSource,
-    pub max_options: u8,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, AnchorSerialize, AnchorDeserialize)]
-pub enum VoteTipping {
-    Strict,           // Requires full voting period
-    Early,           // Can pass early if threshold met
-    Disabled,        // No early tipping
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, AnchorSerialize, AnchorDeserialize)]
-pub enum VoteWeightSource {
-    Deposit,         // Token deposit
-    Snapshot,        // Token snapshot
-    LockedTokens,    // Locked token balance
-    NFT,            // NFT voting power
-}
-
-#[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct ProposalExecutionParams {
     pub instruction_data: Vec<u8>,
     pub program_id: Pubkey,
@@ -120,17 +105,6 @@ pub struct ProposalAccountMeta {
     pub pubkey: Pubkey,
     pub is_signer: bool,
     pub is_writable: bool,
-}
-
-#[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct ProposalMetadata {
-    pub title: String,
-    pub description: String,
-    pub link: Option<String>,
-    pub category: String,
-    pub tags: Vec<String>,
-    pub created_at: i64,
-    pub updated_at: i64,
 }
 
 #[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
@@ -225,8 +199,9 @@ pub struct GovernanceConfig {
     pub vote_threshold: u64,
     pub min_voting_period: i64,
     pub max_voting_period: i64,
-    pub execution_delay: i64,
-    pub grace_period: i64,
+    pub quorum_percentage: u8,
+    pub approval_threshold: u8,
+    pub chaos_params: ChaosParams,
 }
 
 impl Default for GovernanceConfig {
@@ -237,8 +212,9 @@ impl Default for GovernanceConfig {
             vote_threshold: 100_000_000, // 0.1 SOL
             min_voting_period: 24 * 60 * 60, // 1 day
             max_voting_period: 7 * 24 * 60 * 60, // 7 days
-            execution_delay: 24 * 60 * 60, // 1 day
-            grace_period: 3 * 24 * 60 * 60, // 3 days
+            quorum_percentage: 10,
+            approval_threshold: 60,
+            chaos_params: ChaosParams::default(),
         }
     }
 }
@@ -267,4 +243,26 @@ impl IsInitialized for Proposal {
     fn is_initialized(&self) -> bool {
         self.is_initialized
     }
+}
+
+#[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
+pub enum DefenseLevel {
+    Low,
+    Medium,
+    High,
+    Critical
+}
+
+#[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
+pub struct ProposalState {
+    pub created_at: i64,
+    pub executed_at: Option<i64>,
+    pub canceled_at: Option<i64>,
+    pub voting_ends_at: i64,
+    pub execution_delay: u64,
+    pub for_votes: u64,
+    pub against_votes: u64,
+    pub status: GovernanceProposalStatus,
+    pub quorum_achieved: bool,
+    pub threshold_achieved: bool,
 } 
