@@ -1,5 +1,6 @@
 use {
     anchor_lang::prelude::*,
+    borsh::{BorshDeserialize, BorshSerialize},
     std::collections::HashMap,
     crate::error::GovernanceError,
     crate::state::proposal::{Proposal, ProposalStatus, ProposalAction, VoteRecord},
@@ -16,7 +17,7 @@ use {
 };
 
 /// Governance metrics and state
-#[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
+#[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize, BorshSerialize, BorshDeserialize)]
 pub struct GovernanceMetrics {
     pub total_stake: u64,
     pub active_stake: u64,
