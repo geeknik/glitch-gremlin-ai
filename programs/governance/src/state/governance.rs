@@ -1,148 +1,161 @@
 use anchor_lang::prelude::*;
 use solana_program::pubkey::Pubkey;
+use std::collections::HashMap;
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+#[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct GovernanceParams {
     pub min_stake_to_propose: u64,
     pub min_stake_to_vote: u64,
-    pub min_voting_period: i64,
-    pub max_voting_period: i64,
-    pub quorum_percentage: u8,
-    pub approval_threshold_percentage: u8,
-    pub proposal_rate_limit: u64,
-    pub proposal_rate_window: i64,
+    pub voting_delay: i64,
+    pub voting_period: i64,
+    pub quorum_votes: u64,
+    pub timelock_delay: i64,
+    pub proposal_threshold: u64,
+    pub vote_threshold: u64,
 }
 
 impl Default for GovernanceParams {
     fn default() -> Self {
         Self {
-            min_stake_to_propose: 1_000_000_000, // 1 SOL
-            min_stake_to_vote: 100_000_000,      // 0.1 SOL
-            min_voting_period: 24 * 60 * 60,     // 1 day
-            max_voting_period: 7 * 24 * 60 * 60, // 7 days
-            quorum_percentage: 10,               // 10%
-            approval_threshold_percentage: 60,    // 60%
-            proposal_rate_limit: 5,              // 5 proposals
-            proposal_rate_window: 24 * 60 * 60,  // per day
+            min_stake_to_propose: 1000,
+            min_stake_to_vote: 100,
+            voting_delay: 0,
+            voting_period: 302400, // ~3.5 days
+            quorum_votes: 4_000_000,
+            timelock_delay: 172800, // 2 days
+            proposal_threshold: 100_000,
+            vote_threshold: 400_000,
         }
     }
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+#[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
 pub enum ProposalAction {
-    UpdateGovernanceParams(GovernanceParams),
-    UpdateAuthority(Pubkey),
-    UpdateTreasuryAuthority(Pubkey),
-    EmergencyHalt,
-    ResumeOperation,
-    Custom(Vec<u8>),
+    UpgradeProgram {
+        program_id: Pubkey,
+        buffer: Pubkey,
+    },
+    ModifyParams {
+        param_name: String,
+        new_value: u64,
+    },
+    TransferTokens {
+        token_mint: Pubkey,
+        recipient: Pubkey,
+        amount: u64,
+    },
+    Custom {
+        instruction_data: Vec<u8>,
+    },
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, AnchorSerialize, AnchorDeserialize)]
 pub enum ProposalStatus {
     Draft,
     Active,
+    Canceled,
+    Defeated,
     Succeeded,
-    Failed,
+    Queued,
+    Expired,
     Executed,
-    Cancelled,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+#[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct ProposalMetadata {
     pub title: String,
     pub description: String,
     pub link: Option<String>,
-    pub created_at: i64,
-    pub updated_at: i64,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+#[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct VoteRecord {
     pub voter: Pubkey,
     pub proposal: Pubkey,
-    pub vote_weight: u64,
-    pub side: bool, // true for yes, false for no
+    pub side: bool,
+    pub voting_power: u64,
     pub timestamp: i64,
 }
 
 impl VoteRecord {
-    pub fn new(voter: Pubkey, proposal: Pubkey, vote_weight: u64, side: bool, timestamp: i64) -> Self {
+    pub fn new(
+        voter: Pubkey,
+        proposal: Pubkey,
+        side: bool,
+        voting_power: u64,
+        timestamp: i64,
+    ) -> Self {
         Self {
             voter,
             proposal,
-            vote_weight,
             side,
+            voting_power,
             timestamp,
         }
     }
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+#[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct ProposalVotingState {
     pub yes_votes: u64,
     pub no_votes: u64,
     pub abstain_votes: u64,
-    pub total_eligible_votes: u64,
-    pub quorum_achieved: bool,
+    pub vote_records: HashMap<Pubkey, VoteRecord>,
+    pub quorum_reached: bool,
     pub vote_end_time: i64,
 }
 
 impl ProposalVotingState {
-    pub fn new(total_eligible_votes: u64, vote_end_time: i64) -> Self {
+    pub fn new(vote_end_time: i64) -> Self {
         Self {
             yes_votes: 0,
             no_votes: 0,
             abstain_votes: 0,
-            total_eligible_votes,
-            quorum_achieved: false,
+            vote_records: HashMap::new(),
+            quorum_reached: false,
             vote_end_time,
         }
     }
 
-    pub fn add_vote(&mut self, weight: u64, side: bool) {
-        if side {
-            self.yes_votes = self.yes_votes.saturating_add(weight);
+    pub fn add_vote(&mut self, vote_record: VoteRecord) -> Result<()> {
+        if self.vote_records.contains_key(&vote_record.voter) {
+            return Err(error!(ErrorCode::AlreadyVoted));
+        }
+
+        if vote_record.side {
+            self.yes_votes = self.yes_votes.checked_add(vote_record.voting_power)
+                .ok_or(ErrorCode::ArithmeticError)?;
         } else {
-            self.no_votes = self.no_votes.saturating_add(weight);
+            self.no_votes = self.no_votes.checked_add(vote_record.voting_power)
+                .ok_or(ErrorCode::ArithmeticError)?;
         }
+
+        self.vote_records.insert(vote_record.voter, vote_record);
+        Ok(())
     }
 
-    pub fn remove_vote(&mut self, weight: u64, side: bool) {
-        if side {
-            self.yes_votes = self.yes_votes.saturating_sub(weight);
+    pub fn remove_vote(&mut self, voter: &Pubkey) -> Result<()> {
+        let vote_record = self.vote_records.remove(voter)
+            .ok_or(ErrorCode::VoteNotFound)?;
+
+        if vote_record.side {
+            self.yes_votes = self.yes_votes.checked_sub(vote_record.voting_power)
+                .ok_or(ErrorCode::ArithmeticError)?;
         } else {
-            self.no_votes = self.no_votes.saturating_sub(weight);
-        }
-    }
-
-    pub fn total_votes_cast(&self) -> u64 {
-        self.yes_votes.saturating_add(self.no_votes).saturating_add(self.abstain_votes)
-    }
-
-    pub fn has_reached_quorum(&self, quorum_percentage: u8) -> bool {
-        let quorum_threshold = (self.total_eligible_votes as u128)
-            .saturating_mul(quorum_percentage as u128)
-            .saturating_div(100)
-            as u64;
-        self.total_votes_cast() >= quorum_threshold
-    }
-
-    pub fn has_passed(&self, approval_threshold_percentage: u8) -> bool {
-        if self.total_votes_cast() == 0 {
-            return false;
+            self.no_votes = self.no_votes.checked_sub(vote_record.voting_power)
+                .ok_or(ErrorCode::ArithmeticError)?;
         }
 
-        let total_decisive_votes = self.yes_votes.saturating_add(self.no_votes);
-        if total_decisive_votes == 0 {
-            return false;
-        }
+        Ok(())
+    }
 
-        let approval_threshold = (total_decisive_votes as u128)
-            .saturating_mul(approval_threshold_percentage as u128)
-            .saturating_div(100)
-            as u64;
+    pub fn has_quorum(&self, quorum_votes: u64) -> bool {
+        self.yes_votes.checked_add(self.no_votes)
+            .map(|total| total >= quorum_votes)
+            .unwrap_or(false)
+    }
 
-        self.yes_votes >= approval_threshold
+    pub fn has_passed(&self, vote_threshold: u64) -> bool {
+        self.yes_votes >= vote_threshold
     }
 } 

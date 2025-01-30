@@ -12,12 +12,17 @@ use solana_program::{
 use std::str::FromStr;
 use std::collections::HashMap;
 
-pub mod chaos;
-pub mod monitoring;
-pub mod state;
 pub mod error;
+pub mod state;
 
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+use error::GovernanceError;
+use state::{
+    GovernanceParams, ProposalAction, ProposalStatus,
+    GovernanceMetrics, GovernanceState, StakeAccount,
+    StakeOperation, StakeOperationType,
+};
+
+declare_id!("Governance1111111111111111111111111111111111");
 
 // Constants for PDA seeds and rate limiting
 pub const GOVERNANCE_SEED: &[u8] = b"governance";
@@ -58,41 +63,12 @@ pub struct EmergencyActionEvent {
 }
 
 #[program]
-pub mod governance {
+pub mod glitch_gremlin_governance {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>, config: GovernanceConfig) -> Result<()> {
-        require!(
-            config.quorum_percentage <= 100 && 
-            config.approval_threshold_percentage <= 100 &&
-            config.proposal_rate_limit > 0,
-            GovernanceError::InvalidConfigParameters
-        );
-
+    pub fn initialize(ctx: Context<Initialize>, authority: Pubkey) -> Result<()> {
         let governance = &mut ctx.accounts.governance;
-        governance.config = config;
-        governance.total_proposals = 0;
-        governance.total_staked = 0;
-        governance.treasury_balance = 0;
-        governance.is_initialized = true;
-        governance.authority = ctx.accounts.authority.key();
-        governance.last_proposal_time = 0;
-        governance.proposal_count_window = 0;
-        
-        // Initialize treasury PDA
-        let (treasury_pda, treasury_bump) = Pubkey::find_program_address(
-            &[TREASURY_SEED],
-            ctx.program_id
-        );
-        governance.treasury = treasury_pda;
-        governance.treasury_bump = treasury_bump;
-
-        emit!(GovernanceInitializedEvent {
-            authority: governance.authority,
-            config: governance.config,
-            timestamp: Clock::get()?.unix_timestamp,
-        });
-
+        *governance = GovernanceState::new(authority);
         Ok(())
     }
 
@@ -547,18 +523,10 @@ pub struct ProposalExecutedEvent {
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
-    #[account(
-        init,
-        payer = payer,
-        space = 8 + std::mem::size_of::<GovernanceState>(),
-        seeds = [GOVERNANCE_SEED],
-        bump
-    )]
+    #[account(init, payer = payer, space = GovernanceState::space())]
     pub governance: Account<'info, GovernanceState>,
     #[account(mut)]
     pub payer: Signer<'info>,
-    /// CHECK: This is the authority that will control governance upgrades
-    pub authority: AccountInfo<'info>,
     pub system_program: Program<'info, System>,
 }
 
