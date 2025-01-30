@@ -772,6 +772,21 @@ pub struct ChaosParameters {
     pub requires_treasury_funding: bool,
     pub treasury_amount: u64,
     pub max_duration: i64,
+    pub defense_level: DefenseLevel,
+    pub rate_limit: u32,
+    pub concurrent_tests: u8,
+}
+
+impl ChaosParameters {
+    pub fn validate(&self) -> Result<()> {
+        require!(self.max_duration > 0, GovernanceError::InvalidVotingPeriod);
+        require!(
+            !self.requires_treasury_funding || self.treasury_amount > 0,
+            GovernanceError::TreasuryExploit
+        );
+        require!(self.concurrent_tests > 0, GovernanceError::InvalidRateLimit);
+        Ok(())
+    }
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq)]
@@ -781,19 +796,6 @@ pub enum ChaosType {
     SecurityAudit,
     ConcurrencyTest,
     CustomScenario,
-}
-
-impl ChaosParameters {
-    pub fn is_valid(&self) -> bool {
-        // Basic validation logic - can be expanded based on specific requirements
-        if self.requires_treasury_funding && self.treasury_amount == 0 {
-            return false;
-        }
-        if self.max_duration <= 0 {
-            return false;
-        }
-        true
-    }
 }
 
 impl GovernanceState {

@@ -2,6 +2,9 @@ use solana_program::pubkey::Pubkey;
 use thiserror::Error;
 use std::collections::{HashSet, HashMap};
 use chrono::{DateTime, Utc};
+use anchor_lang::prelude::*;
+use crate::error::GovernanceError;
+use super::chaos_types::{ChaosType, ResourceUsage};
 
 #[derive(Error, Debug)]
 pub enum GovernanceError {
@@ -534,4 +537,222 @@ pub enum GovernanceOperation {
         signers: Vec<Pubkey>,
         required_signers: usize,
     },
+}
+
+pub struct GovernanceSecurityChecker {
+    recent_proposals: HashSet<Pubkey>,
+    recent_votes: HashSet<(Pubkey, Pubkey)>, // (voter, proposal)
+    blocked_addresses: HashSet<Pubkey>,
+    last_check_timestamp: i64,
+}
+
+impl GovernanceSecurityChecker {
+    pub fn new() -> Self {
+        Self {
+            recent_proposals: HashSet::new(),
+            recent_votes: HashSet::new(),
+            blocked_addresses: HashSet::new(),
+            last_check_timestamp: 0,
+        }
+    }
+
+    pub fn check_proposal_security(
+        &mut self,
+        proposer: &Pubkey,
+        chaos_type: &ChaosType,
+        clock: &Clock,
+    ) -> Result<()> {
+        // Rate limiting
+        self.clean_old_records(clock.unix_timestamp);
+        
+        require!(
+            !self.blocked_addresses.contains(proposer),
+            GovernanceError::GovernanceTakeover
+        );
+
+        require!(
+            !self.recent_proposals.contains(proposer),
+            GovernanceError::ProposalSpam
+        );
+
+        // Check for specific attack patterns
+        match chaos_type {
+            ChaosType::FlashLoanProbe { .. } => {
+                self.check_flash_loan_attack(chaos_type)?;
+            },
+            ChaosType::QuorumManipulation { .. } => {
+                self.check_quorum_manipulation(chaos_type)?;
+            },
+            ChaosType::TimelockBypass { .. } => {
+                self.check_timelock_bypass(chaos_type, clock)?;
+            },
+            _ => {},
+        }
+
+        // Record the proposal
+        self.recent_proposals.insert(*proposer);
+        self.last_check_timestamp = clock.unix_timestamp;
+
+        Ok(())
+    }
+
+    fn check_flash_loan_attack(&self, chaos_type: &ChaosType) -> Result<()> {
+        if let ChaosType::FlashLoanProbe { amount, token_mint } = chaos_type {
+            // Check for suspicious token movement patterns
+            let threshold = 1_000_000; // 1M tokens
+            
+            if *amount > threshold {
+                msg!("Large token movement detected: {} tokens", amount);
+                return Err(GovernanceError::FlashLoanAttack(
+                    "Token amount exceeds flash loan threshold".to_string()
+                ));
+            }
+
+            // Check for rapid token mint interactions
+            if self.recent_proposals.iter().any(|p| {
+                if let ChaosType::FlashLoanProbe { token_mint: recent_mint, .. } = chaos_type {
+                    recent_mint == token_mint
+                } else {
+                    false
+                }
+            }) {
+                return Err(GovernanceError::FlashLoanAttack(
+                    "Multiple flash loan attempts on same token mint".to_string()
+                ));
+            }
+
+            // Verify token mint is not blacklisted
+            if self.blocked_addresses.contains(token_mint) {
+                return Err(GovernanceError::FlashLoanAttack(
+                    "Token mint is blacklisted".to_string()
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn check_quorum_manipulation(&self, chaos_type: &ChaosType) -> Result<()> {
+        if let ChaosType::QuorumManipulation { target_percentage, stake_simulation } = chaos_type {
+            // Check for suspicious voting patterns
+            let total_recent_votes = self.recent_votes.len() as u64;
+            let unique_voters = self.recent_votes.iter()
+                .map(|(voter, _)| voter)
+                .collect::<HashSet<_>>()
+                .len() as u64;
+
+            // Detect potential sybil attacks
+            if total_recent_votes > 0 && unique_voters < total_recent_votes / 3 {
+                return Err(GovernanceError::QuorumManipulation(
+                    "Suspicious voting pattern detected: low unique voter ratio".to_string()
+                ));
+            }
+
+            // Check for rapid stake changes
+            if *stake_simulation > 1_000_000 { // 1M tokens
+                return Err(GovernanceError::QuorumManipulation(
+                    "Large stake change detected".to_string()
+                ));
+            }
+
+            // Verify target percentage is reasonable
+            if *target_percentage > 75 {
+                return Err(GovernanceError::QuorumManipulation(
+                    "Suspicious quorum target percentage".to_string()
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn check_timelock_bypass(&self, chaos_type: &ChaosType, clock: &Clock) -> Result<()> {
+        if let ChaosType::TimelockBypass { target_timelock, attempts } = chaos_type {
+            // Check for minimum timelock duration
+            let min_timelock = 3600; // 1 hour
+            if *target_timelock < min_timelock {
+                return Err(GovernanceError::TimelockBypass(
+                    "Timelock duration too short".to_string()
+                ));
+            }
+
+            // Check for suspicious repeated attempts
+            if *attempts > 3 {
+                return Err(GovernanceError::TimelockBypass(
+                    "Too many timelock bypass attempts".to_string()
+                ));
+            }
+
+            // Track historical timelock patterns
+            let recent_timelock_attempts = self.recent_proposals.iter()
+                .filter(|_| true) // Replace with actual timelock attempt check
+                .count();
+
+            if recent_timelock_attempts > 5 {
+                return Err(GovernanceError::TimelockBypass(
+                    "Too many recent timelock operations".to_string()
+                ));
+            }
+
+            // Check for suspicious timing patterns
+            let current_time = clock.unix_timestamp;
+            if current_time - self.last_check_timestamp < min_timelock {
+                return Err(GovernanceError::TimelockBypass(
+                    "Suspicious timing pattern detected".to_string()
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn clean_old_records(&mut self, current_timestamp: i64) {
+        if current_timestamp - self.last_check_timestamp > 3600 {
+            self.recent_proposals.clear();
+            self.recent_votes.clear();
+            self.last_check_timestamp = current_timestamp;
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum SecurityEventType {
+    FlashLoanAttempt { amount: u64, token_mint: Pubkey },
+    QuorumChange { old_percentage: u8, new_percentage: u8 },
+    TimelockModification { old_timelock: i64, new_timelock: i64 },
+    RapidVoting { num_votes: u32, time_window: i64 },
+    MultipleProposals { proposer: Pubkey, count: u32 },
+}
+
+#[derive(Debug, Clone)]
+pub enum SecurityEventSeverity {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+impl SecurityEventSeverity {
+    fn calculate_severity(event_type: &SecurityEventType) -> Self {
+        match event_type {
+            SecurityEventType::FlashLoanAttempt { amount, .. } => {
+                if *amount > 10_000_000 {
+                    SecurityEventSeverity::Critical
+                } else if *amount > 1_000_000 {
+                    SecurityEventSeverity::High
+                } else {
+                    SecurityEventSeverity::Medium
+                }
+            },
+            SecurityEventType::QuorumChange { old_percentage, new_percentage } => {
+                let change = new_percentage.abs_diff(*old_percentage);
+                if change > 30 {
+                    SecurityEventSeverity::Critical
+                } else if change > 15 {
+                    SecurityEventSeverity::High
+                } else {
+                    SecurityEventSeverity::Medium
+                }
+            },
+            // Add other pattern matching for different event types
+            _ => SecurityEventSeverity::Low,
+        }
+    }
 } 

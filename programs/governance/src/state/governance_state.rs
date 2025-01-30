@@ -331,4 +331,16 @@ impl GovernanceState {
 
         Ok(context.unwrap_or_else(|| String::from("New conversation")))
     }
+
+    pub fn validate_governance_params(&self, quorum: u8, threshold: u8) -> Result<()> {
+        require!(
+            quorum >= self.config.quorum_percentage && quorum <= 100,
+            GovernanceError::InvalidGovernanceConfig
+        );
+        require!(
+            threshold >= self.config.approval_threshold_percentage && threshold <= 100,
+            GovernanceError::InvalidGovernanceConfig
+        );
+        Ok(())
+    }
 } 
