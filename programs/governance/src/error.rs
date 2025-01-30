@@ -55,110 +55,125 @@ pub enum GovernanceError {
     #[msg("Invalid account owner")]
     InvalidAccountOwner,
     
-    #[msg("Arithmetic operation failed")]
-    ArithmeticError,
+    #[msg("Arithmetic operation overflow")]
+    ArithmeticOverflow,
+    
+    #[msg("Arithmetic operation underflow")]
+    ArithmeticUnderflow,
     
     #[msg("Insufficient stake amount")]
-    InsufficientStake,
+    InsufficientStakeBalance,
     
-    #[msg("Invalid stake duration")]
-    InvalidStakeDuration,
+    #[msg("Invalid stake amount")]
+    InvalidStakeAmount,
     
-    #[msg("Stake still locked")]
+    #[msg("Stake account is locked")]
     StakeLocked,
+    
+    #[msg("Invalid lock duration")]
+    InvalidLockDuration,
+    
+    #[msg("Account is already delegated")]
+    AlreadyDelegated,
+    
+    #[msg("Account is not delegated")]
+    NotDelegated,
     
     #[msg("Invalid proposal parameters")]
     InvalidProposalParameters,
     
     #[msg("Proposal rate limit exceeded")]
-    RateLimitExceeded,
+    ProposalRateLimitExceeded,
     
-    #[msg("Invalid configuration parameters")]
-    InvalidConfigParameters,
+    #[msg("Invalid voting period")]
+    InvalidVotingPeriod,
     
-    #[msg("Serialization error")]
-    SerializationError,
+    #[msg("Voting period has ended")]
+    VotingPeriodEnded,
     
-    #[msg("Client error")]
-    ClientError,
+    #[msg("Voting period has not ended")]
+    VotingPeriodNotEnded,
     
-    #[msg("Test execution failed")]
-    TestExecutionFailed,
+    #[msg("Proposal already executed")]
+    ProposalAlreadyExecuted,
+    
+    #[msg("Proposal execution failed")]
+    ProposalExecutionFailed,
+    
+    #[msg("Invalid vote")]
+    InvalidVote,
+    
+    #[msg("Already voted")]
+    AlreadyVoted,
+    
+    #[msg("Invalid quorum percentage")]
+    InvalidQuorumPercentage,
+    
+    #[msg("Invalid approval threshold percentage")]
+    InvalidApprovalThresholdPercentage,
+    
+    #[msg("Treasury operation failed")]
+    TreasuryOperationFailed,
+    
+    #[msg("Invalid treasury amount")]
+    InvalidTreasuryAmount,
+    
+    #[msg("Insufficient treasury balance")]
+    InsufficientTreasuryBalance,
+    
+    #[msg("Emergency halt active")]
+    EmergencyHaltActive,
+    
+    #[msg("Invalid emergency action")]
+    InvalidEmergencyAction,
+    
+    #[msg("Unauthorized developer")]
+    UnauthorizedDeveloper,
+    
+    #[msg("Invalid token mint")]
+    InvalidTokenMint,
+    
+    #[msg("Invalid token account")]
+    InvalidTokenAccount,
+    
+    #[msg("Invalid token amount")]
+    InvalidTokenAmount,
+    
+    #[msg("Token transfer failed")]
+    TokenTransferFailed,
+    
+    #[msg("Serialization failed")]
+    SerializationFailed,
+    
+    #[msg("Deserialization failed")]
+    DeserializationFailed,
+    
+    #[msg("Invalid chaos test parameters")]
+    InvalidChaosTestParameters,
+    
+    #[msg("Chaos test execution failed")]
+    ChaosTestExecutionFailed,
     
     #[msg("Monitoring initialization failed")]
     MonitoringInitializationFailed,
     
-    #[msg("Arithmetic overflow")]
-    ArithmeticOverflow,
+    #[msg("Invalid monitoring parameters")]
+    InvalidMonitoringParameters,
     
-    #[msg("Invalid lock duration")]
-    InvalidLockDuration,
-    
-    #[msg("Insufficient stake amount for operation")]
-    InsufficientStakeAmount,
-    
-    #[msg("Delegation chain not allowed")]
-    DelegationChainNotAllowed,
+    #[msg("Monitoring operation failed")]
+    MonitoringOperationFailed,
 }
 
-// Enhanced error context trait with additional functionality
-pub trait ErrorContext<T> {
-    fn with_context(self, msg: &str) -> Result<T>;
-}
-
-// Implement for Result<T, GovernanceError>
-impl<T> ErrorContext<T> for Result<T, GovernanceError> {
-    fn with_context(self, msg: &str) -> Result<T> {
-        self.map_err(|e| {
-            msg!("{}: {}", msg, e.to_string());
-            e
-        })
-    }
-}
-
-// Implement for Option<T>
-impl<T> ErrorContext<T> for Option<T> {
-    fn with_context<C>(self, context: C) -> Result<T>
-    where
-        C: fmt::Display + Send + Sync + 'static
-    {
-        self.ok_or_else(|| {
-            msg!("{}", context);
-            GovernanceError::InvalidProgramState
-        })
-    }
-
-    fn with_error_details<C, F>(self, f: F) -> Result<T>
-    where
-        F: FnOnce() -> C,
-        C: fmt::Display + Send + Sync + 'static
-    {
-        self.ok_or_else(|| {
-            let context = f();
-            msg!("{}", context);
-            GovernanceError::InvalidProgramState
-        })
-    }
-}
-
-// Enhanced error conversion implementations
 impl From<ProgramError> for GovernanceError {
     fn from(err: ProgramError) -> Self {
         match err {
-            ProgramError::Custom(code) => {
-                if code == GovernanceError::ArithmeticOverflow as u32 {
-                    GovernanceError::ArithmeticOverflow
-                } else {
-                    GovernanceError::InvalidProgramState
-                }
-            }
-            ProgramError::InvalidAccountData => GovernanceError::StateInconsistency,
-            ProgramError::InsufficientFunds => GovernanceError::ResourceExhaustion,
-            ProgramError::InvalidArgument => GovernanceError::InvalidStakeAmount,
-            ProgramError::AccountAlreadyInitialized => GovernanceError::StateInconsistency,
-            ProgramError::UninitializedAccount => GovernanceError::InvalidProgramState,
-            ProgramError::NotEnoughAccountKeys => GovernanceError::InvalidStakeAmount,
-            ProgramError::AccountBorrowFailed => GovernanceError::StateInconsistency,
+            ProgramError::InvalidArgument => GovernanceError::InvalidInstructionData,
+            ProgramError::InvalidAccountData => GovernanceError::InvalidAccountData,
+            ProgramError::AccountAlreadyInitialized => GovernanceError::AccountAlreadyInitialized,
+            ProgramError::UninitializedAccount => GovernanceError::AccountNotInitialized,
+            ProgramError::InsufficientFunds => GovernanceError::InsufficientStakeBalance,
+            ProgramError::InvalidProgramId => GovernanceError::InvalidProgramState,
+            ProgramError::MissingRequiredSignature => GovernanceError::InvalidAuthority,
             _ => GovernanceError::InvalidProgramState,
         }
     }
@@ -167,11 +182,12 @@ impl From<ProgramError> for GovernanceError {
 impl From<anchor_lang::error::Error> for GovernanceError {
     fn from(err: anchor_lang::error::Error) -> Self {
         match err {
-            anchor_lang::error::Error::AnchorError(ae) => {
-                match ae.error_code_number {
-                    1 => GovernanceError::InvalidStakeAmount,
-                    2 => GovernanceError::StateInconsistency,
-                    3 => GovernanceError::UnauthorizedModification,
+            anchor_lang::error::Error::AnchorError(e) => {
+                match e.error_code_number {
+                    // Map specific Anchor error codes to our error types
+                    0 => GovernanceError::InvalidInstructionData,
+                    1 => GovernanceError::InvalidProgramState,
+                    2 => GovernanceError::AccountNotInitialized,
                     _ => GovernanceError::InvalidProgramState,
                 }
             }
@@ -180,27 +196,8 @@ impl From<anchor_lang::error::Error> for GovernanceError {
     }
 }
 
-impl From<solana_client::client_error::ClientError> for GovernanceError {
-    fn from(_: solana_client::client_error::ClientError) -> Self {
-        GovernanceError::ClientError
-    }
-}
-
 impl From<std::io::Error> for GovernanceError {
     fn from(_: std::io::Error) -> Self {
-        GovernanceError::SerializationError
-    }
-}
-
-impl From<MonitoringError> for GovernanceError {
-    fn from(err: MonitoringError) -> Self {
-        match err {
-            MonitoringError::ArithmeticOverflow => GovernanceError::ArithmeticOverflow,
-            MonitoringError::InvalidStakeAmount => GovernanceError::InsufficientStake,
-            MonitoringError::InvalidLockState => GovernanceError::StakeLocked,
-            MonitoringError::RateLimitExceeded => GovernanceError::RateLimitExceeded,
-            MonitoringError::HighStakeConcentration => GovernanceError::HighStakeConcentration,
-            _ => GovernanceError::InvalidProgramState,
-        }
+        GovernanceError::SerializationFailed
     }
 } 

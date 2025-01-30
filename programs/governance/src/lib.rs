@@ -31,8 +31,13 @@ pub const DEV_WALLET: &str = "12ZA59vt9MW9XNfpDNThamLmPsPFQ2MEgkngk1F7HGkn";
 pub const TREASURY_AUTH_SEED: &[u8] = b"treasury_auth";
 pub const EMERGENCY_HALT_SEED: &[u8] = b"emergency_halt";
 
-use state::*;
-use error::GovernanceError;
+pub use state::*;
+pub use error::GovernanceError;
+
+// Re-export important types
+pub use state::governance::{GovernanceParams, ProposalAction, ProposalStatus};
+pub use state::governance_state::{GovernanceMetrics, GovernanceState};
+pub use state::stake_account::{StakeAccount, StakeOperation, StakeOperationType};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub enum EmergencyActionType {

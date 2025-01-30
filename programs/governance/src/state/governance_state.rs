@@ -1,6 +1,7 @@
 use solana_program::pubkey::Pubkey;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use super::governance::{Proposal, ProposalStatus, ProposalAction, GovernanceParams, VoteRecord};
 
 /// Governance metrics and state
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -55,9 +56,11 @@ pub struct VoteCount {
 }
 
 /// Governance state manager
+#[derive(Debug)]
 pub struct GovernanceState {
     pub metrics: GovernanceMetrics,
     pub active_proposals: HashMap<u64, Proposal>,
+    pub params: GovernanceParams,
     redis_client: redis::Client,
     mongo_client: mongodb::Client,
 }
@@ -66,7 +69,7 @@ impl GovernanceState {
     pub async fn new(redis_url: &str, mongo_url: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let redis_client = redis::Client::open(redis_url)?;
         let mongo_client = mongodb::Client::with_uri_str(mongo_url).await?;
-
+        
         Ok(Self {
             metrics: GovernanceMetrics {
                 total_staked: 0,
@@ -77,9 +80,10 @@ impl GovernanceState {
                 emergency_reserve: 0,
                 governance_apy: 0.0,
                 spooky_bonus: 0.0,
-                quorum_percentage: 15,
+                quorum_percentage: 10,
             },
             active_proposals: HashMap::new(),
+            params: GovernanceParams::default(),
             redis_client,
             mongo_client,
         })
@@ -87,22 +91,26 @@ impl GovernanceState {
 
     /// Update governance metrics from on-chain data
     pub async fn update_metrics(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        // Update Redis cache
         let mut conn = self.redis_client.get_async_connection().await?;
         
-        redis::cmd("HSET")
-            .arg("governance:metrics")
-            .arg("total_staked").arg(self.metrics.total_staked)
-            .arg("staker_count").arg(self.metrics.staker_count)
-            .arg("active_proposals").arg(self.metrics.active_proposals)
+        // Update metrics from Redis
+        self.metrics.total_staked = redis::cmd("GET")
+            .arg("total_staked")
             .query_async(&mut conn)
-            .await?;
+            .await
+            .unwrap_or(0);
 
-        // Update MongoDB for historical tracking
-        let db = self.mongo_client.database("governance");
-        let metrics = db.collection("metrics");
-        
-        metrics.insert_one(bson::to_document(&self.metrics)?, None).await?;
+        self.metrics.staker_count = redis::cmd("GET")
+            .arg("staker_count")
+            .query_async(&mut conn)
+            .await
+            .unwrap_or(0);
+
+        // Update proposal metrics
+        let proposals_coll = self.mongo_client.database("governance").collection("proposals");
+        self.metrics.active_proposals = proposals_coll
+            .count_documents(doc! { "status": "Active" }, None)
+            .await? as u32;
 
         Ok(())
     }
@@ -113,16 +121,17 @@ impl GovernanceState {
         pubkey: &Pubkey,
         context: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let db = self.mongo_client.database("governance");
-        let chats = db.collection("chat_contexts");
+        let mut conn = self.redis_client.get_async_connection().await?;
+        let key = format!("chat_context:{}", pubkey.to_string());
         
-        let doc = doc! {
-            "pubkey": pubkey.to_string(),
-            "context": context,
-            "timestamp": bson::DateTime::now(),
-        };
+        redis::cmd("SET")
+            .arg(&key)
+            .arg(context)
+            .arg("EX")
+            .arg(3600) // 1 hour expiry
+            .query_async(&mut conn)
+            .await?;
 
-        chats.insert_one(doc, None).await?;
         Ok(())
     }
 
@@ -131,18 +140,15 @@ impl GovernanceState {
         &self,
         pubkey: &Pubkey,
     ) -> Result<Option<String>, Box<dyn std::error::Error>> {
-        let db = self.mongo_client.database("governance");
-        let chats = db.collection("chat_contexts");
+        let mut conn = self.redis_client.get_async_connection().await?;
+        let key = format!("chat_context:{}", pubkey.to_string());
         
-        let filter = doc! {
-            "pubkey": pubkey.to_string(),
-        };
+        let context: Option<String> = redis::cmd("GET")
+            .arg(&key)
+            .query_async(&mut conn)
+            .await?;
 
-        if let Some(doc) = chats.find_one(filter, None).await? {
-            Ok(doc.get_str("context").ok().map(|s| s.to_string()))
-        } else {
-            Ok(None)
-        }
+        Ok(context)
     }
 
     /// Create a new proposal
@@ -150,28 +156,16 @@ impl GovernanceState {
         &mut self,
         proposal: Proposal,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        // Store in Redis for quick access
-        let mut conn = self.redis_client.get_async_connection().await?;
-        
-        let proposal_key = format!("proposal:{}", proposal.id);
-        redis::cmd("HSET")
-            .arg(&proposal_key)
-            .arg("title").arg(&proposal.title)
-            .arg("description").arg(&proposal.description)
-            .arg("proposer").arg(proposal.proposer.to_string())
-            .query_async(&mut conn)
-            .await?;
+        let proposals_coll = self.mongo_client
+            .database("governance")
+            .collection("proposals");
 
-        // Store in MongoDB for persistence
-        let db = self.mongo_client.database("governance");
-        let proposals = db.collection("proposals");
-        
-        proposals.insert_one(bson::to_document(&proposal)?, None).await?;
+        let proposal_doc = mongodb::bson::to_document(&proposal)?;
+        proposals_coll.insert_one(proposal_doc, None).await?;
 
-        // Update local state
+        // Update active proposals cache
         self.active_proposals.insert(proposal.id, proposal);
         self.metrics.active_proposals += 1;
-        self.update_metrics().await?;
 
         Ok(())
     }
@@ -184,39 +178,29 @@ impl GovernanceState {
         vote: bool,
         stake_amount: u64,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        let vote_record = VoteRecord::new(
+            *voter,
+            Pubkey::default(), // This should be the proposal's pubkey
+            stake_amount,
+            vote,
+            chrono::Utc::now().timestamp(),
+        );
+
+        // Store vote in MongoDB
+        let votes_coll = self.mongo_client
+            .database("governance")
+            .collection("votes");
+
+        let vote_doc = mongodb::bson::to_document(&vote_record)?;
+        votes_coll.insert_one(vote_doc, None).await?;
+
+        // Update proposal vote counts
         if let Some(proposal) = self.active_proposals.get_mut(&proposal_id) {
-            // Update vote counts
             if vote {
-                proposal.votes.yes += stake_amount;
+                proposal.votes.yes = proposal.votes.yes.saturating_add(stake_amount);
             } else {
-                proposal.votes.no += stake_amount;
+                proposal.votes.no = proposal.votes.no.saturating_add(stake_amount);
             }
-
-            // Store vote in Redis
-            let mut conn = self.redis_client.get_async_connection().await?;
-            let vote_key = format!("vote:{}:{}", proposal_id, voter);
-            
-            redis::cmd("HSET")
-                .arg(&vote_key)
-                .arg("voter").arg(voter.to_string())
-                .arg("vote").arg(vote)
-                .arg("stake_amount").arg(stake_amount)
-                .query_async(&mut conn)
-                .await?;
-
-            // Store vote in MongoDB
-            let db = self.mongo_client.database("governance");
-            let votes = db.collection("votes");
-            
-            let doc = doc! {
-                "proposal_id": proposal_id as i64,
-                "voter": voter.to_string(),
-                "vote": vote,
-                "stake_amount": stake_amount as i64,
-                "timestamp": bson::DateTime::now(),
-            };
-
-            votes.insert_one(doc, None).await?;
         }
 
         Ok(())
@@ -227,26 +211,14 @@ impl GovernanceState {
         &self,
         pubkey: &Pubkey,
     ) -> Result<String, Box<dyn std::error::Error>> {
-        let mut context = String::new();
+        let mut conn = self.redis_client.get_async_connection().await?;
+        let key = format!("ai_context:{}", pubkey.to_string());
+        
+        let context: Option<String> = redis::cmd("GET")
+            .arg(&key)
+            .query_async(&mut conn)
+            .await?;
 
-        // Add governance metrics
-        context.push_str(&format!("\nGovernance Overview:\n"));
-        context.push_str(&format!("Total Staked: {} GREMLINAI\n", self.metrics.total_staked));
-        context.push_str(&format!("Active Stakers: {}\n", self.metrics.staker_count));
-        context.push_str(&format!("Treasury Balance: {} GREMLINAI\n", self.metrics.treasury_balance));
-        context.push_str(&format!("Current APY: {}%\n", self.metrics.governance_apy));
-
-        // Add user's voting power and proposals
-        if let Some(user_context) = self.get_chat_context(pubkey).await? {
-            context.push_str(&format!("\nYour Context:\n{}\n", user_context));
-        }
-
-        // Add active proposals
-        context.push_str("\nActive Proposals:\n");
-        for proposal in self.active_proposals.values() {
-            context.push_str(&format!("- {}: {}\n", proposal.id, proposal.title));
-        }
-
-        Ok(context)
+        Ok(context.unwrap_or_else(|| String::from("New conversation")))
     }
 } 
