@@ -45,10 +45,15 @@ solana-transaction-status = { workspace = true }
 solana-banks-interface = { workspace = true }
 solana-banks-client = { workspace = true }
 solana-runtime = { workspace = true }
-time-series-generator = "0.2.0"
+time_series_generator = "0.2.0"
 circular-buffer = "0.1.6"
 metrics = "0.21"
 metrics-exporter-prometheus = "0.12"
+statrs = "0.16"
+linreg = "0.2"
+moving_average = "1.1.0"
+seasonal = "0.3.1"
+exponential-smoothing = "1.1.0"
 
 [dev-dependencies]
 solana-program-test = { workspace = true }
