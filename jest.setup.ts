@@ -1,196 +1,144 @@
-import { Connection } from '@solana/web3.js';
-import RedisMock from './__mocks__/ioredis';
 import { jest } from '@jest/globals';
-import type { TensorFlowMock } from '../__mocks__/@tensorflow/tfjs-node';
-import cryptoRandomString from 'crypto-random-string';
+import { Rank, ShapeMap, Tensor, KernelBackend } from '@tensorflow/tfjs-core';
 
-declare global {
-    var tf: TensorFlowMock; 
-}
+const createMockTensorInstance = () => ({
+  shape: [1],
+  dtype: 'float32',
+  size: 1,
+  data: async () => new Float32Array(1),
+  dataSync: () => new Float32Array(1),
+  dispose: () => {},
+  array: async () => [0],
+  arraySync: () => [0],
+  print: () => {},
+  reshape: function(newShape: number[]) { 
+    const instance = createMockTensorInstance();
+    instance.shape = newShape;
+    return instance;
+  },
+  cast: function(dtype: string) {
+    const instance = createMockTensorInstance();
+    instance.dtype = dtype;
+    return instance;
+  },
+  clone: function() { return createMockTensorInstance(); },
+  val: async () => new Float32Array(1),
+  buffer: async () => ({ shape: [1], dtype: 'float32', size: 1, values: new Float32Array(1) }),
+  expandDims: function() { return createMockTensorInstance(); }
+});
 
-// Create type-safe mock implementation
-const mockTf = {
-    sequential: jest.fn(() => ({
-        add: jest.fn().mockReturnThis(),
-        compile: jest.fn().mockReturnThis(),
-        predict: jest.fn().mockResolvedValue({
-            dataSync: () => [0],
-            dispose: jest.fn()
-        }),
-        summary: jest.fn(),
-        dispose: jest.fn(),
-        getWeights: jest.fn().mockReturnValue([]),
-        setWeights: jest.fn(),
-        trainOnBatch: jest.fn().mockResolvedValue(0),
-        layers: [],
-        optimizer: {},
-        name: 'mocked-model'
-    })),
-    layers: {
-        dense: jest.fn().mockImplementation((config: any) => ({
-          apply: jest.fn().mockReturnValue(tf.tensor2d([[0]])),
-          getConfig: jest.fn().mockReturnValue(config),
-          build: jest.fn()
-        })),
-        dropout: jest.fn().mockReturnValue({})
-    },
-    losses: {
-        meanSquaredError: jest.fn().mockReturnValue({})
-    },
-    train: {
-        adam: jest.fn().mockReturnValue({})
-    },
-    tensor: jest.fn().mockReturnValue({}),
-    loadLayersModel: jest.fn().mockResolvedValue({
-        predict: jest.fn().mockResolvedValue([]),
-        compile: jest.fn(),
-        fit: jest.fn(),
-        summary: jest.fn()
+// Mock TensorFlow
+const tf = {
+
+  sequential: jest.fn().mockReturnValue({
+    add: jest.fn().mockReturnThis(),
+    compile: jest.fn(),
+    fit: jest.fn().mockResolvedValue({}),
+    predict: jest.fn().mockReturnValue({
+      data: () => Promise.resolve(new Float32Array([0.5])),
+      dispose: jest.fn()
+    }),
+    dispose: jest.fn(),
+    layers: [],
+    getWeights: jest.fn().mockReturnValue([]),
+    setWeights: jest.fn()
+  }),
+  layers: {
+    dense: jest.fn().mockImplementation((config) => ({
+      apply: jest.fn(),
+      getWeights: jest.fn().mockReturnValue([]),
+      setWeights: jest.fn(),
+      units: config.units,
+      activation: config.activation,
+      kernelInitializer: config.kernelInitializer,
+      getConfig: () => config,
+      name: 'dense'
+    }))
+  },
+  ready: jest.fn().mockResolvedValue(undefined),
+  getBackend: jest.fn().mockReturnValue('cpu'),
+  setBackend: jest.fn().mockResolvedValue(true),
+  env: jest.fn().mockReturnValue({ flags: {}, platform: 'node' }),
+  tensor2d: jest.fn().mockReturnValue({
+    dispose: jest.fn(),
+    data: () => Promise.resolve(new Float32Array([0.5])),
+    arraySync: () => [[0.5]],
+    reshape: jest.fn().mockReturnThis()
+  }),
+  train: {
+    adam: jest.fn().mockReturnValue({
+      minimize: jest.fn()
     })
+  },
+  tensor: jest.fn().mockReturnValue({
+    dispose: jest.fn(),
+    data: () => Promise.resolve(new Float32Array([0.5])),
+    arraySync: () => [[0.5]],
+    reshape: jest.fn().mockReturnThis()
+  }),
+  disposeVariables: jest.fn(),
+  backend: jest.fn().mockReturnValue({
+    dispose: () => true,
+    disposeData: () => true,
+    read: async () => new Float32Array(),
+    readSync: () => new Float32Array(),
+    readToGPU: () => ({
+      texture: undefined,
+      texShape: [1, 1],
+      tensorRef: createMockTensorInstance(),
+      buffer: {
+        __brand: 'GPUBuffer',
+        size: 4,
+        usage: 0,
+        mapState: 'unmapped',
+        getMappedRange: () => new ArrayBuffer(4),
+        unmap: () => {},
+        destroy: () => {},
+        label: '',
+        onSubmittedWorkDone: () => Promise.resolve(undefined),
+        mapAsync: () => Promise.resolve(undefined),
+        getBindGroupLayout: () => ({})
+      }
+    }),
+    numDataIds: () => 0,
+    createTensorFromGPUData: () => createMockTensorInstance(),
+    write: () => ({}),
+    memory: () => ({ unreliable: false, reasons: [] }),
+    refCount: () => 0,
+    incRef: () => {},
+    timerAvailable: () => true,
+    time: () => Promise.resolve({ kernelMs: 0, wallMs: 0 }),
+    getTexture: () => null,
+    getDataSubset: () => new Float32Array(),
+    makeTensorInfo: (shape: number[], dtype: string) => ({ dataId: {}, shape, dtype }),
+    move: () => {},
+    fromPixels: () => createMockTensorInstance()
+  }),
+  randomNormal: jest.fn().mockImplementation(() => createMockTensorInstance()),
+  loadLayersModel: jest.fn().mockResolvedValue({
+    layers: [
+      {
+        getClassName: jest.fn().mockReturnValue('Dense'),
+        inputShape: [10],
+        outputShape: [10],
+        apply: jest.fn().mockImplementation(() => createMockTensorInstance())
+      }
+    ],
+    predict: jest.fn().mockImplementation(() => createMockTensorInstance()),
+    dispose: jest.fn()
+  }),
+  losses: {
+    meanSquaredError: jest.fn().mockImplementation(() => createMockTensorInstance())
+  },
+  buffer: jest.fn().mockReturnValue({
+    shape: [1],
+    dtype: 'float32',
+    size: 1,
+    values: new Float32Array(1)
+  })
 };
 
-// Export the mock for direct imports
-export const tf = mockTf;
+// Export the mock TensorFlow instance
+export default tf;
 
-// Declare global tf type
-declare global {
-    var tf: typeof mockTf;
-}
 
-// Assign clean mock to global
-global.tf = {
-  ...mockTf,
-  sequential: jest.fn(),
-  layers: { dense: jest.fn() },
-  train: { adam: jest.fn() }
-};
-
-// Add the missing utility function to the mock
-const mockTfWithUtils = {
-    ...mockTf,
-    util: {
-        isNullOrUndefined: (value: any) => value === null || value === undefined
-    }
-};
-
-// Mock the module with updated implementation
-jest.mock('@tensorflow/tfjs-node', () => ({
-    __esModule: true,
-    ...mockTfWithUtils,
-}));
-
-// Setup Jest environment
-jest.useFakeTimers({ enableGlobally: true });
-jest.setTimeout(30000); // 30 second timeout for all tests
-
-// Environment variables
-process.env.HELIUS_API_KEY = 'test-helius-key';
-process.env.NODE_ENV = 'test';
-
-interface RedisMock {
-    status: string;
-    keyPrefix: string;
-    flushall(): Promise<void>;
-    quit(): Promise<void>;
-    connect(): Promise<void>;
-    set(key: string, value: string): Promise<void>;
-    get(key: string): Promise<string | null>;
-}
-
-interface SecurityMock {
-    validateRequest: jest.Mock;
-    generateNonce: jest.Mock;
-    verifySignature: jest.Mock;
-    encryptPayload: jest.Mock;
-    decryptPayload: jest.Mock;
-    mutation: {
-        test: jest.Mock;
-    };
-}
-
-// Extend global environment
-declare global {
-    var security: SecurityMock;
-    var __REDIS__: RedisMock;
-    var connection: jest.Mocked<Connection>;
-    var cleanupMocks: () => Promise<void>;
-    // Keep redis for backward compatibility
-    var redis: RedisMock;
-}
-
-// Initialize security mock
-global.security = {
-    validateRequest: jest.fn(),
-    generateNonce: jest.fn().mockImplementation(() => cryptoRandomString({length: 16})),
-    verifySignature: jest.fn().mockReturnValue(true),
-    encryptPayload: jest.fn().mockImplementation((payload) => Buffer.from(JSON.stringify(payload)).toString('base64')),
-    decryptPayload: jest.fn().mockImplementation((payload) => JSON.parse(Buffer.from(payload, 'base64').toString())),
-    mutation: {
-        test: jest.fn()
-    }
-};
-
-// Jest hooks for setup and teardown
-beforeAll(async () => {
-    // Only create Redis if not already initialized
-    if (!global.__REDIS__) {
-        const redisMock = new RedisMock({
-            keyPrefix: 'test:',
-            enableOfflineQueue: true,
-        });
-        global.__REDIS__ = redisMock;
-        global.redis = redisMock; // For backward compatibility
-        await redisMock.connect();
-    }
-});
-
-afterAll(async () => {
-    jest.useRealTimers();
-    if (global.__REDIS__) {
-        await global.__REDIS__.quit();
-        delete global.__REDIS__;
-        delete global.redis;
-    }
-    // Clean up tf mock
-    delete global.tf;
-    jest.unmock('@tensorflow/tfjs-node');
-});
-
-beforeEach(async () => {
-    jest.resetAllMocks();
-    jest.restoreAllMocks();
-    if (global.__REDIS__) {
-        await global.__REDIS__.flushall();
-        await global.__REDIS__.set('requests:default', '0');
-        await global.__REDIS__.set('requests:governance', '0');
-    }
-});
-
-afterEach(async () => {
-    jest.clearAllMocks();
-    if (global.__REDIS__) {
-        await global.__REDIS__.flushall();
-    }
-});
-
-global.cleanupMocks = async () => {
-    jest.clearAllMocks();
-    if (global.__REDIS__) {
-        try {
-            await global.__REDIS__.flushall();
-            await global.__REDIS__.quit();
-        } catch (error) {
-            console.warn('Failed to cleanup Redis in cleanupMocks:', error);
-        }
-    }
-};
-
-process.on('exit', () => {
-    if (global.__REDIS__?.status === 'ready') {
-        try {
-            global.__REDIS__.quit();
-        } catch (error) {
-            console.error('Failed to cleanup Redis on exit:', error);
-        }
-    }
-});

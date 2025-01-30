@@ -1,28 +1,27 @@
 const tf = {
-    sequential: jest.fn(() => {
-        console.log('Mock tf.sequential() called');
-        const model = {
-            add: jest.fn().mockReturnThis(),
-            compile: jest.fn(),
-            predict: jest.fn(() => ({
-                dataSync: jest.fn(() => [0]),
-                array: jest.fn(() => Promise.resolve([[0]])),
-                dispose: jest.fn()
-            })),
-            getWeights: jest.fn(() => []),
-            setWeights: jest.fn(),
+    sequential: jest.fn().mockImplementation(() => {
+        const mockLayers = [];
+        const mockModel = {
+            add: jest.fn().mockImplementation((layer) => {
+                mockLayers.push(layer);
+                return mockModel;
+            }),
+            compile: jest.fn().mockReturnThis(),
+            fit: jest.fn().mockResolvedValue({
+                history: { loss: [0.1], val_loss: [0.08] }
+            }),
+            predict: jest.fn().mockReturnValue({
+                data: () => Promise.resolve(new Float32Array([0.5])),
+                dispose: jest.fn(),
+                arraySync: () => [[0.5]]
+            }),
+            save: jest.fn().mockResolvedValue(undefined),
             dispose: jest.fn(),
-            fit: jest.fn(() => Promise.resolve({ 
-                history: { 
-                    loss: [0.1],
-                    accuracy: [0.9]
-                }
-            })),
-            save: jest.fn(() => Promise.resolve()),
-            load: jest.fn(() => Promise.resolve())
+            summary: jest.fn(),
+            getLayer: jest.fn().mockImplementation((name) => mockLayers.find(l => l.name === name)),
+            layers: mockLayers
         };
-        console.log('Mock tf.sequential() returning model:', model);
-        return model;
+        return mockModel;
     }),
 
     layers: {
@@ -51,13 +50,23 @@ const tf = {
         dispose: jest.fn()
     })),
 
-    tensor2d: jest.fn((values, shape) => ({
-        shape: shape,
-        dtype: 'float32',
-        dataSync: jest.fn(() => values.flat()),
-        array: jest.fn(() => Promise.resolve(values)),
-        dispose: jest.fn()
-    })),
+    tensor2d: jest.fn((values, shape) => {
+        const tensor = {
+            shape: shape,
+            dtype: 'float32',
+            dataSync: jest.fn(() => values.flat()),
+            array: jest.fn(() => Promise.resolve(values)),
+            dispose: jest.fn(),
+            slice: jest.fn().mockImplementation((start, size) => ({
+                dispose: jest.fn(),
+                dataSync: jest.fn(() => values.flat()),
+                array: jest.fn(() => Promise.resolve(values)),
+                shape: size,
+                slice: jest.fn() // Allow chaining of slice calls
+            }))
+        };
+        return tensor;
+    }),
 
     concat: jest.fn((tensors) => ({
         dispose: jest.fn()

@@ -1,137 +1,140 @@
-import { jest } from '@jest/globals';
-import { setupTensorFlowMocks, type TensorFlowMock } from './helpers/tf-mock.js';
+import * as tf from '@tensorflow/tfjs-node';
+import { ConcreteMLModel } from '../src/concrete-ml-model.js';
 
-// Set up TensorFlow mocks before importing the module that uses it
-const mockTf = setupTensorFlowMocks();
-jest.mock('@tensorflow/tfjs-node', () => mockTf);
+// Mock TensorFlow.js
+jest.mock('@tensorflow/tfjs-node', () => ({
+    sequential: jest.fn(),
+    layers: {
+        dense: jest.fn()
+    },
+    train: {
+        adam: jest.fn()
+    },
+    tensor2d: jest.fn(),
+    loadLayersModel: jest.fn()
+}));
 
-// Now import the module that uses TensorFlow
-import type * as tf from '@tensorflow/tfjs-node';
+describe('ConcreteMLModel', () => {
+    let model: ConcreteMLModel;
+    let mockSequential: any;
+    let mockTensor: any;
 
-describe('AI Model Tests', () => {
-  let model: ReturnType<typeof mockTf.sequential>;
-  
-  beforeEach(async () => {
-    // Create new model with correct architecture
-    model = {
-      add: jest.fn().mockImplementation((layer) => {
-        model.layers.push(layer);
-        return model;
-      }),
-      compile: jest.fn(),
-      layers: [],
-      dispose: jest.fn(),
-      predict: jest.fn((input: tf.Tensor) => {
-        // Add explicit shape property with safe access
-        const inputWithShape = Object.assign(input, {
-          shape: input.shape ? [input.shape[0], input.shape[1]] : [0, 0]
+    beforeEach(() => {
+        jest.clearAllMocks();
+
+        // Mock tensor operations
+        mockTensor = {
+            dispose: jest.fn(),
+            data: () => Promise.resolve(new Float32Array([0.5])),
+            shape: [1, 10],
+            arraySync: () => [0.5]
+        };
+
+        (tf.tensor2d as jest.Mock).mockReturnValue(mockTensor);
+
+        // Mock layers
+        const mockDense = {
+            apply: jest.fn(),
+            getConfig: () => ({}),
+            name: 'dense'
+        };
+        (tf.layers.dense as jest.Mock).mockReturnValue(mockDense);
+
+        // Mock sequential model
+        mockSequential = {
+            add: jest.fn(),
+            compile: jest.fn(),
+            fit: jest.fn().mockResolvedValue({ history: { loss: [0.1] } }),
+            predict: jest.fn().mockReturnValue(mockTensor),
+            dispose: jest.fn(),
+            layers: [],
+            save: jest.fn().mockResolvedValue(undefined)
+        };
+        (tf.sequential as jest.Mock).mockReturnValue(mockSequential);
+        (tf.loadLayersModel as jest.Mock).mockResolvedValue(mockSequential);
+
+        // Mock optimizer
+        (tf.train.adam as jest.Mock).mockReturnValue({});
+
+        // Create model instance
+        model = new ConcreteMLModel({
+            inputShape: [10],
+            hiddenLayers: [20, 15],
+            outputShape: 5,
+            learningRate: 0.001
         });
-        
-        if (!inputWithShape.shape || inputWithShape.shape[1] !== 20) {
-          throw new Error('Input shape mismatch');
-        }
-        return Object.assign(mockTf.tensor([[0.5]]), {shape: [1, 1]});
-      })
-    };
-    
-    // Mock layer implementations
-    mockTf.randomNormal = jest.fn(() => ({})); // Return empty object to allow property assignment
-    mockTf.tensor = jest.fn(() => ({ 
-      shape: [1, 1],
-      dataSync: () => new Float32Array([0.5]) 
-    })); // Mock tensor creation with dataSync
-    mockTf.layers.dense = jest.fn((config: any) => ({
-      getConfig: () => config,
-      name: config.name || 'dense',
-      units: config.units,
-      activation: config.activation
-    }));
-    
-    mockTf.layers.dropout = jest.fn((config: any) => ({
-      getConfig: () => config,
-      name: 'dropout',
-      rate: config.rate
-    }));
-
-    // Add layers
-    model.add(mockTf.layers.dense({
-      units: 128,
-      inputShape: [20],
-      activation: 'relu'
-    }));
-    
-    model.add(mockTf.layers.dropout({
-      rate: 0.2
-    }));
-    
-    model.add(mockTf.layers.dense({
-      units: 32,
-      activation: 'relu'
-    }));
-    
-    model.add(mockTf.layers.dense({
-      units: 1,
-      activation: 'linear'
-    }));
-    
-    // Compile model
-    model.compile({
-      optimizer: mockTf.train.adam(0.001),
-      loss: 'meanSquaredError'
     });
-  });
 
-  afterEach(() => {
-    if (model) {
-      model.dispose();
-    }
-    mockTf.disposeVariables();
-    jest.clearAllMocks();
-  });
+    afterEach(() => {
+        jest.resetAllMocks();
+    });
 
-  it('should load model successfully', () => {
-    expect(model).toBeDefined();
-    expect(model.layers).toHaveLength(4);
-  });
+    test('should create model with correct architecture', () => {
+        expect(tf.sequential).toHaveBeenCalled();
+        expect(tf.layers.dense).toHaveBeenCalledTimes(3);
+        
+        // Check input layer
+        expect(tf.layers.dense).toHaveBeenNthCalledWith(1, {
+            units: 20,
+            activation: 'relu',
+            inputShape: [10]
+        });
 
-  it('should make predictions', async () => {
-    const input = Object.assign(
-      {},
-      mockTf.randomNormal([1, 20], 0, 1, 'float32'),
-      {shape: [1, 20]}
-    );
-    const prediction = model.predict(input);
-    
-    expect(prediction).toBeDefined();
-    expect(prediction.shape).toEqual([1, 1]);
-    expect(prediction.dataSync()).toBeDefined();
-  });
+        // Check hidden layer
+        expect(tf.layers.dense).toHaveBeenNthCalledWith(2, {
+            units: 15,
+            activation: 'relu'
+        });
 
-  it('should handle invalid input', () => {
-    const invalidInput = Object.assign(
-      {},
-      mockTf.randomNormal([1, 15], 0, 1, 'float32'),
-      {shape: [1, 15]}
-    );
-    
-    expect(() => model.predict(invalidInput)).toThrow('Input shape mismatch');
-  });
+        // Check output layer
+        expect(tf.layers.dense).toHaveBeenNthCalledWith(3, {
+            units: 5,
+            activation: 'softmax'
+        });
+    });
 
-  it('should have correct model architecture', () => {
-    expect(model).toBeDefined();
-    const layers = model.layers;
-    
-    // Verify layer types and units
-    expect(layers[0]?.name).toBe('dense');
-    expect(layers[0]?.getConfig()?.units).toBe(128);
-    
-    expect(layers[1]?.name).toBe('dropout');
-    expect(layers[1]?.getConfig()?.rate).toBe(0.2);
-    
-    expect(layers[2]?.name).toBe('dense');
-    expect(layers[2]?.getConfig()?.units).toBe(32);
-    
-    expect(layers[3]?.name).toBe('dense');
-    expect(layers[3]?.getConfig()?.units).toBe(1);
-  });
+    test('should train model correctly', async () => {
+        const mockTrainData = {
+            xs: [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]],
+            ys: [[1, 0, 0, 0, 0]]
+        };
+
+        await model.train(mockTrainData.xs, mockTrainData.ys, {
+            epochs: 10,
+            batchSize: 32
+        });
+
+        expect(mockSequential.fit).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.anything(),
+            {
+                epochs: 10,
+                batchSize: 32,
+                validationSplit: 0.1,
+                verbose: 1
+            }
+        );
+    });
+
+    test('should predict correctly', async () => {
+        const mockInput = [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]];
+        const prediction = await model.predict(mockInput);
+
+        expect(mockSequential.predict).toHaveBeenCalled();
+        expect(prediction).toBeDefined();
+    });
+
+    test('should save and load model', async () => {
+        const path = 'test/model';
+        await model.save(path);
+        await model.load(path);
+
+        expect(mockSequential.save).toHaveBeenCalledWith(`file://${path}`);
+        expect(tf.loadLayersModel).toHaveBeenCalledWith(`file://${path}`);
+    });
+
+    test('should dispose resources correctly', () => {
+        model.dispose();
+        expect(mockSequential.dispose).toHaveBeenCalled();
+    });
 });

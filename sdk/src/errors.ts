@@ -1,102 +1,323 @@
+import type { ErrorMetadata, ErrorDetails, BaseErrorDetails } from './types.js';
+
 export enum ErrorCode {
-    // Request and validation errors (1000-1099)
-    INSUFFICIENT_FUNDS = 1001,
-    INVALID_PROGRAM = 1002,
-    INVALID_PROGRAM_ADDRESS = 1003,
-    REQUEST_TIMEOUT = 1004,
-    INVALID_TEST_TYPE = 1005,
-    INVALID_INTENSITY = 1006,
-    INVALID_DURATION = 1007,
-    RATE_LIMIT_EXCEEDED = 1008,
-    INVALID_JSON = 1009,
-    TREASURY_ERROR = 1010,
-    INVALID_AMOUNT = 1011,
-    STAKE_TOO_LOW = 1012,
-    STAKE_TOO_HIGH = 1013,
-    INVALID_TEST_DURATION = 1014,
-    INVALID_TEST_INTENSITY = 1015,
-    // Voting and balance errors (1015-1019)
-    INSUFFICIENT_VOTE_BALANCE = 1016,
-    ALREADY_VOTED = 1017, 
-    INVALID_PROPOSAL_ID = 1018,
-    TIMELOCK_NOT_ELAPSED_VOTING = 1019,
-
-    // Staking and balance errors (1100-1199)
-    INSUFFICIENT_STAKE = 1100,
-    INSUFFICIENT_BALANCE = 1101,
-    STAKE_NOT_FOUND = 1102,
-    TOKENS_LOCKED = 1103,
-    INVALID_LOCKUP = 1104,
-    INVALID_DELEGATION_PERCENTAGE = 1105,
-    STAKE_ALREADY_DELEGATED = 1106,
-    NO_REWARDS_AVAILABLE = 1107,
-    INVALID_LOCKUP_PERIOD = 1108,
-    STAKE_NOT_FOUND_WITHDRAW = 1109,
-    TOKENS_STILL_LOCKED = 1110,
-
-    // Governance errors (2000-2099)
-    INSUFFICIENT_VOTING_POWER = 2001,
-    PROPOSAL_NOT_FOUND = 2002,
-    PROPOSAL_NOT_ACTIVE = 2003,
-    INVALID_VOTE = 2004,
-    INVALID_STATE = 2005,
-    VOTING_PERIOD_ENDED = 2006,
-    PROPOSAL_ALREADY_EXECUTED = 2007,
-    INSUFFICIENT_QUORUM = 2008,
-    PROPOSAL_FAILED = 2009,
-    PROPOSAL_REJECTED = 2010,
-    INVALID_PROPOSAL_FORMAT = 2011,
-    TIMELOCK_NOT_ELAPSED = 2012,
-    DELEGATION_NOT_ALLOWED = 2013,
-    EMERGENCY_PAUSE_ACTIVE = 2014,
-    PROPOSAL_EXECUTION_FAILED = 2015,
-    PROPOSAL_ENDED = 2016,
+    // System Level Errors
+    UNKNOWN_ERROR = 'UNKNOWN_ERROR',
+    INVALID_ARGUMENT = 'INVALID_ARGUMENT',
+    INVALID_STATE = 'INVALID_STATE',
+    NOT_IMPLEMENTED = 'NOT_IMPLEMENTED',
+    TIMEOUT = 'TIMEOUT',
     
-    // Connection and system errors (5000-5099)
-    CONNECTION_ERROR = 5001
+    // Program Level Errors
+    PROGRAM_ERROR = 'PROGRAM_ERROR',
+    INVALID_PROGRAM_ID = 'INVALID_PROGRAM_ID',
+    INVALID_PROGRAM_ACCOUNT = 'INVALID_PROGRAM_ACCOUNT',
+    PROGRAM_EXECUTION_FAILED = 'PROGRAM_EXECUTION_FAILED',
+    PROGRAM_UPGRADE_REQUIRED = 'PROGRAM_UPGRADE_REQUIRED',
+    PROGRAM_DEPRECATED = 'PROGRAM_DEPRECATED',
+    
+    // Security Related
+    UNAUTHORIZED = 'UNAUTHORIZED',
+    INVALID_SIGNATURE = 'INVALID_SIGNATURE',
+    INVALID_AUTHORITY = 'INVALID_AUTHORITY',
+    SIGNER_VALIDATION_FAILED = 'SIGNER_VALIDATION_FAILED',
+    OWNER_VALIDATION_FAILED = 'OWNER_VALIDATION_FAILED',
+    PDA_VALIDATION_FAILED = 'PDA_VALIDATION_FAILED',
+    BUMP_SEED_MISMATCH = 'BUMP_SEED_MISMATCH',
+    
+    // Mutation Related
+    INVALID_MUTATION_TYPE = 'INVALID_MUTATION_TYPE',
+    INVALID_MUTATION_TARGET = 'INVALID_MUTATION_TARGET',
+    INVALID_MUTATION_PAYLOAD = 'INVALID_MUTATION_PAYLOAD',
+    MUTATION_EXECUTION_FAILED = 'MUTATION_EXECUTION_FAILED',
+    
+    // Validation Related
+    VALIDATION_ERROR = 'VALIDATION_ERROR',
+    INVALID_ACCOUNT_DATA = 'INVALID_ACCOUNT_DATA',
+    INVALID_INSTRUCTION = 'INVALID_INSTRUCTION',
+    ACCOUNT_SIZE_MISMATCH = 'ACCOUNT_SIZE_MISMATCH',
+    ACCOUNT_OWNER_MISMATCH = 'ACCOUNT_OWNER_MISMATCH',
+    ACCOUNT_NOT_INITIALIZED = 'ACCOUNT_NOT_INITIALIZED',
+    
+    // Resource Related
+    INSUFFICIENT_FUNDS = 'INSUFFICIENT_FUNDS',
+    RATE_LIMIT_EXCEEDED = 'RATE_LIMIT_EXCEEDED',
+    RESOURCE_EXHAUSTED = 'RESOURCE_EXHAUSTED',
+    COMPUTE_BUDGET_EXCEEDED = 'COMPUTE_BUDGET_EXCEEDED',
+    MEMORY_LIMIT_EXCEEDED = 'MEMORY_LIMIT_EXCEEDED',
+
+    // Test Related
+    TEST_EXECUTION_FAILED = 'TEST_EXECUTION_FAILED',
+    TEST_TIMEOUT = 'TEST_TIMEOUT',
+    TEST_VALIDATION_FAILED = 'TEST_VALIDATION_FAILED',
+    
+    // Redis Related
+    REDIS_ERROR = 'REDIS_ERROR',
+    REDIS_NOT_CONFIGURED = 'REDIS_NOT_CONFIGURED',
+    REDIS_CONNECTION_FAILED = 'REDIS_CONNECTION_FAILED',
+    
+    // Governance Related
+    PROPOSAL_CREATION_FAILED = 'PROPOSAL_CREATION_FAILED',
+    PROPOSAL_NOT_ACTIVE = 'PROPOSAL_NOT_ACTIVE',
+    ALREADY_VOTED = 'ALREADY_VOTED',
+    INSUFFICIENT_VOTING_POWER = 'INSUFFICIENT_VOTING_POWER',
+    INVALID_VOTE = 'INVALID_VOTE',
+    INVALID_PROPOSAL_FORMAT = 'INVALID_PROPOSAL_FORMAT',
+    
+    // Staking Related
+    STAKE_CREATION_FAILED = 'STAKE_CREATION_FAILED',
+    STAKE_NOT_FOUND = 'STAKE_NOT_FOUND',
+    INVALID_STAKE_STATUS = 'INVALID_STAKE_STATUS',
+    UNSTAKE_FAILED = 'UNSTAKE_FAILED',
+    INVALID_STAKE_AMOUNT = 'INVALID_STAKE_AMOUNT',
+    INVALID_LOCKUP_PERIOD = 'INVALID_LOCKUP_PERIOD',
+
+    // Additional Error Codes
+    INVALID_AMOUNT = 'INVALID_AMOUNT',
+    INVALID_TEST_TYPE = 'INVALID_TEST_TYPE',
+    INVALID_SECURITY_LEVEL = 'INVALID_SECURITY_LEVEL',
+    INVALID_EXECUTION_ENVIRONMENT = 'INVALID_EXECUTION_ENVIRONMENT',
+    INVALID_DURATION = 'INVALID_DURATION',
+    INVALID_INTENSITY = 'INVALID_INTENSITY'
 }
 
-export interface ErrorDetails {
-    timestamp?: number;
-    requestId?: string;
-    metadata?: Record<string, unknown>;
+export function createErrorMetadata(
+    error: Error | string,
+    context: {
+        programId?: string;
+        instruction?: string;
+        accounts?: string[];
+        value?: string | number | boolean | null;
+        payload?: string | number | boolean | null;
+    } = {}
+): ErrorMetadata {
+    return {
+        programId: context.programId || '',
+        instruction: context.instruction || '',
+        error: error instanceof Error ? error.message : error,
+        accounts: context.accounts || [],
+        value: context.value || null,
+        payload: context.payload || null,
+        mutation: {
+            type: '',
+            target: '',
+            payload: null
+        },
+        securityContext: {
+            environment: 'testnet',
+            upgradeable: false,
+            validations: {
+                ownerChecked: false,
+                signerChecked: false,
+                accountDataMatched: false,
+                pdaVerified: false,
+                bumpsMatched: false
+            }
+        }
+    };
+}
+
+interface EnhancedError extends Error {
+    code: ErrorCode;
+    details: ErrorDetails;
+    toJSON(): {
+        name: string;
+        message: string;
+        code: ErrorCode;
+        details: ErrorDetails;
+    };
+}
+
+type ErrorDetailsInput = {
+    metadata?: Partial<ErrorMetadata>;
+    source?: {
+        file?: string;
+        line?: number;
+        function?: string;
+    };
+};
+
+function createErrorDetails(
+    code: ErrorCode,
+    message: string,
+    metadata: ErrorMetadata,
+    error: Error,
+    source?: ErrorDetailsInput['source']
+): ErrorDetails {
+    return {
+        code,
+        message,
+        metadata,
+        timestamp: Date.now(),
+        stackTrace: error.stack || '',
+        source: {
+            file: source?.file || '',
+            line: source?.line || 0,
+            function: source?.function || ''
+        }
+    };
+}
+
+export function createError(
+    code: ErrorCode,
+    message: string,
+    input?: ErrorDetailsInput
+): EnhancedError {
+    const error = new Error(message);
+    const metadata = createErrorMetadata(message, input?.metadata);
+    const errorDetails = createErrorDetails(code, message, metadata, error, input?.source);
+
+    const enhancedError = Object.assign(error, {
+        code,
+        details: errorDetails,
+        toJSON(): {
+            name: string;
+            message: string;
+            code: ErrorCode;
+            details: ErrorDetails;
+        } {
+            return {
+                name: error.name,
+                message: error.message,
+                code,
+                details: errorDetails
+            };
+        }
+    });
+
+    return enhancedError as EnhancedError;
 }
 
 export class GlitchError extends Error {
-    constructor(message: string, public code: ErrorCode, public details?: ErrorDetails) {
+    constructor(
+        message: string, 
+        public code: ErrorCode, 
+        public details?: ErrorDetails
+    ) {
         super(message);
         this.name = 'GlitchError';
         
-        // Capture stack trace
-        if (Error.captureStackTrace) {
-            Error.captureStackTrace(this, GlitchError);
+        // Initialize default error details if not provided
+        if (!this.details) {
+            this.details = createErrorDetails(
+                this.code,
+                this.message,
+                createErrorMetadata(this.message),
+                this
+            );
         }
     }
-    
-    toJSON(): Record<string, unknown> {
+
+    public toJSON() {
         return {
-            code: this.code,
+            name: this.name,
             message: this.message,
+            code: this.code,
             details: this.details,
             stack: this.stack
         };
     }
 }
 
+// Specialized error classes
 export class InsufficientFundsError extends GlitchError {
-    constructor(details?: ErrorDetails) {
-        super('Insufficient $GREMLINAI tokens for chaos request', ErrorCode.INSUFFICIENT_FUNDS, details);
+    constructor(message: string, metadata?: Partial<ErrorMetadata>) {
+        super(
+            message, 
+            ErrorCode.INSUFFICIENT_FUNDS,
+            createErrorDetails(
+                ErrorCode.INSUFFICIENT_FUNDS,
+                message,
+                createErrorMetadata(message, metadata),
+                new Error(message)
+            )
+        );
     }
 }
 
-export class InvalidProgramError extends GlitchError {
-    constructor(details?: ErrorDetails) {
-        super('Invalid target program address', ErrorCode.INVALID_PROGRAM, details);
+export class ValidationError extends GlitchError {
+    constructor(message: string, metadata?: Partial<ErrorMetadata>) {
+        super(
+            message, 
+            ErrorCode.VALIDATION_ERROR,
+            createErrorDetails(
+                ErrorCode.VALIDATION_ERROR,
+                message,
+                createErrorMetadata(message, metadata),
+                new Error(message)
+            )
+        );
+    }
+}
+
+export class UnauthorizedError extends GlitchError {
+    constructor(message: string, metadata?: Partial<ErrorMetadata>) {
+        super(
+            message, 
+            ErrorCode.UNAUTHORIZED,
+            createErrorDetails(
+                ErrorCode.UNAUTHORIZED,
+                message,
+                createErrorMetadata(message, metadata),
+                new Error(message)
+            )
+        );
     }
 }
 
 export class RequestTimeoutError extends GlitchError {
-    constructor(details?: ErrorDetails) {
-        super('Chaos request timed out', ErrorCode.REQUEST_TIMEOUT, details);
+    constructor(message: string, metadata?: Partial<ErrorMetadata>) {
+        super(
+            message, 
+            ErrorCode.TIMEOUT,
+            createErrorDetails(
+                ErrorCode.TIMEOUT,
+                message,
+                createErrorMetadata(message, metadata),
+                new Error(message)
+            )
+        );
     }
+}
+
+export class ProgramError extends GlitchError {
+    constructor(message: string, metadata?: Partial<ErrorMetadata>) {
+        super(
+            message, 
+            ErrorCode.PROGRAM_ERROR,
+            createErrorDetails(
+                ErrorCode.PROGRAM_ERROR,
+                message,
+                createErrorMetadata(message, metadata),
+                new Error(message)
+            )
+        );
+    }
+}
+
+export class SecurityError extends GlitchError {
+    constructor(message: string, code: ErrorCode, metadata?: Partial<ErrorMetadata>) {
+        super(
+            message, 
+            code,
+            createErrorDetails(
+                code,
+                message,
+                createErrorMetadata(message, metadata),
+                new Error(message)
+            )
+        );
+    }
+}
+
+export function isGlitchError(error: unknown): error is GlitchError {
+    return error instanceof GlitchError;
+}
+
+export function isSecurityError(error: unknown): error is SecurityError {
+    return error instanceof SecurityError;
+}
+
+export function isProgramError(error: unknown): error is ProgramError {
+    return error instanceof ProgramError;
 }

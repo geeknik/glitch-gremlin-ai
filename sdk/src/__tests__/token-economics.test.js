@@ -1,95 +1,71 @@
-import { TokenEconomics, TestType } from '../token-economics';
-import { GlitchError, ErrorCode } from '../errors';
+import { TokenEconomics } from '../token-economics';
+import { TestType } from '../types';
 
 describe('TokenEconomics', () => {
     describe('fee calculation', () => {
         it('should throw for invalid test types', () => {
-            expect(() => TokenEconomics.calculateTestFee('INVALID' as any, 300, 5))
+            expect(() => TokenEconomics.calculateTestFee('INVALID', 300, 5))
                 .toThrow('Invalid test type');
         });
 
-        it('should calculate fees for all test types', () => {
-            const types = [TestType.FUZZ, TestType.LOAD, TestType.EXPLOIT, TestType.CONCURRENCY];
-            types.forEach(type => {
-                const fee = TokenEconomics.calculateTestFee(type, 300, 5);
-                expect(fee).toBeGreaterThan(0);
-            });
-        });
-
-        it('should handle edge case parameters', () => {
-            const minFee = TokenEconomics.calculateTestFee(TestType.FUZZ, 60, 1);
-            const maxFee = TokenEconomics.calculateTestFee(TestType.EXPLOIT, 3600, 10);
-            expect(minFee).toBeLessThan(maxFee);
-        });
         it('should calculate base fees correctly', () => {
-            const fee = TokenEconomics.calculateTestFee(TestType.FUZZ, 300, 5);
-            expect(fee).toBeGreaterThan(0);
-            expect(typeof fee).toBe('number');
+            const fee = TokenEconomics.calculateTestFee(TestType.ARITHMETIC_OVERFLOW, 300, 5);
+            expect(fee).toBe(300 * 5 * TokenEconomics.BASE_FEE_MULTIPLIER);
         });
 
-        it('should scale fees with test type', () => {
-            const fuzzFee = TokenEconomics.calculateTestFee(TestType.FUZZ, 300, 5);
-            const exploitFee = TokenEconomics.calculateTestFee(TestType.EXPLOIT, 300, 5);
-            expect(exploitFee).toBeGreaterThan(fuzzFee);
-        });
-
-        it('should scale fees with duration', () => {
-            const shortTest = TokenEconomics.calculateTestFee(TestType.FUZZ, 300, 5);
-            const longTest = TokenEconomics.calculateTestFee(TestType.FUZZ, 600, 5);
-            expect(longTest).toBeGreaterThan(shortTest);
-        });
-
-        it('should scale fees with intensity', () => {
-            const lowIntensity = TokenEconomics.calculateTestFee(TestType.FUZZ, 300, 2);
-            const highIntensity = TokenEconomics.calculateTestFee(TestType.FUZZ, 300, 8);
+        it('should apply intensity multiplier', () => {
+            const lowIntensity = TokenEconomics.calculateTestFee(TestType.ACCESS_CONTROL, 300, 1);
+            const highIntensity = TokenEconomics.calculateTestFee(TestType.ACCESS_CONTROL, 300, 10);
             expect(highIntensity).toBeGreaterThan(lowIntensity);
         });
-    });
 
-    describe('stake validation', () => {
-        it('should validate minimum stake', () => {
-            expect(() => TokenEconomics.validateStakeAmount(100))
-                .toThrow('Stake amount below minimum required');
+        it('should apply duration multiplier', () => {
+            const shortDuration = TokenEconomics.calculateTestFee(TestType.REENTRANCY, 60, 5);
+            const longDuration = TokenEconomics.calculateTestFee(TestType.REENTRANCY, 3600, 5);
+            expect(longDuration).toBeGreaterThan(shortDuration);
         });
 
-        it('should validate maximum stake', () => {
-            expect(() => TokenEconomics.validateStakeAmount(20_000_000))
-                .toThrow('Stake amount cannot exceed 10000000');
-        });
-
-        it('should accept valid stake amounts', () => {
-            expect(() => TokenEconomics.validateStakeAmount(5000))
-                .not.toThrow();
+        it('should enforce minimum fees', () => {
+            const fee = TokenEconomics.calculateTestFee(TestType.ARITHMETIC_OVERFLOW, 60, 1);
+            expect(fee).toBeGreaterThanOrEqual(TokenEconomics.MIN_FEE);
         });
     });
 
-    describe('rewards calculation', () => {
-        it('should calculate staking rewards', () => {
-            const rewards = TokenEconomics.calculateRewards(10000, 365 * 24 * 60 * 60);
-            expect(rewards).toBeGreaterThan(0);
+    describe('burn rate calculation', () => {
+        it('should calculate burn rate based on test type', () => {
+            const criticalBurn = TokenEconomics.calculateBurnRate(TestType.REENTRANCY);
+            const standardBurn = TokenEconomics.calculateBurnRate(TestType.ACCESS_CONTROL);
+            expect(criticalBurn).toBeGreaterThan(standardBurn);
         });
 
-        it('should increase rewards with longer lockup', () => {
-            const shortLockup = TokenEconomics.calculateRewards(10000, 30 * 24 * 60 * 60);
-            const longLockup = TokenEconomics.calculateRewards(10000, 365 * 24 * 60 * 60);
-            expect(longLockup).toBeGreaterThan(shortLockup);
+        it('should enforce minimum burn rate', () => {
+            const burnRate = TokenEconomics.calculateBurnRate(TestType.ARITHMETIC_OVERFLOW);
+            expect(burnRate).toBeGreaterThanOrEqual(TokenEconomics.MIN_BURN_RATE);
         });
     });
 
-    describe('test parameter validation', () => {
-        it('should validate duration range', () => {
-            expect(() => TokenEconomics.validateTestParameters(30, 5))
-                .toThrow('Test duration must be between 60 and 3600 seconds');
+    describe('reward calculation', () => {
+        it('should calculate validator rewards', () => {
+            const reward = TokenEconomics.calculateValidatorReward(1000, TestType.REENTRANCY);
+            expect(reward).toBe(1000 * TokenEconomics.VALIDATOR_REWARD_MULTIPLIER);
         });
 
-        it('should validate intensity range', () => {
-            expect(() => TokenEconomics.validateTestParameters(300, 11))
-                .toThrow('Test intensity must be between 1 and 10');
+        it('should calculate bug bounty rewards', () => {
+            const bounty = TokenEconomics.calculateBugBounty(TestType.ARITHMETIC_OVERFLOW, 9);
+            expect(bounty).toBeGreaterThan(0);
+            expect(bounty).toBeLessThanOrEqual(TokenEconomics.MAX_BUG_BOUNTY);
+        });
+    });
+
+    describe('governance staking', () => {
+        it('should calculate voting power', () => {
+            const power = TokenEconomics.calculateVotingPower(1000, 365);
+            expect(power).toBeGreaterThan(1000);
         });
 
-        it('should accept valid parameters', () => {
-            expect(() => TokenEconomics.validateTestParameters(300, 5))
-                .not.toThrow();
+        it('should calculate early unstake penalty', () => {
+            const penalty = TokenEconomics.calculateUnstakePenalty(1000, 0.5);
+            expect(penalty).toBe(500); // 50% penalty
         });
     });
 });

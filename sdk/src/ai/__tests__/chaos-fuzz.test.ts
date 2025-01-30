@@ -1,97 +1,66 @@
-import { jest } from '@jest/globals';
-import { ChaosGenerator, ChaosConfig } from '../chaosGenerator';
-import { VulnerabilityType } from '../src/types';
-import { FuzzInput } from '../src/types';
+import { ChaosGenerator } from '../chaosGenerator.js';
+import { PublicKey } from '@solana/web3.js';
+import { VulnerabilityType, VulnerabilityAnalysis } from '../../types.js';
 
 describe('ChaosGenerator', () => {
-    let chaosGenerator: ChaosGenerator;
-    const defaultConfig: ChaosConfig = {
-        mutationRate: 0.1,
-        maxChaosLevel: 5,
-        targetVulnerabilities: [VulnerabilityType.ArithmeticOverflow as any]
-    };
+    let generator: ChaosGenerator;
+    const testProgramId = new PublicKey('11111111111111111111111111111111');
 
     beforeEach(() => {
-        chaosGenerator = new ChaosGenerator(defaultConfig);
-    });
-
-    describe('initialization', () => {
-        it('should create with default configuration', () => {
-            const generator = new ChaosGenerator();
-            expect(generator).toBeDefined();
-        });
-
-        it('should create with custom configuration', () => {
-            const generator = new ChaosGenerator(defaultConfig);
-            expect(generator).toBeDefined();
+        generator = new ChaosGenerator({
+            targetProgram: testProgramId,
+            maxAccounts: 5,
+            maxDataSize: 1024,
+            maxSeeds: 16,
+            vulnerabilityTypes: [
+                VulnerabilityType.ARITHMETIC_OVERFLOW,
+                VulnerabilityType.ACCESS_CONTROL
+            ]
         });
     });
 
-    describe('enhanceInput', () => {
-        const mockInput: FuzzInput = {
-            instruction: 100,
-            data: new Uint8Array([1, 2, 3, 4]),
-            probability: 0.5,
-            metadata: {},
-            created: Date.now()
-        };
-
-        it('should enhance input based on chaos level', () => {
-            const chaosLevel = 3;
-            const enhanced = chaosGenerator.enhanceInput(mockInput, chaosLevel);
-            
-            expect(enhanced).toBeDefined();
-            expect(enhanced.instruction).toBeDefined();
-            expect(enhanced.data).toBeDefined();
-            expect(enhanced.probability).toBeDefined();
-            expect(enhanced.probability).toBeGreaterThanOrEqual(mockInput.probability);
-        });
-
-        it('should respect maximum chaos level', () => {
-            expect(() => {
-                chaosGenerator.enhanceInput(mockInput, defaultConfig.maxChaosLevel + 1);
-            }).toThrow();
-        });
-
-        it('should increase mutation probability with chaos level', () => {
-            const lowChaos = chaosGenerator.enhanceInput(mockInput, 1);
-            const highChaos = chaosGenerator.enhanceInput(mockInput, 4);
-            
-            expect(highChaos.probability).toBeGreaterThan(lowChaos.probability);
-        });
-
-        it('should maintain data length after mutation', () => {
-            const enhanced = chaosGenerator.enhanceInput(mockInput, 3);
-            expect(enhanced.data.length).toBe(mockInput.data.length);
-        });
-    });
-
-    describe('edge cases', () => {
-        it('should handle empty input data', () => {
-            const emptyInput: FuzzInput = {
-                instruction: 0,
-                data: new Uint8Array(),
-                probability: 0.5,
-                metadata: {},
-                created: Date.now()
+    describe('generateChaos', () => {
+        it('should generate valid chaos input', async () => {
+            const params = {
+                programId: testProgramId,
+                accounts: [
+                    new PublicKey('22222222222222222222222222222222'),
+                    new PublicKey('33333333333333333333333333333333')
+                ],
+                data: Buffer.from([1, 2, 3, 4]),
+                seeds: [Buffer.from('test')]
             };
-            
-            const enhanced = chaosGenerator.enhanceInput(emptyInput, 1);
-            expect(enhanced.data.length).toBe(0);
+            const result = await generator.generateChaos(params);
+            expect(result.success).toBe(true);
+            expect(result.coverage).toBeGreaterThan(0);
+            expect(result.vulnerabilities).toBeInstanceOf(Array);
+            expect(result.transactions).toBeInstanceOf(Array);
         });
 
-        it('should handle maximum instruction values', () => {
-            const maxInput: FuzzInput = {
-                instruction: 255,
-                data: new Uint8Array([255, 255]),
-                probability: 1.0,
-                metadata: {},
-                created: Date.now()
+        it('should detect arithmetic overflow vulnerabilities', async () => {
+            const params = {
+                programId: testProgramId,
+                accounts: [
+                    new PublicKey('22222222222222222222222222222222')
+                ],
+                data: Buffer.from([255, 255, 255, 255]),
+                seeds: [Buffer.from('overflow')]
             };
-            
-            const enhanced = chaosGenerator.enhanceInput(maxInput, 1);
-            expect(enhanced.instruction).toBeLessThanOrEqual(255);
-            expect(enhanced.instruction).toBeGreaterThanOrEqual(0);
+            const result = await generator.generateChaos(params);
+            expect(result.vulnerabilities.some((v: VulnerabilityAnalysis) => v.type === VulnerabilityType.ARITHMETIC_OVERFLOW)).toBe(true);
+        });
+
+        it('should detect access control vulnerabilities', async () => {
+            const params = {
+                programId: testProgramId,
+                accounts: [
+                    new PublicKey('44444444444444444444444444444444')
+                ],
+                data: Buffer.from([1, 2, 3, 4]),
+                seeds: [Buffer.from('access')]
+            };
+            const result = await generator.generateChaos(params);
+            expect(result.vulnerabilities.some((v: VulnerabilityAnalysis) => v.type === VulnerabilityType.ACCESS_CONTROL)).toBe(true);
         });
     });
 });

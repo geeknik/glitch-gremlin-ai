@@ -1,141 +1,254 @@
 import * as tf from '@tensorflow/tfjs-node';
+import type { Sequential, LayersModel } from '@tensorflow/tfjs-layers';
+import type { Tensor } from '@tensorflow/tfjs-core';
 import { VulnerabilityType } from './types.js';
+import { Tensor as TensorNode } from '@tensorflow/tfjs-node';
 
 export interface PredictionResult {
     type: VulnerabilityType;
     confidence: number;
+    details: string[];
 }
 
-export class VulnerabilityDetectionModel {
-    private model: tf.Sequential | null = null;
-    private initialized: boolean = false;
+export interface MLConfig {
+    inputShape: number[];
+    hiddenLayers: number[];
+    outputShape: number;
+    learningRate: number;
+}
 
-    constructor() {
+export interface TrainConfig {
+    epochs: number;
+    batchSize: number;
+    validationSplit?: number;
+    verbose?: number;
+}
+
+/**
+ * Base class for all machine learning models in the system
+ */
+export abstract class MLModel {
+    protected model: tf.Sequential;
+    protected readonly config: MLConfig;
+    protected initialized: boolean;
+
+    constructor(config: MLConfig) {
+        this.config = config;
         this.initialized = false;
-        this.model = null;
-        this.initializeModel();
+        this.model = this.buildModel();
     }
 
-    private initializeModel() {
-        this.model = tf.sequential();
+    protected buildModel(): tf.Sequential {
+        const model = tf.sequential();
 
         // Input layer
-        this.model.add(tf.layers.dense({
-            units: 64,
+        model.add(tf.layers.dense({
+            units: this.config.hiddenLayers[0],
             activation: 'relu',
-            inputShape: [20]
+            inputShape: this.config.inputShape
         }));
-        
-        this.model.add(tf.layers.dropout({ rate: 0.2 }));
-        
-        // Hidden layer
-        this.model.add(tf.layers.dense({
-            units: 32,
-            activation: 'relu'
-        }));
-        
-        this.model.add(tf.layers.dropout({ rate: 0.2 }));
-        
-        // Output layer - one unit per vulnerability type
-        this.model.add(tf.layers.dense({
-            units: Object.keys(VulnerabilityType).length,
+
+        // Hidden layers
+        for (let i = 1; i < this.config.hiddenLayers.length; i++) {
+            model.add(tf.layers.dense({
+                units: this.config.hiddenLayers[i],
+                activation: 'relu'
+            }));
+        }
+
+        // Output layer
+        model.add(tf.layers.dense({
+            units: this.config.outputShape,
             activation: 'softmax'
         }));
 
-        this.model.compile({
-            optimizer: tf.train.adam(0.001),
+        // Compile model
+        model.compile({
+            optimizer: tf.train.adam(this.config.learningRate),
             loss: 'categoricalCrossentropy',
             metrics: ['accuracy']
         });
 
-        this.model = this.model;
         this.initialized = true;
+        return model;
     }
 
-    async train(data: Array<{ features: number[]; label: VulnerabilityType }>): Promise<{ loss: number }> {
-        if (!this.model || !this.initialized) {
+    public async train(
+        x: tf.Tensor | number[][],
+        y: tf.Tensor | number[][],
+        config: TrainConfig
+    ): Promise<tf.History> {
+        if (!this.initialized) {
             throw new Error('Model not initialized');
         }
 
-        if (!data || data.length === 0) {
-            throw new Error('Training data cannot be empty');
-        }
-
-        const xs = tf.tensor2d(data.map(d => d.features));
-        const ys = tf.oneHot(
-            tf.tensor1d(data.map(d => Object.values(VulnerabilityType).indexOf(d.label)), 'int32'),
-            Object.keys(VulnerabilityType).length
-        );
+        const xs = Array.isArray(x) ? tf.tensor2d(x) : x;
+        const ys = Array.isArray(y) ? tf.tensor2d(y) : y;
 
         try {
-            const result = await this.model.fit(xs, ys, {
-                epochs: 10,
-                validationSplit: 0.2,
-                shuffle: true
+            return await this.model.fit(xs, ys, {
+                epochs: config.epochs,
+                batchSize: config.batchSize,
+                validationSplit: config.validationSplit || 0.1,
+                verbose: config.verbose || 1
             });
-
-            return {
-                loss: Number(result.history.loss[result.history.loss.length - 1])
-            };
         } finally {
-            tf.dispose([xs, ys]);
+            if (Array.isArray(x)) xs.dispose();
+            if (Array.isArray(y)) ys.dispose();
         }
     }
 
-    async predict(features: number[]): Promise<PredictionResult> {
-        if (!this.model || !this.initialized) {
+    public async predict(x: tf.Tensor | number[][]): Promise<tf.Tensor> {
+        if (!this.initialized) {
             throw new Error('Model not initialized');
         }
 
-        if (features.length !== 20) {
-            throw new Error('Invalid input: expected 20 features');
-        }
-
-        const input = tf.tensor2d([features]);
+        const xs = Array.isArray(x) ? tf.tensor2d(x) : x;
         try {
-            const prediction = this.model.predict(input) as tf.Tensor;
-            const probabilities = await prediction.data();
-            const maxIndex = probabilities.indexOf(Math.max(...Array.from(probabilities)));
-
-            return {
-                type: Object.values(VulnerabilityType)[maxIndex],
-                confidence: probabilities[maxIndex]
-            };
+            return this.model.predict(xs) as tf.Tensor;
         } finally {
-            tf.dispose([input]);
+            if (Array.isArray(x)) xs.dispose();
         }
     }
 
-    async save(path: string): Promise<void> {
-        if (!this.model || !this.initialized) {
+    public async save(path: string): Promise<void> {
+        if (!this.initialized) {
             throw new Error('Model not initialized');
-        }
-
-        if (!path) {
-            throw new Error('Invalid save path specified');
         }
         await this.model.save(`file://${path}`);
     }
 
-    async load(path: string): Promise<void> {
-        try {
-            this.model = await tf.loadLayersModel(`file://${path}/model.json`) as tf.Sequential;
-            this.model.compile({
-                optimizer: tf.train.adam(0.001),
-                loss: 'categoricalCrossentropy',
-                metrics: ['accuracy']
-            });
-            this.initialized = true;
-        } catch (error) {
-            throw new Error(`Failed to load model: ${error instanceof Error ? error.message : String(error)}`);
+    public async load(path: string): Promise<void> {
+        const loadedModel = await tf.loadLayersModel(`file://${path}`);
+        if (!(loadedModel instanceof tf.Sequential)) {
+            throw new Error('Loaded model is not a Sequential model');
+        }
+        this.model = loadedModel;
+        this.model.compile({
+            optimizer: tf.train.adam(this.config.learningRate),
+            loss: 'categoricalCrossentropy',
+            metrics: ['accuracy']
+        });
+        this.initialized = true;
+    }
+
+    public dispose(): void {
+        if (this.initialized && this.model) {
+            this.model.dispose();
+            this.initialized = false;
         }
     }
 
-    async cleanup(): Promise<void> {
-        if (this.model) {
-            this.model.dispose();
-            this.model = null;
-            this.initialized = false;
+    public getConfig(): MLConfig {
+        return { ...this.config };
+    }
+
+    public isInitialized(): boolean {
+        return this.initialized;
+    }
+
+    protected async calculateModelHash(): Promise<string> {
+        if (!this.initialized) {
+            throw new Error('Model not initialized');
         }
+        
+        // Get model weights as a concatenated array
+        const weights = this.model.getWeights();
+        const weightData = await Promise.all(
+            weights.map(w => w.data())
+        );
+        
+        // Create a hash of the weights
+        const weightString = weightData
+            .map(d => Array.from(d).join(','))
+            .join('|');
+            
+        return Buffer.from(weightString).toString('base64');
+    }
+}
+
+export class VulnerabilityDetectionModel extends MLModel {
+    constructor() {
+        const config: MLConfig = {
+            inputShape: [20],
+            hiddenLayers: [64, 32],
+            outputShape: Object.keys(VulnerabilityType).length,
+            learningRate: 0.001
+        };
+        super(config);
+    }
+
+    public async trainOnBatch(data: { features: number[]; label: VulnerabilityType }[]): Promise<{ loss: number }> {
+        const features = data.map(d => d.features);
+        const labels = data.map(d => this.oneHotEncode(d.label));
+        
+        const history = await this.train(features, labels, {
+            epochs: 1,
+            batchSize: data.length
+        });
+        
+        // Extract loss value from history and ensure it's a number
+        const lossValue = Array.isArray(history.history.loss) 
+            ? history.history.loss[0] 
+            : history.history.loss;
+            
+        const loss = typeof lossValue === 'number' ? lossValue : 0;
+        
+        return { loss };
+    }
+
+    public async predictVulnerability(features: number[]): Promise<PredictionResult> {
+        const prediction = await this.predict([features]);
+        const predictionData = await prediction.data();
+        
+        // Get the index of the highest probability
+        const maxIndex = Array.from(predictionData).indexOf(Math.max(...Array.from(predictionData)));
+        const vulnerabilityType = Object.values(VulnerabilityType)[maxIndex];
+        
+        return {
+            type: vulnerabilityType,
+            confidence: predictionData[maxIndex],
+            details: this.generateDetails(vulnerabilityType, predictionData[maxIndex])
+        };
+    }
+
+    private oneHotEncode(vulnerabilityType: VulnerabilityType): number[] {
+        const numClasses = Object.keys(VulnerabilityType).length;
+        const index = Object.values(VulnerabilityType).indexOf(vulnerabilityType);
+        return Array(numClasses).fill(0).map((_, i) => i === index ? 1 : 0);
+    }
+
+    private generateDetails(type: VulnerabilityType, confidence: number): string[] {
+        const details = [`Detected vulnerability type: ${type}`];
+        details.push(`Confidence score: ${(confidence * 100).toFixed(2)}%`);
+
+        details.push('Recommendations:');
+        switch (type) {
+            case VulnerabilityType.REENTRANCY:
+                details.push('- Implement checks-effects-interactions pattern');
+                details.push('- Use reentrancy guards');
+                details.push('- Update state before external calls');
+                break;
+            case VulnerabilityType.ACCESS_CONTROL:
+                details.push('- Implement proper authorization checks');
+                details.push('- Use role-based access control');
+                details.push('- Add multi-signature requirements for critical operations');
+                break;
+            case VulnerabilityType.ARITHMETIC_OVERFLOW:
+                details.push('- Use checked math operations');
+                details.push('- Implement value range validation');
+                details.push('- Add overflow checks for critical calculations');
+                break;
+            default:
+                details.push('- Review code for potential security issues');
+                details.push('- Consider security audit');
+                break;
+        }
+
+        return details;
+    }
+
+    public async cleanup(): Promise<void> {
+        this.dispose();
     }
 }

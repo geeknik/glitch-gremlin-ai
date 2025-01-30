@@ -1,294 +1,295 @@
 import * as tf from '@tensorflow/tfjs-node';
+import { FuzzingState, FuzzingAction } from '@/types.js';
 
-class ModelBuildError extends Error {
-    constructor(message: string) {
-        super(message);
-        this.name = 'ModelBuildError';
-    }
-}
-import { SmartMutationOperator } from './reinforcement-fuzzing-utils.js';
-
-/**
-* Interface defining the state representation for the RL agent
-*/
-export interface FuzzingState {
-    programCounter: number;
-    coverage: number;
-    lastCrash: number;
-    mutationHistory: string[];
-    executionTime: number;
-}
-
-/**
-* Interface defining the result of taking an action
-*/
-interface ActionResult {
-    nextState: FuzzingState;
+export interface FuzzingExperience {
+    state: FuzzingState;
+    action: FuzzingAction;
     reward: number;
+    nextState: FuzzingState;
     done: boolean;
+    priority?: number;
 }
 
-/**
-* Reinforcement Learning based fuzzing model using Deep Q-Network (DQN)
-*/
-export class ReinforcementFuzzer {
-    private model!: tf.LayersModel;  // Definite assignment assertion
-    private targetModel!: tf.LayersModel;  // Definite assignment assertion
-    private replayBuffer: Array<[FuzzingState, number, number, FuzzingState, boolean]>;
+export interface RLFuzzingConfig {
+    stateSize: number;
+    actionSize: number;
+    batchSize?: number;
+    gamma?: number;
+    epsilonMin?: number;
+    epsilonDecay?: number;
+    targetUpdateFrequency?: number;
+    maxConcurrentFuzzing: number;
+    priorityAlpha?: number;  // Priority exponent
+    priorityBeta?: number;   // Importance sampling weight
+    maxMemorySize?: number;  // Maximum size of replay buffer
+}
+
+interface PrioritizedExperience extends FuzzingExperience {
+    priority: number;
+    index: number;
+}
+
+export class ReinforcementFuzzing {
+    private model: tf.Sequential;
+    private targetModel: tf.Sequential;
+    private readonly stateSize: number;
+    private readonly actionSize: number;
+    private readonly batchSize: number;
+    private readonly gamma: number;
     private epsilon: number;
-    
+    private readonly epsilonMin: number;
+    private readonly epsilonDecay: number;
+    private readonly priorityAlpha: number;
+    private readonly priorityBeta: number;
+    private readonly maxMemorySize: number;
+    private memory: PrioritizedExperience[];
+    private memoryIndex: number;
+
     constructor(
-        private readonly stateSize: number = 64,
-        private readonly actionSize: number = 32,
-        private readonly batchSize: number = 32,
-        private readonly gamma: number = 0.99,
-        private readonly epsilonDecay: number = 0.995,
-        private readonly initialEpsilon: number = 1.0,
-        private readonly targetUpdateFreq: number = 100
+        stateSize: number,
+        actionSize: number,
+        batchSize: number = 32,
+        gamma: number = 0.95,
+        epsilon: number = 1.0,
+        epsilonMin: number = 0.01,
+        epsilonDecay: number = 0.995,
+        priorityAlpha: number = 0.6,
+        priorityBeta: number = 0.4,
+        maxMemorySize: number = 10000
     ) {
-        if (stateSize <= 0 || actionSize <= 0 || batchSize <= 0) {
-            throw new ModelBuildError('Invalid model configuration: dimensions must be positive');
-        }
-        this.replayBuffer = [];
-        this.epsilon = this.initialEpsilon;
-        
-        try {
-            this.model = this.buildNetwork();
-            this.targetModel = this.buildNetwork();
-            this.updateTargetModel();
-        } catch (error) {
-            if (error instanceof Error) {
-                throw new ModelBuildError(`Failed to build neural network: ${error.message}`);
-            }
-            throw new ModelBuildError('Failed to build neural network');
-        }
-    }
-
-    /**
-    * Builds the DQN network architecture
-    */
-    private buildNetwork(): tf.LayersModel {
-        try {
-            // Verify TensorFlow is properly initialized
-            if (!tf || !tf.sequential || !tf.layers || !tf.train) {
-                throw new Error('TensorFlow not properly initialized');
-            }
-
-            // Create model
-            const model = tf.sequential();
-            
-            // Add layers with error handling
-            try {
-                // Input layer
-                const inputLayer = tf.layers.dense({
-                    units: 128,
-                    activation: 'relu',
-                    inputShape: [this.stateSize],
-                    kernelInitializer: 'glorotUniform',
-                    name: 'input_layer'
-                });
-                model.add(inputLayer);
-                
-                // Hidden layer
-                const hiddenLayer = tf.layers.dense({
-                    units: 64,
-                    activation: 'relu',
-                    kernelInitializer: 'glorotUniform',
-                    name: 'hidden_layer'
-                });
-                model.add(hiddenLayer);
-                
-                // Output layer
-                const outputLayer = tf.layers.dense({
-                    units: this.actionSize,
-                    activation: 'linear',
-                    kernelInitializer: 'glorotUniform',
-                    name: 'output_layer'
-                });
-                model.add(outputLayer);
-            } catch (layerError) {
-                throw new Error(`Failed to add layers: ${layerError instanceof Error ? layerError.message : 'Unknown error'}`);
-            }
-
-            // Compile model
-            try {
-                const optimizer = tf.train.adam(0.001);
-                model.compile({
-                    optimizer: optimizer,
-                    loss: 'meanSquaredError',
-                    metrics: ['mse']
-                });
-            } catch (compileError) {
-                throw new Error(`Failed to compile model: ${compileError instanceof Error ? compileError.message : 'Unknown error'}`);
-            }
-
-            return model;
-        } catch (error) {
-            throw new ModelBuildError(`Failed to build network: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    }
-
-    /**
-    * Updates the target network weights with the main network weights
-    */
-    private updateTargetModel(): void {
+        this.stateSize = stateSize;
+        this.actionSize = actionSize;
+        this.batchSize = batchSize;
+        this.gamma = gamma;
+        this.epsilon = epsilon;
+        this.epsilonMin = epsilonMin;
+        this.epsilonDecay = epsilonDecay;
+        this.priorityAlpha = priorityAlpha;
+        this.priorityBeta = priorityBeta;
+        this.maxMemorySize = maxMemorySize;
+        this.memory = [];
+        this.memoryIndex = 0;
+        this.model = this.buildModel();
+        this.targetModel = this.buildModel();
         this.targetModel.setWeights(this.model.getWeights());
     }
 
-    /**
-    * Converts a FuzzingState to tensor representation
-    */
-    private stateToTensor(state: FuzzingState): tf.Tensor {
-        // Validate state types
-        if (typeof state.programCounter !== 'number' ||
-            typeof state.coverage !== 'number' ||
-            typeof state.lastCrash !== 'number' ||
-            typeof state.executionTime !== 'number' ||
-            !Array.isArray(state.mutationHistory)) {
-            throw new Error('Invalid FuzzingState type structure');
-        }
-        // Convert state object to flat array with padding
-        const stateArray = new Array(this.stateSize).fill(0);
-        
-        // Set fixed position values
-        stateArray[0] = state.programCounter;
-        stateArray[1] = state.coverage;
-        stateArray[2] = state.lastCrash;
-        stateArray[3] = state.executionTime;
-        
-        // Fill mutation history indices starting from index 4
-        const maxMutations = this.stateSize - 4;
-        for (let i = 0; i < Math.min(state.mutationHistory.length, maxMutations); i++) {
-            stateArray[4 + i] = i; // Store index as ID
-        }
-        
-        return tf.tensor2d([stateArray], [1, this.stateSize]);
+    private buildModel(): tf.Sequential {
+        const model = tf.sequential();
+
+        // Input layer
+        model.add(tf.layers.dense({
+            units: 128,
+            activation: 'relu',
+            inputShape: [this.stateSize]
+        }));
+
+        // Hidden layers with dropout for regularization
+        model.add(tf.layers.dense({
+            units: 128,
+            activation: 'relu'
+        }));
+        model.add(tf.layers.dropout({ rate: 0.2 }));
+
+        // Additional hidden layer
+        model.add(tf.layers.dense({
+            units: 64,
+            activation: 'relu'
+        }));
+        model.add(tf.layers.dropout({ rate: 0.2 }));
+
+        // Output layer for action values
+        model.add(tf.layers.dense({
+            units: this.actionSize,
+            activation: 'linear'
+        }));
+
+        model.compile({
+            optimizer: tf.train.adam(0.001),
+            loss: 'huberLoss'  // More robust to outliers than MSE
+        });
+
+        return model;
     }
 
-    /**
-    * Selects an action using epsilon-greedy policy
-    */
-    public async selectAction(state: FuzzingState): Promise<number> {
-        // Validate state before processing
-        if (typeof state.programCounter !== 'number' ||
-            typeof state.coverage !== 'number' ||
-            typeof state.lastCrash !== 'number' ||
-            typeof state.executionTime !== 'number' ||
-            !Array.isArray(state.mutationHistory)) {
-            throw new Error('Invalid FuzzingState type structure');
+    private stateToTensor(state: FuzzingState): tf.Tensor {
+        // Enhanced state representation
+        const stateArray = [
+            state.metrics.coverage,
+            state.metrics.uniquePaths,
+            state.metrics.vulnerabilitiesFound,
+            state.metrics.successRate,
+            state.metrics.avgExecutionTime,
+            state.programState.slot,
+            state.programState.blockTime,
+            ...state.programState.accounts.flatMap(account => [
+                Number(account.lamports),
+                account.executable ? 1 : 0,
+                // Add account type encoding
+                account.owner === 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' ? 1 : 0,
+                account.owner === '11111111111111111111111111111111' ? 1 : 0
+            ]),
+            // Add historical metrics
+            state.history.actions.length,
+            state.history.rewards.reduce((sum, r) => sum + r, 0) / Math.max(1, state.history.rewards.length),
+            // Add security metrics
+            state.metrics.coverage * 100,  // Normalize to percentage
+            state.metrics.successRate * 100,  // Normalize to percentage
+            state.metrics.vulnerabilitiesFound * 10,  // Scale for better gradient flow
+            Math.log(Math.max(1, state.metrics.avgExecutionTime))  // Log scale for execution time
+        ];
+        return tf.tensor(stateArray, [1, stateArray.length]);
+    }
+
+    public remember(
+        state: FuzzingState,
+        action: FuzzingAction,
+        reward: number,
+        nextState: FuzzingState,
+        done: boolean
+    ): void {
+        const experience: PrioritizedExperience = {
+            state,
+            action,
+            reward,
+            nextState,
+            done,
+            priority: 1.0,  // New experiences get max priority
+            index: this.memoryIndex
+        };
+
+        if (this.memory.length < this.maxMemorySize) {
+            this.memory.push(experience);
+        } else {
+            // Replace old experiences using circular buffer
+            this.memory[this.memoryIndex % this.maxMemorySize] = experience;
         }
-        if (state.mutationHistory.length > this.stateSize - 4) {
-            throw new Error(`State dimensions exceed network input size (max ${this.stateSize - 4} mutations)`);
+        this.memoryIndex++;
+    }
+
+    private sampleBatch(): {
+        batch: PrioritizedExperience[];
+        importanceWeights: number[];
+        indices: number[];
+    } {
+        const priorities = this.memory.map(exp => Math.pow(exp.priority, this.priorityAlpha));
+        const totalPriority = priorities.reduce((a, b) => a + b, 0);
+        const probabilities = priorities.map(p => p / totalPriority);
+
+        const batch: PrioritizedExperience[] = [];
+        const indices: number[] = [];
+        const importanceWeights: number[] = [];
+
+        for (let i = 0; i < Math.min(this.batchSize, this.memory.length); i++) {
+            const rand = Math.random();
+            let cumSum = 0;
+            let index = 0;
+            
+            for (let j = 0; j < probabilities.length; j++) {
+                cumSum += probabilities[j];
+                if (rand < cumSum) {
+                    index = j;
+                    break;
+                }
+            }
+
+            batch.push(this.memory[index]);
+            indices.push(index);
+            
+            // Calculate importance sampling weights
+            const weight = Math.pow(1 / (this.memory.length * probabilities[index]), this.priorityBeta);
+            importanceWeights.push(weight);
         }
-        
-        // Decay epsilon on every exploration step
-        if (Math.random() < this.epsilon) {
-            this.epsilon *= this.epsilonDecay;
+
+        // Normalize weights
+        const maxWeight = Math.max(...importanceWeights);
+        const normalizedWeights = importanceWeights.map(w => w / maxWeight);
+
+        return { batch, importanceWeights: normalizedWeights, indices };
+    }
+
+    public async train(): Promise<number> {
+        if (this.memory.length < this.batchSize) {
+            return 0;
+        }
+
+        const { batch, importanceWeights, indices } = this.sampleBatch();
+        const states = tf.concat(batch.map(exp => this.stateToTensor(exp.state)));
+        const nextStates = tf.concat(batch.map(exp => this.stateToTensor(exp.nextState)));
+
+        try {
+            const targetQValues = this.targetModel.predict(nextStates) as tf.Tensor;
+            const currentQValues = this.model.predict(states) as tf.Tensor;
+
+            const qTargets = await currentQValues.array() as number[][];
+            const nextQValues = await targetQValues.array() as number[][];
+
+            for (let i = 0; i < batch.length; i++) {
+                const experience = batch[i];
+                const actionIndex = this.getActionIndex(experience.action);
+                
+                if (experience.done) {
+                    qTargets[i][actionIndex] = experience.reward;
+                } else {
+                    const futureQ = Math.max(...nextQValues[i]);
+                    qTargets[i][actionIndex] = experience.reward + this.gamma * futureQ;
+                }
+
+                // Update priorities based on TD error
+                const tdError = Math.abs(qTargets[i][actionIndex] - currentQValues.arraySync()[i][actionIndex]);
+                this.memory[indices[i]].priority = tdError;
+            }
+
+            // Apply importance weights to loss
+            const weightsTensor = tf.tensor2d([importanceWeights], [1, importanceWeights.length]);
+            
+            const history = await this.model.fit(states, tf.tensor2d(qTargets), {
+                batchSize: this.batchSize,
+                epochs: 1,
+                verbose: 0,
+                sampleWeight: weightsTensor
+            });
+
+            return history.history.loss[0] as number;
+        } finally {
+            tf.dispose([states, nextStates]);
+        }
+    }
+
+    public act(state: FuzzingState): number {
+        // Epsilon-greedy with decay
+        if (Math.random() <= this.epsilon) {
             return Math.floor(Math.random() * this.actionSize);
         }
 
         const stateTensor = this.stateToTensor(state);
-        const predictions = await this.model.predict(stateTensor) as tf.Tensor;
-        const action = predictions.argMax(1).dataSync()[0];
-        
-        // Cleanup tensors with null safety
-        stateTensor?.dispose();
-        predictions?.dispose();
-        
-        return action;
-    }
-
-    /**
-    * Stores experience in replay buffer
-    */
-    public remember(state: FuzzingState, action: number, reward: number, 
-                nextState: FuzzingState, done: boolean): void {
-        this.replayBuffer.push([state, action, reward, nextState, done]);
-        
-        // Limit buffer size
-        if (this.replayBuffer.length > 10000) {
-            this.replayBuffer.shift();
+        try {
+            const actionValues = this.model.predict(stateTensor) as tf.Tensor;
+            return Number(actionValues.reshape([this.actionSize]).argMax().dataSync()[0]);
+        } finally {
+            tf.dispose([stateTensor]);
         }
     }
 
-    /**
-    * Trains the model on a batch of experiences
-    */
-    public async train(): Promise<number> {
-        if (this.replayBuffer.length < this.batchSize) {
-            return 0;
+    public updateEpsilon(): void {
+        this.epsilon = Math.max(this.epsilonMin, this.epsilon * this.epsilonDecay);
+    }
+
+    private getActionIndex(action: FuzzingAction): number {
+        switch (action.type) {
+            case 'MUTATE':
+                return 0;
+            case 'CROSSOVER':
+                return 1;
+            case 'RESET':
+                return 2;
+            case 'EXPLOIT':
+                return 3;
+            default:
+                throw new Error(`Unknown action type: ${action.type}`);
         }
-
-        // Sample random batch
-        const batch = this.sampleBatch();
-        
-        const states = tf.concat(batch.map(exp => this.stateToTensor(exp[0])));
-        const nextStates = tf.concat(batch.map(exp => this.stateToTensor(exp[3])));
-
-        const currentQs = await this.model.predict(states) as tf.Tensor;
-        const targetQs = await this.targetModel.predict(nextStates) as tf.Tensor;
-
-        const updates = currentQs.arraySync() as number[][];
-        
-        for (let i = 0; i < this.batchSize; i++) {
-            const [_, action, reward, __, done] = batch[i];
-            
-            if (done) {
-                updates[i][action] = reward;
-            } else {
-                const futureQ = Math.max(...(targetQs.arraySync() as number[][])[i]);
-                updates[i][action] = reward + this.gamma * futureQ;
-            }
-        }
-
-        const loss = await this.model.trainOnBatch(states, tf.tensor(updates));
-
-        // Cleanup tensors
-        states.dispose();
-        nextStates.dispose();
-        currentQs.dispose();
-        targetQs.dispose();
-
-        // Decay epsilon
-        this.epsilon *= this.epsilonDecay;
-        
-        return loss as number;
     }
 
-    /**
-    * Samples a random batch from replay buffer
-    */
-    private sampleBatch(): Array<[FuzzingState, number, number, FuzzingState, boolean]> {
-        const batch = [];
-        for (let i = 0; i < this.batchSize; i++) {
-            const idx = Math.floor(Math.random() * this.replayBuffer.length);
-            batch.push(this.replayBuffer[idx]);
-        }
-        return batch;
-    }
-
-    /**
-    * Saves the model to the specified path
-    */
-    public async saveModel(path: string): Promise<void> {
-        await this.model.save(`file://${path}`);
-    }
-
-    /**
-    * Loads a saved model from the specified path
-    */
-    public async loadModel(path: string): Promise<void> {
-        this.model = await tf.loadLayersModel(`file://${path}`);
-        this.targetModel = await tf.loadLayersModel(`file://${path}`);
-        this.model.compile({
-            optimizer: tf.train.adam(0.001),
-            loss: 'meanSquaredError'
-        });
-    }
-
-    /**
-    * Cleans up TensorFlow resources
-    */
     public dispose(): void {
         this.model.dispose();
         this.targetModel.dispose();

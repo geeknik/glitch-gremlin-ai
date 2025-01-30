@@ -65,38 +65,90 @@ global.security = {
   }
 };
 
-// Mock Solana packages
-jest.mock('@solana/web3.js', () => ({
-  Connection: jest.fn().mockImplementation(() => ({
-    getAccountInfo: jest.fn().mockResolvedValue(null),
-    getProgramAccounts: jest.fn().mockResolvedValue([]),
-    getRecentBlockhash: jest.fn().mockResolvedValue({
-      blockhash: 'mock-blockhash',
-      feeCalculator: { lamportsPerSignature: 5000 }
-    }),
-    confirmTransaction: jest.fn().mockResolvedValue({ value: { err: null } }),
-    getSignatureStatus: jest.fn().mockResolvedValue({ value: { err: null } }),
-    sendTransaction: jest.fn().mockResolvedValue('mock-signature')
-  })),
-  PublicKey: jest.fn().mockImplementation((key) => ({
-    toString: () => key,
-    toBase58: () => key,
-    toBuffer: () => Buffer.from(key)
-  })),
-  Keypair: {
-    generate: jest.fn().mockReturnValue({
-      publicKey: { toBase58: () => 'mock-pubkey' },
-      secretKey: new Uint8Array(32)
+// Mock TensorFlow.js
+jest.mock('@tensorflow/tfjs-node', () => ({
+    sequential: jest.fn(() => ({
+        add: jest.fn(),
+        compile: jest.fn(),
+        fit: jest.fn().mockResolvedValue({
+            history: {
+                loss: [0.5],
+                acc: [0.8],
+                val_loss: [0.6],
+                val_acc: [0.75]
+            }
+        }),
+        predict: jest.fn().mockReturnValue({
+            data: jest.fn().mockResolvedValue(new Float32Array([0.8])),
+            dispose: jest.fn()
+        }),
+        dispose: jest.fn(),
+        save: jest.fn().mockResolvedValue(undefined),
+        loadLayersModel: jest.fn().mockResolvedValue({
+            layers: [],
+            compile: jest.fn(),
+            fit: jest.fn(),
+            predict: jest.fn(),
+            dispose: jest.fn()
+        })
+    })),
+    layers: {
+        dense: jest.fn().mockReturnValue({})
+    },
+    train: {
+        adam: jest.fn()
+    },
+    tensor2d: jest.fn().mockReturnValue({
+        dispose: jest.fn()
     })
-  },
-  SystemProgram: {
-    programId: { toString: () => 'mock-system-program' }
-  },
-  Transaction: jest.fn().mockImplementation(() => ({
-    add: jest.fn(),
-    sign: jest.fn(),
-    serialize: jest.fn()
-  }))
+}));
+
+// Mock fs promises
+jest.mock('fs/promises', () => ({
+    writeFile: jest.fn().mockResolvedValue(undefined),
+    readFile: jest.fn().mockResolvedValue('{"version":"1.0.0"}'),
+    mkdir: jest.fn().mockResolvedValue(undefined),
+    access: jest.fn().mockResolvedValue(undefined)
+}));
+
+// Mock Redis
+jest.mock('ioredis', () => {
+    return jest.fn().mockImplementation(() => ({
+        connect: jest.fn().mockResolvedValue(undefined),
+        disconnect: jest.fn().mockResolvedValue(undefined),
+        get: jest.fn().mockResolvedValue(null),
+        set: jest.fn().mockResolvedValue('OK'),
+        del: jest.fn().mockResolvedValue(1),
+        quit: jest.fn().mockResolvedValue('OK'),
+        on: jest.fn(),
+        status: 'ready'
+    }));
+});
+
+// Mock Solana Web3.js
+jest.mock('@solana/web3.js', () => ({
+    Connection: jest.fn().mockImplementation(() => ({
+        getAccountInfo: jest.fn().mockResolvedValue(null),
+        getBalance: jest.fn().mockResolvedValue(1000000),
+        getRecentBlockhash: jest.fn().mockResolvedValue({
+            blockhash: '123',
+            feeCalculator: { lamportsPerSignature: 5000 }
+        }),
+        sendTransaction: jest.fn().mockResolvedValue('tx-signature')
+    })),
+    PublicKey: jest.fn().mockImplementation((key) => ({
+        toString: () => key,
+        toBase58: () => key
+    })),
+    Keypair: {
+        generate: jest.fn().mockReturnValue({
+            publicKey: { toString: () => 'mock-pubkey' },
+            secretKey: new Uint8Array(32)
+        })
+    },
+    SystemProgram: {
+        programId: { toString: () => 'system-program' }
+    }
 }));
 
 // Set up environment variables for testing
@@ -104,15 +156,16 @@ process.env.SOLANA_CLUSTER_URL = 'http://localhost:8899';
 process.env.REDIS_URL = 'redis://r.glitchgremlin.ai:6379';
 process.env.NODE_ENV = 'test';
 
-// Configure Jest environment
-jest.setTimeout(10000); // 10 second timeout
+// Global test configuration
+jest.setTimeout(30000); // 30 second timeout
 
-// Mock console methods to reduce noise
+// Console mocks to reduce noise
 global.console = {
-  ...console,
-  log: jest.fn(),
-  debug: jest.fn(),
-  info: jest.fn(),
-  warn: jest.fn()
+    ...console,
+    log: jest.fn(),
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn()
 };
 

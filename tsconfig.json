@@ -1,32 +1,29 @@
 {
     "compilerOptions": {
-        "target": "ES2022",
-        "module": "NodeNext",
-        "moduleResolution": "NodeNext",
-        "rootDirs": ["."],
-        "composite": true,
+        "target": "ES2020",
+        "module": "ESNext",
+        "moduleResolution": "node",
+        "lib": ["ES2020", "DOM"],
+        "outDir": "dist",
+        "rootDir": ".",
         "strict": true,
         "esModuleInterop": true,
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
-        "outDir": "./dist",
-        "rootDir": ".",
-        "declaration": false,
-        "sourceMap": true,
-        "types": ["jest", "node"],
-        "paths": {
-            "@glitch-gremlin/sdk": ["./sdk/src/index.ts"],
-            "#cli/*": ["./cli/src/*"],
-            "@glitch-gremlin/sdk/*": ["./sdk/src/*"]
-        },
-        "baseUrl": ".",
         "resolveJsonModule": true,
-        "lib": ["es2020"]
+        "declaration": true,
+        "declarationMap": true,
+        "sourceMap": true,
+        "composite": true,
+        "baseUrl": ".",
+        "paths": {
+            "@/*": ["src/*"]
+        }
     },
-    "include": ["sdk/src/**/*", "cli/src/**/*", "__tests__/**/*"],
-    "exclude": ["node_modules", "dist"],
+    "include": ["sdk/src/**/*", "cli/src/**/*"],
+    "exclude": ["node_modules", "dist", "**/__tests__/*"],
     "references": [
-        { "path": "./sdk/tsconfig.json" },
-        { "path": "./cli/tsconfig.json" }
+        { "path": "./sdk" },
+        { "path": "./cli" }
     ]
 }

@@ -1,26 +1,26 @@
 import { EventEmitter } from 'events';
 
 export class Logger extends EventEmitter {
-    private name: string;
+    private readonly context: string;
 
-    constructor(name: string) {
+    constructor(context: string) {
         super();
-        this.name = name;
+        this.context = context;
     }
 
-    info(message: string): void {
-        console.log(`[${this.name}] INFO: ${message}`);
+    public info(message: string, ...args: any[]): void {
+        console.log(`[${this.context}] INFO: ${message}`, ...args);
     }
 
-    debug(message: string): void {
-        console.debug(`[${this.name}] DEBUG: ${message}`);
+    public warn(message: string, ...args: any[]): void {
+        console.warn(`[${this.context}] WARN: ${message}`, ...args);
     }
 
-    warn(message: string): void {
-        console.warn(`[${this.name}] WARN: ${message}`);
+    public error(message: string, ...args: any[]): void {
+        console.error(`[${this.context}] ERROR: ${message}`, ...args);
     }
 
-    error(message: string): void {
-        console.error(`[${this.name}] ERROR: ${message}`);
+    public debug(message: string, ...args: any[]): void {
+        console.debug(`[${this.context}] DEBUG: ${message}`, ...args);
     }
 }

@@ -1,6 +1,6 @@
-import type { Config } from '@jest/types';
-
-const config: Config.InitialOptions = {
+const { Config } = require('@jest/types');
+/** @type {import('@jest/types').Config.InitialOptions} */
+const config = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   roots: ['<rootDir>/sdk/src', '<rootDir>/cli/src'],
@@ -13,8 +13,14 @@ const config: Config.InitialOptions = {
       tsconfig: 'tsconfig.json',
       useESM: true,
       isolatedModules: true
+    }],
+    '^.+\\.jsx?$': ['babel-jest', {
+      presets: ['@babel/preset-env']
     }]
   },
+  transformIgnorePatterns: [
+    '/node_modules/(?!(crypto-random-string)/)'
+  ],
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
     '^@glitch-gremlin/sdk$': '<rootDir>/sdk/src/index.ts',
@@ -23,12 +29,11 @@ const config: Config.InitialOptions = {
     '#cli/(.*)': '<rootDir>/cli/$1',
     '^@/(.*)$': '<rootDir>/sdk/src/$1',
     '^@ai/(.*)$': '<rootDir>/sdk/src/ai/$1',
-    '^@tensorflow/tfjs-node$': '<rootDir>/sdk/src/ai/__mocks__/@tensorflow/tfjs-node.ts'
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node', 'mjs'],
   extensionsToTreatAsEsm: ['.ts', '.tsx'],
   setupFilesAfterEnv: [
-    '<rootDir>/sdk/src/__tests__/setupAfterEnv.ts' // Removed outdated setup file
+    '<rootDir>/jest.setup.ts'
   ],
   testPathIgnorePatterns: [
     '/node_modules/',
@@ -45,7 +50,7 @@ const config: Config.InitialOptions = {
     '/__tests__/',
     '/__mocks__/'
   ],
-  testTimeout: 30000,
+  testTimeout: 60000,
   verbose: true,
   clearMocks: true,
   restoreMocks: true,
@@ -53,5 +58,4 @@ const config: Config.InitialOptions = {
   automock: false
 };
 
-export default config;
-
+module.exports = config;

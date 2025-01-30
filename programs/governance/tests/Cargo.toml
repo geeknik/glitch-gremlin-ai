@@ -1,0 +1,15 @@
+[package]
+name = "governance-tests"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+glitch-gremlin-ai = { path = "../../.." }
+governance = { path = ".." }
+solana-program = { workspace = true }
+solana-program-test = { workspace = true }
+solana-sdk = { workspace = true }
+tokio = { workspace = true }
+assert_matches = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true } 

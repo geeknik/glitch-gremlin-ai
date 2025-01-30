@@ -1,127 +1,110 @@
 import * as tf from '@tensorflow/tfjs-node';
-import type { PredictionResult } from './types';
-import type VulnerabilityDetectionModel from './types';
-import { VulnerabilityType } from './types';
+import { ModelConfig, TrainingResult, PredictionResult, ModelMetadata } from '@/types.js';
 
-export class VulnerabilityDetectionModelImpl implements VulnerabilityDetectionModel {
-    private model: tf.LayersModel;
-    private initialized: boolean = false;
+export abstract class BaseMLModel {
+    protected model: tf.Sequential | null = null;
+    protected readonly config: ModelConfig;
+    protected metadata: ModelMetadata;
 
-    constructor() {
-        this.model = this.buildModel();
-    }
-
-    async ensureInitialized(): Promise<void> {
-        if (!this.initialized) {
-            // Try to initialize with default weights if not trained
-            const model = this.buildModel();
-            await model.compile({
-                optimizer: 'adam',
-                loss: 'categoricalCrossentropy',
-                metrics: ['accuracy']
-            });
-            this.model = model;
-            this.initialized = true;
-            await this.model.loadWeights({}); // Ensure weights are loaded
-        }
-    }
-
-    private buildModel(): tf.LayersModel {
-        const model = tf.sequential({
-            layers: [
-                tf.layers.dense({ units: 64, activation: 'relu', inputShape: [100] }),
-                tf.layers.dropout({ rate: 0.2 }),
-                tf.layers.dense({ units: 32, activation: 'relu' }),
-                tf.layers.dense({ units: Object.keys(VulnerabilityType).length, activation: 'softmax' })
-            ]
-        });
-
-        model.compile({
-            optimizer: 'adam',
-            loss: 'categoricalCrossentropy',
-            metrics: ['accuracy'] 
-        });
-
-        return model;
-    }
-
-    async train(features: number[][], labels: number[]): Promise<void> {
-        if (!features.length || !labels.length) return;
-        if (features.length > 100000) {
-            throw new Error('Training dataset exceeds maximum size of 100,000 samples');
-        }
-
-        // Add resource limits
-        const maxMemory = 1024 * 1024 * 1024; // 1GB
-        const xs = tf.tensor2d(features);
-        const ys = tf.oneHot(tf.tensor1d(labels, 'int32'), Object.keys(VulnerabilityType).length);
-
-        // Check memory constraints
-        if (xs.size * 4 + ys.size * 4 > maxMemory) {
-            xs.dispose();
-            ys.dispose();
-            throw new Error('Training data exceeds available memory budget');
-        }
-
-        await this.model.fit(xs, ys, {
-            epochs: 10,
-            batchSize: 32,
-            validationSplit: 0.2
-        });
-
-        xs.dispose();
-        ys.dispose();
-        this.initialized = true;
-    }
-
-    async predict(features: number[]): Promise<{
-        type: VulnerabilityType;
-        confidence: number;
-    }> {
-        if (!this.initialized) {
-            throw new Error('Model not trained');
-        }
-        if (features.length !== 100) {
-            throw new Error('Invalid feature vector length');
-        }
-
-        // Add security metrics collection
-        const startTime = Date.now();
-        const startMemory = process.memoryUsage().heapUsed;
-
-        const input = tf.tensor2d([features]);
-        const prediction = this.model.predict(input) as tf.Tensor;
-        const probabilities = await prediction.array() as number[][];
-
-        // Collect security metrics
-        const execTime = Date.now() - startTime;
-        const memoryUsed = process.memoryUsage().heapUsed - startMemory;
-        console.log(`Security metrics - Execution time: ${execTime}ms, Memory used: ${memoryUsed} bytes`);
-
-        input.dispose();
-        prediction.dispose();
-
-        const maxIndex = probabilities[0].indexOf(Math.max(...probabilities[0]));
-        return {
-            type: Object.values(VulnerabilityType)[maxIndex],
-            confidence: probabilities[0][maxIndex]
+    constructor(config: ModelConfig) {
+        this.config = config;
+        this.metadata = {
+            id: crypto.randomUUID(),
+            createdAt: new Date(),
+            lastTrainedAt: new Date(),
+            modelVersion: config.modelVersion || '1.0.0',
+            accuracy: 0,
+            loss: 0,
+            totalSamples: 0,
+            epochs: 0,
+            duration: 0
         };
     }
 
-    async cleanup(): Promise<void> {
-        if (this.model) {
-            (this.model as any).dispose();
+    public abstract train(features: number[][], labels: number[][]): Promise<TrainingResult>;
+    public abstract predict(features: number[][]): Promise<PredictionResult>;
+    protected abstract buildModel(): tf.Sequential;
+
+    public async save(path: string): Promise<void> {
+        if (!this.model) {
+            throw new Error('Model not initialized');
         }
-        (tf as any).disposeVariables();
-    }
-
-    async save(path: string): Promise<void> {
         await this.model.save(`file://${path}`);
+        await this.saveMetadata(path);
     }
 
-    async load(path: string): Promise<void> {
-        this.model = await tf.loadLayersModel(`file://${path}`);
-        this.initialized = true;
+    public async load(path: string): Promise<void> {
+        this.model = await tf.loadLayersModel(`file://${path}/model.json`) as tf.Sequential;
+        await this.loadMetadata(path);
+    }
+
+    protected async saveMetadata(path: string): Promise<void> {
+        const fs = await import('fs/promises');
+        const metadataPath = `${path}/metadata.json`;
+        await fs.writeFile(metadataPath, JSON.stringify(this.metadata, null, 2));
+    }
+
+    protected async loadMetadata(path: string): Promise<void> {
+        const fs = await import('fs/promises');
+        const metadataPath = `${path}/metadata.json`;
+        const data = await fs.readFile(metadataPath, 'utf-8');
+        this.metadata = JSON.parse(data);
+    }
+
+    public getMetadata(): ModelMetadata {
+        return { ...this.metadata };
+    }
+
+    protected async updateTrainingMetrics(metrics: TrainingResult): Promise<void> {
+        if (!this.metadata) {
+            throw new Error('Model metadata not initialized');
+        }
+
+        this.metadata.lastTrainedAt = new Date();
+        this.metadata.accuracy = metrics.accuracy;
+        this.metadata.loss = metrics.loss;
+        this.metadata.epochs = metrics.epochs;
+        this.metadata.duration = metrics.duration;
+    }
+
+    protected validateFeatures(features: number[][]): void {
+        if (!features.length) {
+            throw new Error('Empty feature set provided');
+        }
+
+        const expectedShape = this.config.inputShape?.[0] || features[0].length;
+        if (features[0].length !== expectedShape) {
+            throw new Error(`Invalid feature shape: expected ${expectedShape}, got ${features[0].length}`);
+        }
+    }
+
+    protected validateLabels(labels: number[][]): void {
+        if (!labels.length) {
+            throw new Error('Empty labels array');
+        }
+        if (labels.length !== labels.length) {
+            throw new Error('Features and labels must have the same length');
+        }
+    }
+
+    protected async preprocessFeatures(features: number[][]): Promise<tf.Tensor2D> {
+        return tf.tidy(() => {
+            const tensor = tf.tensor2d(features);
+            return tensor.div(tf.scalar(255)) as tf.Tensor2D; // Normalize to [0, 1]
+        });
+    }
+
+    protected async preprocessLabels(labels: number[][]): Promise<tf.Tensor2D> {
+        return tf.tidy(() => {
+            return tf.tensor2d(labels) as tf.Tensor2D;
+        });
+    }
+
+    public async cleanup(): Promise<void> {
+        if (this.model) {
+            this.model.dispose();
+            this.model = null;
+        }
     }
 }
 

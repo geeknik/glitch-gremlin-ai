@@ -1,111 +1,85 @@
-import * as tf from '@tensorflow/tfjs-node';
+import type { Tensor } from '@tensorflow/tfjs-node';
 
-const createSequentialModel = (): tf.Sequential => {
-  const model = {
-    add: jest.fn().mockReturnThis(),
-    compile: jest.fn().mockImplementation(function(this: any) {
-      return this; // Enable method chaining
+interface Layer {
+    apply: (input: Tensor) => Tensor;
+    getClassName: () => string;
+}
+
+interface Sequential {
+    add: (layer: Layer) => Sequential;
+    compile: (config: any) => void;
+    fit: (x: Tensor, y: Tensor, config: any) => Promise<any>;
+    predict: (input: Tensor) => Tensor;
+    dispose: () => void;
+    layers: Layer[];
+    save: (path: string) => Promise<void>;
+    load: (path: string) => Promise<void>;
+}
+
+const mockTf = {
+    sequential: () => ({
+        add: jest.fn().mockImplementation((layer) => {
+            return {
+                layers: [layer],
+                compile: jest.fn(),
+                fit: jest.fn().mockResolvedValue({}),
+                predict: jest.fn().mockReturnValue({
+                    array: () => Promise.resolve([[0.8, 0.2]]),
+                    dispose: jest.fn()
+                }),
+                dispose: jest.fn(),
+                save: jest.fn().mockResolvedValue(undefined),
+                load: jest.fn().mockResolvedValue(undefined)
+            };
+        }),
+        compile: jest.fn(),
+        fit: jest.fn().mockResolvedValue({}),
+        predict: jest.fn().mockReturnValue({
+            array: () => Promise.resolve([[0.8, 0.2]]),
+            dispose: jest.fn()
+        }),
+        dispose: jest.fn(),
+        layers: [],
+        save: jest.fn().mockResolvedValue(undefined),
+        load: jest.fn().mockResolvedValue(undefined)
     }),
-    predict: jest.fn().mockReturnValue({
-      dataSync: jest.fn().mockReturnValue(new Float32Array([0.1, 0.2, 0.3])),
-      array: jest.fn().mockResolvedValue([[0.1, 0.2, 0.3]]),
-      dispose: jest.fn()
-    }),
-    fit: jest.fn().mockResolvedValue({ 
-      history: { 
-        loss: [0.1],
-        val_loss: [0.2]
-      }
-    }),
-    save: jest.fn().mockResolvedValue(undefined),
-    dispose: jest.fn().mockImplementation(function() {
-        return Promise.resolve();
-    }),
-    compile: jest.fn().mockImplementation(function() {
-        return this;
-    }),
-    getWeights: jest.fn().mockReturnValue([{
-      dataSync: () => new Float32Array(10),
-      dispose: jest.fn()
-    }]),
-    setWeights: jest.fn(),
-    summary: jest.fn(),
-    // Add required Sequential properties
-    model: {
-      layers: [],
-      optimizer: {},
-      metricsNames: [],
-      metricsTensors: []
+    layers: {
+        dense: (config: any) => ({
+            apply: jest.fn(),
+            getClassName: () => 'Dense',
+            ...config
+        }),
+        dropout: (config: any) => ({
+            apply: jest.fn(),
+            getClassName: () => 'Dropout',
+            ...config
+        })
     },
-    checkShape: jest.fn(),
-    pop: jest.fn(),
-    call: jest.fn(),
-    countParams: jest.fn().mockReturnValue(0),
-    evaluate: jest.fn().mockResolvedValue([0]),
-    evaluateDataset: jest.fn().mockResolvedValue([0]),
-    getConfig: jest.fn().mockReturnValue({}),
-    getLayer: jest.fn(),
-    getLossesFor: jest.fn().mockReturnValue([]),
-    getUpdatesFor: jest.fn().mockReturnValue([]),
-    loadWeights: jest.fn().mockResolvedValue(undefined),
-    trainable: true,
-    name: 'mock-sequential-model',
-    inputs: [],
-    outputs: []
-  };
-
-  return model as unknown as tf.Sequential;
-};
-
-const mockTF: any = {
-  sequential: jest.fn().mockImplementation(() => createSequentialModel()),
-  layers: {
-    dense: jest.fn().mockReturnValue({
-      apply: jest.fn(),
-      getWeights: jest.fn().mockReturnValue([]),
-      setWeights: jest.fn()
+    train: {
+        adam: (learningRate: number) => ({
+            learningRate
+        })
+    },
+    tensor2d: (data: number[][], shape?: number[]) => ({
+        shape: shape || [data.length, data[0]?.length || 0],
+        dataSync: () => new Float32Array(data.flat()),
+        dispose: jest.fn(),
+        array: () => Promise.resolve(data)
     }),
-    dropout: jest.fn().mockReturnValue({
-      apply: jest.fn()
-    })
-  },
-  train: {
-    adam: jest.fn().mockReturnValue({
-      apply: jest.fn(),
-      minimize: jest.fn()
-    })
-  },
-  tensor: jest.fn((values) => ({
-    dataSync: jest.fn().mockReturnValue(new Float32Array(values)),
     dispose: jest.fn(),
-    reshape: jest.fn().mockReturnThis(),
-    mul: jest.fn().mockReturnThis(),
-    add: jest.fn().mockReturnThis(),
-    sub: jest.fn().mockReturnThis(),
-    array: jest.fn().mockResolvedValue(values),
-    arraySync: jest.fn().mockReturnValue(values)
-  })),
-  tensor2d: jest.fn().mockReturnValue({
-    dataSync: jest.fn().mockReturnValue(new Float32Array(10)),
-    dispose: jest.fn()
-  }),
-  concat: jest.fn().mockReturnValue({
-    dispose: jest.fn()
-  }),
-  argMax: jest.fn().mockReturnValue({
-    dataSync: jest.fn().mockReturnValue([0]),
-    dispose: jest.fn()
-  }),
-  tidy: jest.fn((fn) => fn()),
-  dispose: jest.fn(),
-  memory: jest.fn().mockReturnValue({
-    numTensors: 0,
-    numDataBuffers: 0,
-    numBytes: 0
-  }),
-  loadLayersModel: jest.fn().mockImplementation(() => createSequentialModel())
+    disposeVariables: jest.fn(),
+    loadLayersModel: jest.fn().mockImplementation((path: string) => {
+        return Promise.resolve({
+            compile: jest.fn(),
+            fit: jest.fn().mockResolvedValue({}),
+            predict: jest.fn().mockReturnValue({
+                array: () => Promise.resolve([[0.8, 0.2]]),
+                dispose: jest.fn()
+            }),
+            dispose: jest.fn(),
+            save: jest.fn().mockResolvedValue(undefined)
+        });
+    })
 };
 
-// Cast to unknown first to avoid type errors
-export default mockTF as unknown as typeof tf;
-export type { Tensor, Sequential } from '@tensorflow/tfjs-node';
+export default mockTf;

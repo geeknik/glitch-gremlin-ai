@@ -1,0 +1,54 @@
+[package]
+name = "governance"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "governance"
+crate-type = ["cdylib", "lib"]
+
+[features]
+no-entrypoint = []
+test-bpf = []
+
+[[test]]
+name = "governance"
+path = "tests/governance_tests.rs"
+required-features = ["test-bpf"]
+
+[[test]]
+name = "chaos"
+path = "tests/chaos_testing.rs"
+required-features = ["test-bpf"]
+
+[[test]]
+name = "integration"
+path = "tests/integration.rs"
+required-features = ["test-bpf"]
+
+[[test]]
+name = "deployment"
+path = "tests/deployment_verification.rs"
+required-features = ["test-bpf"]
+
+[dependencies]
+solana-program = { workspace = true }
+anchor-lang = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+solana-program-test = { workspace = true }
+solana-sdk = { workspace = true }
+tokio-test = { workspace = true }
+assert_matches = { workspace = true }
+
+borsh = { version = "0.10", features = ["const-generics"] }
+num-derive = "0.4"
+num-traits = "0.2"
+spl-token = { version = "3.5", features = ["no-entrypoint"] }
+spl-associated-token-account = { version = "1.1", features = ["no-entrypoint"] }
+anchor-spl = "=0.28.0"
+chrono = { workspace = true } 

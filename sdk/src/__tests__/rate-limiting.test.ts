@@ -1,8 +1,11 @@
 import { jest } from '@jest/globals';
 import { TestType } from '../index.js';
+import { Keypair } from '@solana/web3.js';
+import { GlitchError, ErrorCode } from '../errors.js';
+import type { Redis } from 'ioredis';
 
 class GlitchSDK {
-    private queueWorker: { redis: any };
+    private queueWorker: { redis: Redis | null } = { redis: null };
     
     static async init(config: any) {
         const sdk = new GlitchSDK();
@@ -11,6 +14,9 @@ class GlitchSDK {
     }
 
     async createChaosRequest(params: any) {
+        if (!this.queueWorker.redis) {
+            throw new GlitchError('Redis not initialized', ErrorCode.REDIS_NOT_CONFIGURED);
+        }
         const lastRequest = await this.queueWorker.redis.get('chaos:last_request');
         if (lastRequest) {
             throw new GlitchError('Rate limit exceeded', ErrorCode.RATE_LIMIT_EXCEEDED);
@@ -22,6 +28,9 @@ class GlitchSDK {
     }
 
     async createProposal(params: any) {
+        if (!this.queueWorker.redis) {
+            throw new GlitchError('Redis not initialized', ErrorCode.REDIS_NOT_CONFIGURED);
+        }
         const count = await this.queueWorker.redis.incr('proposal:count');
         await this.queueWorker.redis.expire('proposal:count', 24 * 60 * 60);
         if (count > 1) {
@@ -30,17 +39,12 @@ class GlitchSDK {
         return count;
     }
 }
-import { Keypair } from '@solana/web3.js';
-import { GlitchError, ErrorCode } from '../errors.js';
-import type { Redis } from 'ioredis';
 
 // Increase timeout for all tests
 jest.setTimeout(30000);
 
 describe('Rate Limiting', () => {
     let sdk: GlitchSDK;
-    let mockIncr: jest.Mock<Promise<number>, [string]>;
-    let mockExpire: jest.Mock<Promise<number>, [string, number]>;
     
     beforeAll(async () => {
         const wallet = Keypair.generate();
@@ -53,47 +57,23 @@ describe('Rate Limiting', () => {
             }
         });
 
-        // Mock Redis methods globally
-        // Mock Redis methods consistently with proper types
-        mockIncr = jest.fn().mockImplementation(
-        async (key: string): Promise<number> => {
-            if (key.includes('chaos:request:count')) {
-                return 1;
-            } else if (key.includes('proposal:count')) {
-                return 1;
-            }
-            return 1;
-        }
-        ) as jest.Mock<Promise<number>, [string]>;
-
-        mockExpire = jest.fn().mockImplementation(
-        async (key: string, seconds: number): Promise<number> => 1
-        ) as jest.Mock<Promise<number>, [string, number]>;
-
-        // Create a complete Redis mock with consistent behavior
+        // Create Redis mock
         const redisMock = {
-            incr: mockIncr,
-            expire: mockExpire,
-            get: jest.fn().mockImplementation(
-                async (key: string): Promise<string | null> => {
-                    if (key.includes('proposal')) {
-                        return null;
-                    }
-                    return Date.now().toString();
-                }
-            ) as jest.Mock<Promise<string | null>, [string]>,
-            set: jest.fn().mockImplementation(
-                async (key: string, value: string): Promise<'OK'> => 'OK'
-            ) as jest.Mock<Promise<'OK'>, [string, string]>,
-            quit: jest.fn().mockImplementation(
-                async (): Promise<'OK'> => 'OK'
-            ) as jest.Mock<Promise<'OK'>, []>,
-            disconnect: jest.fn().mockImplementation(
-                async (): Promise<'OK'> => 'OK'
-            ) as jest.Mock<Promise<'OK'>, []>
-        } as unknown as Redis;
-        
-        sdk['queueWorker']['redis'] = redisMock;
+            get: jest.fn(),
+            set: jest.fn(),
+            incr: jest.fn(),
+            expire: jest.fn(),
+            quit: jest.fn()
+        };
+
+        // Set default implementations
+        redisMock.get.mockImplementation(() => Promise.resolve(null));
+        redisMock.set.mockImplementation(() => Promise.resolve('OK'));
+        redisMock.incr.mockImplementation(() => Promise.resolve(1));
+        redisMock.expire.mockImplementation(() => Promise.resolve(1));
+        redisMock.quit.mockImplementation(() => Promise.resolve('OK'));
+
+        sdk['queueWorker']['redis'] = redisMock as unknown as Redis;
     });
 
     beforeEach(() => {
@@ -102,161 +82,67 @@ describe('Rate Limiting', () => {
     });
 
     afterEach(() => {
-        jest.clearAllMocks();
         jest.useRealTimers();
     });
 
-    describe('Request Rate Limits', () => {
-        it('should enforce cooldown between requests', async () => {
-            let firstRequest = true;
-            const mockGet = jest.spyOn(sdk['queueWorker']['redis'], 'get')
-                .mockImplementation((key: string) => {
-                    if (key === 'chaos:last_request') {
-                        if (firstRequest) {
-                            firstRequest = false;
-                            return Promise.resolve(null);
-                        }
-                        return Promise.resolve(Date.now().toString());
-                    }
-                    return Promise.resolve(null);
-                });
-            const mockSet = jest.spyOn(sdk['queueWorker']['redis'], 'set')
-                .mockImplementation(() => Promise.resolve('OK'));
+    afterAll(async () => {
+        await sdk['queueWorker']['redis']?.quit();
+    });
 
-            // First request should succeed
-            await sdk.createChaosRequest({
-                targetProgram: "11111111111111111111111111111111",
-                testType: TestType.FUZZ,
-                duration: 60,
-                intensity: 1
-            });
-
-            // Immediate second request should fail
+    describe('Chaos Request Rate Limiting', () => {
+        it('should allow first request', async () => {
+            const redis = sdk['queueWorker']['redis'] as jest.Mocked<Redis>;
+            redis.get.mockResolvedValueOnce(null);
+            
             await expect(sdk.createChaosRequest({
-                targetProgram: "11111111111111111111111111111111",
                 testType: TestType.FUZZ,
-                duration: 60,
-                intensity: 1
-            })).rejects.toThrow('Rate limit exceeded');
+                duration: 60
+            })).resolves.toBe(1);
 
-            expect(mockIncr).toHaveBeenCalledTimes(1);
-            expect(mockExpire).toHaveBeenCalledTimes(1);
-            expect(mockGet).toHaveBeenCalled();
-            expect(mockSet).toHaveBeenCalled();
-
-            mockGet.mockRestore();
-            mockSet.mockRestore();
-        });
-        it('should properly handle multiple rate limit attempts', async () => {
-            // Mock incr to enforce rate limit
-            let attempts = 0;
-            let firstRequest = true;
-            const mockGet = jest.spyOn(sdk['queueWorker']['redis'], 'get')
-                .mockImplementation((key: string) => {
-                    if (key === 'chaos:last_request') {
-                        if (firstRequest) {
-                            firstRequest = false;
-                            return Promise.resolve(null);
-                        }
-                        return Promise.resolve(Date.now().toString());
-                    }
-                    return Promise.resolve(null);
-                });
-
-            mockIncr.mockImplementation(async (key: string): Promise<number> => {
-                attempts++;
-                return attempts;
-            });
-
-            // First request should succeed
-            await sdk.createChaosRequest({
-                targetProgram: "11111111111111111111111111111111",
-                testType: TestType.FUZZ,
-                duration: 60,
-                intensity: 1
-            });
-
-            // Second request should fail but still increment counter
-            await expect(sdk.createChaosRequest({
-                targetProgram: "11111111111111111111111111111111",
-                testType: TestType.FUZZ,
-                duration: 60,
-                intensity: 1
-            })).rejects.toThrow('Rate limit exceeded');
-
-            expect(mockIncr).toHaveBeenCalledTimes(1);
-            expect(mockExpire).toHaveBeenCalledTimes(1);
+            expect(redis.get).toHaveBeenCalledWith('chaos:last_request');
+            expect(redis.set).toHaveBeenCalled();
+            expect(redis.incr).toHaveBeenCalledWith('chaos:request:count');
+            expect(redis.expire).toHaveBeenCalledWith('chaos:request:count', 60);
         });
 
-        describe('governance rate limiting', () => {
-            it('should limit proposals per day', async () => {
-                let proposalCount = 0;
-                const mockGet = jest.spyOn(sdk['queueWorker']['redis'], 'get')
-                    .mockImplementation(() => Promise.resolve(null));
-                    
-                mockIncr.mockImplementation(async (key: string): Promise<number> => {
-                    if (key.includes('proposal:count')) {
-                        proposalCount++;
-                        return proposalCount;
-                    }
-                    return 1;
-                });
-
-                // Let the original implementation handle the rate limiting
-
-                // First proposal should succeed
-                await sdk.createProposal({
-                    title: "Test Proposal",
-                    description: "Test Description",
-                    targetProgram: "11111111111111111111111111111111",
-                    testParams: {
-                        testType: TestType.FUZZ,
-                        duration: 300,
-                        intensity: 5,
-                        targetProgram: "11111111111111111111111111111111"
-                    },
-                    stakingAmount: 1000
-                });
-                
-                expect(mockIncr).toHaveBeenCalledTimes(1);
-                expect(mockExpire).toHaveBeenCalledTimes(1);
-
-                // Second proposal should fail due to daily limit
-                await expect(
-                    sdk.createProposal({
-                        title: "Test Proposal 2",
-                        description: "Test Description",
-                        targetProgram: "11111111111111111111111111111111",
-                        testParams: {
-                            testType: TestType.FUZZ,
-                            duration: 300,
-                            intensity: 5,
-                            targetProgram: "11111111111111111111111111111111"
-                        },
-                        stakingAmount: 1000
-                    })
-                ).rejects.toThrow('Rate limit exceeded');
-
-                // After 24 hours, should succeed
-                jest.advanceTimersByTime(24 * 60 * 60 * 1000);
-                proposalCount = 0; // Reset counter after time advance
-                
-                await sdk.createProposal({
-                    title: "Test Proposal 3",
-                    description: "Test Description",
-                    targetProgram: "11111111111111111111111111111111",
-                    testParams: {
-                        testType: TestType.FUZZ,
-                        duration: 300,
-                        intensity: 5,
-                        targetProgram: "11111111111111111111111111111111"
-                    },
-                    stakingAmount: 1000
-                });
-
-                expect(mockIncr).toHaveBeenCalledTimes(3);
-                expect(mockExpire).toHaveBeenCalledTimes(3);
+        it('should block rapid subsequent requests', async () => {
+            const redis = sdk['queueWorker']['redis'] as jest.Mocked<Redis>;
+            redis.get.mockImplementation(async (key) => {
+                if (key === 'chaos:last_request') {
+                    return Date.now().toString();
+                }
+                return null;
             });
+
+            await expect(sdk.createChaosRequest({
+                testType: TestType.FUZZ,
+                duration: 60
+            })).rejects.toThrow('Rate limit exceeded');
+        });
+    });
+
+    describe('Proposal Rate Limiting', () => {
+        it('should allow first proposal', async () => {
+            const redis = sdk['queueWorker']['redis'] as jest.Mocked<Redis>;
+            redis.incr.mockResolvedValueOnce(1);
+
+            await expect(sdk.createProposal({
+                title: 'Test Proposal',
+                description: 'Test Description'
+            })).resolves.toBe(1);
+
+            expect(redis.incr).toHaveBeenCalledWith('proposal:count');
+            expect(redis.expire).toHaveBeenCalledWith('proposal:count', 24 * 60 * 60);
+        });
+
+        it('should block multiple proposals within 24 hours', async () => {
+            const redis = sdk['queueWorker']['redis'] as jest.Mocked<Redis>;
+            redis.incr.mockResolvedValueOnce(2);
+
+            await expect(sdk.createProposal({
+                title: 'Test Proposal 2',
+                description: 'Test Description 2'
+            })).rejects.toThrow('Rate limit exceeded');
         });
     });
 });

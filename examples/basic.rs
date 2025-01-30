@@ -1,20 +1,37 @@
-use glitch_sdk::GlitchClient;
-use solana_sdk::signature::Keypair;
+use solana_sdk::{
+    signature::{Keypair, Signer},
+    pubkey::Pubkey,
+};
 use std::str::FromStr;
+use glitch_gremlin_ai::{
+    ProgramDeployer,
+    HeliusClient,
+    GovernanceState,
+};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let client = GlitchClient::new("https://api.mainnet-beta.solana.com".to_string(), None);
+    // Initialize a new keypair for testing
     let signer = Keypair::new();
+    
+    // Create a new program deployer
+    let _deployer = ProgramDeployer::new(signer.pubkey());
+    
+    // Initialize Helius client for RPC access
+    let _client = HeliusClient::new(
+        "https://api.helius.xyz".to_string(),
+        "your-api-key-here".to_string()
+    );
+    
+    // Create a new governance state
+    let state = GovernanceState::new(signer.pubkey());
 
-    // Create a chaos request
-    client.create_chaos_request(&signer, 1000, b"test_params".to_vec()).await?;
-    println!("Chaos request created");
+    // Example of working with a specific program ID
+    let program_id = Pubkey::from_str("GremLin1111111111111111111111111111111111111")?;
+    println!("Program ID: {}", program_id);
 
-    // Finalize the request
-    let request_id = Pubkey::from_str("GremLin1111111111111111111111111111111111111")?;
-    client.finalize_chaos_request(&signer, request_id, 1, b"test_results".to_vec()).await?;
-    println!("Chaos request finalized");
+    // Print the authority
+    println!("Authority: {}", state.authority);
 
     Ok(())
 }

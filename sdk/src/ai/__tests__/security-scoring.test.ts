@@ -1,116 +1,62 @@
-import { SecurityScoring } from '../src/solana/security-scoring-model';
-import { Connection, PublicKey } from '@solana/web3.js';
 import * as tf from '@tensorflow/tfjs-node';
-import { mock, MockProxy } from 'jest-mock-extended';
+import { Connection } from '@solana/web3.js';
+import { SecurityScoring } from '../src/solana/security-scoring-model.js';
+import { SecurityMetrics, SecurityScore, SecurityAnalysis, RiskLevel, SecurityMetric } from '../src/solana/types.js';
+import { VulnerabilityType } from '../types.js';
 
+// Mock TensorFlow.js
 jest.mock('@tensorflow/tfjs-node', () => {
-  const mockTensor = {
-    dispose: jest.fn(),
-    dataSync: () => new Float32Array([0.5]),
-    arraySync: () => [0.5]
-  };
+    const mockTensor = {
+        dispose: jest.fn(),
+        data: () => Promise.resolve(new Float32Array([0.8, 0.7, 0.9])),
+        shape: [1, 3],
+        tensor: true,
+        arraySync: () => [0.8, 0.7, 0.9]
+    };
 
-  return {
-    getBackend: jest.fn().mockReturnValue('cpu'),
-    setBackend: jest.fn().mockResolvedValue(true),
-    ready: jest.fn().mockResolvedValue(undefined),
-    sequential: jest.fn().mockReturnValue({
-      add: jest.fn().mockReturnThis(),
-      compile: jest.fn(),
-      fit: jest.fn().mockResolvedValue({}),
-      predict: jest.fn().mockReturnValue(mockTensor),
-      dispose: jest.fn(),
-      layers: []
-    }),
-    layers: {
-      dense: jest.fn(),
-      dropout: jest.fn()
-    },
-    train: {
-      adam: jest.fn()
-    },
-    tensor: jest.fn().mockReturnValue(mockTensor),
-    tensor1d: jest.fn().mockReturnValue(mockTensor),
-    tensor2d: jest.fn().mockReturnValue(mockTensor)
-  };
+    const mockDense = {
+        apply: jest.fn(),
+        getConfig: () => ({}),
+        name: 'dense'
+    };
+
+    const mockModel = {
+        add: jest.fn(),
+        compile: jest.fn(),
+        fit: jest.fn().mockResolvedValue({ history: { loss: [0.1] } }),
+        predict: jest.fn().mockReturnValue(mockTensor),
+        dispose: jest.fn(),
+        layers: [],
+        save: jest.fn().mockResolvedValue(undefined),
+        load: jest.fn().mockResolvedValue(undefined)
+    };
+
+    return {
+        layers: {
+            dense: jest.fn().mockReturnValue(mockDense)
+        },
+        sequential: jest.fn().mockReturnValue(mockModel),
+        tensor2d: jest.fn().mockReturnValue(mockTensor),
+        train: {
+            adam: jest.fn().mockReturnValue({})
+        },
+        loadLayersModel: jest.fn().mockResolvedValue(mockModel)
+    };
 });
 
-describe('SecurityScoringModel', () => {
-    let securityScoring: SecurityScoring;
-    let connection: Partial<Connection>;
+// Mock Connection
+const mockConnection = {
+    getAccountInfo: jest.fn().mockResolvedValue(null),
+    getProgramAccounts: jest.fn().mockResolvedValue([]),
+    getSlot: jest.fn().mockResolvedValue(1)
+} as unknown as Connection;
 
+describe('SecurityScoring', () => {
+    let securityScoring: SecurityScoring;
+    let mockMetrics: SecurityMetrics;
 
     beforeEach(() => {
-        // Set up the mocks for tf methods
-        const tfMock = {
-            sequential: jest.fn().mockReturnValue({
-                add: jest.fn().mockReturnThis(),
-                compile: jest.fn(),
-                fit: jest.fn().mockResolvedValue({}),
-                predict: jest.fn().mockReturnValue({
-                    dataSync: () => new Float32Array([0.5]),
-                    dispose: jest.fn()
-                }),
-                dispose: jest.fn(),
-                layers: []
-            }),
-            layers: {
-                dense: jest.fn().mockReturnValue({
-                    apply: jest.fn()
-                })
-            },
-            train: {
-                adam: jest.fn()
-            },
-            tensor: jest.fn().mockReturnValue({
-                dispose: jest.fn(),
-                dataSync: () => new Float32Array([0.5])
-            })
-        };
-
-        // No need to assign mocks as they're handled in jest.setup.ts
-
-        // Use the shared mock implementation
-        const mockModel = {
-            add: jest.fn().mockReturnThis(),
-            compile: jest.fn(),
-            fit: jest.fn().mockResolvedValue({ history: { loss: [0.1] } }),
-            predict: jest.fn().mockReturnValue({
-                dataSync: () => new Float32Array([0.5]),
-                data: () => Promise.resolve(new Float32Array([0.5])),
-                dispose: jest.fn(),
-                shape: [1],
-                arraySync: () => [[0.5]]
-            }),
-            dispose: jest.fn(),
-            layers: [],
-            save: jest.fn().mockResolvedValue(undefined),
-            load: jest.fn().mockResolvedValue(undefined)
-        };
-
-        jest.spyOn(tf, 'sequential').mockReturnValue(mockModel);
-        const mockTensor = {
-            dispose: jest.fn(),
-            data: () => Promise.resolve(new Float32Array([0.5])),
-            shape: [1],
-            tensor: true,  // Required for type checking
-            arraySync: () => [0.5]
-        };
-        jest.spyOn(tf, 'tensor').mockReturnValue(mockTensor);
-
-        connection = {
-            getAccountInfo: jest.fn().mockImplementation(() => Promise.resolve({
-                lamports: 0n,
-                owner: new PublicKey('11111111111111111111111111111111'),
-                executable: false,
-                data: Buffer.from([]),
-                rentEpoch: 0
-            })),
-            getProgramAccounts: jest.fn().mockImplementation(() => Promise.resolve([])),
-            getSlot: jest.fn().mockImplementation(() => Promise.resolve(1))
-        } as unknown as Connection;
-
-        const config = {
+        securityScoring = new SecurityScoring({
             thresholds: {
                 high: 0.8,
                 medium: 0.6,
@@ -118,26 +64,52 @@ describe('SecurityScoringModel', () => {
             },
             weightings: {
                 ownership: 0.6,
-                access: 0.4
+                access: 0.4,
+                arithmetic: 0.5,
+                input: 0.3,
+                state: 0.4
             }
+        }, mockConnection);
+        
+        const baseMetric: SecurityMetric = {
+            name: 'Test Metric',
+            score: 0.8,
+            weight: 1.0,
+            details: [],
+            risk: 'LOW',
+            timestamp: Date.now()
         };
 
-        securityScoring = new SecurityScoring(config, connection as Connection);
+        mockMetrics = {
+            ownership: { ...baseMetric, name: 'Ownership' },
+            access: { ...baseMetric, name: 'Access Control' },
+            arithmetic: { ...baseMetric, name: 'Arithmetic Safety' },
+            input: { ...baseMetric, name: 'Input Validation' },
+            state: { ...baseMetric, name: 'State Management' }
+        };
     });
 
-    it('should initialize correctly', () => {
-        expect(securityScoring).toBeDefined();
+    afterEach(() => {
+        jest.clearAllMocks();
     });
 
-    it('should analyze program security', async () => {
-        const program = new PublicKey('11111111111111111111111111111111');
-        const result = await securityScoring.analyzeProgram(program);
-        expect(result).toBeDefined();
+    test('should initialize with correct model configuration', () => {
+        expect(tf.sequential).toHaveBeenCalled();
+        expect(tf.layers.dense).toHaveBeenCalledTimes(3);
     });
 
-    it('should return a score', async () => {
-        const program = new PublicKey('11111111111111111111111111111111');
-        const result = await securityScoring.analyzeProgram(program);
-        expect(typeof result.score.score).toBe('number');
+    test('should analyze program correctly', async () => {
+        const analysis = await securityScoring.analyzeProgram('11111111111111111111111111111111');
+
+        expect(analysis).toBeDefined();
+        expect(analysis.securityScore).toBeDefined();
+        expect(analysis.analysis.patterns).toBeDefined();
+        expect(analysis.analysis.riskLevel).toBeDefined();
+        expect(analysis.suggestions).toBeInstanceOf(Array);
+
+        const findings = analysis.analysis.patterns;
+        expect(findings.some((p: { type: string }) => p.type === VulnerabilityType.ARITHMETIC_OVERFLOW)).toBe(true);
+        expect(findings.some((p: { type: string }) => p.type === VulnerabilityType.ACCESS_CONTROL)).toBe(true);
+        expect(findings.some((p: { type: string }) => p.type === VulnerabilityType.PDA_VALIDATION)).toBe(true);
     });
 });

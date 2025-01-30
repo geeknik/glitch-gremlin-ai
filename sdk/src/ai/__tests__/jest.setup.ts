@@ -1,8 +1,15 @@
-import mockTf from './__mocks__/tf-mock';
+import mockTf from './__mocks__/tf-mock.js';
 
-// Set up TensorFlow mock implementations
+jest.mock('@tensorflow/tfjs-node', () => mockTf);
+
+// Configure Jest environment
+process.env.NODE_ENV = 'test';
+
+// Add any global test setup here
 beforeAll(() => {
-  // The mock implementation is already fully defined in tf-mock.ts
-  // No need to redefine it here since we're importing the mock directly
-  jest.doMock('@tensorflow/tfjs-node', () => mockTf);
+    // Setup any test environment variables or global mocks
+});
+
+afterAll(() => {
+    // Cleanup any resources after all tests
 });

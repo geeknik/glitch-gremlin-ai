@@ -1,28 +1,27 @@
 {
+  "extends": "../tsconfig.json",
   "compilerOptions": {
     "target": "ES2020",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "esModuleInterop": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "outDir": "./dist/esm",
-    "declarationDir": "./dist/types",
-    "rootDir": "./src",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "lib": ["ES2020", "DOM"],
+    "outDir": "../dist",
+    "rootDir": "src",
     "strict": true,
-    "allowJs": true,
+    "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "isolatedModules": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
     "composite": true,
-    "types": ["jest", "node", "@types/jest"],
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@solana/*": ["./node_modules/@solana/*"]
-    }
+      "@/*": ["src/*"]
+    },
+    "types": ["node", "jest", "@tensorflow/tfjs-node"]
   },
-  "include": ["src/**/*", "src/__tests__/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "**/__tests__/*", "dist"]
 }

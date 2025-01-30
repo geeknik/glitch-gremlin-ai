@@ -1,33 +1,29 @@
-import { VulnerabilityType } from './vulnerability-detection';
-import { FuzzingResult } from './chaos-fuzz';
+import { VulnerabilityType } from './types.js';
+import { FuzzingResult } from './types.js';
 
 interface SecurityFinding {
-    id: string;
     type: VulnerabilityType;
-    severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+    severity: 'HIGH' | 'MEDIUM' | 'LOW';
+    confidence: number;
     description: string;
-    location?: {
-        file: string;
-        lineNumber: number;
-    };
-    remediation: string;
+    location?: string;
+    recommendation?: string;
+    timestamp: number;
+    riskScore?: number;
     codeSnippet?: string;
-    riskScore: number;
+    remediation?: string;
 }
 
 interface TrendData {
-    timestamp: Date;
-    vulnerabilityCount: number;
-    severityDistribution: Record<string, number>;
-    riskScore: number;
+    timestamp: number;
+    value: number;
+    type: string;
+    riskScore?: number;
 }
 
-class SecurityReportGenerator {
+export class SecurityReportGenerator {
     private findings: SecurityFinding[] = [];
     private fuzzingResults: FuzzingResult[] = [];
-    private trendData: TrendData[] = [];
-
-    constructor() {}
 
     public addFinding(finding: SecurityFinding): void {
         this.findings.push(finding);
@@ -37,115 +33,176 @@ class SecurityReportGenerator {
         this.fuzzingResults.push(result);
     }
 
-    public addTrendData(data: TrendData): void {
-        this.trendData.push(data);
+    public generateReport(): string {
+        let report = '# Security Analysis Report\n\n';
+
+        // Add summary section
+        report += this.generateSummary();
+
+        // Add findings section
+        report += this.generateFindingsSection();
+
+        // Add trends section
+        report += this.generateTrendsSection();
+
+        // Add recommendations section
+        report += this.generateRecommendations();
+
+        return report;
     }
 
-    private calculateRiskScore(): number {
-        const severityWeights = {
-            CRITICAL: 10,
-            HIGH: 7,
-            MEDIUM: 4,
-            LOW: 1
+    private generateSummary(): string {
+        const totalFindings = this.findings.length;
+        const severityCount = {
+            HIGH: 0,
+            MEDIUM: 0,
+            LOW: 0
         };
 
-        return this.findings.reduce((score, finding) => 
-            score + severityWeights[finding.severity] * finding.riskScore, 0);
-    }
-
-    private generateRemediation(): string[] {
-        return this.findings.map(finding => {
-            return `## ${finding.type} (${finding.severity})
-            ${finding.description}
-            
-            ### Remediation Steps
-            ${finding.remediation}
-            
-            ${finding.codeSnippet ? `### Code Fix\n\`\`\`typescript\n${finding.codeSnippet}\n\`\`\``: ''}`;
+        this.findings.forEach(finding => {
+            severityCount[finding.severity]++;
         });
+
+        let summary = '## Summary\n\n';
+        summary += `Total Findings: ${totalFindings}\n`;
+        summary += `High Severity: ${severityCount.HIGH}\n`;
+        summary += `Medium Severity: ${severityCount.MEDIUM}\n`;
+        summary += `Low Severity: ${severityCount.LOW}\n\n`;
+
+        return summary;
     }
 
-    private analyzeTrends(): string {
-        const trendAnalysis = this.trendData
-            .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-        
-        return `## Vulnerability Trends
-            - Current Risk Score: ${this.calculateRiskScore()}
-            - Trend Direction: ${this.calculateTrendDirection(trendAnalysis)}
-            - Critical Findings: ${this.countSeverity('CRITICAL')}
-            - High Severity: ${this.countSeverity('HIGH')}
-            - Medium Severity: ${this.countSeverity('MEDIUM')}
-            - Low Severity: ${this.countSeverity('LOW')}`;
+    private generateFindingsSection(): string {
+        let section = '## Security Findings\n\n';
+
+        // Sort findings by severity
+        const sortedFindings = [...this.findings].sort((a, b) => {
+            const severityOrder = { HIGH: 3, MEDIUM: 2, LOW: 1 };
+            return severityOrder[b.severity] - severityOrder[a.severity];
+        });
+
+        sortedFindings.forEach(finding => {
+            section += `### ${finding.type}\n`;
+            section += `**Severity**: ${finding.severity}\n`;
+            section += `**Confidence**: ${(finding.confidence * 100).toFixed(1)}%\n`;
+            section += `**Description**: ${finding.description}\n`;
+            
+            if (finding.location) {
+                section += `**Location**: ${finding.location}\n`;
+            }
+            
+            if (finding.recommendation) {
+                section += `**Recommendation**: ${finding.recommendation}\n`;
+            }
+
+            if (finding.codeSnippet) {
+                section += '\n```solidity\n';
+                section += finding.codeSnippet;
+                section += '\n```\n';
+            }
+
+            section += '\n';
+        });
+
+        return section;
     }
 
-    private countSeverity(severity: string): number {
-        return this.findings.filter(f => f.severity === severity).length;
+    private generateTrendsSection(): string {
+        let section = '## Security Trends\n\n';
+
+        const trends = this.analyzeTrends();
+        trends.forEach(trend => {
+            section += `### ${trend.type}\n`;
+            section += `Value: ${trend.value}\n`;
+            if (trend.riskScore !== undefined) {
+                section += `Risk Score: ${trend.riskScore}\n`;
+            }
+            section += '\n';
+        });
+
+        return section;
     }
 
-    private calculateTrendDirection(trends: TrendData[]): string {
-        if (trends.length < 2) return 'Insufficient data';
-        const recent = trends[trends.length - 1].riskScore;
-        const previous = trends[trends.length - 2].riskScore;
-        return recent > previous ? 'Increasing' : 'Decreasing';
+    private generateRecommendations(): string {
+        let section = '## Recommendations\n\n';
+
+        // Group findings by type
+        const findingsByType = new Map<VulnerabilityType, SecurityFinding[]>();
+        this.findings.forEach(finding => {
+            const findings = findingsByType.get(finding.type) || [];
+            findings.push(finding);
+            findingsByType.set(finding.type, findings);
+        });
+
+        // Generate recommendations for each type
+        findingsByType.forEach((findings, type) => {
+            section += `### ${type}\n`;
+            const uniqueRecommendations = new Set(
+                findings
+                    .map(f => f.recommendation)
+                    .filter((r): r is string => r !== undefined)
+            );
+            uniqueRecommendations.forEach(rec => {
+                section += `- ${rec}\n`;
+            });
+            section += '\n';
+        });
+
+        return section;
     }
 
-    public generateMarkdownReport(): string {
-        return `# Security Analysis Report
-        ${new Date().toISOString()}
+    private analyzeTrends(): TrendData[] {
+        const trends: TrendData[] = [];
 
-        ## Executive Summary
-        Total Vulnerabilities: ${this.findings.length}
-        Overall Risk Score: ${this.calculateRiskScore()}
-        
-        ${this.analyzeTrends()}
+        // Analyze findings over time
+        const timeRanges = this.getTimeRanges();
+        timeRanges.forEach(range => {
+            const findingsInRange = this.findings.filter(f => 
+                f.timestamp >= range.start && f.timestamp < range.end
+            );
 
-        ## Detailed Findings
-        ${this.generateRemediation().join('\n\n')}
+            trends.push({
+                timestamp: range.start,
+                value: findingsInRange.length,
+                type: 'Finding Count',
+                riskScore: this.calculateRiskScore(findingsInRange)
+            });
+        });
 
-        ## Fuzzing Campaign Results
-        Total Fuzzing Tests: ${this.fuzzingResults.length}
-        Failed Tests: ${this.fuzzingResults.filter(r => !r.success).length}`;
+        return trends;
     }
 
-    public generateJsonReport(): string {
-        return JSON.stringify({
-            timestamp: new Date(),
-            findings: this.findings,
-            riskScore: this.calculateRiskScore(),
-            trendAnalysis: {
-                data: this.trendData,
-                direction: this.calculateTrendDirection(this.trendData)
-            },
-            fuzzingResults: this.fuzzingResults
-        }, null, 2);
+    private getTimeRanges(): { start: number; end: number }[] {
+        if (this.findings.length === 0) return [];
+
+        const timestamps = this.findings.map(f => f.timestamp);
+        const minTime = Math.min(...timestamps);
+        const maxTime = Math.max(...timestamps);
+        const dayInMs = 24 * 60 * 60 * 1000;
+
+        const ranges: { start: number; end: number }[] = [];
+        for (let start = minTime; start < maxTime; start += dayInMs) {
+            ranges.push({
+                start,
+                end: start + dayInMs
+            });
+        }
+
+        return ranges;
     }
 
-    public generateHtmlReport(): string {
-        const markdown = this.generateMarkdownReport();
-        // Convert markdown to HTML (implement or use a library)
-        return `<!DOCTYPE html>
-        <html>
-            <head>
-                <title>Security Analysis Report</title>
-                <style>
-                    body { font-family: Arial, sans-serif; }
-                    .severity-critical { color: #ff0000; }
-                    .severity-high { color: #ff6600; }
-                    .severity-medium { color: #ffcc00; }
-                    .severity-low { color: #00cc00; }
-                </style>
-            </head>
-            <body>
-                ${this.convertMarkdownToHtml(markdown)}
-            </body>
-        </html>`;
-    }
+    private calculateRiskScore(findings: SecurityFinding[]): number {
+        const severityWeights = {
+            HIGH: 1.0,
+            MEDIUM: 0.6,
+            LOW: 0.3
+        };
 
-    private convertMarkdownToHtml(markdown: string): string {
-        // Implement markdown to HTML conversion
-        return markdown.replace(/\n/g, '<br>');
+        return findings.reduce((score, finding) => {
+            return score + (severityWeights[finding.severity] * finding.confidence);
+        }, 0) / Math.max(findings.length, 1);
     }
 }
 
-export { SecurityReportGenerator, SecurityFinding, TrendData };
+export type { SecurityFinding, TrendData };
 

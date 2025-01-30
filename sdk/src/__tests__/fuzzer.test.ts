@@ -1,4 +1,4 @@
-import { Fuzzer } from '../ai/fuzzer.js';
+import { Fuzzer, FuzzInput, FuzzConfig } from '../ai/fuzzer.js';
 import { VulnerabilityType } from '../types.js';
 import { PublicKey } from '@solana/web3.js';
 import { IoRedisMock } from '../__mocks__/ioredis.js';
@@ -16,115 +16,81 @@ jest.mock('../metrics/collector', () => {
 
 describe('Fuzzer', () => {
     let fuzzer: Fuzzer;
-    let redisMock: IoRedisMock;
     let mockMetricsCollector: jest.Mocked<MetricsCollector>;
 
     beforeEach(async () => {
-        // Set up Redis mock
-        redisMock = new IoRedisMock({
-            data: new Map(),
-            keyPrefix: 'test:'
-        });
-
         // Set up metrics collector mock
         mockMetricsCollector = new MetricsCollector() as jest.Mocked<MetricsCollector>;
         mockMetricsCollector.recordMetric = jest.fn();
 
-        fuzzer = new Fuzzer(redisMock, mockMetricsCollector);
+        const config: FuzzConfig = {
+            targetProgram: new PublicKey('11111111111111111111111111111111'),
+            maxIterations: 100,
+            timeoutMs: 5000,
+            mutationRate: 0.1,
+            crossoverRate: 0.7,
+            populationSize: 10,
+            selectionPressure: 0.8,
+            targetVulnerabilities: [
+                VulnerabilityType.ARITHMETIC_OVERFLOW,
+                VulnerabilityType.ACCESS_CONTROL
+            ],
+            maxAccounts: 5,
+            maxDataSize: 1024,
+            maxSeeds: 16
+        };
+
+        fuzzer = new Fuzzer(config);
     });
 
     afterEach(async () => {
         jest.clearAllMocks();
-        await redisMock.flushall();
-        try {
-            await redisMock.quit();
-        } catch (error) {
-            // Ignore Redis connection errors during cleanup
-        }
     });
 
-    describe('generateFuzzInput', () => {
-        const baseInput = {
-            instruction: 1,
+    describe('fuzz', () => {
+        const baseInput: FuzzInput = {
+            programId: new PublicKey('11111111111111111111111111111111'),
+            accounts: [
+                new PublicKey('22222222222222222222222222222222'),
+                new PublicKey('33333333333333333333333333333333')
+            ],
             data: Buffer.from([0, 1, 2, 3]),
-            probability: 0.5,
-            metadata: {},
-            created: Date.now()
+            seeds: [Buffer.from('test')]
         };
 
-        it('should generate a mutated input', async () => {
-            const input = await fuzzer.generateFuzzInput(baseInput);
-            expect(input).toHaveProperty('instruction');
-            expect(input).toHaveProperty('data');
-            expect(input).toHaveProperty('probability');
-            expect(input.probability).toBeGreaterThanOrEqual(0);
-            expect(input.probability).toBeLessThanOrEqual(1);
-        });
-
-        it('should handle edge cases', async () => {
-            // Test with invalid base input
-            const nullInput = await fuzzer.generateFuzzInput(null as any);
-            expect(nullInput.probability).toBeNaN();
-
-            // Test with empty data
-            const emptyInput = { ...baseInput, data: Buffer.from([]) };
-            const input = await fuzzer.generateFuzzInput(emptyInput);
-            expect(input.data).toBeInstanceOf(Buffer);
-        });
-    });
-
-    describe('analyzeFuzzResult', () => {
-        it('should detect arithmetic overflow', async () => {
-            const result = { error: { message: 'arithmetic overflow detected' }};
-            const input = {
-                instruction: 1,
-                data: Buffer.from([255, 255, 255, 255])
-            };
-
-            const analysis = await fuzzer.analyzeFuzzResult(result, input);
-            expect(analysis.type).toBe(VulnerabilityType.ArithmeticOverflow);
-            expect(analysis.confidence).toBeGreaterThan(0.7);
+        it('should perform fuzzing and detect vulnerabilities', async () => {
+            const result = await fuzzer.fuzz(baseInput);
+            expect(result).toBeDefined();
+            expect(result.input).toBeDefined();
+            expect(result.vulnerabilities).toBeInstanceOf(Array);
+            expect(result.metrics).toBeDefined();
+            expect(result.transactions).toBeInstanceOf(Array);
 
             // Verify metrics collection
             expect(mockMetricsCollector.recordMetric)
-                .toHaveBeenCalledWith('vulnerability_detected', {
-                    type: VulnerabilityType.ArithmeticOverflow,
-                    confidence: expect.any(Number),
-                    location: expect.any(String),
-                    timestamp: expect.any(Number)
-                });
+                .toHaveBeenCalledWith('fuzzer.iteration', expect.any(Number));
+        });
+
+        it('should detect arithmetic overflow', async () => {
+            const result = await fuzzer.fuzz({
+                ...baseInput,
+                data: Buffer.from([255, 255, 255, 255])
+            });
+
+            expect(result.vulnerabilities.some(v => v.type === VulnerabilityType.ARITHMETIC_OVERFLOW)).toBe(true);
+            expect(mockMetricsCollector.recordMetric)
+                .toHaveBeenCalledWith('fuzzer.vulnerability_detected', expect.any(Object));
         });
 
         it('should detect access control issues', async () => {
-            const result = { error: { message: 'InvalidAccountOwner' }};
-            const input = {
-                instruction: 2,
-                data: Buffer.from([1, 2, 3, 4])
-            };
+            const result = await fuzzer.fuzz({
+                ...baseInput,
+                accounts: [new PublicKey('44444444444444444444444444444444')]
+            });
 
-            const analysis = await fuzzer.analyzeFuzzResult(result, input);
-            expect(analysis.type).toBe('access-control');
-            expect(analysis.confidence).toBeGreaterThan(0.7);
-
-            // Verify metrics collection
+            expect(result.vulnerabilities.some(v => v.type === VulnerabilityType.ACCESS_CONTROL)).toBe(true);
             expect(mockMetricsCollector.recordMetric)
-                .toHaveBeenCalledWith('vulnerability_detected', {
-                    type: VulnerabilityType.AccessControl,
-                    confidence: expect.any(Number)
-                });
-        });
-
-        it('should handle clean results', async () => {
-            const result = { error: undefined };
-            const input = {
-                instruction: 3,
-                data: Buffer.from([0, 0, 0, 0])
-            };
-
-            const analysis = await fuzzer.analyzeFuzzResult(result, input);
-
-            expect(analysis.type).toBeUndefined();
-            expect(analysis.confidence).toBeUndefined();
+                .toHaveBeenCalledWith('fuzzer.vulnerability_detected', expect.any(Object));
         });
     });
 });

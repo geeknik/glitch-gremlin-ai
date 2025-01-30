@@ -27,5 +27,8 @@ export default {
     modulePathIgnorePatterns: [
         '<rootDir>/dist/'
     ],
-    setupFilesAfterEnv: ['<rootDir>/src/__tests__/setupAfterEnv.ts']
+    setupFilesAfterEnv: [
+        '<rootDir>/src/__tests__/setupAfterEnv.ts',
+        '<rootDir>/src/ai/__mocks__/@tensorflow/tfjs-node.ts'
+    ]
 }

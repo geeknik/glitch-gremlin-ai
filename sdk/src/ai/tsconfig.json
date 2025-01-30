@@ -2,10 +2,15 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "../../dist/ai",
-    "rootDir": "src",
-    "composite": true
+    "rootDir": "../../src",
+    "composite": true,
+    "baseUrl": "../../",
+    "paths": {
+      "@/*": ["src/*"]
+    }
   },
   "include": [
+    "../../src/types.ts",
     "src/**/*.ts",
     "src/**/*.tsx"
   ],
@@ -15,5 +20,8 @@
     "coverage",
     "**/__tests__/**",
     "jest.setup.ts"
+  ],
+  "references": [
+    { "path": "../.." }
   ]
 }

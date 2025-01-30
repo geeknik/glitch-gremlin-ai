@@ -1,161 +1,162 @@
-import { Server } from 'socket.io';
-import { createServer } from 'http';
-import { RLFuzzingModel } from './reinforcement-fuzzing';
+import { WebSocketServer } from 'ws';
+import { FuzzingState } from './types.js';
+import { Logger } from './logger.js';
+import { FuzzingMetricsCollector } from './reinforcement-fuzzing-utils.js';
 
-interface DashboardMetrics {
-    timestamp: number;
-    episodeReward: number;
-    loss: number;
-    epsilon: number;
+interface DashboardState {
+    currentEpisode: number;
+    totalEpisodes: number;
+    currentReward: number;
+    totalReward: number;
     coverage: number;
-    memoryUsage: number;
-    uniqueCrashes: number;
+    vulnerabilitiesFound: number;
+    activeConnections: number;
 }
 
-interface MetricsBuffer {
-    metrics: DashboardMetrics[];
-    maxSize: number;
-    currentIndex: number;
+interface DashboardConfig {
+    port: number;
+    metricsCollector: FuzzingMetricsCollector;
 }
 
 export class DashboardServer {
-    private io: Server;
-    private metricsBuffer: MetricsBuffer;
-    private connectedClients: Set<string>;
-    private isCollecting: boolean;
-    private collectInterval?: NodeJS.Timer;
+    private readonly wss: WebSocketServer;
+    private readonly logger: Logger;
+    private readonly metricsCollector: FuzzingMetricsCollector;
+    private state: DashboardState;
+    private updateInterval?: NodeJS.Timeout;
+    private isRunning: boolean = false;
 
-    constructor(port: number = 3000, bufferSize: number = 1000) {
-        const httpServer = createServer();
-        this.io = new Server(httpServer, {
-            cors: {
-                origin: "*",
-                methods: ["GET", "POST"]
-            }
-        });
+    constructor(config: DashboardConfig) {
+        this.logger = new Logger('DashboardServer');
+        this.metricsCollector = config.metricsCollector;
+        
+        // Initialize WebSocket server
+        this.wss = new WebSocketServer({ port: config.port });
 
-        this.metricsBuffer = {
-            metrics: new Array(bufferSize),
-            maxSize: bufferSize,
-            currentIndex: 0
+        // Initialize state
+        this.state = {
+            currentEpisode: 0,
+            totalEpisodes: 0,
+            currentReward: 0,
+            totalReward: 0,
+            coverage: 0,
+            vulnerabilitiesFound: 0,
+            activeConnections: 0
         };
 
-        this.connectedClients = new Set();
-        this.isCollecting = false;
+        this.setupWebSocket();
+        this.startServer(config.port);
+    }
 
-        httpServer.listen(port, () => {
-            console.log(`Dashboard server listening on port ${port}`);
+    private setupWebSocket(): void {
+        this.wss.on('connection', (ws) => {
+            this.state.activeConnections++;
+            this.broadcastState();
+
+            ws.on('message', async (message: Buffer) => {
+                try {
+                    const data = JSON.parse(message.toString());
+                    switch (data.type) {
+                        case 'start':
+                            await this.start();
+                            break;
+                        case 'stop':
+                            await this.stop();
+                            break;
+                        default:
+                            this.logger.warn(`Unknown message type: ${data.type}`);
+                    }
+                } catch (error) {
+                    this.logger.error('Error processing message:', error);
+                }
+            });
+
+            ws.on('close', () => {
+                this.state.activeConnections--;
+                this.broadcastState();
+            });
         });
-
-        this.setupSocketHandlers();
     }
 
-    private setupSocketHandlers(): void {
-        this.io.on('connection', (socket) => {
-            console.log(`Client connected: ${socket.id}`);
-            this.connectedClients.add(socket.id);
-
-            // Send historical data to new clients
-            this.sendHistoricalData(socket);
-
-            socket.on('requestMetrics', () => {
-                this.sendHistoricalData(socket);
-            });
-
-            socket.on('disconnect', () => {
-                console.log(`Client disconnected: ${socket.id}`);
-                this.connectedClients.delete(socket.id);
-            });
-
-            socket.on('error', (error) => {
-                console.error(`Socket error for client ${socket.id}:`, error);
-            });
-        });
+    private startServer(port: number): void {
+        this.logger.info(`WebSocket server running on ws://localhost:${port}`);
     }
 
-    private sendHistoricalData(socket: any): void {
-        const metrics = this.getBufferedMetrics();
-        socket.emit('historicalMetrics', metrics);
-    }
+    public async start(): Promise<void> {
+        if (this.isRunning) {
+            return;
+        }
 
-    private getBufferedMetrics(): DashboardMetrics[] {
-        return this.metricsBuffer.metrics.filter(Boolean);
-    }
-
-    public startMetricsCollection(interval: number = 1000): void {
-        if (this.isCollecting) return;
-
-        this.isCollecting = true;
-        this.collectInterval = setInterval(() => {
-            this.collectAndBroadcastMetrics();
-        }, interval);
-    }
-
-    public stopMetricsCollection(): void {
-        if (this.collectInterval) {
-            clearInterval(this.collectInterval);
-            this.isCollecting = false;
+        try {
+            this.isRunning = true;
+            this.startStateUpdates();
+            this.logger.info('Dashboard server started');
+        } catch (error) {
+            this.logger.error('Error starting dashboard server:', error);
+            await this.stop();
         }
     }
 
-    private collectAndBroadcastMetrics(): void {
+    public async stop(): Promise<void> {
+        if (!this.isRunning) {
+            return;
+        }
+
         try {
-            const metrics: DashboardMetrics = {
-                timestamp: Date.now(),
-                episodeReward: this.getCurrentEpisodeReward(),
-                loss: this.getCurrentLoss(),
-                epsilon: this.getCurrentEpsilon(),
-                coverage: this.getCurrentCoverage(),
-                memoryUsage: process.memoryUsage().heapUsed,
-                uniqueCrashes: this.getUniqueCrashes()
+            this.isRunning = false;
+            this.stopStateUpdates();
+            this.wss.close();
+            this.logger.info('Dashboard server stopped');
+        } catch (error) {
+            this.logger.error('Error stopping dashboard server:', error);
+        }
+    }
+
+    private startStateUpdates(): void {
+        if (this.updateInterval) {
+            clearInterval(this.updateInterval);
+        }
+        this.updateInterval = setInterval(() => this.updateAndBroadcastState(), 1000);
+    }
+
+    private stopStateUpdates(): void {
+        if (this.updateInterval) {
+            clearInterval(this.updateInterval);
+            this.updateInterval = undefined;
+        }
+    }
+
+    private async updateAndBroadcastState(): Promise<void> {
+        if (!this.isRunning) {
+            return;
+        }
+
+        try {
+            // Get latest metrics from collector
+            const metrics = this.metricsCollector.getProgressMetrics();
+
+            // Update state with latest metrics
+            this.state = {
+                ...this.state,
+                currentReward: metrics.avgReward,
+                coverage: metrics.codeCoverage,
+                vulnerabilitiesFound: metrics.vulnerabilities
             };
 
-            this.addMetricsToBuffer(metrics);
-            this.broadcastMetrics(metrics);
+            this.broadcastState();
         } catch (error) {
-            console.error('Error collecting metrics:', error);
+            this.logger.error('Error updating dashboard state:', error);
         }
     }
 
-    private addMetricsToBuffer(metrics: DashboardMetrics): void {
-        this.metricsBuffer.metrics[this.metricsBuffer.currentIndex] = metrics;
-        this.metricsBuffer.currentIndex = 
-            (this.metricsBuffer.currentIndex + 1) % this.metricsBuffer.maxSize;
-    }
-
-    private broadcastMetrics(metrics: DashboardMetrics): void {
-        this.io.emit('metrics', metrics);
-    }
-
-    // Placeholder methods for metric collection - to be implemented based on RL model
-    private getCurrentEpisodeReward(): number {
-        // TODO: Implement actual metric collection from RL model
-        return 0;
-    }
-
-    private getCurrentLoss(): number {
-        // TODO: Implement actual metric collection from RL model
-        return 0;
-    }
-
-    private getCurrentEpsilon(): number {
-        // TODO: Implement actual metric collection from RL model
-        return 0;
-    }
-
-    private getCurrentCoverage(): number {
-        // TODO: Implement actual metric collection from RL model
-        return 0;
-    }
-
-    private getUniqueCrashes(): number {
-        // TODO: Implement actual metric collection from RL model
-        return 0;
-    }
-
-    public shutdown(): void {
-        this.stopMetricsCollection();
-        this.io.close();
+    private broadcastState(): void {
+        const message = JSON.stringify(this.state);
+        this.wss.clients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(message);
+            }
+        });
     }
 }
+
 
