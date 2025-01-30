@@ -287,7 +287,7 @@ export class ChaosGenerator {
         ];
 
         return {
-            type: VulnerabilityType.PDAValidation,
+            type: VulnerabilityType.PDASafety,
             severity: SecurityLevel.HIGH,
             confidence: this.calculateConfidence(SecurityLevel.HIGH, evidence),
             description: 'Improper PDA validation could lead to account confusion',

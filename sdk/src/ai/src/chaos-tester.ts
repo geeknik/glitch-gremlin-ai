@@ -1,6 +1,6 @@
 import { Connection, PublicKey, Transaction } from '@solana/web3.js';
 import { FuzzingMutation, FuzzingResult, FuzzingMetrics, VulnerabilityInfo } from '../../types.js';
-import { VulnerabilityType, SecurityLevel } from '../../types.js';
+import { SecurityLevel, VulnerabilityType } from '../../types.js';
 
 export class ChaosTester {
     private connection: Connection;
@@ -77,7 +77,7 @@ export class ChaosTester {
                 this.addVulnerability(VulnerabilityType.Reentrancy, SecurityLevel.CRITICAL);
             }
             if (log.includes('invalid PDA') || log.includes('seed mismatch')) {
-                this.addVulnerability(VulnerabilityType.PDAValidation, SecurityLevel.HIGH);
+                this.addVulnerability(VulnerabilityType.PDASafety, SecurityLevel.HIGH);
             }
             if (log.includes('invalid CPI') || log.includes('program not found')) {
                 this.addVulnerability(VulnerabilityType.CPISafety, SecurityLevel.HIGH);
@@ -101,6 +101,9 @@ export class ChaosTester {
             recommendation: this.getVulnerabilityRecommendation(type),
             vulnerabilityType: type,
             details: {
+                expectedValue: undefined,
+                actualValue: undefined,
+                location: undefined,
                 impact: this.getVulnerabilityImpact(type),
                 likelihood: severity
             }
@@ -116,12 +119,20 @@ export class ChaosTester {
                 return 'Access control vulnerability detected';
             case VulnerabilityType.Reentrancy:
                 return 'Potential reentrancy vulnerability detected';
-            case VulnerabilityType.PDAValidation:
+            case VulnerabilityType.PDASafety:
                 return 'PDA validation vulnerability detected';
             case VulnerabilityType.CPISafety:
                 return 'CPI safety vulnerability detected';
             case VulnerabilityType.SignerAuthorization:
                 return 'Signer authorization vulnerability detected';
+            case VulnerabilityType.AuthorityCheck:
+                return 'Authority check vulnerability detected';
+            case VulnerabilityType.DataValidation:
+                return 'Data validation vulnerability detected';
+            case VulnerabilityType.AccountValidation:
+                return 'Account validation vulnerability detected';
+            case VulnerabilityType.None:
+                return 'No vulnerability detected';
             default:
                 return 'Unknown vulnerability detected';
         }
@@ -135,12 +146,20 @@ export class ChaosTester {
                 return 'Implement proper access control checks and authority validation';
             case VulnerabilityType.Reentrancy:
                 return 'Implement reentrancy guards and follow checks-effects-interactions pattern';
-            case VulnerabilityType.PDAValidation:
+            case VulnerabilityType.PDASafety:
                 return 'Implement proper PDA validation and ownership checks';
             case VulnerabilityType.CPISafety:
                 return 'Implement proper CPI target validation and security checks';
             case VulnerabilityType.SignerAuthorization:
                 return 'Implement proper signer validation and authority checks';
+            case VulnerabilityType.AuthorityCheck:
+                return 'Implement proper authority validation checks';
+            case VulnerabilityType.DataValidation:
+                return 'Implement proper data validation checks';
+            case VulnerabilityType.AccountValidation:
+                return 'Implement proper account validation checks';
+            case VulnerabilityType.None:
+                return 'No security issues found - maintain secure coding practices';
             default:
                 return 'Review and implement proper security controls';
         }
@@ -154,12 +173,20 @@ export class ChaosTester {
                 return 'Unauthorized access to protected functionality';
             case VulnerabilityType.Reentrancy:
                 return 'Potential manipulation of program state and fund drainage';
-            case VulnerabilityType.PDAValidation:
+            case VulnerabilityType.PDASafety:
                 return 'Potential account confusion or unauthorized access';
             case VulnerabilityType.CPISafety:
                 return 'Potential execution of malicious code or fund drainage';
             case VulnerabilityType.SignerAuthorization:
                 return 'Unauthorized transaction execution';
+            case VulnerabilityType.AuthorityCheck:
+                return 'Unauthorized access to privileged operations';
+            case VulnerabilityType.DataValidation:
+                return 'Potential data corruption or invalid state';
+            case VulnerabilityType.AccountValidation:
+                return 'Potential account confusion or unauthorized access';
+            case VulnerabilityType.None:
+                return 'No security impact';
             default:
                 return 'Unknown impact';
         }
@@ -249,32 +276,13 @@ export class ChaosTester {
             [VulnerabilityType.Reentrancy]: 0.9,
             [VulnerabilityType.ArithmeticOverflow]: 0.8,
             [VulnerabilityType.AccessControl]: 0.85,
-            [VulnerabilityType.PdaSafety]: 0.7,
-            [VulnerabilityType.CpiSafety]: 0.75,
+            [VulnerabilityType.PDASafety]: 0.7,
+            [VulnerabilityType.CPISafety]: 0.75,
             [VulnerabilityType.SignerAuthorization]: 0.8,
             [VulnerabilityType.AuthorityCheck]: 0.7,
             [VulnerabilityType.DataValidation]: 0.6,
             [VulnerabilityType.AccountValidation]: 0.65,
-            [VulnerabilityType.None]: 0.0,
-            [VulnerabilityType.CPIValidation]: 0.7,
-            [VulnerabilityType.AuthorityValidation]: 0.75,
-            [VulnerabilityType.SignerValidation]: 0.8,
-            [VulnerabilityType.PDAValidation]: 0.7,
-            [VulnerabilityType.AccountConfusion]: 0.65,
-            [VulnerabilityType.ClockManipulation]: 0.6,
-            [VulnerabilityType.StateConsistency]: 0.7,
-            [VulnerabilityType.LamportDrain]: 0.8,
-            [VulnerabilityType.InstructionInjection]: 0.75,
-            [VulnerabilityType.RaceCondition]: 0.8,
-            [VulnerabilityType.ComputeBudget]: 0.6,
-            [VulnerabilityType.TokenValidation]: 0.7,
-            [VulnerabilityType.TimelockBypass]: 0.75,
-            [VulnerabilityType.QuorumManipulation]: 0.8,
-            [VulnerabilityType.DelegateAbuse]: 0.7,
-            [VulnerabilityType.TreasuryDrain]: 0.85,
-            [VulnerabilityType.Custom]: 0.5,
-            [VulnerabilityType.PDASafety]: 0.7,
-            [VulnerabilityType.CPISafety]: 0.75
+            [VulnerabilityType.None]: 0.0
         };
         return weights;
     }

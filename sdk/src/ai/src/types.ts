@@ -3,25 +3,8 @@ import { VulnerabilityType as BaseVulnerabilityType, SecurityLevel } from '../..
 
 // Core types for Solana security fuzzing and analysis
 
-// Vulnerability types that can be detected during fuzzing
-export const enum VulnerabilityType {
-    None = 'NONE',
-    ArithmeticOverflow = 'ARITHMETIC_OVERFLOW',
-    AccessControl = 'ACCESS_CONTROL',
-    PDASafety = 'PDA_SAFETY',
-    Reentrancy = 'REENTRANCY',
-    DataValidation = 'DATA_VALIDATION',
-    LogicError = 'LOGIC_ERROR',
-    UnhandledError = 'UNHANDLED_ERROR',
-    CPISafety = 'CPI_SAFETY',
-    AuthorityCheck = 'AUTHORITY_CHECK',
-    AccountConfusion = 'ACCOUNT_CONFUSION',
-    SignerAuthorization = 'SIGNER_AUTHORIZATION',
-    ClockManipulation = 'CLOCK_MANIPULATION',
-    LamportDrain = 'LAMPORT_DRAIN',
-    InstructionInjection = 'INSTRUCTION_INJECTION',
-    RaceCondition = 'RACE_CONDITION'
-}
+// Use the root VulnerabilityType
+export { VulnerabilityType } from '../../types.js';
 
 // Metric types for data collection and analysis
 export const enum MetricType {
@@ -71,14 +54,14 @@ export const enum RetentionPeriods {
 
 // Error types for improved error handling
 export interface PredictionResult {
-    vulnerabilityType: VulnerabilityType;
+    vulnerabilityType: BaseVulnerabilityType;
     confidence: number;
     details: string;
     timestamp: Date;
     modelVersion: string;
     probabilities?: number[];
-    vulnerabilities?: VulnerabilityType[];
-    type?: VulnerabilityType;
+    vulnerabilities?: BaseVulnerabilityType[];
+    type?: BaseVulnerabilityType;
     prediction?: number[];
     location?: string;
     risk?: 'HIGH' | 'MEDIUM' | 'LOW';
@@ -137,9 +120,9 @@ export interface MLModel {
 }
 
 export interface VulnerabilityDetectionModel extends MLModel {
-    detectVulnerability(features: number[][]): Promise<VulnerabilityType>;
+    detectVulnerability(features: number[][]): Promise<BaseVulnerabilityType>;
     getConfidenceScore(features: number[][]): Promise<number>;
-    getVulnerabilityDetails(type: VulnerabilityType): string;
+    getVulnerabilityDetails(type: BaseVulnerabilityType): string;
     predict(features: number[][]): Promise<PredictionResult>;
     ensureInitialized(): Promise<void>;
     cleanup(): Promise<void>;
@@ -193,7 +176,7 @@ export interface SecurityMetrics {
 }
 
 export interface VulnerabilityReport {
-    type: VulnerabilityType;
+    type: BaseVulnerabilityType;
     severity: number;
     confidence: number;
     details: string[];
@@ -264,7 +247,7 @@ export interface FuzzingAction {
     params: {
         targetAccounts?: string[];
         mutationRate?: number;
-        exploitType?: VulnerabilityType;
+        exploitType?: BaseVulnerabilityType;
         data?: Buffer;
     };
     timestamp: number;
@@ -279,7 +262,7 @@ export interface FuzzingReward {
         executionTime: number;
     };
     metadata?: {
-        vulnerabilityTypes?: VulnerabilityType[];
+        vulnerabilityTypes?: BaseVulnerabilityType[];
         newPathsFound?: number;
         failureRate?: number;
     };
@@ -294,7 +277,7 @@ export interface FuzzingEpisode {
     metadata: {
         duration: number;
         successRate: number;
-        vulnerabilitiesFound: VulnerabilityType[];
+        vulnerabilitiesFound: BaseVulnerabilityType[];
     };
 }
 
@@ -395,7 +378,7 @@ export interface ChaosRequest {
     result?: {
         success: boolean;
         findings: Array<{
-            type: VulnerabilityType;
+            type: BaseVulnerabilityType;
             severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
             description: string;
             location?: string;
@@ -414,27 +397,42 @@ export interface ModelOutput {
     details?: string;
 }
 
-export type MutationType = 
-    | 'ARITHMETIC'
-    | 'ACCESS_CONTROL'
-    | 'REENTRANCY'
-    | 'PDA'
-    | 'CONCURRENCY'
-    | 'TYPE_COSPLAY'
-    | 'BOUNDARY'
-    | 'EXTREME'
-    | 'RACE';
+export enum MutationType {
+    Arithmetic = 'ARITHMETIC',
+    AccessControl = 'ACCESS_CONTROL',
+    Reentrancy = 'REENTRANCY',
+    PDA = 'PDA',
+    Concurrency = 'CONCURRENCY',
+    TypeCosplay = 'TYPE_COSPLAY',
+    Boundary = 'BOUNDARY',
+    Extreme = 'EXTREME',
+    Race = 'RACE',
+    DataValidation = 'DATA_VALIDATION',
+    AccountValidation = 'ACCOUNT_VALIDATION',
+    CPIValidation = 'CPI_VALIDATION',
+    AuthorityValidation = 'AUTHORITY_VALIDATION',
+    SignerValidation = 'SIGNER_VALIDATION',
+    Custom = 'CUSTOM'
+}
 
 export interface FuzzingMutation {
     type: MutationType;
-    data: Buffer;
+    target: string;
+    payload: string | number | boolean | null | Buffer;
+    securityImpact: SecurityLevel;
     description: string;
+    expectedVulnerability?: BaseVulnerabilityType;
     metadata?: {
         severity?: 'low' | 'medium' | 'high' | 'critical';
         probability?: number;
         impact?: number;
         targetFunction?: string;
         expectedOutcome?: string;
+        instruction?: string;
+        expectedValue?: string | number;
+        actualValue?: string | number;
+        custom?: boolean;
+        timestamp?: number;
     };
 }
 

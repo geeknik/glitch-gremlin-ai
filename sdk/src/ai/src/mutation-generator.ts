@@ -1,5 +1,5 @@
-import { VulnerabilityType, MutationType, SecurityLevel } from '../../types.js';
-import { FuzzingMutation } from '../types.js';
+import { SecurityLevel } from '../../types.js';
+import { VulnerabilityType, MutationType, FuzzingMutation } from './types.js';
 import { generateRandomBytes, generateRandomU64 } from '../utils/random.js';
 
 export class MutationGenerator {
@@ -13,7 +13,7 @@ export class MutationGenerator {
             {
                 name: 'Similar Account',
                 input: { similar: true },
-                expectedError: VulnerabilityType.AccountValidation
+                expectedError: VulnerabilityType.AccountConfusion
             }
         ];
     }
@@ -66,7 +66,7 @@ export class MutationGenerator {
             payload: generateRandomBytes(32),
             securityImpact: SecurityLevel.HIGH,
             description: 'Testing account confusion',
-            expectedVulnerability: VulnerabilityType.AccountValidation
+            expectedVulnerability: VulnerabilityType.AccountConfusion
         };
     }
 
