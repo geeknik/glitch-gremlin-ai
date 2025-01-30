@@ -76,6 +76,54 @@ pub enum GovernanceError {
     StateManipulation,
     #[msg("Concurrent execution attempt")]
     ConcurrentExecution,
+    #[msg("Invalid parameters")]
+    InvalidParameters,
+    #[msg("Vote not found")]
+    VoteNotFound,
+    #[msg("Proposal not found")]
+    ProposalNotFound,
+    #[msg("Invalid proposal state")]
+    InvalidProposalState,
+    #[msg("Already voted")]
+    AlreadyVoted,
+    #[msg("Arithmetic overflow")]
+    ArithmeticOverflow,
+    #[msg("Arithmetic underflow")]
+    ArithmeticUnderflow,
+    #[msg("Stake still locked")]
+    StakeLocked,
+    #[msg("Invalid lock duration")]
+    InvalidLockDuration,
+    #[msg("Already delegated")]
+    AlreadyDelegated,
+    #[msg("Not delegated")]
+    NotDelegated,
+    #[msg("Unauthorized developer")]
+    UnauthorizedDeveloper,
+    #[msg("Invalid token mint")]
+    InvalidTokenMint,
+    #[msg("Proposal already executed")]
+    ProposalAlreadyExecuted,
+    #[msg("Execution delay not elapsed")]
+    ExecutionDelayNotElapsed,
+    #[msg("Uninitialized account")]
+    UninitializedAccount,
+    #[msg("Invalid quorum")]
+    InvalidQuorum,
+    #[msg("Invalid threshold")]
+    InvalidThreshold,
+    #[msg("Client error")]
+    ClientError,
+    #[msg("Serialization error")]
+    SerializationError,
+    #[msg("Invalid account data")]
+    InvalidAccountData,
+    #[msg("Database error")]
+    DatabaseError,
+    #[msg("Redis error")]
+    RedisError,
+    #[msg("Not implemented")]
+    NotImplemented,
 }
 
 impl From<anchor_lang::error::Error> for GovernanceError {
