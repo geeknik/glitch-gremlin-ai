@@ -1,91 +1,25 @@
 [workspace]
-members = [
-    "programs/governance",
-    "programs/governance/tests",
-]
 resolver = "2"
+members = [
+    "programs/*"
+]
+
+[profile.release]
+overflow-checks = true
+lto = "fat"
+codegen-units = 1
+
+[profile.release.build-override]
+opt-level = 3
+incremental = false
+codegen-units = 1
+
+[profile.dev]
+overflow-checks = true
 
 [workspace.dependencies]
-solana-program = "=1.16.0"
-solana-program-test = "=1.16.0"
-solana-sdk = "=1.16.0"
-# Pinned to 1.14.1 for Solana compatibility
-# This version is required by solana-program-test 1.16.0
-tokio = { version = "=1.14.1", features = ["full", "test-util"] }
-# Additional async runtime for testing only
-tokio-test = "=0.4.2"
-# Hyper version that matches Solana's requirements
-hyper = { version = "=0.14.26", features = ["full"] }
-# Socket2 version that matches Solana's requirements
-socket2 = { version = "=0.4.9", features = ["all"] }
-anchor-lang = "=0.28.0"
-nexus-zkvm = { git = "https://github.com/nexus-xyz/nexus-zkvm", branch = "main" }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-axum = { version = "0.4.8", features = ["ws"] }
-tower-http = { version = "0.2.5", features = ["fs"] }
-reqwest = { version = "0.11.17", features = ["json"] }
-redis = { version = "0.23.3", features = ["tokio-comp"] }
-mongodb = { version = "2.2.2", features = ["tokio-runtime"] }
-bson = "2.1.0"
-chrono = "0.4"
-uuid = { version = "1.0", features = ["v4"] }
-futures = "0.3"
-tower = "=0.4.13"
-clap = { version = "4.4", features = ["derive"] }
-base64 = "0.21"
-libafl = "0.11"
-libafl_bolts = "0.11"
-libafl_targets = "0.11"
-arbitrary = { version = "1.3", features = ["derive"] }
-bytemuck = "1.14"
-rand = "0.8"
-thiserror = "1.0"
-assert_matches = "1.5"
-
-[package]
-name = "glitch-gremlin-ai"
-version = "0.1.0"
-edition = "2021"
-
-[lib]
-name = "glitch_gremlin_ai"
-crate-type = ["cdylib", "lib"]
-path = "src/lib.rs"
-
-[dependencies]
-solana-program = { workspace = true }
-anchor-lang = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-tokio = { workspace = true }
-hyper = { workspace = true }
-axum = { workspace = true }
-tower-http = { workspace = true }
-reqwest = { workspace = true }
-redis = { workspace = true }
-mongodb = { workspace = true }
-bson = { workspace = true }
-chrono = { workspace = true }
-uuid = { workspace = true }
-futures = { workspace = true }
-tower = { workspace = true }
-clap = { workspace = true }
-base64 = { workspace = true }
-libafl = { workspace = true }
-libafl_bolts = { workspace = true }
-libafl_targets = { workspace = true }
-arbitrary = { workspace = true }
-bytemuck = { workspace = true }
-rand = { workspace = true }
-thiserror = { workspace = true }
-
-[dev-dependencies]
-solana-program-test = { workspace = true }
-solana-sdk = { workspace = true }
-tokio-test = { workspace = true }
-assert_matches = { workspace = true }
-
-[[bin]]
-name = "governance-server"
-path = "src/bin/server.rs"
+anchor-lang = "0.30.1"
+anchor-spl = "0.30.1"
+solana-program = "1.18"
+solana-program-test = "1.18"
+solana-sdk = "1.18"

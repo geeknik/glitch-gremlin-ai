@@ -21,8 +21,17 @@ export interface ChaosResult {
     }[];
 }
 
+interface ChaosParams {
+    programId: PublicKey;
+    accounts: PublicKey[];
+    data: Buffer;
+    seeds?: Buffer[];
+    file?: string;
+}
+
 export class ChaosGenerator {
     private config: ChaosConfig;
+    private currentFile?: string;
 
     constructor(config: ChaosConfig) {
         this.config = {
@@ -31,8 +40,8 @@ export class ChaosGenerator {
             maxDataSize: config.maxDataSize || 1024,
             maxSeeds: config.maxSeeds || 32,
             vulnerabilityTypes: config.vulnerabilityTypes || [
-                VulnerabilityType.ARITHMETIC_OVERFLOW,
-                VulnerabilityType.ACCESS_CONTROL
+                VulnerabilityType.ArithmeticOverflow,
+                VulnerabilityType.AccessControl
             ]
         };
     }
@@ -47,11 +56,11 @@ export class ChaosGenerator {
         const transactions: ChaosResult['transactions'] = [];
 
         // Check for arithmetic overflow vulnerabilities
-        if (this.config.vulnerabilityTypes?.includes(VulnerabilityType.ARITHMETIC_OVERFLOW)) {
+        if (this.config.vulnerabilityTypes?.includes(VulnerabilityType.ArithmeticOverflow)) {
             const hasOverflow = this.detectArithmeticOverflow(params.data);
             if (hasOverflow) {
                 vulnerabilities.push({
-                    type: VulnerabilityType.ARITHMETIC_OVERFLOW,
+                    type: VulnerabilityType.ArithmeticOverflow,
                     severity: VulnerabilitySeverity.CRITICAL,
                     confidence: this.calculateConfidence(VulnerabilitySeverity.CRITICAL, [
                         `Data pattern: ${params.data.toString('hex')}`,
@@ -59,28 +68,26 @@ export class ChaosGenerator {
                     ]),
                     description: 'Potential arithmetic overflow detected in instruction data',
                     location: {
-                        file: 'instruction_data',
-                        line: params.data.length - 4
+                        file: params.file || 'unknown',
+                        startLine: params.data.length - 4,
+                        endLine: params.data.length
                     },
-                    details: [
-                        `Data pattern: ${params.data.toString('hex')}`,
-                        'Last 4 bytes contain potential overflow pattern'
-                    ],
-                    recommendation: 'Implement SafeMath or checked arithmetic operations',
-                    evidence: {
-                        code: 'amount.unchecked_mul(rate)',
-                        logs: ['Overflow occurred at transaction 0x123...']
+                    details: {
+                        impact: "Critical - Potential integer overflow leading to incorrect calculations",
+                        likelihood: "High - Common in arithmetic operations without proper checks",
+                        recommendation: "Implement SafeMath operations or proper overflow checks",
+                        references: ["CWE-190: Integer Overflow"]
                     }
                 });
             }
         }
 
         // Check for access control vulnerabilities
-        if (this.config.vulnerabilityTypes?.includes(VulnerabilityType.ACCESS_CONTROL)) {
+        if (this.config.vulnerabilityTypes?.includes(VulnerabilityType.AccessControl)) {
             const hasAccessControl = this.detectAccessControl(params.accounts);
             if (hasAccessControl) {
                 vulnerabilities.push({
-                    type: VulnerabilityType.ACCESS_CONTROL,
+                    type: VulnerabilityType.AccessControl,
                     severity: VulnerabilitySeverity.CRITICAL,
                     confidence: this.calculateConfidence(VulnerabilitySeverity.CRITICAL, [
                         'Unauthorized account detected in instruction',
@@ -88,17 +95,16 @@ export class ChaosGenerator {
                     ]),
                     description: 'Potential access control vulnerability detected',
                     location: {
-                        file: 'account_permissions',
-                        function: 'verify_authority'
+                        file: params.file || 'unknown',
+                        startLine: 150,
+                        endLine: 160,
+                        function: "processTransaction"
                     },
-                    details: [
-                        'Unauthorized account detected in instruction',
-                        ...params.accounts.map(acc => `Account: ${acc.toBase58()}`)
-                    ],
-                    recommendation: 'Implement proper authority checks and signer verification',
-                    evidence: {
-                        code: 'pub fn verify_authority(ctx: Context<VerifyAuthority>)',
-                        logs: ['Unauthorized execution attempt from: Pubkey(...)']
+                    details: {
+                        impact: "Critical - Unauthorized access to restricted functions",
+                        likelihood: "High - Missing or improper authority checks",
+                        recommendation: "Implement proper authority validation",
+                        references: ["CWE-284: Improper Access Control"]
                     }
                 });
             }
@@ -212,19 +218,20 @@ export class ChaosGenerator {
         ];
         
         return {
-            type: VulnerabilityType.ARITHMETIC_OVERFLOW,
+            type: VulnerabilityType.ArithmeticOverflow,
             severity: VulnerabilitySeverity.CRITICAL,
             confidence: this.calculateConfidence(VulnerabilitySeverity.CRITICAL, evidence),
             description: 'Critical arithmetic overflow vulnerability detected in token calculations',
             location: {
-                file: 'token-program.rs',
-                line: 156
+                file: this.currentFile || 'program.rs',
+                startLine: 156,
+                endLine: 156
             },
-            details: evidence,
-            recommendation: 'Implement SafeMath or checked arithmetic operations',
-            evidence: {
-                code: 'amount.unchecked_mul(rate)',
-                logs: ['Overflow occurred at transaction 0x123...']
+            details: {
+                impact: "Critical - Potential integer overflow in calculations",
+                likelihood: "High - Unchecked arithmetic operations",
+                recommendation: "Implement SafeMath or proper overflow checks",
+                references: evidence
             }
         };
     }
@@ -237,19 +244,21 @@ export class ChaosGenerator {
         ];
 
         return {
-            type: VulnerabilityType.ACCESS_CONTROL,
+            type: VulnerabilityType.AccessControl,
             severity: VulnerabilitySeverity.CRITICAL,
             confidence: this.calculateConfidence(VulnerabilitySeverity.CRITICAL, evidence),
             description: 'Critical access control vulnerability in admin functions',
             location: {
-                file: 'governance.rs',
-                function: 'execute_proposal'
+                file: this.currentFile || 'unknown',
+                startLine: 200,
+                endLine: 220,
+                function: "validateAccess"
             },
-            details: evidence,
-            recommendation: 'Implement proper authority checks and signer verification',
-            evidence: {
-                code: 'pub fn execute_proposal(ctx: Context<ExecuteProposal>)',
-                logs: ['Unauthorized execution attempt from: Pubkey(...)']
+            details: {
+                impact: "Critical - Unauthorized access to program functions",
+                likelihood: "High - Missing authority checks",
+                recommendation: "Implement proper access control validation",
+                references: evidence
             }
         };
     }
@@ -262,19 +271,21 @@ export class ChaosGenerator {
         ];
 
         return {
-            type: VulnerabilityType.REENTRANCY,
+            type: VulnerabilityType.Reentrancy,
             severity: VulnerabilitySeverity.HIGH,
             confidence: this.calculateConfidence(VulnerabilitySeverity.HIGH, evidence),
             description: 'Potential reentrancy vulnerability in cross-program invocations',
             location: {
-                file: 'vault.rs',
-                function: 'withdraw'
+                file: this.currentFile || 'unknown',
+                startLine: 250,
+                endLine: 270,
+                function: "processInstruction"
             },
-            details: evidence,
-            recommendation: 'Implement checks-effects-interactions pattern and reentrancy guards',
-            evidence: {
-                code: 'transfer_tokens(ctx, amount);\nctx.accounts.vault.balance -= amount;',
-                logs: ['Multiple withdraw attempts in same transaction']
+            details: {
+                impact: "Critical - Potential reentrancy attack vector",
+                likelihood: "High - Missing reentrancy guards",
+                recommendation: "Implement checks-effects-interactions pattern",
+                references: evidence
             }
         };
     }
@@ -287,19 +298,21 @@ export class ChaosGenerator {
         ];
 
         return {
-            type: VulnerabilityType.PDA_VALIDATION,
+            type: VulnerabilityType.PDAValidation,
             severity: VulnerabilitySeverity.HIGH,
             confidence: this.calculateConfidence(VulnerabilitySeverity.HIGH, evidence),
             description: 'Improper PDA validation could lead to account confusion',
             location: {
-                file: 'state.rs',
-                function: 'initialize_vault'
+                file: this.currentFile || 'unknown',
+                startLine: 300,
+                endLine: 320,
+                function: "validatePDA"
             },
-            details: evidence,
-            recommendation: 'Implement proper PDA derivation and bump seed validation',
-            evidence: {
-                code: 'let (pda, _) = Pubkey::find_program_address(&[b"vault"], program_id);',
-                logs: ['PDA validation failed: incorrect seeds']
+            details: {
+                impact: "High - Invalid PDA validation",
+                likelihood: "Medium - Incorrect seed validation",
+                recommendation: "Implement proper PDA validation checks",
+                references: evidence
             }
         };
     }

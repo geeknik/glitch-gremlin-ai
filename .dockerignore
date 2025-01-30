@@ -1,0 +1,9 @@
+target/
+node_modules/
+.anchor/
+.git/
+.github/
+.vscode/
+dist/
+build/
+*.log 
