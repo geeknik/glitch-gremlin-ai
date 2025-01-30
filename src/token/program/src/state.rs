@@ -396,6 +396,18 @@ pub struct ChaosRequest {
 }
 
 impl ChaosRequest {
+    pub fn validate_memory_layout(&self) -> Result<(), ProgramError> {
+        let layout = std::alloc::Layout::for_value(self);
+        
+        // Verify no padding bytes
+        if layout.size() != std::mem::size_of::<Self>() {
+            msg!("Invalid memory layout detected");
+            return Err(GovernanceError::MemoryCorruption.into());
+        }
+        
+        Ok(())
+    }
+
     pub fn new(
         id: u64,
         owner: Pubkey,

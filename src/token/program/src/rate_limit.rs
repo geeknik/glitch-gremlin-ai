@@ -17,14 +17,23 @@ impl RateLimiter {
         rate_limit_info: &mut RateLimitInfo,
         clock: &Clock,
         config: &RateLimitConfig,
-        program_id: &Pubkey, // Needed for CPI
-        token_account: &AccountInfo, // Token account
-        insurance_account: &AccountInfo, // Insurance fund
+        program_id: &Pubkey,
+        token_account: &AccountInfo,
+        insurance_account: &AccountInfo,
     ) -> ProgramResult {
-        // DESIGN.md 9.6.4 Memory Safety
-        std::arch::asm!("mfence"); // Memory barrier
-        std::arch::asm!("lfence"); // Speculative execution barrier
+        // Memory barriers for safety
+        std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);
+        
         let current_time = clock.unix_timestamp;
+        
+        // Unified dynamic pricing logic
+        let requests_per_hour = rate_limit_info.request_count.saturating_mul(3600);
+        let base_multiplier = (requests_per_hour as f64 / 15.0).exp();
+        let entropy = clock.slot.wrapping_mul(0xDEADBEEF);
+        let jitter = (entropy % 10) as f64 / 100.0;
+        let dynamic_multiplier = (base_multiplier * (1.0 + jitter))
+            .max(1.0)
+            .min(1000.0);
         
         // Dynamic request pricing (DESIGN.md 9.1 and 9.3)
         let requests_per_hour = rate_limit_info.request_count.saturating_mul(3600);

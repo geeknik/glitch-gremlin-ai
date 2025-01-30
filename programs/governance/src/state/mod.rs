@@ -144,12 +144,12 @@ pub use vote_record::*;
 pub struct ProposalStateInfo {
     pub created_at: i64,
     pub executed_at: Option<i64>,
-    pub canceled_at: Option<i64>,
+    pub canceled_at: Option<i64>, 
     pub voting_ends_at: i64,
     pub execution_delay: u64,
     pub for_votes: u64,
     pub against_votes: u64,
-    pub status: ProposalState,
+    pub status: ProposalState,  // References the enum
     pub quorum_achieved: bool,
     pub threshold_achieved: bool,
 }

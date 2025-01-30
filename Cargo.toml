@@ -20,6 +20,9 @@ overflow-checks = true
 [workspace.dependencies]
 anchor-lang = "0.30.1"
 anchor-spl = "0.30.1"
+redis = { version = "0.23", features = ["tokio-comp"] }
+mongodb = { version = "2.6", default-features = false }
+lazy_static = "1.4"
 solana-program = "1.18"
 solana-program-test = "1.18"
 solana-sdk = "1.18"

@@ -34,6 +34,16 @@ pub fn create_error_context(operation: &str, message: &str) -> (String, String) 
 
 #[error_code]
 pub enum GovernanceError {
+    #[msg("Invalid chaos parameters")]
+    InvalidChaosParameters,
+    #[msg("Arithmetic error in calculations")]
+    ArithmeticError,
+    #[msg("Invalid burn percentage")]
+    InvalidBurnPercentage,
+    #[msg("Invalid pricing factor")]
+    InvalidPricingFactor,
+    #[msg("Memory corruption detected")]
+    MemoryCorruption,
     #[msg("Invalid governance configuration")]
     InvalidGovernanceConfig,
     #[msg("Invalid stake amount")]
