@@ -2,14 +2,22 @@
 name = "governance-tests"
 version = "0.1.0"
 edition = "2021"
+# Added documentation about test dependencies
+description = "Integration tests for the Glitch Gremlin Governance program"
 
 [dependencies]
-glitch-gremlin-ai = { path = "../../.." }
 governance = { path = ".." }
-solana-program = { workspace = true }
-solana-program-test = { workspace = true }
+anchor-lang = { workspace = true }
+# Use workspace-managed tokio version for test compatibility
+tokio = { workspace = true, features = ["full", "test-util"] }
+hyper = { workspace = true }
+
+[dev-dependencies]
 solana-sdk = { workspace = true }
-tokio = { workspace = true }
-assert_matches = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true } 
+tokio-test = { workspace = true }
+# Test utilities for async runtime
+futures = { workspace = true }
+
+[features]
+# Feature flag for running tests against local validator
+local-validator = ["governance/local-testing"] 
