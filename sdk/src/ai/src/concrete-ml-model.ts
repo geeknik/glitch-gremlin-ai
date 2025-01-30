@@ -110,37 +110,53 @@ export class ConcreteMLModel {
         };
     }
 
-    async predict(features: number[][]): Promise<PredictionResult> {
+    public async predict(features: number[][]): Promise<PredictionResult> {
         if (!this.model) {
             throw new Error('Model not initialized');
         }
 
+        if (!Array.isArray(features) || !Array.isArray(features[0])) {
+            throw new Error('Features must be a 2D array (batch of feature vectors)');
+        }
+
         const xs = tf.tensor2d(features);
-        const prediction = this.model.predict(xs) as tf.Tensor;
+        const prediction = await this.model.predict(xs) as tf.Tensor;
         const values = await prediction.data();
 
         xs.dispose();
         prediction.dispose();
 
+        const predictionValues = Array.from(values);
         return {
-            prediction: Array.from(values),
+            prediction: predictionValues,
             confidence: Number(values[0]),
-            timestamp: Date.now(),
-            modelVersion: this.metadata?.version || '1.0.0',
-            vulnerabilityType: this.getPredictedVulnerabilityType(Number(values[0])),
+            vulnerabilityType: this.mapPredictionToVulnerability(predictionValues),
             details: {
                 expectedValue: 0.5,
                 actualValue: Number(values[0]),
                 deviation: Math.abs(0.5 - Number(values[0]))
-            }
+            },
+            timestamp: Date.now(),
+            modelVersion: this.metadata?.version || '1.0.0'
         };
     }
 
-    private getPredictedVulnerabilityType(confidence: number): VulnerabilityType {
-        if (confidence > this.config.threshold) {
-            return VulnerabilityType.ARITHMETIC_OVERFLOW; // Default for now, expand based on model purpose
+    protected mapPredictionToVulnerability(prediction: number[]): VulnerabilityType {
+        const maxIndex = prediction.indexOf(Math.max(...prediction));
+        switch (maxIndex) {
+            case 0:
+                return VulnerabilityType.ArithmeticOverflow;
+            case 1:
+                return VulnerabilityType.AccessControl;
+            case 2:
+                return VulnerabilityType.Reentrancy;
+            case 3:
+                return VulnerabilityType.PDASafety;
+            case 4:
+                return VulnerabilityType.CPISafety;
+            default:
+                return VulnerabilityType.None;
         }
-        return VulnerabilityType.NONE;
     }
 
     async save(path: string): Promise<void> {

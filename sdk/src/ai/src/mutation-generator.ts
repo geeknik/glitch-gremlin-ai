@@ -1,4 +1,5 @@
-import { VulnerabilityType } from '@/types.js';
+import { VulnerabilityType, FuzzingMutation, MutationType } from '../../types.js';
+import { generateRandomBytes, generateRandomU64 } from '../utils/random.js';
 
 export class MutationGenerator {
     public generatePDAMutations() {
@@ -6,12 +7,12 @@ export class MutationGenerator {
             {
                 name: 'Invalid PDA Seeds',
                 input: { seeds: [] },
-                expectedError: VulnerabilityType.PDA_SAFETY
+                expectedError: VulnerabilityType.PDASafety
             },
             {
                 name: 'Similar Account',
                 input: { similar: true },
-                expectedError: VulnerabilityType.ACCOUNT_CONFUSION
+                expectedError: VulnerabilityType.AccountConfusion
             }
         ];
     }
@@ -21,12 +22,12 @@ export class MutationGenerator {
             {
                 name: 'Invalid Data Size',
                 input: Buffer.alloc(0),
-                expectedError: VulnerabilityType.ACCESS_CONTROL
+                expectedError: VulnerabilityType.AccessControl
             },
             {
                 name: 'Malformed Data',
                 input: Buffer.from([0xFF, 0xFF]),
-                expectedError: VulnerabilityType.ACCESS_CONTROL
+                expectedError: VulnerabilityType.AccessControl
             }
         ];
     }
@@ -36,13 +37,79 @@ export class MutationGenerator {
             {
                 name: 'Integer Overflow',
                 input: Number.MAX_SAFE_INTEGER,
-                expectedError: VulnerabilityType.ARITHMETIC_OVERFLOW
+                expectedError: VulnerabilityType.ArithmeticOverflow
             },
             {
                 name: 'Integer Underflow',
                 input: Number.MIN_SAFE_INTEGER,
-                expectedError: VulnerabilityType.ARITHMETIC_OVERFLOW
+                expectedError: VulnerabilityType.ArithmeticOverflow
             }
         ];
+    }
+
+    generatePDAMutation(): FuzzingMutation {
+        return {
+            type: MutationType.PDA,
+            target: 'pda_validation',
+            payload: generateRandomBytes(32),
+            securityImpact: 'HIGH',
+            description: 'Testing PDA validation',
+            expectedVulnerability: VulnerabilityType.PDASafety
+        };
+    }
+
+    generateAccountConfusionMutation(): FuzzingMutation {
+        return {
+            type: MutationType.TypeCosplay,
+            target: 'account_validation',
+            payload: generateRandomBytes(32),
+            securityImpact: 'HIGH',
+            description: 'Testing account confusion',
+            expectedVulnerability: VulnerabilityType.AccountConfusion
+        };
+    }
+
+    generateAccessControlMutation(): FuzzingMutation {
+        return {
+            type: MutationType.AccessControl,
+            target: 'authority_check',
+            payload: generateRandomBytes(32),
+            securityImpact: 'HIGH',
+            description: 'Testing access control',
+            expectedVulnerability: VulnerabilityType.AccessControl
+        };
+    }
+
+    generateSignerValidationMutation(): FuzzingMutation {
+        return {
+            type: MutationType.SignerValidation,
+            target: 'signer_check',
+            payload: generateRandomBytes(32),
+            securityImpact: 'HIGH',
+            description: 'Testing signer validation',
+            expectedVulnerability: VulnerabilityType.AccessControl
+        };
+    }
+
+    generateArithmeticMutation(): FuzzingMutation {
+        return {
+            type: MutationType.Arithmetic,
+            target: 'arithmetic_operation',
+            payload: generateRandomU64().toString(),
+            securityImpact: 'HIGH',
+            description: 'Testing arithmetic overflow',
+            expectedVulnerability: VulnerabilityType.ArithmeticOverflow
+        };
+    }
+
+    generateUnderflowMutation(): FuzzingMutation {
+        return {
+            type: MutationType.Arithmetic,
+            target: 'arithmetic_operation',
+            payload: '0',
+            securityImpact: 'HIGH',
+            description: 'Testing arithmetic underflow',
+            expectedVulnerability: VulnerabilityType.ArithmeticOverflow
+        };
     }
 } 

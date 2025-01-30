@@ -1,4 +1,4 @@
-import { VulnerabilityType, FuzzingMutation, MutationType } from '../../types.js';
+import { VulnerabilityType, FuzzingMutation, MutationType, SecurityLevel } from '../../types.js';
 import { PublicKey } from '@solana/web3.js';
 import { generateRandomBytes, generateRandomU64 } from '../utils/random.js';
 
@@ -57,8 +57,9 @@ export class SolanaFuzzingStrategy implements IFuzzingStrategy {
             type: MutationType.Arithmetic,
             target: 'arithmetic_operation',
             payload: generateRandomU64().toString(),
-            securityImpact: 'HIGH',
-            description: 'Testing for arithmetic overflow/underflow vulnerabilities'
+            securityImpact: 'HIGH' as SecurityLevel,
+            description: 'Testing for arithmetic overflow/underflow vulnerabilities',
+            expectedVulnerability: VulnerabilityType.ArithmeticOverflow
         };
     }
 
@@ -67,9 +68,10 @@ export class SolanaFuzzingStrategy implements IFuzzingStrategy {
         return {
             type: MutationType.AccessControl,
             target: 'authority_check',
-            payload: unauthorizedKey.toBase58(),
-            securityImpact: 'HIGH',
-            description: 'Testing for access control vulnerabilities'
+            payload: unauthorizedKey,
+            securityImpact: 'HIGH' as SecurityLevel,
+            description: 'Testing for access control vulnerabilities',
+            expectedVulnerability: VulnerabilityType.AccessControl
         };
     }
 
@@ -77,13 +79,14 @@ export class SolanaFuzzingStrategy implements IFuzzingStrategy {
         return {
             type: MutationType.Reentrancy,
             target: 'cross_program_invocation',
-            payload: {
+            payload: Buffer.from(JSON.stringify({
                 instructions: [
                     { index: 0, repeat: 2 }
                 ]
-            },
-            securityImpact: 'CRITICAL',
-            description: 'Testing for reentrancy vulnerabilities'
+            })),
+            securityImpact: 'CRITICAL' as SecurityLevel,
+            description: 'Testing for reentrancy vulnerabilities',
+            expectedVulnerability: VulnerabilityType.Reentrancy
         };
     }
 
@@ -91,9 +94,10 @@ export class SolanaFuzzingStrategy implements IFuzzingStrategy {
         return {
             type: MutationType.PDA,
             target: 'pda_validation',
-            payload: generateRandomBytes(32).toString('hex'),
-            securityImpact: 'HIGH',
-            description: 'Testing for PDA validation vulnerabilities'
+            payload: generateRandomBytes(32),
+            securityImpact: 'HIGH' as SecurityLevel,
+            description: 'Testing for PDA validation vulnerabilities',
+            expectedVulnerability: VulnerabilityType.PDASafety
         };
     }
 
@@ -101,12 +105,13 @@ export class SolanaFuzzingStrategy implements IFuzzingStrategy {
         return {
             type: MutationType.Concurrency,
             target: 'concurrent_operation',
-            payload: {
+            payload: Buffer.from(JSON.stringify({
                 threadCount: 5,
                 operations: ['read', 'write', 'modify']
-            },
-            securityImpact: 'HIGH',
-            description: 'Testing for concurrency vulnerabilities'
+            })),
+            securityImpact: 'HIGH' as SecurityLevel,
+            description: 'Testing for concurrency vulnerabilities',
+            expectedVulnerability: VulnerabilityType.StateConsistency
         };
     }
 
@@ -114,12 +119,13 @@ export class SolanaFuzzingStrategy implements IFuzzingStrategy {
         return {
             type: MutationType.DataValidation,
             target: 'input_validation',
-            payload: {
+            payload: Buffer.from(JSON.stringify({
                 invalidData: generateRandomBytes(16).toString('hex'),
                 expectedFormat: 'hex'
-            },
-            securityImpact: 'MEDIUM',
-            description: 'Testing for data validation vulnerabilities'
+            })),
+            securityImpact: 'MEDIUM' as SecurityLevel,
+            description: 'Testing for data validation vulnerabilities',
+            expectedVulnerability: VulnerabilityType.DataValidation
         };
     }
 
@@ -127,12 +133,13 @@ export class SolanaFuzzingStrategy implements IFuzzingStrategy {
         return {
             type: MutationType.Custom,
             target: 'custom_operation',
-            payload: {
+            payload: Buffer.from(JSON.stringify({
                 customData: generateRandomBytes(32).toString('hex'),
                 operation: 'custom_test'
-            },
-            securityImpact: 'MEDIUM',
-            description: 'Testing with custom mutation pattern'
+            })),
+            securityImpact: 'MEDIUM' as SecurityLevel,
+            description: 'Testing with custom mutation pattern',
+            expectedVulnerability: VulnerabilityType.Custom
         };
     }
 } 
