@@ -3,17 +3,18 @@ import type {
     FuzzingMetrics, 
     FuzzingResult,
     SecurityContext,
-    SecurityLevel,
     VulnerabilityInfo,
     FuzzingMutation
 } from '../../types.js';
 
 import {
     VulnerabilityType,
-    MutationType
+    MutationType,
+    SecurityLevel
 } from '../../types.js';
 
 import { createError, ErrorCode } from '../../errors.js';
+import { Keypair } from '@solana/web3.js';
 
 export interface ExtendedFuzzingConfig extends Omit<FuzzingConfig, 'mutationRate'> {
     // Core fuzzing parameters
@@ -230,54 +231,75 @@ export class Fuzzer {
         // Generate mutation based on type
         switch (type) {
             case MutationType.Arithmetic:
-                return {
-                    type: MutationType.Arithmetic,
-                    target: 'instruction_data',
-                    payload: Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(),
-                    securityImpact: 'HIGH',
-                    description: 'Testing for arithmetic overflow vulnerabilities',
-                    expectedVulnerability: VulnerabilityType.ArithmeticOverflow
-                };
+                return this.generateArithmeticMutation();
             
             case MutationType.AccessControl:
-                return {
-                    type: MutationType.AccessControl,
-                    target: 'authority',
-                    payload: 'invalid_authority',
-                    securityImpact: 'CRITICAL',
-                    description: 'Testing for access control vulnerabilities',
-                    expectedVulnerability: VulnerabilityType.AccessControl
-                };
+                return this.generateAccessControlMutation();
             
             case MutationType.Reentrancy:
-                return {
-                    type: MutationType.Reentrancy,
-                    target: 'instruction_sequence',
-                    payload: 'reentrant_call',
-                    securityImpact: 'CRITICAL',
-                    description: 'Testing for reentrancy vulnerabilities',
-                    expectedVulnerability: VulnerabilityType.Reentrancy
-                };
+                return this.generateReentrancyMutation();
             
             case MutationType.PDA:
-                return {
-                    type: MutationType.PDA,
-                    target: 'pda_derivation',
-                    payload: 'invalid_seeds',
-                    securityImpact: 'HIGH',
-                    description: 'Testing for PDA validation vulnerabilities',
-                    expectedVulnerability: VulnerabilityType.PDASafety
-                };
+                return this.generatePDAMutation();
             
             default:
-                return {
-                    type: MutationType.Custom,
-                    target: 'custom',
-                    payload: null,
-                    securityImpact: 'MEDIUM',
-                    description: 'Custom mutation type',
-                };
+                return this.generateDataValidationMutation();
         }
+    }
+
+    private generateArithmeticMutation(): FuzzingMutation {
+        return {
+            type: MutationType.Arithmetic,
+            target: 'amount',
+            payload: Number.MAX_SAFE_INTEGER,
+            securityImpact: SecurityLevel.HIGH,
+            description: 'Testing for arithmetic overflow',
+            expectedVulnerability: VulnerabilityType.ArithmeticOverflow
+        };
+    }
+
+    private generateAccessControlMutation(): FuzzingMutation {
+        return {
+            type: MutationType.AccessControl,
+            target: 'authority',
+            payload: Keypair.generate().publicKey.toBase58(),
+            securityImpact: SecurityLevel.CRITICAL,
+            description: 'Testing unauthorized access',
+            expectedVulnerability: VulnerabilityType.AccessControl
+        };
+    }
+
+    private generateReentrancyMutation(): FuzzingMutation {
+        return {
+            type: MutationType.Reentrancy,
+            target: 'instruction',
+            payload: 'reentrant_call',
+            securityImpact: SecurityLevel.CRITICAL,
+            description: 'Testing for reentrancy vulnerabilities',
+            expectedVulnerability: VulnerabilityType.Reentrancy
+        };
+    }
+
+    private generatePDAMutation(): FuzzingMutation {
+        return {
+            type: MutationType.PDA,
+            target: 'seeds',
+            payload: Buffer.from('invalid_seed'),
+            securityImpact: SecurityLevel.HIGH,
+            description: 'Testing PDA validation',
+            expectedVulnerability: VulnerabilityType.PDASafety
+        };
+    }
+
+    private generateDataValidationMutation(): FuzzingMutation {
+        return {
+            type: MutationType.DataValidation,
+            target: 'data',
+            payload: null,
+            securityImpact: SecurityLevel.MEDIUM,
+            description: 'Testing data validation',
+            expectedVulnerability: VulnerabilityType.DataValidation
+        };
     }
 
     private async analyzeResults(mutations: FuzzingMutation[]): Promise<void> {
@@ -305,8 +327,8 @@ export class Fuzzer {
                 id: `VULN-${Date.now()}`,
                 name: `${mutation.expectedVulnerability} Vulnerability`,
                 description: mutation.description,
-                severity: 'critical',
-                confidence: 0.9,
+                severity: this.getVulnerabilitySeverity(this.calculateConfidence(mutation.expectedVulnerability)),
+                confidence: this.calculateConfidence(mutation.expectedVulnerability),
                 createdAt: new Date(),
                 updatedAt: new Date(),
                 evidence: [`Mutation: ${mutation.type}`],
@@ -316,8 +338,8 @@ export class Fuzzer {
                     expectedValue: 'secure_state',
                     actualValue: mutation.payload?.toString() || 'unknown',
                     location: mutation.target,
-                    impact: 'Critical security impact',
-                    likelihood: 'High'
+                    impact: this.getImpactDescription(this.getVulnerabilitySeverity(this.calculateConfidence(mutation.expectedVulnerability))),
+                    likelihood: this.getLikelihoodDescription(this.calculateConfidence(mutation.expectedVulnerability))
                 }
             };
         }
@@ -341,14 +363,14 @@ export class Fuzzer {
 
     private shouldStopFuzzing(): boolean {
         // Stop if we've found critical vulnerabilities
-        return this.vulnerabilities.some(v => v.severity === 'critical');
+        return this.vulnerabilities.some(v => v.severity === SecurityLevel.CRITICAL);
     }
 
     private updateFinalMetrics(startTime: number): void {
         this.metrics.executionTime = Date.now() - startTime;
         this.metrics.errorRate = this.metrics.failedExecutions / this.metrics.totalExecutions;
         this.metrics.securityScore = this.calculateSecurityScore();
-        this.metrics.riskLevel = this.calculateRiskLevel();
+        this.metrics.riskLevel = this.calculateRiskLevel(this.metrics.securityScore / 100);
     }
 
     private calculateSecurityScore(): number {
@@ -358,12 +380,16 @@ export class Fuzzer {
         return Math.max(0, 100 - vulnerabilityPenalty + coverageBonus);
     }
 
-    private calculateRiskLevel(): SecurityLevel {
-        const score = this.calculateSecurityScore();
-        if (score < 40) return 'CRITICAL';
-        if (score < 60) return 'HIGH';
-        if (score < 80) return 'MEDIUM';
-        return 'LOW';
+    private calculateRiskLevel(score: number): SecurityLevel {
+        if (score >= 0.8) {
+            return SecurityLevel.CRITICAL;
+        } else if (score >= 0.6) {
+            return SecurityLevel.HIGH;
+        } else if (score >= 0.4) {
+            return SecurityLevel.MEDIUM;
+        } else {
+            return SecurityLevel.LOW;
+        }
     }
 
     private updateMetrics(newMetrics: Partial<FuzzingMetrics>): void {
@@ -371,5 +397,100 @@ export class Fuzzer {
             ...this.metrics,
             ...newMetrics
         };
+    }
+
+    private addVulnerability(type: VulnerabilityType, severity: SecurityLevel): void {
+        const vulnerability: VulnerabilityInfo = {
+            id: crypto.randomUUID(),
+            name: type.toString(),
+            description: this.getVulnerabilityDescription(type),
+            severity,
+            confidence: this.calculateConfidence(type),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            evidence: this.collectEvidence(),
+            recommendation: this.getRecommendation(type),
+            vulnerabilityType: type,
+            details: {
+                impact: this.getImpactDescription(severity),
+                likelihood: this.getLikelihoodDescription(this.calculateConfidence(type))
+            }
+        };
+        this.vulnerabilities.push(vulnerability);
+    }
+
+    private getVulnerabilitySeverity(score: number): SecurityLevel {
+        if (score >= 0.9) {
+            return SecurityLevel.CRITICAL;
+        } else if (score >= 0.7) {
+            return SecurityLevel.HIGH;
+        } else if (score >= 0.4) {
+            return SecurityLevel.MEDIUM;
+        }
+        return SecurityLevel.LOW;
+    }
+
+    private calculateConfidence(vulnType?: VulnerabilityType): number {
+        // Implement confidence calculation logic based on vulnerability type
+        switch (vulnType) {
+            case VulnerabilityType.ArithmeticOverflow:
+                return 0.9;
+            case VulnerabilityType.AccessControl:
+                return 0.9;
+            case VulnerabilityType.Reentrancy:
+                return 0.9;
+            case VulnerabilityType.PDASafety:
+                return 0.9;
+            default:
+                return 0.5;
+        }
+    }
+
+    private getVulnerabilityDescription(type: VulnerabilityType): string {
+        // Implement vulnerability description logic based on type
+        switch (type) {
+            case VulnerabilityType.ArithmeticOverflow:
+                return 'Testing for arithmetic overflow vulnerabilities';
+            case VulnerabilityType.AccessControl:
+                return 'Testing for access control vulnerabilities';
+            case VulnerabilityType.Reentrancy:
+                return 'Testing for reentrancy vulnerabilities';
+            case VulnerabilityType.PDASafety:
+                return 'Testing for PDA validation vulnerabilities';
+            default:
+                return 'Testing for unknown vulnerability';
+        }
+    }
+
+    private collectEvidence(): string[] {
+        // Implement evidence collection logic
+        return [];
+    }
+
+    private getImpactDescription(severity: SecurityLevel): string {
+        switch (severity) {
+            case SecurityLevel.CRITICAL:
+                return 'Critical impact - immediate action required';
+            case SecurityLevel.HIGH:
+                return 'High impact - requires prompt attention';
+            case SecurityLevel.MEDIUM:
+                return 'Medium impact - should be addressed';
+            case SecurityLevel.LOW:
+                return 'Low impact - monitor and review';
+            default:
+                return 'Unknown impact level';
+        }
+    }
+
+    private getLikelihoodDescription(confidence: number): string {
+        if (confidence >= 0.8) {
+            return 'Very likely';
+        } else if (confidence >= 0.6) {
+            return 'Likely';
+        } else if (confidence >= 0.4) {
+            return 'Possible';
+        } else {
+            return 'Unlikely';
+        }
     }
 }

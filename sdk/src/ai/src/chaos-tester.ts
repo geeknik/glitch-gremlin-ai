@@ -1,38 +1,33 @@
 import { Connection, PublicKey, Transaction } from '@solana/web3.js';
 import { FuzzingMutation, FuzzingResult, FuzzingMetrics, VulnerabilityInfo } from '../../types.js';
-import { VulnerabilityType } from '../../types.js';
+import { VulnerabilityType, SecurityLevel } from '../../types.js';
 
 export class ChaosTester {
     private connection: Connection;
     private programId: PublicKey;
-    private metrics: FuzzingMetrics;
+    private metrics: FuzzingMetrics = {
+        totalExecutions: 0,
+        successfulExecutions: 0,
+        failedExecutions: 0,
+        totalTests: 0,
+        executionTime: 0,
+        errorRate: 0,
+        coverage: 0,
+        vulnerabilitiesFound: [],
+        securityScore: 100,
+        riskLevel: SecurityLevel.LOW,
+        averageExecutionTime: 0,
+        peakMemoryUsage: 0,
+        cpuUtilization: 0,
+        uniquePaths: 0,
+        edgeCoverage: 0,
+        mutationEfficiency: 0
+    };
     private vulnerabilities: VulnerabilityInfo[] = [];
 
     constructor(connection: Connection, programId: string) {
         this.connection = connection;
         this.programId = new PublicKey(programId);
-        this.metrics = this.initializeMetrics();
-    }
-
-    private initializeMetrics(): FuzzingMetrics {
-        return {
-            totalExecutions: 0,
-            successfulExecutions: 0,
-            failedExecutions: 0,
-            totalTests: 0,
-            executionTime: 0,
-            errorRate: 0,
-            coverage: 0,
-            vulnerabilitiesFound: [],
-            securityScore: 0,
-            riskLevel: 'LOW',
-            averageExecutionTime: 0,
-            peakMemoryUsage: 0,
-            cpuUtilization: 0,
-            uniquePaths: 0,
-            edgeCoverage: 0,
-            mutationEfficiency: 0
-        };
     }
 
     async testScenario(mutation: FuzzingMutation): Promise<FuzzingResult> {
@@ -73,36 +68,36 @@ export class ChaosTester {
     private analyzeExecutionLogs(result: any): void {
         for (const log of result.logs) {
             if (log.includes('overflow') || log.includes('underflow')) {
-                this.addVulnerability(VulnerabilityType.ArithmeticOverflow, 'HIGH');
+                this.addVulnerability(VulnerabilityType.ArithmeticOverflow, SecurityLevel.HIGH);
             }
             if (log.includes('unauthorized') || log.includes('permission denied')) {
-                this.addVulnerability(VulnerabilityType.AccessControl, 'HIGH');
+                this.addVulnerability(VulnerabilityType.AccessControl, SecurityLevel.HIGH);
             }
             if (log.includes('reentrancy') || log.includes('recursive call')) {
-                this.addVulnerability(VulnerabilityType.Reentrancy, 'CRITICAL');
+                this.addVulnerability(VulnerabilityType.Reentrancy, SecurityLevel.CRITICAL);
             }
             if (log.includes('invalid PDA') || log.includes('seed mismatch')) {
-                this.addVulnerability(VulnerabilityType.PDAValidation, 'HIGH');
+                this.addVulnerability(VulnerabilityType.PDAValidation, SecurityLevel.HIGH);
             }
             if (log.includes('invalid CPI') || log.includes('program not found')) {
-                this.addVulnerability(VulnerabilityType.CPISafety, 'HIGH');
+                this.addVulnerability(VulnerabilityType.CPISafety, SecurityLevel.HIGH);
             }
             if (log.includes('signer required') || log.includes('missing signature')) {
-                this.addVulnerability(VulnerabilityType.SignerAuthorization, 'HIGH');
+                this.addVulnerability(VulnerabilityType.SignerAuthorization, SecurityLevel.HIGH);
             }
         }
     }
 
-    private addVulnerability(type: VulnerabilityType, severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'): void {
+    private addVulnerability(type: VulnerabilityType, severity: SecurityLevel): void {
         const vulnerability: VulnerabilityInfo = {
             id: `VULN-${Date.now()}-${type}`,
             name: type,
             description: this.getVulnerabilityDescription(type),
-            severity: severity.toLowerCase() as 'low' | 'medium' | 'high' | 'critical',
-            confidence: 0.9,
+            severity: severity,
+            confidence: this.calculateConfidence(),
             createdAt: new Date(),
             updatedAt: new Date(),
-            evidence: [],
+            evidence: this.collectEvidence(),
             recommendation: this.getVulnerabilityRecommendation(type),
             vulnerabilityType: type,
             details: {
@@ -189,35 +184,7 @@ export class ChaosTester {
     }
 
     private updateSecurityScore(): void {
-        const vulnerabilityWeights: Record<VulnerabilityType, number> = {
-            [VulnerabilityType.None]: 0.0,
-            [VulnerabilityType.Reentrancy]: 1.0,
-            [VulnerabilityType.ArithmeticOverflow]: 0.8,
-            [VulnerabilityType.AccessControl]: 0.9,
-            [VulnerabilityType.PDASafety]: 0.7,
-            [VulnerabilityType.CPISafety]: 0.8,
-            [VulnerabilityType.SignerAuthorization]: 0.9,
-            [VulnerabilityType.AuthorityCheck]: 0.9,
-            [VulnerabilityType.DataValidation]: 0.6,
-            [VulnerabilityType.AccountValidation]: 0.7,
-            [VulnerabilityType.CPIValidation]: 0.8,
-            [VulnerabilityType.AuthorityValidation]: 0.9,
-            [VulnerabilityType.SignerValidation]: 0.9,
-            [VulnerabilityType.PDAValidation]: 0.7,
-            [VulnerabilityType.AccountConfusion]: 0.8,
-            [VulnerabilityType.ClockManipulation]: 0.7,
-            [VulnerabilityType.StateConsistency]: 0.7,
-            [VulnerabilityType.LamportDrain]: 0.9,
-            [VulnerabilityType.InstructionInjection]: 0.9,
-            [VulnerabilityType.RaceCondition]: 0.8,
-            [VulnerabilityType.ComputeBudget]: 0.6,
-            [VulnerabilityType.TokenValidation]: 0.8,
-            [VulnerabilityType.TimelockBypass]: 0.8,
-            [VulnerabilityType.QuorumManipulation]: 0.9,
-            [VulnerabilityType.DelegateAbuse]: 0.8,
-            [VulnerabilityType.TreasuryDrain]: 1.0,
-            [VulnerabilityType.Custom]: 0.5
-        };
+        const vulnerabilityWeights = this.getVulnerabilityWeights();
 
         let totalWeight = 0;
         for (const vuln of this.vulnerabilities) {
@@ -228,24 +195,30 @@ export class ChaosTester {
         this.metrics.riskLevel = this.calculateRiskLevel(this.metrics.securityScore);
     }
 
-    private calculateRiskLevel(score: number): 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' {
-        if (score >= 90) return 'LOW';
-        if (score >= 70) return 'MEDIUM';
-        if (score >= 50) return 'HIGH';
-        return 'CRITICAL';
+    private calculateRiskLevel(score: number): SecurityLevel {
+        if (score < 40) return SecurityLevel.CRITICAL;
+        if (score < 60) return SecurityLevel.HIGH;
+        if (score < 80) return SecurityLevel.MEDIUM;
+        return SecurityLevel.LOW;
     }
 
     private async executeTestTransaction(mutation: FuzzingMutation): Promise<any> {
-        const transaction = new Transaction();
+        const startTime = Date.now();
         
-        // Add test instruction based on mutation type
-        const instruction = await this.createTestInstruction(mutation);
-        transaction.add(instruction);
+        try {
+            const transaction = new Transaction();
+            
+            // Add test instruction based on mutation type
+            const instruction = await this.createTestInstruction(mutation);
+            transaction.add(instruction);
 
-        // Send and confirm transaction
-        const result = await this.connection.simulateTransaction(transaction);
-        
-        return result;
+            // Send and confirm transaction
+            const result = await this.connection.simulateTransaction(transaction);
+            
+            return result;
+        } catch (error) {
+            throw new Error(`Test transaction execution failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
     }
 
     private async createTestInstruction(mutation: FuzzingMutation): Promise<any> {
@@ -255,5 +228,54 @@ export class ChaosTester {
             keys: [],
             data: Buffer.from(JSON.stringify(mutation.payload))
         };
+    }
+
+    private calculateConfidence(): number {
+        // Simple confidence calculation based on evidence and validation
+        return 0.9; // High confidence for now, can be made more sophisticated
+    }
+
+    private collectEvidence(): string[] {
+        // Collect evidence from test execution
+        return [
+            `Test executed at: ${new Date().toISOString()}`,
+            `Program ID: ${this.programId}`,
+            `Transaction count: ${this.metrics.totalExecutions}`
+        ];
+    }
+
+    private getVulnerabilityWeights(): Record<VulnerabilityType, number> {
+        const weights: Record<VulnerabilityType, number> = {
+            [VulnerabilityType.Reentrancy]: 0.9,
+            [VulnerabilityType.ArithmeticOverflow]: 0.8,
+            [VulnerabilityType.AccessControl]: 0.85,
+            [VulnerabilityType.PdaSafety]: 0.7,
+            [VulnerabilityType.CpiSafety]: 0.75,
+            [VulnerabilityType.SignerAuthorization]: 0.8,
+            [VulnerabilityType.AuthorityCheck]: 0.7,
+            [VulnerabilityType.DataValidation]: 0.6,
+            [VulnerabilityType.AccountValidation]: 0.65,
+            [VulnerabilityType.None]: 0.0,
+            [VulnerabilityType.CPIValidation]: 0.7,
+            [VulnerabilityType.AuthorityValidation]: 0.75,
+            [VulnerabilityType.SignerValidation]: 0.8,
+            [VulnerabilityType.PDAValidation]: 0.7,
+            [VulnerabilityType.AccountConfusion]: 0.65,
+            [VulnerabilityType.ClockManipulation]: 0.6,
+            [VulnerabilityType.StateConsistency]: 0.7,
+            [VulnerabilityType.LamportDrain]: 0.8,
+            [VulnerabilityType.InstructionInjection]: 0.75,
+            [VulnerabilityType.RaceCondition]: 0.8,
+            [VulnerabilityType.ComputeBudget]: 0.6,
+            [VulnerabilityType.TokenValidation]: 0.7,
+            [VulnerabilityType.TimelockBypass]: 0.75,
+            [VulnerabilityType.QuorumManipulation]: 0.8,
+            [VulnerabilityType.DelegateAbuse]: 0.7,
+            [VulnerabilityType.TreasuryDrain]: 0.85,
+            [VulnerabilityType.Custom]: 0.5,
+            [VulnerabilityType.PDASafety]: 0.7,
+            [VulnerabilityType.CPISafety]: 0.75
+        };
+        return weights;
     }
 } 

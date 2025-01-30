@@ -15,10 +15,10 @@ export enum TestType {
 }
 
 export enum SecurityLevel {
-    LOW = 'low',
-    MEDIUM = 'medium',
-    HIGH = 'high',
-    CRITICAL = 'critical'
+    LOW = 'LOW',
+    MEDIUM = 'MEDIUM',
+    HIGH = 'HIGH',
+    CRITICAL = 'CRITICAL'
 }
 
 export enum VulnerabilityType {
@@ -447,7 +447,7 @@ export interface ChaosResult {
 export interface Finding {
     id: string;
     type: string;
-    severity: 'low' | 'medium' | 'high' | 'critical';
+    severity: SecurityLevel;
     title: string;
     description: string;
     evidence?: {
@@ -639,7 +639,7 @@ export interface ValidationResult {
     error?: string;
     details?: {
         type: VulnerabilityType;
-        severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+        severity: SecurityLevel;
         evidence?: string[];
         impact?: string;
         likelihood?: string;
@@ -786,7 +786,7 @@ export interface VulnerabilityLocation {
 
 export interface VulnerabilityAnalysis {
     type: VulnerabilityType;
-    severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    severity: SecurityLevel;
     confidence: number; // 0-1 scale
     description: string;
     location?: {
@@ -901,7 +901,7 @@ export interface SecurityMetrics {
     timestamp: number;
     findings: Array<{
         type: VulnerabilityType;
-        severity: 'low' | 'medium' | 'high' | 'critical';
+        severity: SecurityLevel;
         location?: string;
         description: string;
     }>;
@@ -909,7 +909,7 @@ export interface SecurityMetrics {
 
 export interface VulnerabilityReport {
     type: VulnerabilityType;
-    severity: 'low' | 'medium' | 'high' | 'critical';
+    severity: SecurityLevel;
     location?: string;
     description: string;
     evidence?: {
@@ -938,7 +938,7 @@ export interface ChaosTestResult {
     success: boolean;
     vulnerabilities: Array<{
         type: VulnerabilityType;
-        severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+        severity: SecurityLevel;
         confidence: number;
         description: string;
         evidence: string[];
@@ -976,7 +976,7 @@ export interface SecurityReport {
     riskScore: number;
     findings: Array<{
         type: VulnerabilityType;
-        severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+        severity: SecurityLevel;
         confidence: number;
         description: string;
         location: string;

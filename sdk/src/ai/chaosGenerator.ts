@@ -56,8 +56,8 @@ export class ChaosGenerator {
             if (hasOverflow) {
                 vulnerabilities.push({
                     type: VulnerabilityType.ArithmeticOverflow,
-                    severity: 'CRITICAL',
-                    confidence: this.calculateConfidence('CRITICAL', [
+                    severity: SecurityLevel.CRITICAL,
+                    confidence: this.calculateConfidence(SecurityLevel.CRITICAL, [
                         `Data pattern: ${params.data.toString('hex')}`,
                         'Last 4 bytes contain potential overflow pattern'
                     ]),
@@ -83,8 +83,8 @@ export class ChaosGenerator {
             if (hasAccessControl) {
                 vulnerabilities.push({
                     type: VulnerabilityType.AccessControl,
-                    severity: 'CRITICAL',
-                    confidence: this.calculateConfidence('CRITICAL', [
+                    severity: SecurityLevel.CRITICAL,
+                    confidence: this.calculateConfidence(SecurityLevel.CRITICAL, [
                         'Unauthorized account detected in instruction',
                         ...params.accounts.map(acc => `Account: ${acc.toBase58()}`)
                     ]),
@@ -187,10 +187,10 @@ export class ChaosGenerator {
     private calculateConfidence(severity: SecurityLevel, evidence: string[]): number {
         // Base confidence levels by severity
         const severityWeights = {
-            'CRITICAL': 0.9,
-            'HIGH': 0.75,
-            'MEDIUM': 0.6,
-            'LOW': 0.45
+            [SecurityLevel.CRITICAL]: 0.9,
+            [SecurityLevel.HIGH]: 0.75,
+            [SecurityLevel.MEDIUM]: 0.6,
+            [SecurityLevel.LOW]: 0.45
         };
 
         // Evidence strength factor (more evidence = higher confidence)
@@ -209,8 +209,8 @@ export class ChaosGenerator {
         
         return {
             type: VulnerabilityType.ArithmeticOverflow,
-            severity: 'CRITICAL',
-            confidence: this.calculateConfidence('CRITICAL', evidence),
+            severity: SecurityLevel.CRITICAL,
+            confidence: this.calculateConfidence(SecurityLevel.CRITICAL, evidence),
             description: 'Critical arithmetic overflow vulnerability detected in token calculations',
             location: {
                 file: this.currentFile || 'program.rs',
@@ -235,8 +235,8 @@ export class ChaosGenerator {
 
         return {
             type: VulnerabilityType.AccessControl,
-            severity: 'CRITICAL',
-            confidence: this.calculateConfidence('CRITICAL', evidence),
+            severity: SecurityLevel.CRITICAL,
+            confidence: this.calculateConfidence(SecurityLevel.CRITICAL, evidence),
             description: 'Critical access control vulnerability in admin functions',
             location: {
                 file: this.currentFile || 'program.rs',
@@ -261,8 +261,8 @@ export class ChaosGenerator {
 
         return {
             type: VulnerabilityType.Reentrancy,
-            severity: 'HIGH',
-            confidence: this.calculateConfidence('HIGH', evidence),
+            severity: SecurityLevel.HIGH,
+            confidence: this.calculateConfidence(SecurityLevel.HIGH, evidence),
             description: 'Potential reentrancy vulnerability in cross-program invocations',
             location: {
                 file: this.currentFile || 'unknown',
@@ -288,8 +288,8 @@ export class ChaosGenerator {
 
         return {
             type: VulnerabilityType.PDAValidation,
-            severity: 'HIGH',
-            confidence: this.calculateConfidence('HIGH', evidence),
+            severity: SecurityLevel.HIGH,
+            confidence: this.calculateConfidence(SecurityLevel.HIGH, evidence),
             description: 'Improper PDA validation could lead to account confusion',
             location: {
                 file: this.currentFile || 'unknown',
