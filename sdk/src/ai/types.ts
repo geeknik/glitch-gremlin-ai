@@ -135,26 +135,28 @@ export interface AnomalyResult {
 }
 
 export enum VulnerabilityType {
-    NONE = 'NONE',
-    ARITHMETIC_OVERFLOW = 'ARITHMETIC_OVERFLOW',
-    ACCESS_CONTROL = 'ACCESS_CONTROL',
-    DATA_VALIDATION = 'DATA_VALIDATION',
-    REENTRANCY = 'REENTRANCY',
-    ACCOUNT_CONFUSION = 'ACCOUNT_CONFUSION',
-    SIGNER_AUTHORIZATION = 'SIGNER_AUTHORIZATION',
-    CLOCK_MANIPULATION = 'CLOCK_MANIPULATION',
-    LAMPORT_DRAIN = 'LAMPORT_DRAIN',
-    INSTRUCTION_INJECTION = 'INSTRUCTION_INJECTION',
-    RACE_CONDITION = 'RACE_CONDITION',
-    PDA_VALIDATION = 'PDA_VALIDATION',
-    PDA_SAFETY = 'PDA_SAFETY',
-    CPI_SAFETY = 'CPI_SAFETY',
-    AUTHORITY_CHECK = 'AUTHORITY_CHECK'
+    None = 'None',
+    ArithmeticOverflow = 'ArithmeticOverflow',
+    AccessControl = 'AccessControl', 
+    DataValidation = 'DataValidation',
+    Reentrancy = 'Reentrancy',
+    AccountConfusion = 'AccountConfusion',
+    SignerAuthorization = 'SignerAuthorization',
+    ClockManipulation = 'ClockManipulation',
+    LamportDrain = 'LamportDrain',
+    InstructionInjection = 'InstructionInjection',
+    RaceCondition = 'RaceCondition',
+    PdaValidation = 'PdaValidation',
+    PdaSafety = 'PdaSafety',
+    CpiSafety = 'CpiSafety',
+    AuthorityCheck = 'AuthorityCheck'
 }
+
+export type SecurityLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
 export interface VulnerabilityAnalysis {
     type: VulnerabilityType;
-    severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    severity: SecurityLevel;
     confidence: number;
     location?: {
         file?: string;
@@ -261,7 +263,11 @@ export interface MutationStrategy extends MutationOperator {
 export interface PredictionResult {
     vulnerabilityType: VulnerabilityType;
     confidence: number;
-    details: string[];
+    details?: {
+        expectedValue: number;
+        actualValue: number;
+        deviation: number;
+    };
     timestamp: number;
     modelVersion: string;
 }

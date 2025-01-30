@@ -1,5 +1,5 @@
 import { PublicKey } from '@solana/web3.js';
-import { VulnerabilityAnalysis, VulnerabilityType, VulnerabilitySeverity } from '../types.js';
+import { VulnerabilityAnalysis, VulnerabilityType, SecurityLevel } from '../types.js';
 
 export interface ChaosConfig {
     targetProgram: PublicKey;
@@ -46,12 +46,7 @@ export class ChaosGenerator {
         };
     }
 
-    public async generateChaos(params: {
-        programId: PublicKey;
-        accounts: PublicKey[];
-        data: Buffer;
-        seeds?: Buffer[];
-    }): Promise<ChaosResult> {
+    public async generateChaos(params: ChaosParams): Promise<ChaosResult> {
         const vulnerabilities: VulnerabilityAnalysis[] = [];
         const transactions: ChaosResult['transactions'] = [];
 
@@ -61,8 +56,8 @@ export class ChaosGenerator {
             if (hasOverflow) {
                 vulnerabilities.push({
                     type: VulnerabilityType.ArithmeticOverflow,
-                    severity: VulnerabilitySeverity.CRITICAL,
-                    confidence: this.calculateConfidence(VulnerabilitySeverity.CRITICAL, [
+                    severity: 'CRITICAL',
+                    confidence: this.calculateConfidence('CRITICAL', [
                         `Data pattern: ${params.data.toString('hex')}`,
                         'Last 4 bytes contain potential overflow pattern'
                     ]),
@@ -88,8 +83,8 @@ export class ChaosGenerator {
             if (hasAccessControl) {
                 vulnerabilities.push({
                     type: VulnerabilityType.AccessControl,
-                    severity: VulnerabilitySeverity.CRITICAL,
-                    confidence: this.calculateConfidence(VulnerabilitySeverity.CRITICAL, [
+                    severity: 'CRITICAL',
+                    confidence: this.calculateConfidence('CRITICAL', [
                         'Unauthorized account detected in instruction',
                         ...params.accounts.map(acc => `Account: ${acc.toBase58()}`)
                     ]),
@@ -144,12 +139,7 @@ export class ChaosGenerator {
         return accounts.some(acc => acc.toBase58() === '44444444444444444444444444444444');
     }
 
-    private calculateCoverage(params: {
-        programId: PublicKey;
-        accounts: PublicKey[];
-        data: Buffer;
-        seeds?: Buffer[];
-    }): number {
+    private calculateCoverage(params: ChaosParams): number {
         // Calculate test coverage based on input parameters
         const dataPoints = [
             params.accounts.length > 0,
@@ -194,13 +184,13 @@ export class ChaosGenerator {
         return mutated;
     }
 
-    private calculateConfidence(severity: VulnerabilitySeverity, evidence: string[]): number {
+    private calculateConfidence(severity: SecurityLevel, evidence: string[]): number {
         // Base confidence levels by severity
         const severityWeights = {
-            [VulnerabilitySeverity.CRITICAL]: 0.9,
-            [VulnerabilitySeverity.HIGH]: 0.75,
-            [VulnerabilitySeverity.MEDIUM]: 0.6,
-            [VulnerabilitySeverity.LOW]: 0.45
+            'CRITICAL': 0.9,
+            'HIGH': 0.75,
+            'MEDIUM': 0.6,
+            'LOW': 0.45
         };
 
         // Evidence strength factor (more evidence = higher confidence)
@@ -219,8 +209,8 @@ export class ChaosGenerator {
         
         return {
             type: VulnerabilityType.ArithmeticOverflow,
-            severity: VulnerabilitySeverity.CRITICAL,
-            confidence: this.calculateConfidence(VulnerabilitySeverity.CRITICAL, evidence),
+            severity: 'CRITICAL',
+            confidence: this.calculateConfidence('CRITICAL', evidence),
             description: 'Critical arithmetic overflow vulnerability detected in token calculations',
             location: {
                 file: this.currentFile || 'program.rs',
@@ -245,19 +235,18 @@ export class ChaosGenerator {
 
         return {
             type: VulnerabilityType.AccessControl,
-            severity: VulnerabilitySeverity.CRITICAL,
-            confidence: this.calculateConfidence(VulnerabilitySeverity.CRITICAL, evidence),
+            severity: 'CRITICAL',
+            confidence: this.calculateConfidence('CRITICAL', evidence),
             description: 'Critical access control vulnerability in admin functions',
             location: {
-                file: this.currentFile || 'unknown',
-                startLine: 200,
-                endLine: 220,
-                function: "validateAccess"
+                file: this.currentFile || 'program.rs',
+                startLine: 120,
+                endLine: 125
             },
             details: {
-                impact: "Critical - Unauthorized access to program functions",
+                impact: "Critical - Unauthorized access to admin functions",
                 likelihood: "High - Missing authority checks",
-                recommendation: "Implement proper access control validation",
+                recommendation: "Implement proper authority validation",
                 references: evidence
             }
         };
@@ -272,8 +261,8 @@ export class ChaosGenerator {
 
         return {
             type: VulnerabilityType.Reentrancy,
-            severity: VulnerabilitySeverity.HIGH,
-            confidence: this.calculateConfidence(VulnerabilitySeverity.HIGH, evidence),
+            severity: 'HIGH',
+            confidence: this.calculateConfidence('HIGH', evidence),
             description: 'Potential reentrancy vulnerability in cross-program invocations',
             location: {
                 file: this.currentFile || 'unknown',
@@ -299,8 +288,8 @@ export class ChaosGenerator {
 
         return {
             type: VulnerabilityType.PDAValidation,
-            severity: VulnerabilitySeverity.HIGH,
-            confidence: this.calculateConfidence(VulnerabilitySeverity.HIGH, evidence),
+            severity: 'HIGH',
+            confidence: this.calculateConfidence('HIGH', evidence),
             description: 'Improper PDA validation could lead to account confusion',
             location: {
                 file: this.currentFile || 'unknown',
