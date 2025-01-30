@@ -298,3 +298,5 @@ export interface VulnerabilityReport {
     recommendations: string[];
     timestamp: number;
 }
+
+export type { SecurityLevel, VulnerabilityType } from '../types.js';

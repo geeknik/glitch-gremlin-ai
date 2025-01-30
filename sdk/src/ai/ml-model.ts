@@ -165,6 +165,31 @@ export abstract class MLModel {
             
         return Buffer.from(weightString).toString('base64');
     }
+
+    protected mapVulnerabilityType(prediction: number): VulnerabilityType {
+        switch (prediction) {
+            case 0:
+                return VulnerabilityType.Reentrancy;
+            case 1:
+                return VulnerabilityType.AccessControl;
+            case 2:
+                return VulnerabilityType.ArithmeticOverflow;
+            case 3:
+                return VulnerabilityType.PdaSafety;
+            case 4:
+                return VulnerabilityType.CpiSafety;
+            case 5:
+                return VulnerabilityType.SignerAuthorization;
+            case 6:
+                return VulnerabilityType.AuthorityCheck;
+            case 7:
+                return VulnerabilityType.DataValidation;
+            case 8:
+                return VulnerabilityType.AccountValidation;
+            default:
+                return VulnerabilityType.None;
+        }
+    }
 }
 
 export class VulnerabilityDetectionModel extends MLModel {
@@ -203,7 +228,7 @@ export class VulnerabilityDetectionModel extends MLModel {
         
         // Get the index of the highest probability
         const maxIndex = Array.from(predictionData).indexOf(Math.max(...Array.from(predictionData)));
-        const vulnerabilityType = Object.values(VulnerabilityType)[maxIndex];
+        const vulnerabilityType = this.mapVulnerabilityType(maxIndex);
         
         return {
             type: vulnerabilityType,
@@ -224,20 +249,50 @@ export class VulnerabilityDetectionModel extends MLModel {
 
         details.push('Recommendations:');
         switch (type) {
-            case VulnerabilityType.REENTRANCY:
+            case VulnerabilityType.Reentrancy:
                 details.push('- Implement checks-effects-interactions pattern');
                 details.push('- Use reentrancy guards');
                 details.push('- Update state before external calls');
                 break;
-            case VulnerabilityType.ACCESS_CONTROL:
+            case VulnerabilityType.AccessControl:
                 details.push('- Implement proper authorization checks');
                 details.push('- Use role-based access control');
                 details.push('- Add multi-signature requirements for critical operations');
                 break;
-            case VulnerabilityType.ARITHMETIC_OVERFLOW:
+            case VulnerabilityType.ArithmeticOverflow:
                 details.push('- Use checked math operations');
                 details.push('- Implement value range validation');
                 details.push('- Add overflow checks for critical calculations');
+                break;
+            case VulnerabilityType.PdaSafety:
+                details.push('- Validate PDA derivation');
+                details.push('- Check bump seeds');
+                details.push('- Verify PDA ownership');
+                break;
+            case VulnerabilityType.CpiSafety:
+                details.push('- Validate CPI target programs');
+                details.push('- Check program ownership');
+                details.push('- Verify account permissions');
+                break;
+            case VulnerabilityType.SignerAuthorization:
+                details.push('- Implement proper authorization checks');
+                details.push('- Use role-based access control');
+                details.push('- Add multi-signature requirements for critical operations');
+                break;
+            case VulnerabilityType.AuthorityCheck:
+                details.push('- Implement proper authorization checks');
+                details.push('- Use role-based access control');
+                details.push('- Add multi-signature requirements for critical operations');
+                break;
+            case VulnerabilityType.DataValidation:
+                details.push('- Implement data validation');
+                details.push('- Use data validation libraries');
+                details.push('- Verify data integrity');
+                break;
+            case VulnerabilityType.AccountValidation:
+                details.push('- Implement account validation');
+                details.push('- Use account validation libraries');
+                details.push('- Verify account integrity');
                 break;
             default:
                 details.push('- Review code for potential security issues');

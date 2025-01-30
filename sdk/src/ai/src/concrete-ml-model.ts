@@ -1,5 +1,6 @@
 import * as tf from '@tensorflow/tfjs-node';
-import { ModelConfig, ModelMetadata, PredictionResult, TrainingResult, VulnerabilityType } from '../types.js';
+import { ModelConfig, ModelMetadata, PredictionResult, TrainingResult } from '../types.js';
+import { VulnerabilityType } from '../../types.js';
 import * as fs from 'fs';
 
 export class ConcreteMLModel {
@@ -151,9 +152,9 @@ export class ConcreteMLModel {
             case 2:
                 return VulnerabilityType.Reentrancy;
             case 3:
-                return VulnerabilityType.PDASafety;
+                return VulnerabilityType.PdaSafety;
             case 4:
-                return VulnerabilityType.CPISafety;
+                return VulnerabilityType.CpiSafety;
             default:
                 return VulnerabilityType.None;
         }

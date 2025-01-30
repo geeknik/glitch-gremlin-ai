@@ -51,9 +51,17 @@ export class ChaosTester {
         failedExecutions: 0,
         totalTests: 0,
         executionTime: 0,
+        errorRate: 0,
         coverage: 0,
-        vulnerabilitiesFound: [] as VulnerabilityType[],
-        errorRate: 0
+        vulnerabilitiesFound: [],
+        securityScore: 100,
+        riskLevel: 'low',
+        averageExecutionTime: 0,
+        peakMemoryUsage: 0,
+        cpuUsage: 0,
+        networkUsage: 0,
+        anomalyScore: 0,
+        falsePositiveRate: 0
     };
 
     constructor(config: ChaosTesterConfig) {
@@ -80,9 +88,17 @@ export class ChaosTester {
             failedExecutions: 0,
             totalTests: 0,
             executionTime: 0,
+            errorRate: 0,
             coverage: 0,
-            vulnerabilitiesFound: [] as VulnerabilityType[],
-            errorRate: 0
+            vulnerabilitiesFound: [],
+            securityScore: 0,
+            riskLevel: 'LOW',
+            averageExecutionTime: 0,
+            peakMemoryUsage: 0,
+            cpuUtilization: 0,
+            uniquePaths: 0,
+            edgeCoverage: 0,
+            mutationEfficiency: 0
         };
     }
 
@@ -111,61 +127,114 @@ export class ChaosTester {
         return 'Unknown error occurred during program execution';
     }
 
-    private createErrorMetadata(
-        message: string,
-        mutation?: FuzzingMutation,
-        error?: unknown
-    ): ErrorMetadata {
-        const environment = this.connection.rpcEndpoint.includes('mainnet') ? 'mainnet' as const : 'testnet' as const;
-        const metadata = mutation?.metadata as MutationMetadata | undefined;
-        const errorMessage = error ? this.getErrorMessage(error) : message;
-
+    private createErrorDetails(code: ErrorCode, message: string, metadata: ErrorMetadata): ErrorDetails {
         return {
-            programId: this.programId.toBase58(),
-            instruction: metadata?.instruction || '',
-            error: errorMessage,
-            accounts: [],
-            value: null,
-            payload: null,
-            mutation: {
-                type: mutation?.type || '',
-                target: mutation?.target || '',
-                payload: mutation?.payload || null
-            },
-            securityContext: {
-                environment,
-                computeUnits: metadata?.computeUnits,
-                memoryUsage: metadata?.memoryUsage
+            code,
+            message,
+            metadata,
+            timestamp: Date.now(),
+            stackTrace: new Error().stack || '',
+            source: {
+                file: 'chaosGenerator.ts',
+                line: 0,
+                function: 'unknown'
             }
         };
     }
 
-    private createErrorDetails(
-        code: ErrorCode, 
-        message: string, 
-        mutation?: FuzzingMutation,
-        error?: unknown
-    ): ErrorDetails {
+    private serializePayload(payload: any): string | number | boolean | null {
+        if (payload instanceof Buffer) {
+            return payload.toString('hex');
+        }
+        if (payload instanceof PublicKey) {
+            return payload.toBase58();
+        }
+        if (typeof payload === 'object' && payload !== null) {
+            return JSON.stringify(payload);
+        }
+        return payload;
+    }
+
+    private createErrorMetadata(instruction: string, error: string, mutation: FuzzingMutation): ErrorMetadata {
         return {
-            code,
-            message,
-            metadata: this.createErrorMetadata(message, mutation, error)
+            programId: this.programId.toString(),
+            instruction,
+            error,
+            accounts: [],
+            value: null,
+            payload: this.serializePayload(mutation.payload),
+            mutation: {
+                type: mutation.type,
+                target: mutation.target,
+                payload: this.serializePayload(mutation.payload)
+            },
+            securityContext: {
+                environment: 'testnet',
+                computeUnits: 0,
+                memoryUsage: 0,
+                upgradeable: false,
+                validations: {
+                    ownerChecked: false,
+                    signerChecked: false,
+                    accountDataMatched: false,
+                    pdaVerified: false,
+                    bumpsMatched: false
+                }
+            }
         };
     }
 
-    private handleError(error: unknown, mutation: FuzzingMutation): never {
+    private handleMutationError(mutation: FuzzingMutation, error: Error): never {
+        const metadata = this.createErrorMetadata(
+            'executeMutation',
+            error.message,
+            mutation
+        );
         const errorDetails = this.createErrorDetails(
-            ErrorCode.MUTATION_EXECUTION_FAILED,
-            'Security violation detected during mutation execution',
-            mutation,
-            error
+            ErrorCode.MUTATION_ERROR,
+            'Error executing mutation',
+            metadata
         );
+        throw new GlitchError('Mutation execution failed', ErrorCode.MUTATION_ERROR, errorDetails);
+    }
 
-        throw createError(
-            ErrorCode.MUTATION_EXECUTION_FAILED,
-            `Security violation detected during mutation execution: ${this.getErrorMessage(error)}`,
-            errorDetails
+    private createBasicErrorMetadata(instruction: string, error: string): ErrorMetadata {
+        return {
+            programId: this.programId.toString(),
+            instruction,
+            error,
+            accounts: [],
+            value: null,
+            payload: null,
+            mutation: {
+                type: '',
+                target: '',
+                payload: null
+            },
+            securityContext: {
+                environment: 'testnet',
+                computeUnits: 0,
+                memoryUsage: 0,
+                upgradeable: false,
+                validations: {
+                    ownerChecked: false,
+                    signerChecked: false,
+                    accountDataMatched: false,
+                    pdaVerified: false,
+                    bumpsMatched: false
+                }
+            }
+        };
+    }
+
+    private handleError(error: Error, instruction: string): never {
+        const metadata = this.createBasicErrorMetadata(instruction, error.message);
+        const errorDetails = this.createErrorDetails(
+            ErrorCode.UNKNOWN_ERROR,
+            error.message,
+            metadata
         );
+        throw new GlitchError('Operation failed', ErrorCode.UNKNOWN_ERROR, errorDetails);
     }
 
     private async executeMutation(mutation: FuzzingMutation): Promise<boolean> {
@@ -242,7 +311,7 @@ export class ChaosTester {
                     );
             }
         } catch (error: unknown) {
-            this.handleError(error, mutation);
+            this.handleMutationError(mutation, error as Error);
         }
     }
 
@@ -712,7 +781,7 @@ export class ChaosTester {
 
             return result.vulnerable;
         } catch (error: unknown) {
-            this.handleError(error, mutation);
+            this.handleMutationError(mutation, error as Error);
         }
     }
 
@@ -725,7 +794,7 @@ export class ChaosTester {
             }
             return result.vulnerable;
         } catch (error: unknown) {
-            this.handleError(error, mutation);
+            this.handleMutationError(mutation, error as Error);
         }
     }
 
@@ -816,7 +885,7 @@ export class ChaosTester {
             }
             return result.vulnerable;
         } catch (error: unknown) {
-            this.handleError(error, mutation);
+            this.handleMutationError(mutation, error as Error);
         }
     }
 

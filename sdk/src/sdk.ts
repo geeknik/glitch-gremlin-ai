@@ -100,18 +100,35 @@ export interface ProposalStatus {
         timeRemaining: number;
     };
 }
-export class GlitchSDK implements GovernanceManager {
-    public readonly connection: Connection;
-    public readonly wallet: any; // Replace with proper wallet type
-    public readonly config: Required<GovernanceConfig>;
+
+export interface IGovernanceManager {
+    createProposal(title: string, description: string, stakingAmount: number): Promise<{ proposalId: string; signature: string }>;
+    vote(proposalId: string, vote: 'yes' | 'no' | 'abstain'): Promise<string>;
+    execute(proposalId: string): Promise<string>;
+    cancel(proposalId: string): Promise<string>;
+    getVoteRecord(voteRecordAddress: PublicKey): Promise<VoteRecord>;
+    getVoteRecords(proposalId: string): Promise<VoteRecord[]>;
+    getProposals(): Promise<ProposalData[]>;
+    getVotingPower(voter: PublicKey): Promise<number>;
+    getDelegation(delegator: PublicKey, delegate: PublicKey): Promise<DelegationRecord | null>;
+    getDelegatedBalance(delegator: PublicKey): Promise<number>;
+    calculateVoteWeight(voter: PublicKey, proposalId: string): Promise<VoteWeight>;
+    getProposalState(proposalId: string): Promise<ProposalState>;
+    getProposalData(proposalId: string): Promise<ProposalData>;
+}
+
+export class GlitchSDK implements IGovernanceManager {
+    private static _instance: GlitchSDK | null = null;
+    private readonly connection: Connection;
+    private readonly wallet: any;
+    private readonly config: Required<GovernanceConfig>;
+    private readonly governanceManager: IGovernanceManager;
     private programId: PublicKey;
     private redis: RedisType | null = null;
     private heliusApiKey?: string;
     private queueWorker!: RedisQueueWorker;
-    private governanceManager: GovernanceManager;
     private lastRequestTime = 0;
     private readonly MIN_REQUEST_INTERVAL = 1000;
-    private static _instance: GlitchSDK | null = null;
     
     // Stake related properties
     public MIN_STAKE_AMOUNT = 100; // From test config
@@ -130,55 +147,15 @@ export class GlitchSDK implements GovernanceManager {
     ) {
         this.connection = connection;
         this.wallet = wallet;
-        this.config = this.validateGovernanceConfig(sdkConfig.governanceConfig || {});
+        this.config = {
+            ...DEFAULT_GOVERNANCE_CONFIG,
+            ...sdkConfig.governanceConfig || {}
+        };
         this.programId = new PublicKey(this.config.programId);
         this.heliusApiKey = sdkConfig.heliusApiKey;
         
         // Initialize governance manager with mock implementation
-        this.governanceManager = {
-            connection: this.connection,
-            wallet: this.wallet,
-            config: this.config,
-            validateProposal: async (connection: Connection, proposalAddress: PublicKey): Promise<ProposalData> => {
-                throw new GlitchError('Not implemented', ErrorCode.NOT_IMPLEMENTED);
-            },
-            createProposalInstruction: async (params: {
-                proposer: PublicKey;
-                title: string;
-                description: string;
-                stakingAmount: number;
-                testParams: ChaosRequestParams;
-            }): Promise<TransactionInstruction> => {
-                throw new GlitchError('Not implemented', ErrorCode.NOT_IMPLEMENTED);
-            },
-            createProposal: async (title: string, description: string, stakingAmount: number): Promise<{ proposalId: string; signature: string }> => {
-                throw new GlitchError('Not implemented', ErrorCode.NOT_IMPLEMENTED);
-            },
-            vote: async (proposalId: string, vote: 'yes' | 'no' | 'abstain'): Promise<string> => {
-                throw new GlitchError('Not implemented', ErrorCode.NOT_IMPLEMENTED);
-            },
-            execute: async (proposalId: string): Promise<string> => {
-                throw new GlitchError('Not implemented', ErrorCode.NOT_IMPLEMENTED);
-            },
-            cancel: async (proposalId: string): Promise<string> => {
-                throw new GlitchError('Not implemented', ErrorCode.NOT_IMPLEMENTED);
-            },
-            getVoteRecord: async (voteRecordAddress: PublicKey): Promise<VoteRecord> => {
-                throw new GlitchError('Not implemented', ErrorCode.NOT_IMPLEMENTED);
-            },
-            getVoteRecords: async (proposalId: string): Promise<VoteRecord[]> => {
-                throw new GlitchError('Not implemented', ErrorCode.NOT_IMPLEMENTED);
-            },
-            getProposals: async (): Promise<ProposalData[]> => {
-                throw new GlitchError('Not implemented', ErrorCode.NOT_IMPLEMENTED);
-            },
-            getVotingPower: async (voter: PublicKey): Promise<number> => {
-                throw new GlitchError('Not implemented', ErrorCode.NOT_IMPLEMENTED);
-            },
-            getDelegation: async (delegator: PublicKey, delegate: PublicKey): Promise<DelegationRecord | null> => {
-                throw new GlitchError('Not implemented', ErrorCode.NOT_IMPLEMENTED);
-            }
-        };
+        this.governanceManager = new GovernanceManager(connection, wallet, this.config);
 
         if (sdkConfig.redis) {
             const redisConfig: RedisConfig = {
@@ -243,11 +220,12 @@ export class GlitchSDK implements GovernanceManager {
         }
     }
 
-    private createErrorMetadataWithContext(error: unknown, context: { instruction: string }): ErrorMetadata {
+    private createErrorMetadata(error: Error | string, context: string): ErrorMetadata {
+        const errorMessage = error instanceof Error ? error.message : error;
         return {
-            programId: this.programId.toBase58(),
-            instruction: context.instruction,
-            error: error instanceof Error ? error.message : String(error),
+            programId: this.config.programId?.toString() || '',
+            instruction: context,
+            error: errorMessage,
             accounts: [],
             value: null,
             payload: null,
@@ -258,6 +236,8 @@ export class GlitchSDK implements GovernanceManager {
             },
             securityContext: {
                 environment: 'testnet',
+                computeUnits: 0,
+                memoryUsage: 0,
                 upgradeable: false,
                 validations: {
                     ownerChecked: false,
@@ -270,19 +250,25 @@ export class GlitchSDK implements GovernanceManager {
         };
     }
 
-    private createFullErrorDetails(error: unknown, code: ErrorCode, message: string, context: { instruction: string }): ErrorDetails {
+    private createErrorDetails(code: ErrorCode, message: string, metadata: ErrorMetadata): ErrorDetails {
         return {
             code,
             message,
-            metadata: this.createErrorMetadataWithContext(error, context),
+            metadata,
             timestamp: Date.now(),
-            stackTrace: error instanceof Error ? error.stack || '' : '',
+            stackTrace: new Error().stack || '',
             source: {
                 file: 'sdk.ts',
                 line: 0,
-                function: context.instruction
+                function: 'unknown'
             }
         };
+    }
+
+    private handleError(error: Error | string, code: ErrorCode, context: string): never {
+        const metadata = this.createErrorMetadata(error, context);
+        const errorDetails = this.createErrorDetails(code, error instanceof Error ? error.message : error, metadata);
+        throw new GlitchError(context, code, errorDetails);
     }
 
     public async submitChaosRequest(params: ChaosRequestParams): Promise<string> {
@@ -416,11 +402,10 @@ export class GlitchSDK implements GovernanceManager {
             throw new GlitchError(
                 'Intensity must be between 1 and 10',
                 ErrorCode.INVALID_AMOUNT,
-                this.createFullErrorDetails(
-                    `Invalid intensity: ${params.intensity}`,
+                this.createErrorDetails(
                     ErrorCode.INVALID_AMOUNT,
                     'Intensity must be between 1 and 10',
-                    { instruction: 'createChaosRequest' }
+                    this.createErrorMetadata(new Error('Intensity must be between 1 and 10'), 'createChaosRequest')
                 )
             );
         }
@@ -428,11 +413,10 @@ export class GlitchSDK implements GovernanceManager {
             throw new GlitchError(
                 'Invalid program',
                 ErrorCode.INVALID_PROGRAM_ID,
-                this.createFullErrorDetails(
-                    'Missing target program',
+                this.createErrorDetails(
                     ErrorCode.INVALID_PROGRAM_ID,
                     'Invalid program',
-                    { instruction: 'createChaosRequest' }
+                    this.createErrorMetadata(new Error('Invalid program'), 'createChaosRequest')
                 )
             );
         }
@@ -716,7 +700,7 @@ export class GlitchSDK implements GovernanceManager {
         );
     }
 
-    public async vote(proposalId: string, support: boolean): Promise<string> {
+    public async vote(proposalId: string, vote: 'yes' | 'no' | 'abstain'): Promise<string> {
         // Get proposal state first
         const proposal = await this.getProposalStatus(proposalId);
         
@@ -753,7 +737,7 @@ export class GlitchSDK implements GovernanceManager {
         const voteIx = await this.createVoteInstruction({
             proposalId: new PublicKey(proposalId),
             voter: this.wallet.publicKey,
-            support,
+            vote,
             votingPower: votingPower.total,
             isSpoogeHolder: votingPower.hasSpoogeBonus
         });
@@ -766,7 +750,7 @@ export class GlitchSDK implements GovernanceManager {
             // Update local vote tracking
             await this.updateVoteRecord(proposalId, {
                 voter: this.wallet.publicKey.toBase58(),
-                support,
+                vote,
                 votingPower: votingPower.total,
                 timestamp: Date.now()
             });
@@ -841,7 +825,7 @@ export class GlitchSDK implements GovernanceManager {
 
     private async updateVoteRecord(proposalId: string, voteData: {
         voter: string;
-        support: boolean;
+        vote: 'yes' | 'no' | 'abstain';
         votingPower: number;
         timestamp: number;
     }): Promise<void> {
@@ -866,7 +850,7 @@ export class GlitchSDK implements GovernanceManager {
     private async createVoteInstruction(params: {
         proposalId: PublicKey;
         voter: PublicKey;
-        support: boolean;
+        vote: 'yes' | 'no' | 'abstain';
         votingPower: number;
         isSpoogeHolder: boolean;
     }): Promise<TransactionInstruction> {
@@ -889,7 +873,7 @@ export class GlitchSDK implements GovernanceManager {
         offset += 1;
 
         // Support flag (1 byte)
-        data.writeUInt8(params.support ? 1 : 0, offset);
+        data.writeUInt8(params.vote === 'yes' ? 1 : params.vote === 'no' ? 0 : 2, offset);
         offset += 1;
 
         // Voting power (8 bytes)
@@ -1307,35 +1291,23 @@ export class GlitchSDK implements GovernanceManager {
         }
     }
 
-    private async checkRedisConnection(client: Redis): Promise<void> {
-        try {
-            const status = await client.ping();
-            if (status !== 'PONG') {
-                throw new Error('Redis ping failed');
-            }
-        } catch (error) {
-            throw new GlitchError(
-                'Redis connection failed',
-                ErrorCode.REDIS_CONNECTION_FAILED,
-                this.createFullErrorDetails(
-                    error,
-                    ErrorCode.REDIS_CONNECTION_FAILED,
-                    'Redis connection failed',
-                    { instruction: 'checkRedisConnection' }
-                )
-            );
+    private async checkRedisConnection(): Promise<boolean> {
+        const client = this.redis;
+        if (client.status !== 'ready') {
+            await client.connect();
         }
+        return client.status === 'ready';
     }
 
     private async handleNotImplemented(method: string): Promise<never> {
         throw new GlitchError(
             `Method ${method} not implemented`,
             ErrorCode.NOT_IMPLEMENTED,
-            {
-                metadata: createErrorMetadata('Not implemented', {
-                    instruction: method
-                })
-            }
+            this.createErrorDetails(
+                ErrorCode.NOT_IMPLEMENTED,
+                `Method ${method} not implemented`,
+                this.createErrorMetadata(new Error(`Method ${method} not implemented`), method)
+            )
         );
     }
 
@@ -1367,12 +1339,11 @@ export class GlitchSDK implements GovernanceManager {
             throw new GlitchError(
                 'Vote record not found',
                 ErrorCode.VALIDATION_ERROR,
-                {
-                    metadata: createErrorMetadata('Vote record not found', {
-                        instruction: 'getVoteRecord',
-                        value: voteRecordAddress.toBase58()
-                    })
-                }
+                this.createErrorDetails(
+                    ErrorCode.VALIDATION_ERROR,
+                    'Vote record not found',
+                    this.createErrorMetadata(new Error('Vote record not found'), 'getVoteRecord')
+                )
             );
         }
 
@@ -1425,12 +1396,11 @@ export class GlitchSDK implements GovernanceManager {
             throw new GlitchError(
                 'Failed to get delegated balance',
                 ErrorCode.PROGRAM_ERROR,
-                {
-                    metadata: createErrorMetadata(error instanceof Error ? error : String(error), {
-                        instruction: 'getDelegatedBalance',
-                        value: delegator.toBase58()
-                    })
-                }
+                this.createErrorDetails(
+                    ErrorCode.PROGRAM_ERROR,
+                    'Failed to get delegated balance',
+                    this.createErrorMetadata(error instanceof Error ? error : String(error), 'getDelegatedBalance')
+                )
             );
         }
     }
@@ -1461,12 +1431,11 @@ export class GlitchSDK implements GovernanceManager {
             throw new GlitchError(
                 'Failed to calculate vote weight',
                 ErrorCode.PROGRAM_ERROR,
-                {
-                    metadata: createErrorMetadata(error instanceof Error ? error : String(error), {
-                        instruction: 'calculateVoteWeight',
-                        value: voter.toBase58()
-                    })
-                }
+                this.createErrorDetails(
+                    ErrorCode.PROGRAM_ERROR,
+                    'Failed to calculate vote weight',
+                    this.createErrorMetadata(error instanceof Error ? error : String(error), 'calculateVoteWeight')
+                )
             );
         }
     }
@@ -1485,12 +1454,11 @@ export class GlitchSDK implements GovernanceManager {
                 throw new GlitchError(
                     'Proposal not found',
                     ErrorCode.VALIDATION_ERROR,
-                    {
-                        metadata: createErrorMetadata('Proposal not found', {
-                            instruction: 'getProposalData',
-                            value: proposalId
-                        })
-                    }
+                    this.createErrorDetails(
+                        ErrorCode.VALIDATION_ERROR,
+                        'Proposal not found',
+                        this.createErrorMetadata(new Error('Proposal not found'), 'getProposalData')
+                    )
                 );
             }
 
@@ -1516,12 +1484,11 @@ export class GlitchSDK implements GovernanceManager {
             throw new GlitchError(
                 'Failed to get proposal data',
                 ErrorCode.PROGRAM_ERROR,
-                {
-                    metadata: createErrorMetadata(error instanceof Error ? error : String(error), {
-                        instruction: 'getProposalData',
-                        value: proposalId
-                    })
-                }
+                this.createErrorDetails(
+                    ErrorCode.PROGRAM_ERROR,
+                    'Failed to get proposal data',
+                    this.createErrorMetadata(error instanceof Error ? error : String(error), 'getProposalData')
+                )
             );
         }
     }

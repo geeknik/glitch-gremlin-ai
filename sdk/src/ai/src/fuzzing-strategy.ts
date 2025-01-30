@@ -68,7 +68,7 @@ export class SolanaFuzzingStrategy implements IFuzzingStrategy {
         return {
             type: MutationType.AccessControl,
             target: 'authority_check',
-            payload: unauthorizedKey,
+            payload: unauthorizedKey.toBase58(),
             securityImpact: 'HIGH' as SecurityLevel,
             description: 'Testing for access control vulnerabilities',
             expectedVulnerability: VulnerabilityType.AccessControl
@@ -79,11 +79,11 @@ export class SolanaFuzzingStrategy implements IFuzzingStrategy {
         return {
             type: MutationType.Reentrancy,
             target: 'cross_program_invocation',
-            payload: Buffer.from(JSON.stringify({
+            payload: JSON.stringify({
                 instructions: [
                     { index: 0, repeat: 2 }
                 ]
-            })),
+            }),
             securityImpact: 'CRITICAL' as SecurityLevel,
             description: 'Testing for reentrancy vulnerabilities',
             expectedVulnerability: VulnerabilityType.Reentrancy
@@ -91,13 +91,17 @@ export class SolanaFuzzingStrategy implements IFuzzingStrategy {
     }
 
     public generatePDAMutation(): FuzzingMutation {
+        const programId = new PublicKey(generateRandomBytes(32));
         return {
             type: MutationType.PDA,
             target: 'pda_validation',
-            payload: generateRandomBytes(32),
+            payload: JSON.stringify({
+                seeds: generateRandomBytes(32),
+                programId: programId.toBase58()
+            }),
             securityImpact: 'HIGH' as SecurityLevel,
             description: 'Testing for PDA validation vulnerabilities',
-            expectedVulnerability: VulnerabilityType.PDASafety
+            expectedVulnerability: VulnerabilityType.PdaSafety
         };
     }
 

@@ -14,51 +14,50 @@ export enum TestType {
     CONCURRENCY = 'CONCURRENCY'
 }
 
-export type SecurityLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+export enum SecurityLevel {
+    LOW = 'low',
+    MEDIUM = 'medium',
+    HIGH = 'high',
+    CRITICAL = 'critical'
+}
 
 export enum VulnerabilityType {
-    // Core Security Vulnerabilities
-    Reentrancy = 'REENTRANCY',
-    ArithmeticOverflow = 'ARITHMETIC_OVERFLOW',
-    AccessControl = 'ACCESS_CONTROL',
     PDASafety = 'PDA_SAFETY',
     CPISafety = 'CPI_SAFETY',
-    SignerAuthorization = 'SIGNER_AUTHORIZATION',
-    AuthorityCheck = 'AUTHORITY_CHECK',
-    
-    // Data Validation
-    DataValidation = 'DATA_VALIDATION',
-    AccountValidation = 'ACCOUNT_VALIDATION',
-    CPIValidation = 'CPI_VALIDATION',
-    AuthorityValidation = 'AUTHORITY_VALIDATION',
-    SignerValidation = 'SIGNER_VALIDATION',
-    PDAValidation = 'PDA_VALIDATION',
-    
-    // Advanced Attack Vectors
-    AccountConfusion = 'ACCOUNT_CONFUSION',
-    ClockManipulation = 'CLOCK_MANIPULATION',
-    StateConsistency = 'STATE_CONSISTENCY',
-    LamportDrain = 'LAMPORT_DRAIN',
-    InstructionInjection = 'INSTRUCTION_INJECTION',
-    RaceCondition = 'RACE_CONDITION',
-    
-    // Program-Specific Vulnerabilities
-    ComputeBudget = 'COMPUTE_BUDGET',
-    TokenValidation = 'TOKEN_VALIDATION',
-    TimelockBypass = 'TIMELOCK_BYPASS',
-    QuorumManipulation = 'QUORUM_MANIPULATION',
-    DelegateAbuse = 'DELEGATE_ABUSE',
-    TreasuryDrain = 'TREASURY_DRAIN',
-    
-    // Custom
-    Custom = 'CUSTOM'
+    ArithmeticOverflow = 'ARITHMETIC_OVERFLOW',
+    Reentrancy = 'REENTRANCY',
+    None = 'NONE',
+    AccessControl = 'AccessControl',
+    PdaSafety = 'PdaSafety',
+    CpiSafety = 'CpiSafety',
+    SignerAuthorization = 'SignerAuthorization',
+    AuthorityCheck = 'AuthorityCheck',
+    DataValidation = 'DataValidation',
+    AccountValidation = 'AccountValidation',
+    CPIValidation = 'CPIValidation',
+    AuthorityValidation = 'AuthorityValidation',
+    SignerValidation = 'SignerValidation',
+    PDAValidation = 'PDAValidation',
+    AccountConfusion = 'AccountConfusion',
+    ClockManipulation = 'ClockManipulation',
+    StateConsistency = 'StateConsistency',
+    LamportDrain = 'LamportDrain',
+    InstructionInjection = 'InstructionInjection',
+    RaceCondition = 'RaceCondition',
+    ComputeBudget = 'ComputeBudget',
+    TokenValidation = 'TokenValidation',
+    TimelockBypass = 'TimelockBypass',
+    QuorumManipulation = 'QuorumManipulation',
+    DelegateAbuse = 'DelegateAbuse',
+    TreasuryDrain = 'TreasuryDrain',
+    Custom = 'Custom'
 }
 
 export interface VulnerabilityInfo {
     id: string;
     name: string;
     description: string;
-    severity: 'low' | 'medium' | 'high' | 'critical';
+    severity: SecurityLevel;
     confidence: number;
     createdAt: Date;
     updatedAt: Date;
@@ -100,8 +99,8 @@ export enum MutationType {
 export interface FuzzingMutation {
     type: MutationType;
     target: string;
-    payload: string | number | boolean | null;
-    securityImpact: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+    payload: string | number | boolean | null | Buffer;
+    securityImpact: SecurityLevel;
     description: string;
     expectedVulnerability?: VulnerabilityType;
     metadata?: {
@@ -153,7 +152,6 @@ export interface FuzzingConfig {
 }
 
 export interface FuzzingMetrics {
-    // Core metrics
     totalExecutions: number;
     successfulExecutions: number;
     failedExecutions: number;
@@ -161,18 +159,12 @@ export interface FuzzingMetrics {
     executionTime: number;
     errorRate: number;
     coverage: number;
-    
-    // Security metrics
     vulnerabilitiesFound: VulnerabilityType[];
     securityScore: number;
     riskLevel: SecurityLevel;
-    
-    // Performance metrics
     averageExecutionTime: number;
     peakMemoryUsage: number;
     cpuUtilization: number;
-    
-    // Advanced metrics
     uniquePaths: number;
     edgeCoverage: number;
     mutationEfficiency: number;
@@ -580,7 +572,10 @@ export interface BaseErrorDetails {
     metadata: ErrorMetadata;
 }
 
-export interface ErrorDetails extends BaseErrorDetails {
+export interface ErrorDetails {
+    code: ErrorCode;
+    message: string;
+    metadata: ErrorMetadata;
     timestamp: number;
     stackTrace: string;
     source: {
@@ -596,24 +591,11 @@ export interface ErrorMetadata {
     error: string;
     accounts: string[];
     value: string | number | boolean | null;
-    payload: string | number | boolean | null;
+    payload: string | number | boolean | null | Buffer | PublicKey | Record<string, any>;
     mutation: {
         type: string;
         target: string;
-        payload: string | number | boolean | null;
-    };
-    vulnerability?: {
-        type: string;
-        severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-        location?: string;
-        evidence?: string[];
-        impact?: string;
-        mitigation?: string;
-        cwe?: string;
-        cvss?: {
-            score: number;
-            vector: string;
-        };
+        payload: string | number | boolean | null | Buffer | PublicKey | Record<string, any>;
     };
     securityContext: {
         environment: 'mainnet' | 'testnet';

@@ -1,7 +1,8 @@
-import { WebSocketServer } from 'ws';
+import WebSocket, { WebSocketServer } from 'ws';
 import { FuzzingState } from './types.js';
 import { Logger } from './logger.js';
 import { FuzzingMetricsCollector } from './reinforcement-fuzzing-utils.js';
+import { SecurityLevel, VulnerabilityType } from '../../types.js';
 
 interface DashboardState {
     currentEpisode: number;
@@ -19,12 +20,13 @@ interface DashboardConfig {
 }
 
 export class DashboardServer {
-    private readonly wss: WebSocketServer;
-    private readonly logger: Logger;
-    private readonly metricsCollector: FuzzingMetricsCollector;
+    private wss: WebSocketServer;
+    private logger: Logger;
+    private metricsCollector: FuzzingMetricsCollector;
     private state: DashboardState;
     private updateInterval?: NodeJS.Timeout;
     private isRunning: boolean = false;
+    private metrics: Map<string, any>;
 
     constructor(config: DashboardConfig) {
         this.logger = new Logger('DashboardServer');
@@ -32,6 +34,7 @@ export class DashboardServer {
         
         // Initialize WebSocket server
         this.wss = new WebSocketServer({ port: config.port });
+        this.metrics = new Map();
 
         // Initialize state
         this.state = {
@@ -49,23 +52,15 @@ export class DashboardServer {
     }
 
     private setupWebSocket(): void {
-        this.wss.on('connection', (ws) => {
+        this.wss.on('connection', (ws: WebSocket) => {
             this.state.activeConnections++;
             this.broadcastState();
+            this.sendInitialData(ws);
 
-            ws.on('message', async (message: Buffer) => {
+            ws.on('message', (message: string) => {
                 try {
-                    const data = JSON.parse(message.toString());
-                    switch (data.type) {
-                        case 'start':
-                            await this.start();
-                            break;
-                        case 'stop':
-                            await this.stop();
-                            break;
-                        default:
-                            this.logger.warn(`Unknown message type: ${data.type}`);
-                    }
+                    const data = JSON.parse(message);
+                    this.handleMessage(data);
                 } catch (error) {
                     this.logger.error('Error processing message:', error);
                 }
@@ -151,11 +146,19 @@ export class DashboardServer {
 
     private broadcastState(): void {
         const message = JSON.stringify(this.state);
-        this.wss.clients.forEach(client => {
+        this.wss.clients.forEach((client: WebSocket) => {
             if (client.readyState === WebSocket.OPEN) {
                 client.send(message);
             }
         });
+    }
+
+    private sendInitialData(ws: WebSocket): void {
+        // Implementation of sendInitialData method
+    }
+
+    private handleMessage(data: any): void {
+        // Implementation of handleMessage method
     }
 }
 

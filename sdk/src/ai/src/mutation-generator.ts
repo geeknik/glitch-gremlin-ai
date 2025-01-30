@@ -1,4 +1,5 @@
-import { VulnerabilityType, FuzzingMutation, MutationType } from '../../types.js';
+import { VulnerabilityType, MutationType, SecurityLevel } from '../../types.js';
+import { FuzzingMutation } from '../types.js';
 import { generateRandomBytes, generateRandomU64 } from '../utils/random.js';
 
 export class MutationGenerator {
@@ -51,10 +52,10 @@ export class MutationGenerator {
         return {
             type: MutationType.PDA,
             target: 'pda_validation',
-            payload: generateRandomBytes(32),
-            securityImpact: 'HIGH',
-            description: 'Testing PDA validation',
-            expectedVulnerability: VulnerabilityType.PDASafety
+            payload: generateRandomBytes(32).toString('hex'),
+            securityImpact: 'HIGH' as SecurityLevel,
+            description: 'Testing for PDA validation vulnerabilities',
+            expectedVulnerability: VulnerabilityType.PdaSafety
         };
     }
 
@@ -110,6 +111,16 @@ export class MutationGenerator {
             securityImpact: 'HIGH',
             description: 'Testing arithmetic underflow',
             expectedVulnerability: VulnerabilityType.ArithmeticOverflow
+        };
+    }
+
+    generateRandomMutation(): FuzzingMutation {
+        return {
+            type: MutationType.DataValidation,
+            target: 'random_mutation',
+            payload: generateRandomBytes(32).toString('hex'),
+            securityImpact: 'MEDIUM' as SecurityLevel,
+            description: 'Random data validation test'
         };
     }
 } 

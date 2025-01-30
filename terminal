@@ -1,0 +1,11 @@
+git add .
+git commit -m "Fix critical TypeScript build errors
+- Resolve enum value mismatches in SecurityLevel and VulnerabilityType
+- Correct vulnerability type mappings in fuzzer
+- Fix Redis connection check implementation
+- Update vote method signature to match interface
+- Add missing error codes
+- Implement all FuzzingMetrics properties
+- Ensure proper type exports"
+git push origin main
+npm run build

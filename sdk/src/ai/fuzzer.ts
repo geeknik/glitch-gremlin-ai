@@ -50,7 +50,7 @@ export class Fuzzer {
                 id: `VULN-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                 name: v.type.toString(),
                 description: v.description,
-                severity: v.severity,
+                severity: v.severity.toLowerCase() as SecurityLevel,
                 confidence: v.confidence,
                 createdAt: new Date(),
                 updatedAt: new Date(),
@@ -161,8 +161,8 @@ export class Fuzzer {
             case 'REENTRANCY': return VulnerabilityType.Reentrancy;
             case 'ARITHMETIC_OVERFLOW': return VulnerabilityType.ArithmeticOverflow;
             case 'ACCESS_CONTROL': return VulnerabilityType.AccessControl;
-            case 'PDA_SAFETY': return VulnerabilityType.PdaSafety;
-            case 'CPI_SAFETY': return VulnerabilityType.CpiSafety;
+            case 'PDA_SAFETY': return VulnerabilityType.PDASafety;
+            case 'CPI_SAFETY': return VulnerabilityType.CPISafety;
             default: return VulnerabilityType.None;
         }
     }
@@ -184,9 +184,9 @@ export class Fuzzer {
                 return 'Use checked math operations and implement value range validation';
             case VulnerabilityType.AccessControl:
                 return 'Implement proper authorization checks and role-based access control';
-            case VulnerabilityType.PdaSafety:
+            case VulnerabilityType.PDASafety:
                 return 'Validate PDA derivation and verify ownership';
-            case VulnerabilityType.CpiSafety:
+            case VulnerabilityType.CPISafety:
                 return 'Validate CPI target programs and verify account permissions';
             default:
                 return 'Review code for potential security issues and consider a security audit';
