@@ -116,6 +116,7 @@ pub enum ProposalAction {
 }
 
 #[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
+<<<<<<< HEAD
 pub struct ProposalVotingState {
     pub yes_votes: u64,
     pub no_votes: u64,
@@ -139,3 +140,17 @@ pub use governance_metrics::*;
 pub use proposal::*;
 pub use stake_account::*;
 pub use vote_record::*;
+=======
+pub struct ProposalStateInfo {
+    pub created_at: i64,
+    pub executed_at: Option<i64>,
+    pub canceled_at: Option<i64>,
+    pub voting_ends_at: i64,
+    pub execution_delay: u64,
+    pub for_votes: u64,
+    pub against_votes: u64,
+    pub status: ProposalState,
+    pub quorum_achieved: bool,
+    pub threshold_achieved: bool,
+}
+>>>>>>> 87e3d7b (refactor: Rename ProposalState to ProposalStateInfo and update status type)
