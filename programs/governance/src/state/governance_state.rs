@@ -5,6 +5,14 @@ use {
     crate::state::proposal::{Proposal, ProposalStatus, ProposalAction, VoteRecord},
     crate::state::governance::GovernanceParams,
     std::str::FromStr,
+    crate::state::{
+        GovernanceMetrics,
+        ProposalState,
+        ProposalVotingState,
+        ProposalMetadata,
+        ChaosParams,
+        DefenseLevel,
+    },
 };
 
 /// Governance metrics and state
@@ -57,26 +65,41 @@ pub struct GovernanceState {
     pub treasury_bump: u8,
     pub treasury_auth_bump: u8,
     pub emergency_halt_bump: u8,
+    pub metrics: GovernanceMetrics,
+    pub chaos_params: ChaosParams,
+    pub defense_level: DefenseLevel,
+    pub blocked_addresses: Vec<Pubkey>,
 }
 
 impl GovernanceState {
+    pub const DISCRIMINATOR_LENGTH: usize = 8;
+    pub const PUBKEY_LENGTH: usize = 32;
+    pub const BOOL_LENGTH: usize = 1;
+    pub const U64_LENGTH: usize = 8;
+    pub const I64_LENGTH: usize = 8;
+    pub const VECTOR_LENGTH_PREFIX: usize = 4;
+    pub const MAX_BLOCKED_ADDRESSES: usize = 100;
+    
     pub fn space() -> usize {
-        // Calculate space needed for the account
-        8 + // discriminator
-        1 + // is_initialized
-        32 + // authority
-        200 + // config (approximate)
-        8 + // total_proposals
-        8 + // total_staked
-        8 + // treasury_balance
-        1 + // emergency_halt_active
-        8 + // last_proposal_time
-        8 + // proposal_count_window
-        8 + // total_treasury_inflow
-        8 + // total_treasury_outflow
-        1 + // treasury_bump
-        1 + // treasury_auth_bump
-        1 // emergency_halt_bump
+        Self::DISCRIMINATOR_LENGTH +
+        Self::BOOL_LENGTH +                     // is_initialized
+        Self::PUBKEY_LENGTH +                   // authority
+        200 +                                   // config (approximate)
+        Self::U64_LENGTH +                      // total_proposals
+        Self::U64_LENGTH +                      // total_staked
+        Self::U64_LENGTH +                      // treasury_balance
+        Self::BOOL_LENGTH +                     // emergency_halt_active
+        Self::I64_LENGTH +                      // last_proposal_time
+        Self::U64_LENGTH +                      // proposal_count_window
+        Self::U64_LENGTH +                      // total_treasury_inflow
+        Self::U64_LENGTH +                      // total_treasury_outflow
+        1 +                                     // treasury_bump
+        1 +                                     // treasury_auth_bump
+        1                                       // emergency_halt_bump
+        200 +                                   // metrics (approximate)
+        200 +                                   // chaos_params (approximate)
+        1 +                                     // defense_level
+        200 +                                   // blocked_addresses (approximate)
     }
 
     pub fn new(authority: Pubkey) -> Self {
@@ -95,6 +118,10 @@ impl GovernanceState {
             treasury_bump: 0,
             treasury_auth_bump: 0,
             emergency_halt_bump: 0,
+            metrics: GovernanceMetrics::default(),
+            chaos_params: ChaosParams::default(),
+            defense_level: DefenseLevel::default(),
+            blocked_addresses: Vec::new(),
         }
     }
 
@@ -103,7 +130,7 @@ impl GovernanceState {
     }
 
     pub fn verify_not_halted(&self) -> Result<()> {
-        require!(!self.is_halted(), GovernanceError::ProgramHalted);
+        require!(!self.emergency_halt_active, GovernanceError::ProgramHalted);
         Ok(())
     }
 
@@ -150,11 +177,10 @@ impl GovernanceState {
     }
 
     pub fn check_proposal_rate_limit(&self, current_time: i64) -> Result<()> {
-        if current_time - self.last_proposal_time <= self.config.voting_period 
-            && self.proposal_count_window >= self.config.min_stake_to_propose {
+        if current_time - self.last_proposal_time <= self.config.proposal_delay 
+            && self.proposal_count_window >= 5 { // Default rate limit of 5 proposals per window
             return Err(GovernanceError::ProposalRateLimitExceeded.into());
         }
-        
         Ok(())
     }
 
