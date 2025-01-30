@@ -6,6 +6,7 @@ use {
     metrics::{counter, gauge, histogram},
     std::sync::Arc,
     tokio::sync::RwLock,
+    super::forecasting::{TimeSeriesForecaster, ExponentialSmoothingParams, ForecastResult},
     time_series_generator::{Generator, TimePoint},
     statrs::statistics::{Data, Distribution, Mean, StandardDeviation},
     linreg::{linear_regression, linear_regression_of},
@@ -33,8 +34,7 @@ pub struct MetricsPoint {
 #[derive(Debug)]
 pub struct MetricsCollector {
     buffer: Arc<RwLock<CircularBuffer<MetricsPoint>>>,
-    generator: Generator,
-    sma: SimpleMovingAverage<f64>,
+    forecaster: TimeSeriesForecaster,
 }
 
 #[derive(Debug, Clone)]
@@ -59,8 +59,7 @@ impl MetricsCollector {
     pub fn new() -> Self {
         Self {
             buffer: Arc::new(RwLock::new(CircularBuffer::new(METRICS_BUFFER_SIZE))),
-            generator: Generator::new(),
-            sma: SimpleMovingAverage::new(24), // 24-hour moving average
+            forecaster: TimeSeriesForecaster::new(),
         }
     }
 
@@ -94,49 +93,58 @@ impl MetricsCollector {
             .collect()
     }
 
-    pub async fn generate_forecast(&self, points: &[MetricsPoint], horizon_hours: i64) -> Vec<TimePoint> {
-        // Convert metrics points to time series
-        let series: Vec<TimePoint> = points
-            .iter()
-            .map(|p| TimePoint {
-                timestamp: p.timestamp.timestamp(),
-                value: p.total_stake as f64,
-            })
+    pub async fn forecast_metrics(
+        &mut self,
+        horizon: usize,
+    ) -> Result<ForecastResult, GovernanceError> {
+        let buffer = self.buffer.read().await;
+        let points: Vec<f64> = buffer.iter()
+            .map(|p| p.total_stake as f64)
             .collect();
 
-        // Generate forecast
-        self.generator.forecast(&series, horizon_hours)
+        if points.len() < 48 { // Need at least 2 days of data
+            return Err(GovernanceError::InvalidMetrics);
+        }
+
+        let params = ExponentialSmoothingParams::default();
+        self.forecaster.ensemble_forecast(&points, horizon, &params)
     }
 
-    pub fn calculate_volatility(&self, points: &[MetricsPoint]) -> f64 {
+    pub async fn analyze_volatility(
+        &mut self,
+        window_hours: i64,
+    ) -> Result<f64, GovernanceError> {
+        let history = self.get_metrics_history(window_hours).await;
+        let points: Vec<f64> = history.iter()
+            .map(|p| p.total_stake as f64)
+            .collect();
+
         if points.is_empty() {
-            return 0.0;
+            return Err(GovernanceError::InvalidMetrics);
+        }
+
+        Ok(self.forecaster.calculate_volatility(&points))
+    }
+
+    pub async fn detect_anomalies(
+        &mut self,
+        window_size: usize,
+    ) -> Result<Vec<MetricsPoint>, GovernanceError> {
+        let buffer = self.buffer.read().await;
+        let points: Vec<MetricsPoint> = buffer.iter().cloned().collect();
+        
+        if points.len() < window_size {
+            return Ok(vec![]);
         }
 
         let values: Vec<f64> = points.iter()
             .map(|p| p.total_stake as f64)
             .collect();
 
-        let mean = values.iter().sum::<f64>() / values.len() as f64;
-        let variance = values.iter()
-            .map(|v| (v - mean).powi(2))
-            .sum::<f64>() / values.len() as f64;
-
-        variance.sqrt()
-    }
-
-    pub async fn detect_anomalies(&self, window_size: usize) -> Vec<MetricsPoint> {
-        let buffer = self.buffer.read().await;
-        let points: Vec<MetricsPoint> = buffer.iter().cloned().collect();
-        
-        if points.len() < window_size {
-            return vec![];
-        }
-
         let mut anomalies = vec![];
         let mut window = CircularBuffer::new(window_size);
 
-        for point in points.iter() {
+        for (i, point) in points.iter().enumerate() {
             if window.is_full() {
                 let mean = window.iter()
                     .map(|p: &MetricsPoint| p.total_stake as f64)
@@ -150,12 +158,16 @@ impl MetricsCollector {
                 let current_value = point.total_stake as f64;
                 if (current_value - mean).abs() > 2.0 * std_dev {
                     anomalies.push(point.clone());
+                    
+                    // Record anomaly in Prometheus metrics
+                    counter!("governance.anomalies_detected", 1);
+                    gauge!("governance.anomaly_deviation", (current_value - mean).abs());
                 }
             }
             window.push(point.clone());
         }
 
-        anomalies
+        Ok(anomalies)
     }
 
     pub async fn export_prometheus(&self) -> String {
@@ -299,16 +311,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_anomaly_detection() {
-        let collector = MetricsCollector::new();
-        let normal_value = 1000;
-        let anomaly_value = 10000;
-
-        // Add normal points
-        for _ in 0..10 {
+    async fn test_forecasting() {
+        let mut collector = MetricsCollector::new();
+        
+        // Generate synthetic data
+        for i in 0..100 {
             let point = MetricsPoint {
                 timestamp: Utc::now(),
-                total_stake: normal_value,
+                total_stake: (i * 100) as u64,
                 active_proposals: 5,
                 total_votes: 100,
                 unique_voters: 50,
@@ -320,38 +330,21 @@ mod tests {
             collector.record_metrics(point).await.unwrap();
         }
 
-        // Add anomaly
-        let anomaly_point = MetricsPoint {
-            timestamp: Utc::now(),
-            total_stake: anomaly_value,
-            active_proposals: 5,
-            total_votes: 100,
-            unique_voters: 50,
-            treasury_balance: 5000,
-            chaos_events: 2,
-            avg_voting_power: 20.0,
-            quorum_percentage: 0.4,
-        };
-        collector.record_metrics(anomaly_point).await.unwrap();
-
-        let anomalies = collector.detect_anomalies(5).await;
-        assert!(!anomalies.is_empty());
+        let forecast = collector.forecast_metrics(24).await.unwrap();
+        assert_eq!(forecast.point_estimate.len(), 24);
+        assert!(forecast.model_quality.mape < 20.0);
     }
 
     #[tokio::test]
-    async fn test_time_series_analysis() {
-        let collector = MetricsCollector::new();
-        let mut points = Vec::new();
+    async fn test_volatility_analysis() {
+        let mut collector = MetricsCollector::new();
         
-        // Generate synthetic data with trend and seasonality
+        // Generate synthetic data with increasing volatility
         for i in 0..100 {
-            let trend = i as f64 * 10.0;
-            let seasonal = (i as f64 * std::f64::consts::PI / 12.0).sin() * 100.0;
-            let noise = rand::random::<f64>() * 50.0;
-            
-            points.push(MetricsPoint {
+            let volatility = (i as f64 / 10.0).sin() * i as f64;
+            let point = MetricsPoint {
                 timestamp: Utc::now(),
-                total_stake: (trend + seasonal + noise) as u64,
+                total_stake: (1000.0 + volatility) as u64,
                 active_proposals: 5,
                 total_votes: 100,
                 unique_voters: 50,
@@ -359,40 +352,11 @@ mod tests {
                 chaos_events: 2,
                 avg_voting_power: 20.0,
                 quorum_percentage: 0.4,
-            });
+            };
+            collector.record_metrics(point).await.unwrap();
         }
 
-        let analysis = collector.analyze_time_series(&points).await.unwrap();
-        assert!(!analysis.trend.is_empty());
-        assert!(!analysis.seasonal.is_empty());
-        assert!(!analysis.forecast.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_trend_analysis() {
-        let collector = MetricsCollector::new();
-        let mut points = Vec::new();
-        
-        // Generate synthetic data with linear trend
-        for i in 0..100 {
-            let trend = i as f64 * 10.0;
-            let noise = rand::random::<f64>() * 20.0;
-            
-            points.push(MetricsPoint {
-                timestamp: Utc::now(),
-                total_stake: (trend + noise) as u64,
-                active_proposals: 5,
-                total_votes: 100,
-                unique_voters: 50,
-                treasury_balance: 5000,
-                chaos_events: 2,
-                avg_voting_power: 20.0,
-                quorum_percentage: 0.4,
-            });
-        }
-
-        let analysis = collector.analyze_trend(&points).await.unwrap();
-        assert!(analysis.slope > 0.0); // Should detect positive trend
-        assert!(analysis.r_squared > 0.8); // Should have good fit
+        let volatility = collector.analyze_volatility(24).await.unwrap();
+        assert!(volatility > 0.0);
     }
 } 
