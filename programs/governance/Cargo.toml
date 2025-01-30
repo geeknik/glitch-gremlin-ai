@@ -52,19 +52,27 @@ metrics = "0.21"
 metrics-exporter-prometheus = "0.12"
 statrs = "0.16"
 linreg = "0.2"
-moving_average = "1.1.0"
-seasonal = "0.3.1"
-nalgebra = "0.32"
-ndarray = { version = "0.15", features = ["rayon"] }
+moving-average = "0.1.7"
+nalgebra = { version = "0.32", features = ["serde-serialize"] }
+ndarray = { version = "0.15", features = ["rayon", "serde"] }
 ndarray-stats = "0.5"
+ndarray-linalg = { version = "0.16", features = ["openblas-system"] }
 rayon = "1.7"
 itertools = "0.11"
 argmin = "0.8"
-optimization = "0.3"
-kalman = "0.3"
+num-complex = "0.4"
+rustfft = "6.1"
+sprs = "0.11"
+lapack = "0.19"
+blas = "0.22"
 
 [dev-dependencies]
 solana-program-test = { workspace = true }
 solana-sdk = { workspace = true }
 assert_matches = "1.5"
-proptest = "1.2" 
+proptest = "1.2"
+criterion = "0.5"
+
+[[bench]]
+name = "forecasting_benchmarks"
+harness = false 
