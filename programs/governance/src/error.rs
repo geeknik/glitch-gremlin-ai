@@ -203,21 +203,21 @@ pub enum GovernanceError {
 impl From<anchor_lang::error::Error> for GovernanceError {
     fn from(err: anchor_lang::error::Error) -> Self {
         msg!("Anchor error: {:?}", err);
-        GovernanceError::InvalidInstructionData
+        GovernanceError::InvalidParameters
     }
 }
 
 impl From<ProgramError> for GovernanceError {
     fn from(err: ProgramError) -> Self {
         msg!("Program error: {:?}", err);
-        GovernanceError::InvalidInstructionData
+        GovernanceError::InvalidParameters
     }
 }
 
 impl From<std::io::Error> for GovernanceError {
     fn from(err: std::io::Error) -> Self {
         msg!("IO error: {:?}", err);
-        GovernanceError::InvalidAccountData
+        GovernanceError::InvalidParameters
     }
 }
 

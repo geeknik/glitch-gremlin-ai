@@ -1,28 +1,16 @@
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::clock::Clock;
 use anchor_spl::token::{Token, TokenAccount, Mint};
-use solana_program::pubkey::Pubkey;
-use solana_program::{
-    program::invoke_signed,
-    system_instruction,
-    account_info::AccountInfo,
-    program_error::ProgramError,
-    sysvar::Sysvar,
-};
 use std::str::FromStr;
-use std::collections::HashMap;
 
 pub mod error;
 pub mod state;
 
+// Re-export only what we need at the top level
+use state::governance::GovernanceParams;
+use state::governance_state::GovernanceState;
 use error::GovernanceError;
-use state::{
-    GovernanceParams, ProposalAction, ProposalStatus,
-    GovernanceMetrics, GovernanceState, StakeAccount,
-    StakeOperation, StakeOperationType,
-};
 
-declare_id!("Governance1111111111111111111111111111111111");
+declare_id!("Governance111111111111111111111111111111111");
 
 // Constants for PDA seeds and rate limiting
 pub const GOVERNANCE_SEED: &[u8] = b"governance";
@@ -36,12 +24,20 @@ pub const DEV_WALLET: &str = "12ZA59vt9MW9XNfpDNThamLmPsPFQ2MEgkngk1F7HGkn";
 pub const TREASURY_AUTH_SEED: &[u8] = b"treasury_auth";
 pub const EMERGENCY_HALT_SEED: &[u8] = b"emergency_halt";
 
+// Re-export types from state module
+pub use state::{
+    governance::{GovernanceParams, ProposalVotingState, ProposalMetadata},
+    governance_state::{GovernanceMetrics},
+    proposal::{Proposal, ProposalStatus, ProposalAction, VoteRecord},
+    stake_account::{StakeAccount, StakeOperation, StakeOperationType},
+    ChaosParams, ChaosMode, ChaosCondition, DefenseLevel,
+};
+
 pub use state::*;
-pub use error::GovernanceError;
 
 // Re-export important types
 pub use state::governance::{GovernanceParams, ProposalAction, ProposalStatus};
-pub use state::governance_state::{GovernanceMetrics, GovernanceState};
+pub use state::governance_state::{GovernanceMetrics};
 pub use state::stake_account::{StakeAccount, StakeOperation, StakeOperationType};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
@@ -65,10 +61,27 @@ pub struct EmergencyActionEvent {
 #[program]
 pub mod glitch_gremlin_governance {
     use super::*;
+    use crate::state::governance_state::GovernanceState;
+    use crate::state::governance::GovernanceParams;
+    use crate::error::GovernanceError;
 
-    pub fn initialize(ctx: Context<Initialize>, authority: Pubkey) -> Result<()> {
+    pub fn initialize(
+        ctx: Context<Initialize>,
+        authority: Pubkey,
+    ) -> Result<()> {
         let governance = &mut ctx.accounts.governance;
-        *governance = GovernanceState::new(authority);
+        governance.is_initialized = true;
+        governance.authority = authority;
+        governance.config = GovernanceConfig::default();
+        governance.total_proposals = 0;
+        governance.total_staked = 0;
+        governance.treasury_balance = 0;
+        governance.emergency_halt_active = false;
+        governance.last_proposal_time = 0;
+        governance.proposal_count_window = 0;
+        governance.total_treasury_inflow = 0;
+        governance.total_treasury_outflow = 0;
+
         Ok(())
     }
 

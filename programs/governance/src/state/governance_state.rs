@@ -4,6 +4,7 @@ use {
     crate::error::GovernanceError,
     crate::state::proposal::{Proposal, ProposalStatus, ProposalAction, VoteRecord},
     crate::state::governance::GovernanceParams,
+    std::str::FromStr,
 };
 
 /// Governance metrics and state
@@ -44,11 +45,18 @@ impl Default for GovernanceMetrics {
 pub struct GovernanceState {
     pub is_initialized: bool,
     pub authority: Pubkey,
-    pub params: GovernanceParams,
-    pub metrics: GovernanceMetrics,
-    pub proposals: HashMap<Pubkey, Proposal>,
+    pub config: GovernanceParams,
+    pub total_proposals: u64,
+    pub total_staked: u64,
+    pub treasury_balance: u64,
     pub emergency_halt_active: bool,
-    pub last_metrics_update: i64,
+    pub last_proposal_time: i64,
+    pub proposal_count_window: u64,
+    pub total_treasury_inflow: u64,
+    pub total_treasury_outflow: u64,
+    pub treasury_bump: u8,
+    pub treasury_auth_bump: u8,
+    pub emergency_halt_bump: u8,
 }
 
 impl GovernanceState {
@@ -57,22 +65,36 @@ impl GovernanceState {
         8 + // discriminator
         1 + // is_initialized
         32 + // authority
-        200 + // params (approximate)
-        200 + // metrics (approximate)
-        1000 + // proposals (approximate)
+        200 + // config (approximate)
+        8 + // total_proposals
+        8 + // total_staked
+        8 + // treasury_balance
         1 + // emergency_halt_active
-        8 // last_metrics_update
+        8 + // last_proposal_time
+        8 + // proposal_count_window
+        8 + // total_treasury_inflow
+        8 + // total_treasury_outflow
+        1 + // treasury_bump
+        1 + // treasury_auth_bump
+        1 // emergency_halt_bump
     }
 
     pub fn new(authority: Pubkey) -> Self {
         Self {
             is_initialized: true,
             authority,
-            params: GovernanceParams::default(),
-            metrics: GovernanceMetrics::default(),
-            proposals: HashMap::new(),
+            config: GovernanceParams::default(),
+            total_proposals: 0,
+            total_staked: 0,
+            treasury_balance: 0,
             emergency_halt_active: false,
-            last_metrics_update: 0,
+            last_proposal_time: 0,
+            proposal_count_window: 0,
+            total_treasury_inflow: 0,
+            total_treasury_outflow: 0,
+            treasury_bump: 0,
+            treasury_auth_bump: 0,
+            emergency_halt_bump: 0,
         }
     }
 
@@ -80,44 +102,25 @@ impl GovernanceState {
         self.emergency_halt_active
     }
 
-    pub fn update_metrics(&mut self) -> Result<()> {
-        let clock = Clock::get()?;
-        
-        // Update metrics only if enough time has passed
-        if clock.unix_timestamp - self.last_metrics_update < 60 {
-            return Ok(());
-        }
-
-        self.metrics.active_proposals = self.proposals.values()
-            .filter(|p| matches!(p.status, ProposalStatus::Active))
-            .count() as u64;
-
-        self.metrics.total_votes = self.proposals.values()
-            .map(|p| p.votes.len() as u64)
-            .sum();
-
-        self.metrics.unique_voters = self.proposals.values()
-            .flat_map(|p| p.votes.keys())
-            .collect::<std::collections::HashSet<_>>()
-            .len() as u64;
-
-        self.last_metrics_update = clock.unix_timestamp;
+    pub fn verify_not_halted(&self) -> Result<()> {
+        require!(!self.is_halted(), GovernanceError::ProgramHalted);
         Ok(())
     }
 
-    pub fn get_proposal(&self, key: &Pubkey) -> Result<&Proposal> {
-        self.proposals.get(key)
-            .ok_or_else(|| error!(GovernanceError::ProposalNotFound))
+    pub fn verify_gremlinai_token(token_mint: &Pubkey) -> Result<()> {
+        require!(
+            token_mint == &Pubkey::from_str(crate::GREMLINAI_TOKEN_MINT).unwrap(),
+            GovernanceError::InvalidTokenMint
+        );
+        Ok(())
     }
 
-    pub fn get_proposal_mut(&mut self, key: &Pubkey) -> Result<&mut Proposal> {
-        self.proposals.get_mut(key)
-            .ok_or_else(|| error!(GovernanceError::ProposalNotFound))
-    }
-
-    pub fn has_active_votes(&self, voter: &Pubkey) -> bool {
-        self.proposals.values()
-            .any(|p| p.status == ProposalStatus::Active && p.votes.contains_key(voter))
+    pub fn verify_dev_authority(authority: &Pubkey) -> Result<()> {
+        require!(
+            authority == &Pubkey::from_str(crate::DEV_WALLET).unwrap(),
+            GovernanceError::UnauthorizedDeveloper
+        );
+        Ok(())
     }
 
     pub fn validate_proposal_parameters(
@@ -128,21 +131,47 @@ impl GovernanceState {
         threshold: u8,
     ) -> Result<()> {
         require!(
-            voting_period >= self.params.min_voting_period && 
-            voting_period <= self.params.max_voting_period,
+            voting_period >= self.config.voting_delay && 
+            voting_period <= self.config.voting_period,
             GovernanceError::InvalidVotingPeriod
         );
 
         require!(
-            quorum >= self.params.min_quorum && quorum <= 100,
+            quorum >= self.config.min_stake_to_vote && quorum <= 100,
             GovernanceError::InvalidQuorum
         );
 
         require!(
-            threshold >= self.params.min_threshold && threshold <= 100,
+            threshold >= self.config.min_stake_to_propose && threshold <= 100,
             GovernanceError::InvalidThreshold
         );
 
+        Ok(())
+    }
+
+    pub fn check_proposal_rate_limit(&self, current_time: i64) -> Result<()> {
+        if current_time - self.last_proposal_time <= self.config.voting_period 
+            && self.proposal_count_window >= self.config.min_stake_to_propose {
+            return Err(GovernanceError::ProposalRateLimitExceeded.into());
+        }
+        
+        Ok(())
+    }
+
+    pub fn has_active_votes(&self, voter: &Pubkey) -> bool {
+        // In production, implement proper vote tracking
+        false
+    }
+
+    pub fn update_metrics(&mut self) -> Result<()> {
+        let clock = Clock::get()?;
+        
+        // Update metrics only if enough time has passed
+        if clock.unix_timestamp - self.last_metrics_update < 60 {
+            return Ok(());
+        }
+
+        self.last_metrics_update = clock.unix_timestamp;
         Ok(())
     }
 
