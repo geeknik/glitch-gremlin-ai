@@ -40,6 +40,28 @@ pub enum GovernanceError {
     InvalidStakeAmount,
     #[msg("Insufficient stake balance")]
     InsufficientStake,
+    #[msg("Invalid proposal parameters")]
+    InvalidProposalParameters,
+    #[msg("Insufficient voting power")]
+    InsufficientVotingPower,
+    #[msg("Voting period has ended")]
+    VotingPeriodEnded,
+    #[msg("Quorum not reached")]
+    QuorumNotReached,
+    #[msg("Approval threshold not met")]
+    ApprovalThresholdNotMet,
+    #[msg("Insufficient treasury balance")]
+    InsufficientTreasuryBalance,
+    #[msg("Invalid treasury account")]
+    InvalidTreasuryAccount,
+    #[msg("Unauthorized delegation")]
+    UnauthorizedDelegation,
+    #[msg("Invalid delegation")]
+    InvalidDelegation,
+    #[msg("Delegation chain not allowed")]
+    DelegationChainNotAllowed,
+    #[msg("Too many active proposals")]
+    TooManyActiveProposals,
     #[msg("Account already halted")]
     AlreadyHalted,
     #[msg("Program is halted")]
