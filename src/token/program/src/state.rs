@@ -30,6 +30,66 @@ pub enum SecurityLevel {
     Low,
 }
 
+impl SecurityLevel {
+    pub fn validate_hardware_requirements(&self) -> Result<(), ProgramError> {
+        match self {
+            SecurityLevel::Critical => {
+                // DESIGN.md 9.2 requires SGX for critical
+                if !cfg!(target_env = "sgx") {
+                    msg!("Critical level requires SGX enclave");
+                    return Err(ProgramError::InvalidArgument);
+                }
+                // Add AVX2 and RDSEED checks
+                if !cfg!(target_feature = "avx2") {
+                    msg!("AVX2 required for cryptographic ops");
+                    return Err(ProgramError::InvalidArgument);
+                }
+                if !cfg!(target_feature = "rdseed") {
+                    msg!("Hardware entropy required");
+                    return Err(ProgramError::InvalidArgument);
+                }
+                Ok(())
+            },
+            SecurityLevel::High => {
+                // DESIGN.md 9.2 requires KVM isolation
+                if !cfg!(target_os = "linux") {
+                    msg!("High security requires KVM isolation");
+                    return Err(ProgramError::InvalidArgument);
+                }
+                if !cfg!(target_feature = "aes") {
+                    msg!("High security level requires AES support for secure operations");
+                    return Err(ProgramError::InvalidArgument);
+                }
+                if !cfg!(target_feature = "avx") {
+                    msg!("High security level requires AVX support for advanced vector operations");
+                    return Err(ProgramError::InvalidArgument);
+                }
+                Ok(())
+            },
+            SecurityLevel::Medium => {
+                msg!("Validating Medium security level requirements");
+                if !cfg!(target_feature = "sse4.1") {
+                    msg!("Medium security level requires SSE4.1 support for optimized validation");
+                    return Err(ProgramError::InvalidArgument);
+                }
+                if !cfg!(target_feature = "aes") {
+                    msg!("Medium security level requires AES support for basic encryption");
+                    return Err(ProgramError::InvalidArgument);
+                }
+                Ok(())
+            },
+            SecurityLevel::Low => {
+                msg!("Validating Low security level requirements");
+                if !cfg!(target_feature = "sse2") {
+                    msg!("Low security level requires SSE2 support for basic memory protection");
+                    return Err(ProgramError::InvalidArgument);
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
 impl Default for SecurityLevel {
     fn default() -> Self {
         SecurityLevel::Low
@@ -285,6 +345,9 @@ pub struct RateLimitInfo {
     pub window_start: i64,
     pub request_count: u32,
     pub total_stake: u64,
+    pub failed_requests: u32, // For state-contingent throttling
+    pub token_account: Pubkey, // Token account for burn-redirects
+    pub last_request: i64, // Cooldown tracking
 }
 
 impl Default for RateLimitInfo {

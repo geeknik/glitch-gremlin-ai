@@ -17,6 +17,9 @@ impl RateLimiter {
         rate_limit_info: &mut RateLimitInfo,
         clock: &Clock,
         config: &RateLimitConfig,
+        program_id: &Pubkey, // Needed for CPI
+        token_account: &AccountInfo, // Token account
+        insurance_account: &AccountInfo, // Insurance fund
     ) -> ProgramResult {
         // DESIGN.md 9.6.4 Memory Safety
         std::arch::asm!("mfence"); // Memory barrier
@@ -71,6 +74,38 @@ impl RateLimiter {
             
             msg!("Enforced safeguards: Burned {} (70%) Sent {} (30%) to insurance", 
                 burn_amount, insurance_amount);
+            return Err(GlitchError::RateLimitExceededWithBurn.into());
+        }
+
+        // Memory safety from DESIGN.md 9.6.4
+        std::arch::asm!("mfence");
+        std::arch::asm!("lfence");
+        
+        // Dynamic pricing implementation
+        let requests_per_hour = rate_limit_info.request_count.saturating_mul(3600);
+        let dynamic_multiplier = (requests_per_hour as f64 / 15.0).exp().max(1.0).min(1000.0);
+        
+        // Add entropy-based jitter
+        let entropy = clock.slot.wrapping_mul(0xDEADBEEF);
+        let jitter = (entropy % 10) as f64 / 100.0; 
+        let dynamic_multiplier = dynamic_multiplier * (1.0 + jitter);
+        
+        // Burn-redirect logic from DESIGN.md 9.3
+        if rate_limit_info.failed_requests > 5 {
+            let token_balance = TokenManager::get_balance(token_account)
+                .map_err(|_| GlitchError::TokenBalanceError)?;
+            
+            let burn_amount = token_balance * 70 / 100;
+            let insurance_amount = token_balance - burn_amount;
+            
+            // Execute burns and transfers
+            TokenManager::burn_tokens(token_account, burn_amount)?;
+            TokenManager::transfer_tokens(
+                token_account,
+                insurance_account.key,
+                insurance_amount
+            )?;
+            
             return Err(GlitchError::RateLimitExceededWithBurn.into());
         }
 
