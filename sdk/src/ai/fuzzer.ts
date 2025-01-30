@@ -1,253 +1,210 @@
-import { VulnerabilityType, VulnerabilityAnalysis } from './types.js';
-import { ChaosGenerator, ChaosConfig, ChaosResult } from './chaosGenerator.js';
+import { VulnerabilityType, FuzzingResult, FuzzingMetrics, VulnerabilityInfo, SecurityLevel } from '../types.js';
+import { VulnerabilityAnalysis } from './types.js';
+import { ChaosGenerator, ChaosConfig, ChaosResult } from './src/chaosGenerator.js';
 import { MetricsCollector } from '../metrics/collector.js';
 import { Logger } from '../utils/logger.js';
-import { PublicKey } from '@solana/web3.js';
 
-export interface FuzzInput {
-    programId: PublicKey;
-    accounts: PublicKey[];
+interface FuzzInput {
+    programId: string;
+    accounts: string[];
     data: Buffer;
     seeds?: Buffer[];
 }
 
-export interface FuzzConfig extends ChaosConfig {
-    maxIterations: number;
-    timeoutMs: number;
-    mutationRate: number;
-    crossoverRate: number;
-    populationSize: number;
-    selectionPressure: number;
-    targetVulnerabilities: VulnerabilityType[];
+interface FuzzMetrics {
+    successRate: number;
+    executionTime: number;
+    totalExecutions: number;
+    successfulExecutions: number;
+    failedExecutions: number;
+    uniquePaths: number;
+    coverage: number;
+    errorRate: number;
 }
 
-export interface FuzzResult {
-    input: FuzzInput;
+interface FuzzResult {
+    success: boolean;
+    metrics: FuzzMetrics;
     vulnerabilities: VulnerabilityAnalysis[];
-    metrics: {
-        iterations: number;
-        timeElapsed: number;
-        successRate: number;
-        coverage: number;
-    };
-    transactions: {
-        hash: string;
-        status: 'success' | 'failed';
-        error?: string;
-        logs?: string[];
-    }[];
+    error?: Error;
 }
 
 export class Fuzzer {
-    private readonly config: FuzzConfig;
-    private readonly generator: ChaosGenerator;
-    private readonly metrics: MetricsCollector;
-    private readonly logger: Logger;
-    private population: FuzzInput[] = [];
+    private chaosGenerator: ChaosGenerator;
+    private metrics: MetricsCollector;
+    private config: ChaosConfig;
+    private logger: Logger;
 
-    constructor(config: FuzzConfig) {
-        this.config = {
-            ...config,
-            maxIterations: config.maxIterations || 1000,
-            timeoutMs: config.timeoutMs || 300000, // 5 minutes
-            mutationRate: config.mutationRate || 0.1,
-            crossoverRate: config.crossoverRate || 0.7,
-            populationSize: config.populationSize || 100,
-            selectionPressure: config.selectionPressure || 0.8
-        };
-        this.generator = new ChaosGenerator(config);
+    constructor(config: ChaosConfig) {
+        this.config = config;
+        this.chaosGenerator = new ChaosGenerator(config);
         this.metrics = new MetricsCollector();
         this.logger = new Logger('Fuzzer');
     }
 
-    public async fuzz(input: FuzzInput): Promise<FuzzResult> {
-        this.logger.info('Starting fuzzing session', input);
-        const startTime = Date.now();
-        
-        // Initialize population
-        this.population = await this.initializePopulation(input);
-        let bestResult: FuzzResult | null = null;
-        let iteration = 0;
-
-        while (iteration < this.config.maxIterations && 
-               Date.now() - startTime < this.config.timeoutMs) {
-            
-            // Evolve population
-            const newPopulation = await this.evolvePopulation();
-            
-            // Evaluate new population
-            for (const candidate of newPopulation) {
-                const result = await this.evaluateCandidate(candidate);
-                if (this.isBetterResult(result, bestResult)) {
-                    bestResult = result;
-                    this.logger.info('Found better result', result);
-                }
-            }
-
-            this.population = await this.selectSurvivors(this.population, newPopulation);
-            iteration++;
-            
-            // Update metrics
-            this.metrics.recordMetric('fuzzer.iteration', iteration);
-            this.metrics.recordMetric('fuzzer.population_size', this.population.length);
-        }
-
-        if (!bestResult) {
-            bestResult = await this.evaluateCandidate(input);
-        }
-
-        this.logger.info('Fuzzing session completed', { 
-            iterations: iteration,
-            timeElapsed: Date.now() - startTime,
-            bestResult 
-        });
-
-        return bestResult;
-    }
-
-    private async initializePopulation(seed: FuzzInput): Promise<FuzzInput[]> {
-        const population: FuzzInput[] = [seed];
-        
-        while (population.length < this.config.populationSize) {
-            const parent = this.selectParent(population);
-            const mutated = await this.mutate(parent);
-            population.push(mutated);
-        }
-
-        return population;
-    }
-
-    private async evolvePopulation(): Promise<FuzzInput[]> {
-        const newPopulation: FuzzInput[] = [];
-        
-        while (newPopulation.length < this.config.populationSize) {
-            if (Math.random() < this.config.crossoverRate) {
-                // Crossover
-                const parent1 = this.selectParent(this.population);
-                const parent2 = this.selectParent(this.population);
-                const [child1, child2] = await this.crossover(parent1, parent2);
-                newPopulation.push(child1, child2);
-            } else {
-                // Mutation
-                const parent = this.selectParent(this.population);
-                const mutated = await this.mutate(parent);
-                newPopulation.push(mutated);
-            }
-        }
-
-        return newPopulation;
-    }
-
-    private selectParent(population: FuzzInput[]): FuzzInput {
-        // Tournament selection
-        const tournamentSize = Math.max(2, Math.floor(population.length * this.config.selectionPressure));
-        const tournament = new Array(tournamentSize)
-            .fill(null)
-            .map(() => population[Math.floor(Math.random() * population.length)]);
-        
-        return tournament[Math.floor(Math.random() * tournament.length)];
-    }
-
-    private async mutate(input: FuzzInput): Promise<FuzzInput> {
-        const mutated = { ...input };
-
-        if (Math.random() < this.config.mutationRate) {
-            // Mutate instruction data
-            mutated.data = await this.generator.mutateInstructionData(input.data);
-        }
-
-        if (Math.random() < this.config.mutationRate) {
-            // Mutate accounts
-            mutated.accounts = await this.generator.mutateAccounts(input.accounts);
-        }
-
-        if (input.seeds && Math.random() < this.config.mutationRate) {
-            // Mutate PDA seeds
-            mutated.seeds = await this.generator.mutateSeeds(input.seeds);
-        }
-
-        return mutated;
-    }
-
-    private async crossover(parent1: FuzzInput, parent2: FuzzInput): Promise<[FuzzInput, FuzzInput]> {
-        // Single-point crossover
-        const child1 = { ...parent1 };
-        const child2 = { ...parent2 };
-
-        // Crossover instruction data
-        const dataPoint = Math.floor(Math.random() * parent1.data.length);
-        const data1 = Buffer.concat([
-            parent1.data.slice(0, dataPoint),
-            parent2.data.slice(dataPoint)
-        ]);
-        const data2 = Buffer.concat([
-            parent2.data.slice(0, dataPoint),
-            parent1.data.slice(dataPoint)
-        ]);
-        child1.data = data1;
-        child2.data = data2;
-
-        // Crossover accounts
-        const accountPoint = Math.floor(Math.random() * parent1.accounts.length);
-        child1.accounts = [
-            ...parent1.accounts.slice(0, accountPoint),
-            ...parent2.accounts.slice(accountPoint)
-        ];
-        child2.accounts = [
-            ...parent2.accounts.slice(0, accountPoint),
-            ...parent1.accounts.slice(accountPoint)
-        ];
-
-        return [child1, child2];
-    }
-
-    private async evaluateCandidate(input: FuzzInput): Promise<FuzzResult> {
-        const startTime = Date.now();
-        const result = await this.generator.generateChaos(input);
-
+    public async fuzz(): Promise<FuzzingResult> {
+        const result = await this.runFuzzingSession();
         return {
-            input,
-            vulnerabilities: result.vulnerabilities,
+            success: result.metrics.successRate === 1,
+            vulnerabilities: result.vulnerabilities.map(v => ({
+                id: `VULN-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                name: v.type.toString(),
+                description: v.description,
+                severity: v.severity,
+                confidence: v.confidence,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                evidence: v.evidence || [],
+                recommendation: this.getRecommendation(v.type),
+                vulnerabilityType: v.type,
+                details: {
+                    expectedValue: undefined,
+                    actualValue: undefined,
+                    location: v.location?.file,
+                    impact: v.details?.impact,
+                    likelihood: v.details?.likelihood
+                }
+            })),
+            expectedVulnerabilities: [],
             metrics: {
-                iterations: 1,
-                timeElapsed: Date.now() - startTime,
-                successRate: result.success ? 1 : 0,
-                coverage: result.coverage || 0
+                totalExecutions: result.metrics.totalExecutions,
+                successfulExecutions: result.metrics.successfulExecutions,
+                failedExecutions: result.metrics.failedExecutions,
+                totalTests: result.metrics.totalExecutions,
+                executionTime: result.metrics.executionTime,
+                errorRate: result.metrics.errorRate,
+                coverage: result.metrics.coverage,
+                vulnerabilitiesFound: result.vulnerabilities.map(v => v.type),
+                securityScore: this.calculateSecurityScore(result),
+                riskLevel: this.calculateRiskLevel(result),
+                averageExecutionTime: result.metrics.executionTime / result.metrics.totalExecutions,
+                peakMemoryUsage: 0, // To be implemented
+                cpuUtilization: 0, // To be implemented
+                uniquePaths: result.metrics.uniquePaths,
+                edgeCoverage: result.metrics.coverage,
+                mutationEfficiency: result.metrics.successRate
             },
-            transactions: result.transactions
+            error: result.error
         };
     }
 
-    private async selectSurvivors(oldPop: FuzzInput[], newPop: FuzzInput[]): Promise<FuzzInput[]> {
-        // Elitism: Keep best solutions from both populations
-        const combined = [...oldPop, ...newPop];
-        const results = await Promise.all(combined.map(input => this.evaluateCandidate(input)));
+    private async runFuzzingSession(): Promise<FuzzResult> {
+        this.logger.info('Starting fuzzing session');
+        const startTime = Date.now();
         
-        // Sort by coverage and success rate
-        const sorted = combined.sort((a, b) => {
-            const resultA = results.find(r => r.input === a)!;
-            const resultB = results.find(r => r.input === b)!;
-            return resultB.metrics.coverage - resultA.metrics.coverage;
-        });
+        const input: FuzzInput = {
+            programId: this.config.programId,
+            accounts: [],
+            data: Buffer.from([]),
+            seeds: [Buffer.from([])]
+        };
 
-        return sorted.slice(0, this.config.populationSize);
+        try {
+            const result = await this.chaosGenerator.generateChaos(input);
+            const success = result.status === 'success';
+            
+            return {
+                success,
+                metrics: {
+                    successRate: success ? 1 : 0,
+                    executionTime: result.metrics.executionTime,
+                    totalExecutions: 1,
+                    successfulExecutions: success ? 1 : 0,
+                    failedExecutions: success ? 0 : 1,
+                    uniquePaths: result.metrics.uniquePaths,
+                    coverage: result.metrics.coverage,
+                    errorRate: success ? 0 : 1
+                },
+                vulnerabilities: this.mapVulnerabilities(result.findings || []),
+                error: result.error ? new Error(result.error) : undefined
+            };
+        } catch (error) {
+            return {
+                success: false,
+                metrics: {
+                    successRate: 0,
+                    executionTime: 0,
+                    totalExecutions: 1,
+                    successfulExecutions: 0,
+                    failedExecutions: 1,
+                    uniquePaths: 0,
+                    coverage: 0,
+                    errorRate: 1
+                },
+                vulnerabilities: [],
+                error: error instanceof Error ? error : new Error(String(error))
+            };
+        }
     }
 
-    private isBetterResult(current: FuzzResult | null, best: FuzzResult | null): boolean {
-        if (!best) return true;
-        if (!current) return false;
+    private mapVulnerabilities(findings: ChaosResult['findings']): VulnerabilityAnalysis[] {
+        return findings.map(finding => ({
+            type: this.mapFindingToVulnerabilityType(finding.type),
+            confidence: finding.confidence || 0.5,
+            severity: finding.severity,
+            description: finding.description,
+            evidence: finding.evidence,
+            metadata: finding.metadata,
+            location: finding.location,
+            details: {
+                impact: finding.impact || 'Unknown',
+                likelihood: finding.likelihood || 'Unknown',
+                exploitScenario: finding.exploitScenario,
+                recommendation: finding.recommendation || this.getRecommendation(this.mapFindingToVulnerabilityType(finding.type)),
+                references: finding.references
+            }
+        }));
+    }
 
-        // Compare based on multiple criteria
-        const currentScore = 
-            current.metrics.coverage * 0.4 +
-            current.metrics.successRate * 0.3 +
-            (current.vulnerabilities.length > 0 ? 0.3 : 0);
+    private mapFindingToVulnerabilityType(findingType: string): VulnerabilityType {
+        switch (findingType.toUpperCase()) {
+            case 'REENTRANCY': return VulnerabilityType.Reentrancy;
+            case 'ARITHMETIC_OVERFLOW': return VulnerabilityType.ArithmeticOverflow;
+            case 'ACCESS_CONTROL': return VulnerabilityType.AccessControl;
+            case 'PDA_SAFETY': return VulnerabilityType.PdaSafety;
+            case 'CPI_SAFETY': return VulnerabilityType.CpiSafety;
+            default: return VulnerabilityType.None;
+        }
+    }
 
-        const bestScore = 
-            best.metrics.coverage * 0.4 +
-            best.metrics.successRate * 0.3 +
-            (best.vulnerabilities.length > 0 ? 0.3 : 0);
+    private mapSeverityLevel(severity: string): SecurityLevel {
+        switch (severity.toUpperCase()) {
+            case 'CRITICAL': return 'CRITICAL';
+            case 'HIGH': return 'HIGH';
+            case 'MEDIUM': return 'MEDIUM';
+            default: return 'LOW';
+        }
+    }
 
-        return currentScore > bestScore;
+    private getRecommendation(type: VulnerabilityType): string {
+        switch (type) {
+            case VulnerabilityType.Reentrancy:
+                return 'Implement checks-effects-interactions pattern and use reentrancy guards';
+            case VulnerabilityType.ArithmeticOverflow:
+                return 'Use checked math operations and implement value range validation';
+            case VulnerabilityType.AccessControl:
+                return 'Implement proper authorization checks and role-based access control';
+            case VulnerabilityType.PdaSafety:
+                return 'Validate PDA derivation and verify ownership';
+            case VulnerabilityType.CpiSafety:
+                return 'Validate CPI target programs and verify account permissions';
+            default:
+                return 'Review code for potential security issues and consider a security audit';
+        }
+    }
+
+    private calculateSecurityScore(result: FuzzResult): number {
+        const baseScore = 100;
+        const vulnerabilityPenalty = result.vulnerabilities.length * 10;
+        const coveragePenalty = (1 - result.metrics.coverage) * 20;
+        return Math.max(0, baseScore - vulnerabilityPenalty - coveragePenalty);
+    }
+
+    private calculateRiskLevel(result: FuzzResult): SecurityLevel {
+        const score = this.calculateSecurityScore(result);
+        if (score >= 90) return 'LOW';
+        if (score >= 70) return 'MEDIUM';
+        if (score >= 50) return 'HIGH';
+        return 'CRITICAL';
     }
 }

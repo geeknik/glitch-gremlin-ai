@@ -1,5 +1,6 @@
 import { Tensor } from '@tensorflow/tfjs-node';
 import { PublicKey } from '@solana/web3.js';
+import { SecurityLevel, VulnerabilityType, MutationType } from '../types.js';
 
 export interface TimeSeriesMetric {
   type: MetricType;
@@ -134,41 +135,41 @@ export interface AnomalyResult {
   zScores: Record<keyof SolanaWeights, number>;
 }
 
-export enum VulnerabilityType {
-    None = 'None',
-    ArithmeticOverflow = 'ArithmeticOverflow',
-    AccessControl = 'AccessControl', 
-    DataValidation = 'DataValidation',
-    Reentrancy = 'Reentrancy',
-    AccountConfusion = 'AccountConfusion',
-    SignerAuthorization = 'SignerAuthorization',
-    ClockManipulation = 'ClockManipulation',
-    LamportDrain = 'LamportDrain',
-    InstructionInjection = 'InstructionInjection',
-    RaceCondition = 'RaceCondition',
-    PdaValidation = 'PdaValidation',
-    PdaSafety = 'PdaSafety',
-    CpiSafety = 'CpiSafety',
-    AuthorityCheck = 'AuthorityCheck'
+export interface FuzzingMutation {
+    type: MutationType;
+    target: string;
+    payload: string | number | boolean | null | Buffer | PublicKey | Record<string, any>;
+    securityImpact: SecurityLevel;
+    description: string;
+    expectedVulnerability?: VulnerabilityType;
+    metadata?: {
+        instruction?: string;
+        expectedValue?: string | number;
+        actualValue?: string | number;
+        custom?: boolean;
+        timestamp?: number;
+    };
 }
-
-export type SecurityLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
 export interface VulnerabilityAnalysis {
     type: VulnerabilityType;
-    severity: SecurityLevel;
     confidence: number;
+    severity: SecurityLevel;
+    description: string;
+    evidence: string[];
+    metadata?: Record<string, any>;
     location?: {
-        file?: string;
-        line?: number;
+        file: string;
+        startLine: number;
+        endLine: number;
         function?: string;
     };
-    description: string;
-    recommendation?: string;
-    evidence?: {
-        code?: string;
-        logs?: string[];
-        transactions?: string[];
+    details?: {
+        impact: string;
+        likelihood: string;
+        exploitScenario?: string;
+        recommendation: string;
+        references?: string[];
     };
 }
 
