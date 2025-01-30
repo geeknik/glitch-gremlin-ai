@@ -76,7 +76,7 @@ export class Fuzzer {
                 coverage: result.metrics.coverage,
                 vulnerabilitiesFound: result.vulnerabilities.map(v => v.type),
                 securityScore: this.calculateSecurityScore(result),
-                riskLevel: this.calculateRiskLevel(result),
+                riskLevel: this.calculateRiskLevel(result.metrics.successRate),
                 averageExecutionTime: result.metrics.executionTime / result.metrics.totalExecutions,
                 peakMemoryUsage: 0, // To be implemented
                 cpuUtilization: 0, // To be implemented
@@ -167,12 +167,12 @@ export class Fuzzer {
         }
     }
 
-    private mapSeverityLevel(severity: string): SecurityLevel {
+    private mapSeverityToSecurityLevel(severity: string): SecurityLevel {
         switch (severity.toUpperCase()) {
-            case 'CRITICAL': return 'CRITICAL';
-            case 'HIGH': return 'HIGH';
-            case 'MEDIUM': return 'MEDIUM';
-            default: return 'LOW';
+            case 'CRITICAL': return SecurityLevel.CRITICAL;
+            case 'HIGH': return SecurityLevel.HIGH;
+            case 'MEDIUM': return SecurityLevel.MEDIUM;
+            default: return SecurityLevel.LOW;
         }
     }
 
@@ -200,11 +200,10 @@ export class Fuzzer {
         return Math.max(0, baseScore - vulnerabilityPenalty - coveragePenalty);
     }
 
-    private calculateRiskLevel(result: FuzzResult): SecurityLevel {
-        const score = this.calculateSecurityScore(result);
-        if (score >= 90) return 'LOW';
-        if (score >= 70) return 'MEDIUM';
-        if (score >= 50) return 'HIGH';
-        return 'CRITICAL';
+    private calculateRiskLevel(score: number): SecurityLevel {
+        if (score >= 90) return SecurityLevel.LOW;
+        if (score >= 70) return SecurityLevel.MEDIUM;
+        if (score >= 50) return SecurityLevel.HIGH;
+        return SecurityLevel.CRITICAL;
     }
 }

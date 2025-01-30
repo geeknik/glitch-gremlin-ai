@@ -2,6 +2,8 @@ import { Tensor } from '@tensorflow/tfjs-node';
 import { PublicKey } from '@solana/web3.js';
 import { SecurityLevel, VulnerabilityType, MutationType } from '../types.js';
 
+export { SecurityLevel, VulnerabilityType, MutationType };
+
 export interface TimeSeriesMetric {
   type: MetricType;
   name: string;
@@ -298,5 +300,3 @@ export interface VulnerabilityReport {
     recommendations: string[];
     timestamp: number;
 }
-
-export type { SecurityLevel, VulnerabilityType } from '../types.js';

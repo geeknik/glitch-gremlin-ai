@@ -13,7 +13,7 @@ export class MutationGenerator {
             {
                 name: 'Similar Account',
                 input: { similar: true },
-                expectedError: VulnerabilityType.AccountConfusion
+                expectedError: VulnerabilityType.AccountValidation
             }
         ];
     }
@@ -53,9 +53,9 @@ export class MutationGenerator {
             type: MutationType.PDA,
             target: 'pda_validation',
             payload: generateRandomBytes(32).toString('hex'),
-            securityImpact: 'HIGH' as SecurityLevel,
+            securityImpact: SecurityLevel.HIGH,
             description: 'Testing for PDA validation vulnerabilities',
-            expectedVulnerability: VulnerabilityType.PdaSafety
+            expectedVulnerability: VulnerabilityType.PDASafety
         };
     }
 
@@ -64,9 +64,9 @@ export class MutationGenerator {
             type: MutationType.TypeCosplay,
             target: 'account_validation',
             payload: generateRandomBytes(32),
-            securityImpact: 'HIGH',
+            securityImpact: SecurityLevel.HIGH,
             description: 'Testing account confusion',
-            expectedVulnerability: VulnerabilityType.AccountConfusion
+            expectedVulnerability: VulnerabilityType.AccountValidation
         };
     }
 
@@ -75,7 +75,7 @@ export class MutationGenerator {
             type: MutationType.AccessControl,
             target: 'authority_check',
             payload: generateRandomBytes(32),
-            securityImpact: 'HIGH',
+            securityImpact: SecurityLevel.HIGH,
             description: 'Testing access control',
             expectedVulnerability: VulnerabilityType.AccessControl
         };
@@ -86,9 +86,9 @@ export class MutationGenerator {
             type: MutationType.SignerValidation,
             target: 'signer_check',
             payload: generateRandomBytes(32),
-            securityImpact: 'HIGH',
+            securityImpact: SecurityLevel.HIGH,
             description: 'Testing signer validation',
-            expectedVulnerability: VulnerabilityType.AccessControl
+            expectedVulnerability: VulnerabilityType.SignerAuthorization
         };
     }
 
@@ -97,7 +97,7 @@ export class MutationGenerator {
             type: MutationType.Arithmetic,
             target: 'arithmetic_operation',
             payload: generateRandomU64().toString(),
-            securityImpact: 'HIGH',
+            securityImpact: SecurityLevel.HIGH,
             description: 'Testing arithmetic overflow',
             expectedVulnerability: VulnerabilityType.ArithmeticOverflow
         };
@@ -108,7 +108,7 @@ export class MutationGenerator {
             type: MutationType.Arithmetic,
             target: 'arithmetic_operation',
             payload: '0',
-            securityImpact: 'HIGH',
+            securityImpact: SecurityLevel.HIGH,
             description: 'Testing arithmetic underflow',
             expectedVulnerability: VulnerabilityType.ArithmeticOverflow
         };
@@ -119,7 +119,7 @@ export class MutationGenerator {
             type: MutationType.DataValidation,
             target: 'random_mutation',
             payload: generateRandomBytes(32).toString('hex'),
-            securityImpact: 'MEDIUM' as SecurityLevel,
+            securityImpact: SecurityLevel.MEDIUM,
             description: 'Random data validation test'
         };
     }

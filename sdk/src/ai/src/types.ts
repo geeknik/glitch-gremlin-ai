@@ -1,5 +1,5 @@
 import { LayersModel } from '@tensorflow/tfjs';
-import { VulnerabilityType as BaseVulnerabilityType } from '../../types.js';
+import { VulnerabilityType as BaseVulnerabilityType, SecurityLevel } from '../../types.js';
 
 // Core types for Solana security fuzzing and analysis
 
@@ -467,4 +467,25 @@ export interface FuzzingStrategy {
     generateMutations(scenario: FuzzingScenario): FuzzingMutation[];
     evaluateMutation(mutation: FuzzingMutation): Promise<boolean>;
     optimizeMutation(mutation: FuzzingMutation, result: boolean): FuzzingMutation;
+}
+
+export interface VulnerabilityInfo {
+    type: string;
+    severity: SecurityLevel;
+    confidence: number;
+    description: string;
+    evidence: string[];
+    metadata?: Record<string, any>;
+    location?: {
+        file: string;
+        startLine: number;
+        endLine: number;
+        function?: string;
+    };
+    details?: {
+        impact: string;
+        likelihood: string;
+        recommendation: string;
+    };
+    references?: string[];
 }

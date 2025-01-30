@@ -1293,8 +1293,14 @@ export class GlitchSDK implements IGovernanceManager {
 
     private async checkRedisConnection(): Promise<boolean> {
         const client = this.redis;
+        if (!client) return false;
+        
         if (client.status !== 'ready') {
-            await client.connect();
+            try {
+                await client.connect();
+            } catch (error) {
+                return false;
+            }
         }
         return client.status === 'ready';
     }

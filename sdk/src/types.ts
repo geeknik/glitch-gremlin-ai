@@ -15,42 +15,23 @@ export enum TestType {
 }
 
 export enum SecurityLevel {
-    LOW = 'LOW',
-    MEDIUM = 'MEDIUM',
+    CRITICAL = 'CRITICAL',
     HIGH = 'HIGH',
-    CRITICAL = 'CRITICAL'
+    MEDIUM = 'MEDIUM',
+    LOW = 'LOW'
 }
 
 export enum VulnerabilityType {
+    Reentrancy = 'REENTRANCY',
+    AccessControl = 'ACCESS_CONTROL',
+    ArithmeticOverflow = 'ARITHMETIC_OVERFLOW',
     PDASafety = 'PDA_SAFETY',
     CPISafety = 'CPI_SAFETY',
-    ArithmeticOverflow = 'ARITHMETIC_OVERFLOW',
-    Reentrancy = 'REENTRANCY',
-    None = 'NONE',
-    AccessControl = 'AccessControl',
-    PdaSafety = 'PdaSafety',
-    CpiSafety = 'CpiSafety',
-    SignerAuthorization = 'SignerAuthorization',
-    AuthorityCheck = 'AuthorityCheck',
-    DataValidation = 'DataValidation',
-    AccountValidation = 'AccountValidation',
-    CPIValidation = 'CPIValidation',
-    AuthorityValidation = 'AuthorityValidation',
-    SignerValidation = 'SignerValidation',
-    PDAValidation = 'PDAValidation',
-    AccountConfusion = 'AccountConfusion',
-    ClockManipulation = 'ClockManipulation',
-    StateConsistency = 'StateConsistency',
-    LamportDrain = 'LamportDrain',
-    InstructionInjection = 'InstructionInjection',
-    RaceCondition = 'RaceCondition',
-    ComputeBudget = 'ComputeBudget',
-    TokenValidation = 'TokenValidation',
-    TimelockBypass = 'TimelockBypass',
-    QuorumManipulation = 'QuorumManipulation',
-    DelegateAbuse = 'DelegateAbuse',
-    TreasuryDrain = 'TreasuryDrain',
-    Custom = 'Custom'
+    SignerAuthorization = 'SIGNER_AUTHORIZATION',
+    AuthorityCheck = 'AUTHORITY_CHECK',
+    DataValidation = 'DATA_VALIDATION',
+    AccountValidation = 'ACCOUNT_VALIDATION',
+    None = 'NONE'
 }
 
 export interface VulnerabilityInfo {

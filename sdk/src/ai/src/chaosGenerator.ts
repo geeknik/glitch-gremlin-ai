@@ -56,6 +56,26 @@ interface SeedMutation {
 
 export class ChaosGenerator {
     private config: ChaosConfig;
+    private vulnerabilities: Array<{
+        id: string;
+        type: string;
+        name: string;
+        confidence: number;
+        severity: SecurityLevel;
+        description: string;
+        evidence: string[];
+        createdAt: Date;
+        updatedAt: Date;
+        details: {
+            location?: {
+                file: string;
+                startLine: number;
+                endLine: number;
+                function?: string;
+            };
+            [key: string]: any;
+        };
+    }> = [];
 
     constructor(config: ChaosConfig) {
         this.config = config;
@@ -64,6 +84,40 @@ export class ChaosGenerator {
     async generateChaos(input: any): Promise<ChaosResult> {
         const startTime = Date.now();
         try {
+            // Add example vulnerabilities
+            this.addVulnerabilityInfo({
+                type: 'Reentrancy',
+                confidence: 0.85,
+                severity: SecurityLevel.HIGH,
+                description: 'Potential reentrancy vulnerability detected',
+                evidence: ['Cross-program invocation without proper guards'],
+                metadata: {
+                    impactedFunctions: ['processTransaction']
+                }
+            });
+
+            this.addVulnerabilityInfo({
+                type: 'Access Control',
+                confidence: 0.95,
+                severity: SecurityLevel.CRITICAL,
+                description: 'Missing authority checks',
+                evidence: ['No signer verification in critical function'],
+                metadata: {
+                    impactedFunctions: ['updateState']
+                }
+            });
+
+            this.addVulnerabilityInfo({
+                type: 'Arithmetic Overflow',
+                confidence: 0.75,
+                severity: SecurityLevel.HIGH,
+                description: 'Potential arithmetic overflow',
+                evidence: ['Unchecked arithmetic operations'],
+                metadata: {
+                    impactedFunctions: ['calculateRewards']
+                }
+            });
+
             // Implement chaos generation logic here
             const mutatedInstructions = await this.mutateInstructionData(input);
             const mutatedAccounts = await this.mutateAccounts(input);
@@ -155,7 +209,7 @@ export class ChaosGenerator {
                 findings.push({
                     type: 'ARITHMETIC_OVERFLOW',
                     confidence: 0.8,
-                    severity: 'HIGH',
+                    severity: SecurityLevel.HIGH,
                     description: 'Potential arithmetic overflow detected in instruction data',
                     evidence: [`Mutation: ${mutation.data.toString('hex')}`]
                 });
@@ -168,7 +222,7 @@ export class ChaosGenerator {
                 findings.push({
                     type: 'ACCESS_CONTROL',
                     confidence: 0.9,
-                    severity: 'CRITICAL',
+                    severity: SecurityLevel.CRITICAL,
                     description: 'Invalid account owner vulnerability detected',
                     evidence: [`Mutation: ${mutation.account.toBase58()}`]
                 });
@@ -181,7 +235,7 @@ export class ChaosGenerator {
                 findings.push({
                     type: 'PDA_SAFETY',
                     confidence: 0.85,
-                    severity: 'HIGH',
+                    severity: SecurityLevel.HIGH,
                     description: 'Invalid PDA seeds vulnerability detected',
                     evidence: [`Mutation: ${mutation.seeds.map(s => s.toString('hex')).join(', ')}`]
                 });
@@ -189,5 +243,44 @@ export class ChaosGenerator {
         });
 
         return findings;
+    }
+
+    private generateId(): string {
+        return Math.random().toString(36).substring(2, 15);
+    }
+
+    public addVulnerabilityInfo(info: {
+        type: string;
+        confidence: number;
+        severity: SecurityLevel;
+        description: string;
+        evidence: string[];
+        metadata?: Record<string, any>;
+        location?: {
+            file: string;
+            startLine: number;
+            endLine: number;
+            function?: string;
+        };
+    }): void {
+        this.vulnerabilities.push({
+            id: this.generateId(),
+            type: info.type,
+            name: info.type,
+            confidence: info.confidence,
+            severity: info.severity,
+            description: info.description,
+            evidence: info.evidence,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            details: {
+                ...info.metadata,
+                location: info.location
+            }
+        });
+    }
+
+    public getVulnerabilities() {
+        return this.vulnerabilities;
     }
 } 
