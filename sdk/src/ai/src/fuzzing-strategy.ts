@@ -9,18 +9,18 @@ interface FuzzingConfig {
     securityLevel: number;
 }
 
-export interface FuzzingStrategy {
+export interface IFuzzingStrategy {
     generateMutation(type: MutationType): FuzzingMutation;
-    generateArithmeticMutations(): FuzzingMutation[];
-    generateAccessControlMutations(): FuzzingMutation[];
-    generateReentrancyMutations(): FuzzingMutation[];
-    generatePDAMutations(): FuzzingMutation[];
-    generateConcurrencyMutations(): FuzzingMutation[];
-    generateDataValidationMutations(): FuzzingMutation[];
-    generateCustomMutation(type: MutationType, target: string, value: unknown): FuzzingMutation;
+    generateArithmeticMutation(): FuzzingMutation;
+    generateAccessControlMutation(): FuzzingMutation;
+    generateReentrancyMutation(): FuzzingMutation;
+    generatePDAMutation(): FuzzingMutation;
+    generateConcurrencyMutation(): FuzzingMutation;
+    generateDataValidationMutation(): FuzzingMutation;
+    generateCustomMutation(): FuzzingMutation;
 }
 
-export class SolanaFuzzingStrategy implements FuzzingStrategy {
+export class SolanaFuzzingStrategy implements IFuzzingStrategy {
     private config: FuzzingConfig;
     private mutationRate: number;
     private securityLevel: number;
@@ -34,278 +34,105 @@ export class SolanaFuzzingStrategy implements FuzzingStrategy {
     public generateMutation(type: MutationType): FuzzingMutation {
         switch (type) {
             case MutationType.Arithmetic:
-                return this.generateArithmeticExploit();
+                return this.generateArithmeticMutation();
             case MutationType.AccessControl:
-                return this.generateAccessControlExploit();
+                return this.generateAccessControlMutation();
             case MutationType.Reentrancy:
-                return this.generateReentrancyExploit();
+                return this.generateReentrancyMutation();
             case MutationType.PDA:
-                return this.generatePDAExploit();
+                return this.generatePDAMutation();
             case MutationType.Concurrency:
-                return this.generateConcurrencyExploit();
+                return this.generateConcurrencyMutation();
             case MutationType.DataValidation:
-                return this.generateDataValidationExploit();
+                return this.generateDataValidationMutation();
             case MutationType.Custom:
-                return this.generateCustomExploit();
+                return this.generateCustomMutation();
             default:
                 throw new Error(`Unsupported mutation type: ${type}`);
         }
     }
 
-    private generateArithmeticExploit(): FuzzingMutation {
+    public generateArithmeticMutation(): FuzzingMutation {
         return {
             type: MutationType.Arithmetic,
-            payload: generateRandomU64(),
             target: 'arithmetic_operation',
+            payload: generateRandomU64().toString(),
             securityImpact: 'HIGH',
-            description: 'Arithmetic overflow/underflow exploitation attempt',
-            expectedVulnerability: VulnerabilityType.ArithmeticOverflow,
-            metadata: {
-                instruction: 'token_transfer',
-                expectedValue: '0',
-                actualValue: 'MAX_U64'
-            }
+            description: 'Testing for arithmetic overflow/underflow vulnerabilities'
         };
     }
 
-    private generateAccessControlExploit(): FuzzingMutation {
+    public generateAccessControlMutation(): FuzzingMutation {
+        const unauthorizedKey = new PublicKey(generateRandomBytes(32));
         return {
             type: MutationType.AccessControl,
-            payload: new PublicKey(generateRandomBytes(32)),
             target: 'authority_check',
+            payload: unauthorizedKey.toBase58(),
             securityImpact: 'HIGH',
-            description: 'Authority bypass attempt',
-            expectedVulnerability: VulnerabilityType.AccessControl,
-            metadata: {
-                instruction: 'authority_check',
-                expectedValue: 'authorized_signer',
-                actualValue: 'unauthorized_signer'
-            }
+            description: 'Testing for access control vulnerabilities'
         };
     }
 
-    private generateReentrancyExploit(): FuzzingMutation {
+    public generateReentrancyMutation(): FuzzingMutation {
         return {
             type: MutationType.Reentrancy,
+            target: 'cross_program_invocation',
             payload: {
                 instructions: [
-                    { index: 0, repeat: 2 },
-                    { index: 1, repeat: 1 }
+                    { index: 0, repeat: 2 }
                 ]
             },
-            target: 'cross_program_invocation',
             securityImpact: 'CRITICAL',
-            description: 'Reentrancy attack simulation',
-            expectedVulnerability: VulnerabilityType.Reentrancy,
-            metadata: {
-                instruction: 'recursive_cpi',
-                expectedValue: 'single_execution',
-                actualValue: 'multiple_execution'
-            }
+            description: 'Testing for reentrancy vulnerabilities'
         };
     }
 
-    private generatePDAExploit(): FuzzingMutation {
+    public generatePDAMutation(): FuzzingMutation {
         return {
             type: MutationType.PDA,
-            payload: generateRandomBytes(32),
-            target: 'pda_derivation',
+            target: 'pda_validation',
+            payload: generateRandomBytes(32).toString('hex'),
             securityImpact: 'HIGH',
-            description: 'PDA validation bypass attempt',
-            expectedVulnerability: VulnerabilityType.PDASafety,
-            metadata: {
-                instruction: 'pda_validation',
-                expectedValue: 'valid_pda',
-                actualValue: 'invalid_pda'
-            }
+            description: 'Testing for PDA validation vulnerabilities'
         };
     }
 
-    private generateConcurrencyExploit(): FuzzingMutation {
+    public generateConcurrencyMutation(): FuzzingMutation {
         return {
             type: MutationType.Concurrency,
+            target: 'concurrent_operation',
             payload: {
-                threadCount: Math.floor(Math.random() * 10) + 2,
+                threadCount: 5,
                 operations: ['read', 'write', 'modify']
             },
-            target: 'state_management',
             securityImpact: 'HIGH',
-            description: 'Race condition exploitation attempt',
-            expectedVulnerability: VulnerabilityType.RaceCondition,
-            metadata: {
-                instruction: 'concurrent_access',
-                expectedValue: 'sequential',
-                actualValue: 'parallel'
-            }
+            description: 'Testing for concurrency vulnerabilities'
         };
     }
 
-    private generateDataValidationExploit(): FuzzingMutation {
+    public generateDataValidationMutation(): FuzzingMutation {
         return {
             type: MutationType.DataValidation,
-            payload: Buffer.from('invalid_data_format'),
-            target: 'data_validation',
+            target: 'input_validation',
+            payload: {
+                invalidData: generateRandomBytes(16).toString('hex'),
+                expectedFormat: 'hex'
+            },
             securityImpact: 'MEDIUM',
-            description: 'Data validation bypass attempt',
-            expectedVulnerability: VulnerabilityType.DataValidation,
-            metadata: {
-                instruction: 'data_validation',
-                expectedValue: 'valid_format',
-                actualValue: 'invalid_format'
-            }
+            description: 'Testing for data validation vulnerabilities'
         };
     }
 
-    private generateCustomExploit(): FuzzingMutation {
+    public generateCustomMutation(): FuzzingMutation {
         return {
             type: MutationType.Custom,
-            payload: generateRandomBytes(64),
-            target: 'custom_target',
+            target: 'custom_operation',
+            payload: {
+                customData: generateRandomBytes(32).toString('hex'),
+                operation: 'custom_test'
+            },
             securityImpact: 'MEDIUM',
-            description: 'Custom security test',
-            expectedVulnerability: VulnerabilityType.Custom,
-            metadata: {
-                instruction: 'custom_test',
-                custom: true,
-                timestamp: Date.now()
-            }
-        };
-    }
-
-    public generateArithmeticMutations(): FuzzingMutation[] {
-        return [
-            this.generateArithmeticExploit(),
-            {
-                type: MutationType.Arithmetic,
-                payload: Buffer.from([0x00, 0x00, 0x00, 0x00]),
-                target: 'division',
-                securityImpact: 'HIGH',
-                description: 'Division by zero attempt',
-                expectedVulnerability: VulnerabilityType.ArithmeticOverflow,
-                metadata: {
-                    instruction: 'division',
-                    expectedValue: 'non_zero_denominator',
-                    actualValue: 'zero_denominator'
-                }
-            }
-        ];
-    }
-
-    public generateAccessControlMutations(): FuzzingMutation[] {
-        return [
-            this.generateAccessControlExploit(),
-            {
-                type: MutationType.AccessControl,
-                payload: new PublicKey(generateRandomBytes(32)),
-                target: 'signer_validation',
-                securityImpact: 'CRITICAL',
-                description: 'Signer validation bypass attempt',
-                expectedVulnerability: VulnerabilityType.SignerAuthorization,
-                metadata: {
-                    instruction: 'signer_check',
-                    expectedValue: 'required_signer',
-                    actualValue: 'missing_signer'
-                }
-            }
-        ];
-    }
-
-    public generateReentrancyMutations(): FuzzingMutation[] {
-        return [
-            this.generateReentrancyExploit(),
-            {
-                type: MutationType.Reentrancy,
-                payload: {
-                    depth: 3,
-                    pattern: 'nested'
-                },
-                target: 'nested_cpi',
-                securityImpact: 'CRITICAL',
-                description: 'Nested reentrancy attack simulation',
-                expectedVulnerability: VulnerabilityType.Reentrancy,
-                metadata: {
-                    instruction: 'nested_cpi',
-                    expectedValue: 'single_level',
-                    actualValue: 'multi_level'
-                }
-            }
-        ];
-    }
-
-    public generatePDAMutations(): FuzzingMutation[] {
-        return [
-            this.generatePDAExploit(),
-            {
-                type: MutationType.PDA,
-                payload: {
-                    seeds: ['invalid', 'seed', 'combination'],
-                    bump: 255
-                },
-                target: 'pda_ownership',
-                securityImpact: 'HIGH',
-                description: 'PDA ownership validation bypass attempt',
-                expectedVulnerability: VulnerabilityType.PDASafety,
-                metadata: {
-                    instruction: 'pda_ownership',
-                    expectedValue: 'valid_owner',
-                    actualValue: 'invalid_owner'
-                }
-            }
-        ];
-    }
-
-    public generateConcurrencyMutations(): FuzzingMutation[] {
-        return [
-            this.generateConcurrencyExploit(),
-            {
-                type: MutationType.Concurrency,
-                payload: {
-                    operations: ['deposit', 'withdraw'],
-                    timing: 'simultaneous'
-                },
-                target: 'account_balance',
-                securityImpact: 'HIGH',
-                description: 'Account balance race condition attempt',
-                expectedVulnerability: VulnerabilityType.RaceCondition,
-                metadata: {
-                    instruction: 'balance_update',
-                    expectedValue: 'atomic_operation',
-                    actualValue: 'race_condition'
-                }
-            }
-        ];
-    }
-
-    public generateDataValidationMutations(): FuzzingMutation[] {
-        return [
-            this.generateDataValidationExploit(),
-            {
-                type: MutationType.DataValidation,
-                payload: Buffer.from('malformed_instruction_data'),
-                target: 'instruction_validation',
-                securityImpact: 'HIGH',
-                description: 'Instruction data validation bypass attempt',
-                expectedVulnerability: VulnerabilityType.DataValidation,
-                metadata: {
-                    instruction: 'instruction_validation',
-                    expectedValue: 'valid_instruction',
-                    actualValue: 'malformed_instruction'
-                }
-            }
-        ];
-    }
-
-    public generateCustomMutation(type: MutationType, target: string, value: unknown): FuzzingMutation {
-        return {
-            type,
-            payload: value,
-            target,
-            securityImpact: 'MEDIUM',
-            description: 'Custom mutation test',
-            metadata: {
-                custom: true,
-                timestamp: Date.now()
-            }
+            description: 'Testing with custom mutation pattern'
         };
     }
 } 
