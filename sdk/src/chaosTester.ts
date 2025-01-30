@@ -18,17 +18,20 @@ import {
     SecurityLevel,
     VulnerabilityType,
     VulnerabilityInfo,
-    SecurityContext,
+    SecurityContext as ISecurityContext,
     ErrorCode,
     ValidationResult,
     ErrorDetails,
     ErrorObject,
     ErrorLike,
-    ErrorMetadata
+    ErrorMetadata,
+    ErrorDetailsInput
 } from './types.js';
 import { GlitchError } from './errors.js';
 import Redis from 'ioredis';
 import { createError } from './errors.js';
+import { v4 as uuidv4 } from 'uuid';
+import type { ErrorDetailsInput as ImportedErrorDetailsInput } from './types.js';
 
 interface MutationMetadata {
     instruction?: string;
@@ -38,6 +41,117 @@ interface MutationMetadata {
     timestamp?: number;
     computeUnits?: number;
     memoryUsage?: number;
+}
+
+interface TestResult {
+    success: boolean;
+    error?: string;
+    metrics?: {
+        executionTime: number;
+        memoryUsage: number;
+        cpuUsage: number;
+    };
+}
+
+interface StackTrace {
+    file: string;
+    line: number;
+    function: string;
+}
+
+interface SecurityContextValidations {
+    ownerChecked: boolean;
+    signerChecked: boolean;
+    accountDataMatched: boolean;
+    pdaVerified: boolean;
+    bumpsMatched: boolean;
+}
+
+interface LocalSecurityContext {
+    environment: 'mainnet' | 'testnet';
+    computeUnits: number;
+    memoryUsage: number;
+    slot: number;
+    blockTime: number;
+    authority: string;
+    signers: string[];
+    programAuthority: string;
+    upgradeable: boolean;
+    validations: SecurityContextValidations;
+    securityLevel: SecurityLevel;
+    maxRetries: number;
+    timeoutMs: number;
+    rateLimit: number;
+    maxTransactions: number;
+    maxInstructions: number;
+    sandboxed: boolean;
+    resourceLimits: {
+        maxMemoryMb: number;
+        maxCpuTimeMs: number;
+        maxNetworkCalls: number;
+        maxInstructions: number;
+    };
+}
+
+interface SerializedPayload {
+    type: 'string' | 'number' | 'boolean' | 'null' | 'buffer';
+    value: string | number | boolean | null;
+}
+
+interface MutationContext {
+    type: MutationType;
+    target: string;
+    payload: string | number | boolean | null;
+}
+
+interface ErrorMetadataContext {
+    programId?: string;
+    instruction?: string;
+    accounts?: string[];
+    value?: any;
+    payload?: any;
+    error?: string;
+    mutation?: {
+        type: MutationType;
+        target: string;
+        payload: any;
+    };
+    securityContext?: LocalSecurityContext;
+}
+
+interface ErrorMetadataInput {
+    programId: string;
+    instruction: string;
+    accounts: string[];
+    value: string | number | boolean | null;
+    payload: string | number | boolean | null;
+    error: string;
+    mutation: MutationContext;
+    securityContext: LocalSecurityContext;
+}
+
+interface ErrorDetailsInput {
+    metadata: ErrorMetadataInput;
+    source: {
+        file: string;
+        line: number;
+        function: string;
+    };
+}
+
+interface ErrorMetadata {
+    programId: string;
+    instruction: string;
+    accounts: string[];
+    value: any;
+    payload: any;
+    error: string;
+    mutation?: {
+        type: MutationType;
+        target: string;
+        payload: any;
+    };
+    securityContext: LocalSecurityContext;
 }
 
 export class ChaosTester {
@@ -54,14 +168,14 @@ export class ChaosTester {
         errorRate: 0,
         coverage: 0,
         vulnerabilitiesFound: [],
-        securityScore: 100,
-        riskLevel: 'low',
+        securityScore: 0,
+        riskLevel: SecurityLevel.LOW,
         averageExecutionTime: 0,
         peakMemoryUsage: 0,
-        cpuUsage: 0,
-        networkUsage: 0,
-        anomalyScore: 0,
-        falsePositiveRate: 0
+        cpuUtilization: 0,
+        uniquePaths: 0,
+        edgeCoverage: 0,
+        mutationEfficiency: 0
     };
 
     constructor(config: ChaosTesterConfig) {
@@ -92,7 +206,7 @@ export class ChaosTester {
             coverage: 0,
             vulnerabilitiesFound: [],
             securityScore: 0,
-            riskLevel: 'LOW',
+            riskLevel: SecurityLevel.LOW,
             averageExecutionTime: 0,
             peakMemoryUsage: 0,
             cpuUtilization: 0,
@@ -100,6 +214,33 @@ export class ChaosTester {
             edgeCoverage: 0,
             mutationEfficiency: 0
         };
+    }
+
+    private updateMetrics(result: TestResult): void {
+        const metrics = this.metrics;
+        metrics.totalExecutions++;
+        
+        if (result.success) {
+            metrics.successfulExecutions++;
+        } else {
+            metrics.failedExecutions++;
+        }
+        
+        metrics.errorRate = metrics.failedExecutions / metrics.totalExecutions;
+        metrics.riskLevel = this.calculateRiskLevel(metrics.errorRate);
+        metrics.securityScore = this.calculateSecurityScore(metrics);
+    }
+
+    private calculateRiskLevel(errorRate: number): SecurityLevel {
+        if (errorRate >= 0.8) {
+            return SecurityLevel.CRITICAL;
+        } else if (errorRate >= 0.6) {
+            return SecurityLevel.HIGH;
+        } else if (errorRate >= 0.4) {
+            return SecurityLevel.MEDIUM;
+        } else {
+            return SecurityLevel.LOW;
+        }
     }
 
     private async executeTestTransaction(
@@ -127,131 +268,304 @@ export class ChaosTester {
         return 'Unknown error occurred during program execution';
     }
 
-    private createErrorDetails(code: ErrorCode, message: string, metadata: ErrorMetadata): ErrorDetails {
+    private createErrorDetails(code: ErrorCode, message: string, metadata: ErrorMetadataContext): ErrorDetails {
+        const error = new Error(message);
+        const errorContext = this.createErrorMetadataContext(error, metadata);
         return {
             code,
             message,
-            metadata,
+            metadata: errorContext.metadata,
             timestamp: Date.now(),
-            stackTrace: new Error().stack || '',
-            source: {
-                file: 'chaosGenerator.ts',
-                line: 0,
-                function: 'unknown'
+            stackTrace: error.stack || '',
+            source: errorContext.source
+        };
+    }
+
+    private isBuffer(value: any): value is Buffer {
+        return Buffer.isBuffer(value);
+    }
+
+    private serializeBuffer(buffer: Buffer): string {
+        return buffer.toString('hex');
+    }
+
+    private serializePayload(value: any): string | number | boolean | null {
+        if (value === null || value === undefined) {
+            return null;
+        }
+        if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+            return value;
+        }
+        if (Buffer.isBuffer(value)) {
+            return value.toString('hex');
+        }
+        try {
+            return JSON.stringify(value);
+        } catch {
+            return null;
+        }
+    }
+
+    private createSecurityContext(environment: 'mainnet' | 'testnet'): LocalSecurityContext {
+        return {
+            environment,
+            computeUnits: 0,
+            memoryUsage: 0,
+            slot: 0,
+            blockTime: 0,
+            authority: '',
+            signers: [],
+            programAuthority: '',
+            upgradeable: false,
+            validations: {
+                ownerChecked: false,
+                signerChecked: false,
+                accountDataMatched: false,
+                pdaVerified: false,
+                bumpsMatched: false
+            },
+            securityLevel: SecurityLevel.HIGH,
+            maxRetries: 3,
+            timeoutMs: 5000,
+            rateLimit: 10,
+            maxTransactions: 100,
+            maxInstructions: 1000,
+            sandboxed: true,
+            resourceLimits: {
+                maxMemoryMb: 1024,
+                maxCpuTimeMs: 5000,
+                maxNetworkCalls: 100,
+                maxInstructions: 1000
             }
         };
     }
 
-    private serializePayload(payload: any): string | number | boolean | null {
-        if (payload instanceof Buffer) {
-            return payload.toString('hex');
-        }
-        if (payload instanceof PublicKey) {
-            return payload.toBase58();
-        }
-        if (typeof payload === 'object' && payload !== null) {
-            return JSON.stringify(payload);
-        }
-        return payload;
+    private createMutationContext(mutation: FuzzingMutation): MutationContext {
+        const payload = this.serializePayload(mutation.payload);
+        return {
+            type: mutation.type,
+            target: mutation.target,
+            payload
+        };
     }
 
-    private createErrorMetadata(instruction: string, error: string, mutation: FuzzingMutation): ErrorMetadata {
+    private createErrorMetadataContext(error: Error | string, context: ErrorMetadataContext = {}): ErrorDetailsInput {
+        const environment = this.connection.rpcEndpoint.includes('mainnet') ? 'mainnet' as const : 'testnet' as const;
+        const securityContext = this.createSecurityContext(environment);
+
+        const serializedValue = context.value ? this.serializePayload(context.value) : null;
+        const serializedPayload = context.payload ? this.serializePayload(context.payload) : null;
+        const serializedMutationPayload = context.mutation?.payload ? this.serializePayload(context.mutation.payload) : null;
+
+        const mutation: MutationContext = context.mutation ? {
+            type: context.mutation.type,
+            target: context.mutation.target,
+            payload: serializedMutationPayload
+        } : {
+            type: MutationType.DataValidation,
+            target: '',
+            payload: null
+        };
+
         return {
-            programId: this.programId.toString(),
-            instruction,
-            error,
-            accounts: [],
-            value: null,
-            payload: this.serializePayload(mutation.payload),
-            mutation: {
-                type: mutation.type,
-                target: mutation.target,
-                payload: this.serializePayload(mutation.payload)
+            metadata: {
+                programId: context.programId || this.programId.toBase58(),
+                instruction: context.instruction || '',
+                accounts: context.accounts || [],
+                value: serializedValue,
+                payload: serializedPayload,
+                error: error instanceof Error ? error.message : error,
+                mutation,
+                securityContext
             },
-            securityContext: {
-                environment: 'testnet',
-                computeUnits: 0,
-                memoryUsage: 0,
-                upgradeable: false,
-                validations: {
-                    ownerChecked: false,
-                    signerChecked: false,
-                    accountDataMatched: false,
-                    pdaVerified: false,
-                    bumpsMatched: false
-                }
+            source: {
+                file: 'chaosTester.ts',
+                line: 0,
+                function: 'createErrorMetadataContext'
             }
+        };
+    }
+
+    private createVulnerability(
+        vulnerabilityType: VulnerabilityType,
+        name: string,
+        description: string,
+        severity: SecurityLevel,
+        details: {
+            expectedValue?: string | number;
+            actualValue?: string | number;
+            location?: string;
+            impact?: string;
+            likelihood?: string;
+        }
+    ): VulnerabilityInfo {
+        const now = new Date();
+        return {
+            id: uuidv4(),
+            name,
+            description,
+            severity,
+            confidence: 0.8,
+            createdAt: now,
+            updatedAt: now,
+            evidence: [],
+            recommendation: this.getVulnerabilityRecommendation(vulnerabilityType),
+            vulnerabilityType,
+            details
         };
     }
 
     private handleMutationError(mutation: FuzzingMutation, error: Error): never {
-        const metadata = this.createErrorMetadata(
-            'executeMutation',
-            error.message,
-            mutation
-        );
-        const errorDetails = this.createErrorDetails(
-            ErrorCode.MUTATION_ERROR,
-            'Error executing mutation',
-            metadata
-        );
-        throw new GlitchError('Mutation execution failed', ErrorCode.MUTATION_ERROR, errorDetails);
-    }
+        const environment = this.connection.rpcEndpoint.includes('mainnet') ? 'mainnet' as const : 'testnet' as const;
+        const securityContext = this.createSecurityContext(environment);
+        const mutationContext = this.createMutationContext(mutation);
 
-    private createBasicErrorMetadata(instruction: string, error: string): ErrorMetadata {
-        return {
-            programId: this.programId.toString(),
-            instruction,
-            error,
-            accounts: [],
-            value: null,
-            payload: null,
-            mutation: {
-                type: '',
-                target: '',
-                payload: null
-            },
-            securityContext: {
-                environment: 'testnet',
-                computeUnits: 0,
-                memoryUsage: 0,
-                upgradeable: false,
-                validations: {
-                    ownerChecked: false,
-                    signerChecked: false,
-                    accountDataMatched: false,
-                    pdaVerified: false,
-                    bumpsMatched: false
+        throw createError(
+            ErrorCode.MUTATION_ERROR,
+            'Mutation execution failed',
+            {
+                metadata: {
+                    programId: this.programId.toBase58(),
+                    instruction: mutation.type.toString(),
+                    accounts: [],
+                    value: null,
+                    payload: null,
+                    error: error instanceof Error ? error.message : error,
+                    mutation: mutationContext,
+                    securityContext
+                },
+                source: {
+                    file: 'chaosTester.ts',
+                    line: 0,
+                    function: 'handleMutationError'
                 }
             }
-        };
+        );
     }
 
-    private handleError(error: Error, instruction: string): never {
-        const metadata = this.createBasicErrorMetadata(instruction, error.message);
-        const errorDetails = this.createErrorDetails(
-            ErrorCode.UNKNOWN_ERROR,
-            error.message,
-            metadata
+    private handleValidationError(error: Error, instruction: string): never {
+        const environment = this.connection.rpcEndpoint.includes('mainnet') ? 'mainnet' as const : 'testnet' as const;
+        const securityContext = this.createSecurityContext(environment);
+
+        throw createError(
+            ErrorCode.VALIDATION_ERROR,
+            'Validation failed',
+            {
+                metadata: {
+                    programId: this.programId.toBase58(),
+                    instruction,
+                    accounts: [],
+                    value: null,
+                    payload: null,
+                    error: error instanceof Error ? error.message : error,
+                    mutation: {
+                        type: MutationType.DataValidation.toString(),
+                        target: instruction,
+                        payload: null
+                    },
+                    securityContext
+                },
+                source: {
+                    file: 'chaosTester.ts',
+                    line: 0,
+                    function: 'handleValidationError'
+                }
+            }
         );
-        throw new GlitchError('Operation failed', ErrorCode.UNKNOWN_ERROR, errorDetails);
+    }
+
+    private handleExecutionError(error: Error, instruction: string): never {
+        const environment = this.connection.rpcEndpoint.includes('mainnet') ? 'mainnet' as const : 'testnet' as const;
+        const securityContext = this.createSecurityContext(environment);
+
+        throw createError(
+            ErrorCode.PROGRAM_EXECUTION_FAILED,
+            'Execution failed',
+            {
+                metadata: {
+                    programId: this.programId.toBase58(),
+                    instruction,
+                    accounts: [],
+                    value: null,
+                    payload: null,
+                    error: error instanceof Error ? error.message : error,
+                    mutation: {
+                        type: MutationType.DataValidation.toString(),
+                        target: instruction,
+                        payload: null
+                    },
+                    securityContext
+                },
+                source: {
+                    file: 'chaosTester.ts',
+                    line: 0,
+                    function: 'handleExecutionError'
+                }
+            }
+        );
+    }
+
+    private handleError(error: Error, instruction: string, metadata?: ErrorMetadataContext): never {
+        const environment = this.connection.rpcEndpoint.includes('mainnet') ? 'mainnet' as const : 'testnet' as const;
+        const securityContext = this.createSecurityContext(environment);
+
+        throw createError(
+            ErrorCode.UNKNOWN_ERROR,
+            'Operation failed',
+            {
+                metadata: {
+                    programId: this.programId.toBase58(),
+                    instruction,
+                    accounts: metadata?.accounts || [],
+                    value: this.serializePayload(metadata?.value),
+                    payload: this.serializePayload(metadata?.payload),
+                    error: error instanceof Error ? error.message : error,
+                    mutation: metadata?.mutation ? {
+                        type: metadata.mutation.type.toString(),
+                        target: metadata.mutation.target,
+                        payload: this.serializePayload(metadata.mutation.payload)
+                    } : undefined,
+                    securityContext
+                },
+                source: {
+                    file: 'chaosTester.ts',
+                    line: 0,
+                    function: 'handleError'
+                }
+            }
+        );
     }
 
     private async executeMutation(mutation: FuzzingMutation): Promise<boolean> {
         try {
             if (!mutation.target) {
+                const environment = this.connection.rpcEndpoint.includes('mainnet') ? 'mainnet' as const : 'testnet' as const;
+                const securityContext = this.createSecurityContext(environment);
+
                 throw createError(
                     ErrorCode.INVALID_MUTATION_TARGET,
                     'Mutation requires a valid target program address',
-                    this.createErrorDetails(
-                        ErrorCode.INVALID_MUTATION_TARGET,
-                        'Mutation requires a valid target program address',
-                        {
-                            securityContext: {
-                                environment: this.connection.rpcEndpoint.includes('mainnet') ? 'mainnet' : 'testnet'
-                            }
+                    {
+                        metadata: {
+                            programId: this.programId.toBase58(),
+                            instruction: '',
+                            accounts: [],
+                            value: null,
+                            payload: null,
+                            error: 'Mutation requires a valid target program address',
+                            mutation: {
+                                type: mutation.type.toString(),
+                                target: '',
+                                payload: null
+                            },
+                            securityContext
+                        },
+                        source: {
+                            file: 'chaosTester.ts',
+                            line: 0,
+                            function: 'executeMutation'
                         }
-                    )
+                    }
                 );
             }
 
@@ -524,7 +838,19 @@ export class ChaosTester {
         const vulnerabilities: VulnerabilityInfo[] = [];
 
         if (!success) {
-            const vulnerability = this.createVulnerability(mutation);
+            const vulnerability = this.createVulnerability(
+                this.getVulnerabilityType(mutation),
+                this.getVulnerabilityName(mutation),
+                this.getVulnerabilityDescription(mutation),
+                this.getVulnerabilitySeverity(mutation),
+                {
+                    expectedValue: mutation.metadata?.expectedValue?.toString(),
+                    actualValue: mutation.metadata?.actualValue?.toString(),
+                    location: mutation.target,
+                    impact: this.getVulnerabilitySeverity(mutation).toString(),
+                    likelihood: SecurityLevel.MEDIUM
+                }
+            );
             vulnerabilities.push(vulnerability);
             this.metrics.vulnerabilitiesFound.push(vulnerability.vulnerabilityType);
 
@@ -539,45 +865,29 @@ export class ChaosTester {
         return vulnerabilities;
     }
 
-    private createVulnerability(mutation: FuzzingMutation): VulnerabilityInfo {
-        const vulnerabilityType = mutation.expectedVulnerability || VulnerabilityType.Custom;
-        return {
-            id: `VULN-${Date.now()}`,
-            name: this.getVulnerabilityName(mutation),
-            description: this.getVulnerabilityDescription(mutation),
-            severity: this.getVulnerabilitySeverity(mutation),
-            confidence: 0.8,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            evidence: [JSON.stringify(mutation)],
-            recommendation: this.getVulnerabilityRecommendation(mutation),
-            vulnerabilityType,
-            details: {
-                expectedValue: mutation.metadata?.expectedValue,
-                actualValue: mutation.metadata?.actualValue,
-                location: mutation.target,
-                impact: 'High',
-                likelihood: 'Medium'
-            }
-        };
-    }
-
     private getVulnerabilityName(mutation: FuzzingMutation): string {
         return `${mutation.type} Vulnerability`;
     }
 
-    private getVulnerabilitySeverity(mutation: FuzzingMutation): 'low' | 'medium' | 'high' | 'critical' {
-        switch (mutation.securityImpact) {
-            case 'CRITICAL':
-                return 'critical';
-            case 'HIGH':
-                return 'high';
-            case 'MEDIUM':
-                return 'medium';
-            case 'LOW':
-                return 'low';
+    private getVulnerabilitySeverity(mutation: FuzzingMutation): SecurityLevel {
+        if (mutation.securityImpact) {
+            return mutation.securityImpact;
+        }
+        switch (mutation.type) {
+            case MutationType.Reentrancy:
+            case MutationType.AccessControl:
+            case MutationType.Arithmetic:
+                return SecurityLevel.CRITICAL;
+            case MutationType.PDA:
+            case MutationType.DataValidation:
+            case MutationType.AccountValidation:
+                return SecurityLevel.HIGH;
+            case MutationType.CPIValidation:
+            case MutationType.AuthorityValidation:
+            case MutationType.SignerValidation:
+                return SecurityLevel.MEDIUM;
             default:
-                return 'medium';
+                return SecurityLevel.LOW;
         }
     }
 
@@ -593,29 +903,35 @@ export class ChaosTester {
                 return 'Potential PDA validation vulnerability detected';
             case MutationType.Concurrency:
                 return 'Potential concurrency vulnerability detected';
-            case MutationType.Custom:
-                return 'Custom vulnerability test failed';
             default:
                 return 'Unknown vulnerability type detected';
         }
     }
 
-    private getVulnerabilityRecommendation(mutation: FuzzingMutation): string {
-        switch (mutation.type) {
-            case MutationType.Arithmetic:
-                return 'Implement proper arithmetic checks and use safe math operations';
-            case MutationType.AccessControl:
-                return 'Review and strengthen access control mechanisms';
-            case MutationType.Reentrancy:
-                return 'Implement reentrancy guards and follow checks-effects-interactions pattern';
-            case MutationType.PDA:
-                return 'Implement proper PDA validation and ownership checks';
-            case MutationType.Concurrency:
-                return 'Implement proper synchronization mechanisms';
-            case MutationType.Custom:
-                return 'Review custom test failure and implement appropriate fixes';
+    private getVulnerabilityRecommendation(vulnerabilityType: VulnerabilityType): string {
+        switch (vulnerabilityType) {
+            case VulnerabilityType.ArithmeticOverflow:
+                return 'Implement proper arithmetic checks and use safe math operations. Consider using checked math operations or the SafeMath library.';
+            case VulnerabilityType.AccessControl:
+                return 'Review and strengthen access control mechanisms. Implement proper ownership checks and role-based access control.';
+            case VulnerabilityType.Reentrancy:
+                return 'Implement reentrancy guards and follow checks-effects-interactions pattern. Consider using a mutex or similar mechanism.';
+            case VulnerabilityType.PDASafety:
+                return 'Implement proper PDA validation and ownership checks. Verify seeds and bump seeds for all PDAs.';
+            case VulnerabilityType.CPISafety:
+                return 'Implement proper CPI validation and security checks. Verify program IDs and account ownership.';
+            case VulnerabilityType.SignerAuthorization:
+                return 'Implement proper signer verification and authorization checks. Verify all required signers are present.';
+            case VulnerabilityType.AuthorityCheck:
+                return 'Implement proper authority validation. Verify authority accounts and their permissions.';
+            case VulnerabilityType.DataValidation:
+                return 'Implement comprehensive data validation checks. Validate all input data and account states.';
+            case VulnerabilityType.AccountValidation:
+                return 'Implement proper account validation checks. Verify account types, owners, and states.';
+            case VulnerabilityType.None:
+                return 'No specific vulnerability identified. Consider general security best practices.';
             default:
-                return 'Review and fix the identified vulnerability';
+                return 'Review and fix the identified vulnerability following Solana security best practices.';
         }
     }
 
@@ -753,35 +1069,49 @@ export class ChaosTester {
                 case MutationType.CPIValidation:
                     result = await this.testCPIValidation(targetPubkey, mutation.payload);
                     if (result.vulnerable) {
-                        this.addVulnerability(VulnerabilityType.CPIValidation);
+                        this.addVulnerability(VulnerabilityType.CPISafety);
                     }
                     break;
                 case MutationType.AuthorityValidation:
                     result = await this.testAuthorityValidation(targetPubkey, mutation.payload);
                     if (result.vulnerable) {
-                        this.addVulnerability(VulnerabilityType.AuthorityValidation);
+                        this.addVulnerability(VulnerabilityType.AuthorityCheck);
                     }
                     break;
                 case MutationType.SignerValidation:
                     result = await this.testSignerValidation(targetPubkey, mutation.payload);
                     if (result.vulnerable) {
-                        this.addVulnerability(VulnerabilityType.SignerValidation);
+                        this.addVulnerability(VulnerabilityType.SignerAuthorization);
                     }
                     break;
                 default:
                     throw createError(
                         ErrorCode.INVALID_MUTATION_TYPE,
                         'Unsupported validation mutation type',
-                        this.createErrorDetails(
-                            ErrorCode.INVALID_MUTATION_TYPE,
-                            'Unsupported validation mutation type'
-                        )
+                        {
+                            metadata: {
+                                programId: this.programId.toBase58(),
+                                instruction: mutation.type,
+                                accounts: [],
+                                value: '',
+                                payload: null,
+                                error: 'Unsupported validation type',
+                                mutation: {
+                                    type: mutation.type,
+                                    target: mutation.target,
+                                    payload: null
+                                },
+                                securityContext: this.createSecurityContext(
+                                    this.connection.rpcEndpoint.includes('mainnet') ? 'mainnet' : 'testnet'
+                                )
+                            }
+                        }
                     );
             }
 
             return result.vulnerable;
         } catch (error: unknown) {
-            this.handleMutationError(mutation, error as Error);
+            this.handleValidationError(error as Error, mutation.type.toString());
         }
     }
 
@@ -794,7 +1124,7 @@ export class ChaosTester {
             }
             return result.vulnerable;
         } catch (error: unknown) {
-            this.handleMutationError(mutation, error as Error);
+            this.handleExecutionError(error as Error, mutation.type.toString());
         }
     }
 
@@ -854,14 +1184,31 @@ export class ChaosTester {
             const targetPubkey = this.validateAndGetPubkey(mutation.target);
             const result = await this.testConcurrency(targetPubkey, mutation.payload);
             if (result.vulnerable) {
-                this.addVulnerability(VulnerabilityType.RaceCondition);
+                this.addVulnerability(VulnerabilityType.None);
             }
             return result.vulnerable;
         } catch (error) {
             throw createError(
                 ErrorCode.MUTATION_EXECUTION_FAILED,
                 'Concurrency mutation failed',
-                { metadata: { error } }
+                {
+                    metadata: {
+                        programId: this.programId.toBase58(),
+                        instruction: 'concurrency_test',
+                        accounts: [],
+                        value: '',
+                        payload: null,
+                        error: error instanceof Error ? error.message : String(error),
+                        mutation: {
+                            type: mutation.type,
+                            target: mutation.target,
+                            payload: null
+                        },
+                        securityContext: this.createSecurityContext(
+                            this.connection.rpcEndpoint.includes('mainnet') ? 'mainnet' : 'testnet'
+                        )
+                    }
+                }
             );
         }
     }
@@ -885,19 +1232,40 @@ export class ChaosTester {
             }
             return result.vulnerable;
         } catch (error: unknown) {
-            this.handleMutationError(mutation, error as Error);
+            this.handleExecutionError(error as Error, mutation.type.toString());
         }
     }
 
     private validateAndGetPubkey(input: string | undefined): PublicKey {
+        const securityContext = this.createSecurityContext(
+            this.connection.rpcEndpoint.includes('mainnet') ? 'mainnet' : 'testnet'
+        );
+
         if (!input) {
             throw createError(
                 ErrorCode.INVALID_MUTATION_TARGET,
                 'Target public key is required',
-                this.createErrorDetails(
-                    ErrorCode.INVALID_MUTATION_TARGET,
-                    'Target public key is required'
-                )
+                {
+                    metadata: {
+                        programId: this.programId.toBase58(),
+                        instruction: '',
+                        accounts: [],
+                        value: null,
+                        payload: null,
+                        error: 'Target public key is required',
+                        mutation: {
+                            type: MutationType.DataValidation,
+                            target: '',
+                            payload: null
+                        },
+                        securityContext
+                    },
+                    source: {
+                        file: 'chaosTester.ts',
+                        line: 0,
+                        function: 'validateAndGetPubkey'
+                    }
+                }
             );
         }
         try {
@@ -906,12 +1274,27 @@ export class ChaosTester {
             throw createError(
                 ErrorCode.INVALID_MUTATION_TARGET,
                 'Invalid public key format',
-                this.createErrorDetails(
-                    ErrorCode.INVALID_MUTATION_TARGET,
-                    'Invalid public key format',
-                    undefined,
-                    error
-                )
+                {
+                    metadata: {
+                        programId: this.programId.toBase58(),
+                        instruction: '',
+                        accounts: [],
+                        value: null,
+                        payload: null,
+                        error: error instanceof Error ? error.message : String(error),
+                        mutation: {
+                            type: MutationType.DataValidation,
+                            target: input,
+                            payload: null
+                        },
+                        securityContext
+                    },
+                    source: {
+                        file: 'chaosTester.ts',
+                        line: 0,
+                        function: 'validateAndGetPubkey'
+                    }
+                }
             );
         }
     }
@@ -1062,5 +1445,73 @@ export class ChaosTester {
             default:
                 return 'unknown_instruction';
         }
+    }
+
+    private calculateSecurityScore(metrics: FuzzingMetrics): number {
+        const weights = {
+            errorRate: 0.4,
+            coverage: 0.3,
+            uniquePaths: 0.2,
+            mutationEfficiency: 0.1
+        };
+
+        const normalizedErrorRate = 1 - metrics.errorRate;
+        const normalizedCoverage = metrics.coverage;
+        const normalizedUniquePaths = Math.min(metrics.uniquePaths / 100, 1);
+        const normalizedMutationEfficiency = metrics.mutationEfficiency;
+
+        return (
+            normalizedErrorRate * weights.errorRate +
+            normalizedCoverage * weights.coverage +
+            normalizedUniquePaths * weights.uniquePaths +
+            normalizedMutationEfficiency * weights.mutationEfficiency
+        ) * 100;
+    }
+
+    private getVulnerabilityType(mutation: FuzzingMutation): VulnerabilityType {
+        if (mutation.expectedVulnerability) {
+            return mutation.expectedVulnerability;
+        }
+        switch (mutation.type) {
+            case MutationType.Arithmetic:
+                return VulnerabilityType.ArithmeticOverflow;
+            case MutationType.AccessControl:
+                return VulnerabilityType.AccessControl;
+            case MutationType.Reentrancy:
+                return VulnerabilityType.Reentrancy;
+            case MutationType.PDA:
+                return VulnerabilityType.PDASafety;
+            case MutationType.DataValidation:
+                return VulnerabilityType.DataValidation;
+            case MutationType.AccountValidation:
+                return VulnerabilityType.AccountValidation;
+            case MutationType.CPIValidation:
+                return VulnerabilityType.CPISafety;
+            case MutationType.AuthorityValidation:
+                return VulnerabilityType.AuthorityCheck;
+            case MutationType.SignerValidation:
+                return VulnerabilityType.SignerAuthorization;
+            default:
+                return VulnerabilityType.None;
+        }
+    }
+
+    private createErrorMetadata(error: Error | string, context: ErrorMetadataContext = {}): ErrorMetadata {
+        const environment = this.connection.rpcEndpoint.includes('mainnet') ? 'mainnet' as const : 'testnet' as const;
+        
+        return {
+            programId: context.programId || this.programId.toBase58(),
+            instruction: context.instruction || '',
+            accounts: context.accounts || [],
+            value: this.serializePayload(context.value),
+            payload: this.serializePayload(context.payload),
+            error: error instanceof Error ? error.message : error,
+            mutation: context.mutation ? {
+                type: context.mutation.type,
+                target: context.mutation.target,
+                payload: this.serializePayload(context.mutation.payload)
+            } : undefined,
+            securityContext: this.createSecurityContext(environment)
+        };
     }
 } 
