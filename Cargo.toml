@@ -7,7 +7,7 @@ edition = "2021"
 [dependencies]
 # Web server dependencies
 axum = { version = "0.7", features = ["http1", "http2", "macros"] }
-hyper = { version = "1.1", features = ["server", "http1", "http2", "tcp"] }
+hyper = { version = "1.1", features = ["server", "http1", "http2"] }
 tower = { version = "0.4", features = ["util"] }
 tower-http = { version = "0.5", features = ["fs"] }
 tokio = { version = "1.36", features = ["full"] }
