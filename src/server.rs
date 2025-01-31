@@ -11,7 +11,6 @@ use thiserror::Error;
 use mongodb::{options::ClientOptions, Client as MongoClient};
 use serde::{Deserialize, Serialize};
 use tower::util::ServiceExt;
-use axum::{http::Request, body::Body};
 
 #[derive(Error, Debug)]
 pub enum ServerError {
@@ -62,12 +61,22 @@ pub async fn start_server(redis_url: &str, mongo_url: &str) -> Result<(), Server
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
     println!("Listening on {}", addr);
 
-    hyper::Server::bind(&addr)
-        .serve(app.into_make_service())
+    let listener = tokio::net::TcpListener::bind(&addr)
+        .await
+        .map_err(|e| ServerError::HyperError(e.to_string()))?;
+
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
         .await
         .map_err(|e| ServerError::HyperError(e.to_string()))?;
 
     Ok(())
+}
+
+async fn shutdown_signal() {
+    tokio::signal::ctrl_c()
+        .await
+        .expect("failed to install CTRL+C signal handler");
 }
 
 async fn static_handler(axum::extract::Path(path): axum::extract::Path<String>) -> impl IntoResponse {
