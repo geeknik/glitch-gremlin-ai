@@ -38,6 +38,18 @@ pub const DEV_WALLET: &str = "12ZA59vt9MW9XNfpDNThamLmPsPFQ2MEgkngk1F7HGkn";
 pub const TREASURY_AUTH_SEED: &[u8] = b"treasury_auth";
 pub const EMERGENCY_HALT_SEED: &[u8] = b"emergency_halt";
 
+<<<<<<< HEAD
+=======
+// Re-export types from state module
+pub use state::{
+    governance::{GovernanceParams, ProposalVotingState, ProposalMetadata},
+    governance_state::GovernanceMetrics,
+    proposal::{Proposal, ProposalStatus, ProposalAction, VoteRecord},
+    stake_account::{StakeAccount, StakeOperation, StakeOperationType},
+    ChaosParams, ChaosMode, ChaosCondition, DefenseLevel,
+};
+
+>>>>>>> 3107af2 (fix: Remove duplicate GovernanceState and clean up imports)
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub enum EmergencyActionType {
     UpdateConfig(Box<GovernanceConfig>),

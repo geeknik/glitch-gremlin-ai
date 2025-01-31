@@ -19,8 +19,7 @@ mongodb = { version = "2.6", default-features = false }
 serde_json = "1.0"
 
 [features]
-default = ["anchor-debug"]
-anchor-debug = []
+default = []
 
 [profile.dev]
 panic = "unwind"

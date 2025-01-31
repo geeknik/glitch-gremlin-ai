@@ -72,6 +72,115 @@ pub struct ChaosParams {
     pub min_proposal_delay: i64,
     pub max_proposal_duration: i64,
     pub min_voting_power: u64,
+<<<<<<< HEAD
+=======
+    pub quorum_percentage: u8,
+    pub approval_threshold: u8,
+
+    // Chaos specific parameters
+    pub volatility_factor: u8,           // 0-100% chance of chaos events
+    pub max_slashing_percentage: u8,     // Maximum % of stake that can be slashed
+    pub chaos_mode: ChaosMode,
+    pub circuit_breaker_threshold: u64,
+    pub recovery_delay: i64,
+    pub max_concurrent_chaos_events: u8,
+    pub min_time_between_chaos: i64,
+    pub chaos_intensity_multiplier: u8,  // 1-10x intensity scaling
+    pub targeted_chaos_enabled: bool,    // Enable targeted chaos on specific accounts
+    pub random_seed_update_interval: i64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, AnchorSerialize, AnchorDeserialize)]
+pub enum ChaosMode {
+    Disabled,
+    Periodic {
+        interval: i64,
+        duration: i64,
+    },
+    Random {
+        probability: u8,    // 0-100%
+        max_duration: i64,
+    },
+    Triggered {
+        condition: ChaosCondition,
+    },
+    Adaptive {
+        base_intensity: u8,
+        scaling_factor: u8,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, AnchorSerialize, AnchorDeserialize)]
+pub enum ChaosCondition {
+    TokenPriceVolatility { threshold: u8 },
+    StakingRateChange { percentage: i8 },
+    VotingActivitySpike { multiplier: u8 },
+    TimeOfDay { hour: u8 },
+    CustomMetric { threshold: u64 },
+}
+
+impl Default for ChaosParams {
+    fn default() -> Self {
+        Self {
+            max_stake_amount: 1_000_000,
+            min_stake_duration: 86_400,    // 1 day
+            max_stake_duration: 31_536_000, // 1 year
+            min_proposal_delay: 3_600,      // 1 hour
+            max_proposal_duration: 604_800,  // 1 week
+            min_voting_power: 100,
+            quorum_percentage: 10,
+            approval_threshold: 60,
+            volatility_factor: 50,          // 50% chance of chaos
+            max_slashing_percentage: 10,     // Max 10% slashing
+            chaos_mode: ChaosMode::Periodic {
+                interval: 86_400,           // Daily chaos
+                duration: 3_600,            // 1 hour duration
+            },
+            circuit_breaker_threshold: 1_000_000,
+            recovery_delay: 3_600,          // 1 hour recovery
+            max_concurrent_chaos_events: 3,
+            min_time_between_chaos: 1_800,  // 30 minutes
+            chaos_intensity_multiplier: 5,   // 5x base intensity
+            targeted_chaos_enabled: false,
+            random_seed_update_interval: 300, // 5 minutes
+        }
+    }
+}
+
+#[account]
+#[derive(Debug)]
+pub struct GovernanceConfig {
+    pub min_proposal_stake: u64,
+    pub proposal_rate_limit: u64,
+    pub vote_threshold: u64,
+    pub min_voting_period: i64,
+    pub max_voting_period: i64,
+    pub quorum_percentage: u8,
+    pub approval_threshold: u8,
+    pub chaos_params: ChaosParams,
+}
+
+impl Default for GovernanceConfig {
+    fn default() -> Self {
+        Self {
+            min_proposal_stake: 1_000_000_000, // 1 SOL
+            proposal_rate_limit: 1,
+            vote_threshold: 100_000_000, // 0.1 SOL
+            min_voting_period: 24 * 60 * 60, // 1 day
+            max_voting_period: 7 * 24 * 60 * 60, // 7 days
+            quorum_percentage: 10,
+            approval_threshold: 60,
+            chaos_params: ChaosParams::default(),
+        }
+    }
+}
+
+
+impl IsInitialized for Proposal {
+    fn is_initialized(&self) -> bool {
+        self.is_initialized
+    }
+>>>>>>> 3107af2 (fix: Remove duplicate GovernanceState and clean up imports)
 }
 
 #[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
