@@ -165,24 +165,6 @@ impl EnhancedRedisClient {
     }
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ErrorType {
-    RateLimit,
-    Timeout,
-    Network,
-    Authorization,
-    Unknown,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum RecoveryAction {
-    BackOff {
-        duration: u64,  // Store duration as u64 milliseconds for serialization
-        reason: String,
-    },
-    Retry {
         max_attempts: u32,
         reason: String,
     },
