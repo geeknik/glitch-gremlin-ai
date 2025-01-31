@@ -11,6 +11,7 @@ use thiserror::Error;
 use mongodb::{options::ClientOptions, Client as MongoClient};
 use serde::{Deserialize, Serialize};
 use tower::ServiceExt;
+use tower::util::ServiceExt;
 use hyper::{Request, Body};
 
 #[derive(Error, Debug)]
@@ -42,7 +43,7 @@ pub async fn start_server(redis_url: &str, mongo_url: &str) -> Result<(), Server
     let _redis_conn = redis_client.get_async_connection().await?;
 
     // Initialize MongoDB connection
-    let mut client_options = ClientOptions::parse(mongo_url).await?;
+    let client_options = ClientOptions::parse(mongo_url).await?;
     client_options.app_name = Some("glitch-gremlin-ai".to_string());
     
     let mongo_client = MongoClient::with_options(client_options)?;
@@ -59,10 +60,10 @@ pub async fn start_server(redis_url: &str, mongo_url: &str) -> Result<(), Server
         .route("/static/*path", get(static_handler));
 
     // Bind to address
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
     println!("Listening on {}", addr);
 
-    axum::Server::bind(&addr)
+    hyper::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
         .map_err(|e| ServerError::HyperError(e.to_string()))?;
