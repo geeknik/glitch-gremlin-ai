@@ -7,7 +7,7 @@ edition = "2021"
 [dependencies]
 # Web server dependencies
 axum = { version = "0.7.5", features = ["http1", "http2", "macros"] }
-hyper = { version = "0.14.36", features = ["full"] }
+hyper = { version = "0.14", features = ["full"] }
 tower = { version = "0.4.13", features = ["util"] }
 tower-http = { version = "0.5.0", features = ["fs"] }
 http = "0.2.11"  # Force matching version with axum/hyper
