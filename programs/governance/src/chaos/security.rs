@@ -26,6 +26,24 @@ pub struct SecuritySanitizer {
     blocked_prompts: HashSet<String>,
 }
 
+#[derive(Error, Debug)]
+pub enum SecurityError {
+    #[error("Prompt injection attempt detected: {0}")]
+    PromptInjection(String),
+    #[error("Invalid instruction data: {0}")]
+    InvalidInstruction(String),
+    #[error("Malicious account configuration: {0}")]
+    MaliciousAccount(String),
+    #[error("Untrusted program invocation: {0}")]
+    UntrustedProgram(String),
+    #[error("Resource limit exceeded: {0}")]
+    ResourceLimit(String),
+    #[error("Invalid security level")]
+    InvalidSecurityLevel,
+    #[error("Destructive chaos parameters: {0}")]
+    DestructiveChaos(String),
+}
+
 impl SecuritySanitizer {
     pub fn new() -> Self {
         let mut sanitizer = Self {
@@ -38,6 +56,30 @@ impl SecuritySanitizer {
         // Initialize security rules
         sanitizer.initialize_security_rules();
         sanitizer
+    }
+
+    pub fn validate_chaos_type(&self, ct: &ChaosType) -> Result<(), SecurityError> {
+        match ct {
+            ChaosType::FuzzTest { max_compute_units, security_level, .. } => {
+                if *max_compute_units > 100_000 {
+                    return Err(SecurityError::ResourceLimit(
+                        "Exceeds max allowed compute units".into()
+                    ));
+                }
+                if *security_level > SecurityLevel::High as u8 {
+                    return Err(SecurityError::InvalidSecurityLevel);
+                }
+            }
+            ChaosType::NetworkChaos { packet_loss_pct, .. } => {
+                if *packet_loss_pct > 30 {
+                    return Err(SecurityError::DestructiveChaos(
+                        "Packet loss exceeds safety threshold".into()
+                    ));
+                }
+            }
+            _ => {}
+        }
+        Ok(())
     }
 
     fn initialize_security_rules(&mut self) {

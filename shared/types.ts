@@ -2,7 +2,23 @@ export enum TestType {
     FUZZ = 'FUZZ',
     LOAD = 'LOAD',
     EXPLOIT = 'EXPLOIT',
-    CONCURRENCY = 'CONCURRENCY'
+    CONCURRENCY = 'CONCURRENCY',
+    MUTATION = 'MUTATION',
+    NETWORK = 'NETWORK'
+}
+
+export enum SecurityLevel {
+    CRITICAL = 0,
+    HIGH = 1,
+    MEDIUM = 2,
+    LOW = 3
+}
+
+export interface ChaosTestConfig {
+    testType: TestType;
+    securityLevel: SecurityLevel;
+    executionEnv: 'sgx' | 'kvm' | 'wasm';
+    proofRequired: boolean;
 }
 
 export interface SecurityMetric {

@@ -3,6 +3,18 @@ use crate::error::GovernanceError;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq)]
 pub enum ChaosType {
+    FuzzTest {
+        iterations: u32,
+        max_compute_units: u64,
+        security_level: u8,
+        require_proof: bool
+    },
+    NetworkChaos {
+        latency_ms: u32,
+        packet_loss_pct: u8,
+        duration_secs: u32,
+        tee_attestation_required: bool
+    },
     ConcurrencyTest {
         num_concurrent_txns: u32,
         interval_ms: u64,
@@ -27,6 +39,18 @@ pub enum ChaosType {
         target_ix: Vec<u8>,
         injection_point: u64,
     },
+}
+
+impl From<ChaosType> for TestType {
+    fn from(ct: ChaosType) -> Self {
+        match ct {
+            ChaosType::FuzzTest {..} => TestType::FUZZ,
+            ChaosType::NetworkChaos {..} => TestType::NETWORK,
+            ChaosType::ConcurrencyTest {..} => TestType::CONCURRENCY,
+            ChaosType::FlashLoanProbe {..} => TestType::EXPLOIT,
+            _ => TestType::FUZZ // Default case
+        }
+    }
 }
 
 impl ChaosType {
