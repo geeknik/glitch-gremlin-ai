@@ -12,29 +12,47 @@ use mongodb::{options::ClientOptions, Client as MongoClient};
 use serde::{Deserialize, Serialize};
 use tower::util::ServiceExt;
 
+/// Server error types for API operations
 #[derive(Error, Debug)]
 pub enum ServerError {
+    /// Error originating from Redis operations
     #[error("Redis error: {0}")]
     RedisError(#[from] redis::RedisError),
+    
+    /// Error originating from MongoDB operations
     #[error("MongoDB error: {0}")]
     MongoError(#[from] mongodb::error::Error),
+    
+    /// Error from HTTP server operations
     #[error("Hyper error: {0}")]
     HyperError(String),
 }
 
+/// Application state container
 #[derive(Clone)]
 pub struct AppState {
+    /// MongoDB client instance
     mongo: MongoClient,
+    /// Redis client instance
     redis: redis::Client,
 }
 
+/// Chaos simulation request payload structure
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChaosRequest {
-    target_program: String,
-    chaos_type: String,
-    parameters: serde_json::Value,
+    /// Target program ID for the chaos test
+    pub target_program: String,
+    /// Type of chaos to simulate
+    pub chaos_type: String,
+    /// Custom parameters for the chaos test
+    pub parameters: serde_json::Value,
 }
 
+/// Starts the chaos simulation API server
+/// 
+/// # Arguments
+/// * `redis_url` - Redis connection URL string
+/// * `mongo_url` - MongoDB connection URL string
 pub async fn start_server(redis_url: &str, mongo_url: &str) -> Result<(), ServerError> {
     // Initialize Redis connection
     let redis_client = redis::Client::open(redis_url)?;
