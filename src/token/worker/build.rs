@@ -7,6 +7,8 @@ mod dummy_security {
 }
 
 fn main() {
+    println!("cargo:rustc-cfg=target_os=\"solana\"");
+
     #[cfg(target_os = "linux")]
     {
         println!("cargo:rustc-cfg=target_os=\"linux\"");
@@ -23,4 +25,4 @@ fn main() {
     {
         println!("cargo:rustc-env=LANDLOCK_ENABLED=0");
     }
-} 
+}
