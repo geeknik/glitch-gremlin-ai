@@ -1,6 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use thiserror::Error;
+#[cfg(target_os = "linux")]
+use landlock::{self, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetStatus};
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+use sgx_types::*;
 
 #[derive(Error, Debug)]
 pub enum SecurityError {
@@ -24,6 +28,20 @@ pub struct SecuritySanitizer {
     max_instruction_size: usize,
     // Blocked prompt patterns
     blocked_prompts: HashSet<String>,
+    // Memory quarantine queue
+    #[cfg(target_os = "linux")]
+    memory_quarantine: Vec<(Vec<u8>, std::time::Instant)>,
+    // Hardware security status
+    #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+    tee_status: Option<TeeAttestationStatus>,
+}
+
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+#[derive(Debug)]
+pub struct TeeAttestationStatus {
+    pub enclave_id: sgx_enclave_id_t,
+    pub attestation_report: Vec<u8>,
+    pub last_verification: std::time::Instant,
 }
 
 #[derive(Error, Debug)]
@@ -51,11 +69,52 @@ impl SecuritySanitizer {
             blocked_patterns: HashSet::new(),
             max_instruction_size: 1024,
             blocked_prompts: HashSet::new(),
+            #[cfg(target_os = "linux")]
+            memory_quarantine: Vec::new(),
+            #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+            tee_status: None,
         };
 
         // Initialize security rules
         sanitizer.initialize_security_rules();
+        
+        // Initialize hardware security if available
+        #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+        sanitizer.initialize_hardware_security();
+        
+        // Setup landlock if on Linux
+        #[cfg(target_os = "linux")]
+        sanitizer.initialize_landlock();
+        
         sanitizer
+    }
+
+    #[cfg(target_os = "linux")]
+    fn initialize_landlock(&self) -> Result<(), SecurityError> {
+        let mut ruleset = Ruleset::new()
+            .map_err(|e| SecurityError::InitializationError(format!("Landlock init failed: {}", e)))?;
+
+        ruleset
+            .handle_access(AccessFs::ReadFile | AccessFs::ReadDir)
+            .map_err(|e| SecurityError::InitializationError(format!("Landlock access failed: {}", e)))?;
+
+        ruleset
+            .restrict_self()
+            .map_err(|e| SecurityError::InitializationError(format!("Landlock restriction failed: {}", e)))?;
+
+        Ok(())
+    }
+
+    #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+    fn initialize_hardware_security(&mut self) {
+        if let Ok(enclave) = sgx_enclave_init() {
+            let report = sgx_create_attestation_report(enclave);
+            self.tee_status = Some(TeeAttestationStatus {
+                enclave_id: enclave,
+                attestation_report: report,
+                last_verification: std::time::Instant::now(),
+            });
+        }
     }
 
     pub fn validate_chaos_type(&self, ct: &ChaosType) -> Result<(), SecurityError> {
