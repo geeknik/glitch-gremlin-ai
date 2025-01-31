@@ -11,7 +11,7 @@ use thiserror::Error;
 use mongodb::{options::ClientOptions, Client as MongoClient};
 use serde::{Deserialize, Serialize};
 use tower::util::ServiceExt;
-use hyper::{Request, Body};
+use axum::{http::Request, body::Body};
 
 #[derive(Error, Debug)]
 pub enum ServerError {
@@ -42,7 +42,7 @@ pub async fn start_server(redis_url: &str, mongo_url: &str) -> Result<(), Server
     let _redis_conn = redis_client.get_async_connection().await?;
 
     // Initialize MongoDB connection
-    let mut client_options = ClientOptions::parse(mongo_url).await?;
+    let client_options = ClientOptions::parse(mongo_url)?;
     client_options.app_name = Some("glitch-gremlin-ai".to_string());
     
     let mongo_client = MongoClient::with_options(client_options)?;
@@ -72,10 +72,10 @@ pub async fn start_server(redis_url: &str, mongo_url: &str) -> Result<(), Server
 
 async fn static_handler(axum::extract::Path(path): axum::extract::Path<String>) -> impl IntoResponse {
     let serve_dir = ServeDir::new("static");
-    let req = hyper::Request::builder()
+    let req = axum::http::Request::builder()
         .uri(format!("/{}", path))
-        .body(hyper::Body::empty())
-        .unwrap();
+        .body(axum::body::Body::empty())
+        .expect("valid request");
     
     match serve_dir.oneshot(req).await {
         Ok(response) => response.into_response(),
