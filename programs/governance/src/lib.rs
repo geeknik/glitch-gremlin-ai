@@ -47,6 +47,15 @@ pub use state::{
     ChaosParams, ChaosMode, ChaosCondition, DefenseLevel,
 };
 
+// Re-export types from state module
+pub use state::{
+    governance::{GovernanceParams, ProposalVotingState, ProposalMetadata},
+    governance_state::GovernanceMetrics,
+    proposal::{Proposal, ProposalStatus, ProposalAction, VoteRecord},
+    stake_account::{StakeAccount, StakeOperation, StakeOperationType},
+    ChaosParams, ChaosMode, ChaosCondition, DefenseLevel,
+};
+
 >>>>>>> 3107af2 (fix: Remove duplicate GovernanceState and clean up imports)
 =======
 // Re-export types from state module
@@ -76,7 +85,7 @@ pub struct EmergencyActionEvent {
     pub timestamp: i64,
 }
 
-<<<<<<< HEAD
+#[program]
 =======
 #[program]
 pub mod glitch_gremlin_governance {
@@ -757,7 +766,6 @@ pub enum SecurityAction {
     ValidatorSlash { validator: Pubkey, amount: u64 },
 }
 
->>>>>>> c02fd30 (feat: Add quarantine state and security event handling to governance)
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct GovernanceConfig {
     pub min_stake_amount: u64,
