@@ -32,6 +32,7 @@ config/*.enc
 config/*.key
 config/*.secret
 config/credentials/
+config/*.json
 mongodb.config
 redis.config
 **/*.uri
