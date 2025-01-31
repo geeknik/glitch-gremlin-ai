@@ -1,5 +1,5 @@
 fn main() {
-    println!("cargo:rustc-check-cfg=cfg(target_os, values(\"solana\"))");
-    println!("cargo:rustc-cfg=target_arch=\"solana\"");
-    println!("cargo:rustc-cfg=target_os=\"solana\"");
+    // Secure Solana-specific config (Section 9.6 Compliance)
+    println!("cargo:rustc-check-cfg=cfg(solana)");
+    println!("cargo:rustc-cfg=solana");
 }

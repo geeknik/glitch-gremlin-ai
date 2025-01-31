@@ -41,7 +41,7 @@ pub async fn start_server(redis_url: &str, mongo_url: &str) -> Result<(), Server
     let _redis_conn = redis_client.get_async_connection().await?;
 
     // Initialize MongoDB connection
-    let client_options = ClientOptions::parse(mongo_url)?;
+    let mut client_options = ClientOptions::parse(mongo_url)?;
     client_options.app_name = Some("glitch-gremlin-ai".to_string());
     
     let mongo_client = MongoClient::with_options(client_options)?;
