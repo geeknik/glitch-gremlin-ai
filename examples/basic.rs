@@ -276,7 +276,7 @@ const CIRCUIT_BREAKER_RESET_SECS: u64 = 300;
 const MAX_ERROR_HISTORY: usize = 1000;
 
 /// Network configuration for test execution
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct NetworkConfig {
     cluster: SolanaCluster,
     commitment: String,
@@ -1961,6 +1961,8 @@ pub struct RateLimiter {
     redis_client: RedisClient,
     window_size: u64,
     max_requests: u32,
+    reset_interval: u64,
+    error_threshold: usize,
     burst_allowance: u32,
 }
 
@@ -2016,7 +2018,7 @@ impl RateLimiter {
         let mut pipe = redis::pipe();
         pipe.atomic()
             .zadd(&key, now.to_string(), now)
-            .zremrangebyscore(&key, "-inf", (now - self.window_size).to_string())
+            .zremrangebyrank(&key, 0, -(self.max_requests as isize))
             .expire(&key, self.window_size as usize);
 
         let _: () = pipe.query(&mut conn)
@@ -2537,7 +2539,7 @@ impl EnhancedRedisClient {
             .map_err(CacheError::Redis)?;
             
         // Update metrics
-        if let Ok(mut metrics) = self.metrics.write() {
+        if let Ok(mut metrics) = self.metrics.lock() {
             metrics.total_operations += 1;
             metrics.last_write = Some(SystemTime::now());
         }
