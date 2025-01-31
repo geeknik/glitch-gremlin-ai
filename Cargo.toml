@@ -1,7 +1,7 @@
 [package]
-name = "glitch-gremlin-governance"
+name = "glitch-gremlin-program"
 version = "0.1.0"
-description = "On-chain governance for Glitch Gremlin AI protocol"
+description = "On-chain program for Glitch Gremlin AI protocol"
 edition = "2021"
 
 [dependencies]
@@ -11,10 +11,10 @@ hyper = { version = "1.1", features = ["server", "http1", "http2"] }
 tower = { version = "0.4", features = ["util"] }
 tower-http = { version = "0.5", features = ["fs"] }
 tokio = { version = "1.36", features = ["full"] }
-bv = { git = "https://github.com/model-checking/kani-safe-bv", branch = "kani-compat-0.11" }
+bv = "0.11.1"
 
-anchor-lang = { version = "0.30.1", features = ["derive"] }
-anchor-spl = "0.30.1"
+anchor-lang = { version = "0.28.0", features = ["derive"] }  # Version with compatible curve25519-dalek
+anchor-spl = "0.28.0"
 borsh = "0.10"
 borsh-derive = "0.10"
 redis = { version = "0.23", features = ["tokio-comp"] }
@@ -27,10 +27,23 @@ mongodb = { version = "2.8.2", default-features = false, features = ["tokio-sync
 futures = "0.3.30"
 serde_json = "1.0"
 
+# Security-focused dependencies
+zeroize = { version = "=1.3.0", features = ["zeroize_derive"] }  # Pin exact version for curve25519-dalek
+ring = { version = "0.17", features = ["std"] }
+memoffset = "0.9"
+static_assertions = "1.1"
+sha2 = "0.10"
+curve25519-dalek = { version = "=3.2.1", features = ["u64_backend"] }  # Pin exact version
+ed25519-dalek = { version = "=1.0.1", features = ["u64_backend"] }  # Pin exact version
+rand = "0.8"
+
 [features]
 default = ["custom-heap", "custom-panic"]
 custom-heap = []
 custom-panic = []
+
+[target.'cfg(any(target_os = "solana", target_os = "unknown"))'.dependencies]
+solana-program = "1.16.5"
 
 [profile.dev]
 panic = "unwind"
