@@ -4,6 +4,7 @@
 **/keys/
 **/*.key
 **/*.pem
+**/*.ggai.json
 **/*.der
 **/*.p12
 **/*.pfx
