@@ -10,7 +10,6 @@ use tower_http::services::ServeDir;
 use thiserror::Error;
 use mongodb::{options::ClientOptions, Client as MongoClient};
 use serde::{Deserialize, Serialize};
-use tower::ServiceExt;
 use tower::util::ServiceExt;
 use hyper::{Request, Body};
 
@@ -43,7 +42,7 @@ pub async fn start_server(redis_url: &str, mongo_url: &str) -> Result<(), Server
     let _redis_conn = redis_client.get_async_connection().await?;
 
     // Initialize MongoDB connection
-    let client_options = ClientOptions::parse(mongo_url).await?;
+    let mut client_options = ClientOptions::parse(mongo_url).await?;
     client_options.app_name = Some("glitch-gremlin-ai".to_string());
     
     let mongo_client = MongoClient::with_options(client_options)?;
@@ -73,9 +72,9 @@ pub async fn start_server(redis_url: &str, mongo_url: &str) -> Result<(), Server
 
 async fn static_handler(axum::extract::Path(path): axum::extract::Path<String>) -> impl IntoResponse {
     let serve_dir = ServeDir::new("static");
-    let req = Request::builder()
+    let req = hyper::Request::builder()
         .uri(format!("/{}", path))
-        .body(Body::empty())
+        .body(hyper::Body::empty())
         .unwrap();
     
     match serve_dir.oneshot(req).await {
