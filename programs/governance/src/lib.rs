@@ -56,6 +56,15 @@ pub use state::{
     ChaosParams, ChaosMode, ChaosCondition, DefenseLevel,
 };
 
+// Re-export types from state module
+pub use state::{
+    governance::{GovernanceParams, ProposalVotingState, ProposalMetadata},
+    governance_state::GovernanceMetrics,
+    proposal::{Proposal, ProposalStatus, ProposalAction, VoteRecord},
+    stake_account::{StakeAccount, StakeOperation, StakeOperationType},
+    ChaosParams, ChaosMode, ChaosCondition, DefenseLevel,
+};
+
 >>>>>>> 3107af2 (fix: Remove duplicate GovernanceState and clean up imports)
 =======
 // Re-export types from state module
@@ -86,6 +95,7 @@ pub struct EmergencyActionEvent {
 }
 
 #[program]
+pub mod glitch_gremlin_governance {
 =======
 #[program]
 pub mod glitch_gremlin_governance {
