@@ -3,7 +3,7 @@ import type { Redis as IORedis, RedisOptions } from 'ioredis';
 export function parseRedisInfo(response: string): Record<string, string> {
     const result: Record<string, string> = {};
     response.split('\r\n').forEach(line => {
-        if (line.startsWith('#')) return; // Skip section headers
+        if (line.startsWith('#') || line.trim() === '') return; // Skip section headers and empty lines
         const [key, ...values] = line.split(':');
         if (key && values.length) {
             result[key.trim()] = values.join(':').trim();
