@@ -1411,6 +1411,24 @@ pub struct SecurityMetrics {
     pub vote_manipulation_attempts: u64,
     pub execution_manipulation_attempts: u64,
     pub state_manipulation_attempts: u64,
+    pub redis_used_memory: u64,
+    pub redis_metrics: HashMap<String, String>,
+}
+
+pub fn parse_redis_info(info: &str) -> HashMap<String, String> {
+    let mut metrics = HashMap::new();
+    let mut current_section = String::new();
+    
+    for line in info.trim().lines() {
+        if line.starts_with('#') {
+            current_section = line.replace('#', "").trim().to_string();
+        } else if let Some((k, v)) = line.split_once(':') {
+            let key = format!("{}.{}", current_section, k.trim());
+            metrics.insert(key, v.trim().to_string());
+        }
+    }
+    
+    metrics
 }
 
 impl SecurityMetrics {
@@ -1430,6 +1448,8 @@ impl SecurityMetrics {
             vote_manipulation_attempts: 0,
             execution_manipulation_attempts: 0,
             state_manipulation_attempts: 0,
+            redis_used_memory: 0,
+            redis_metrics: HashMap::new(),
         }
     }
 

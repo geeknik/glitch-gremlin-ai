@@ -1,5 +1,12 @@
 import type { Redis as IORedis, RedisOptions } from 'ioredis';
 
+export interface RedisError extends Error {
+    code?: string;
+    command?: string;
+    args?: any[];
+    response?: any;
+}
+
 export interface RedisConfig extends RedisOptions {
     host: string;
     port: number;
@@ -14,7 +21,11 @@ export interface RedisConfig extends RedisOptions {
     connectTimeout?: number;
 }
 
-export type Redis = IORedis;
+export interface Redis extends IORedis {
+    info(section?: string): Promise<string>;
+    get(key: string): Promise<string | null>;
+    hgetall(key: string): Promise<{[key: string]: string} | null>;
+}
 
 export interface RedisQueueConfig {
     queueName: string;

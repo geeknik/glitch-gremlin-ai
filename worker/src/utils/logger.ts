@@ -20,4 +20,16 @@ export class Logger {
   debug(message: string, ...args: any[]) {
     console.debug(`[${this.context}] DEBUG:`, message, ...args);
   }
+
+  redisError(error: RedisError, context: string = 'Redis') {
+    const truncatedResponse = error.response 
+      ? String(error.response).slice(0, 500) + (error.response.length > 500 ? '...' : '')
+      : undefined;
+    
+    this.error(`[${context}] ${error.code || 'UNKNOWN'} in ${error.command}`, {
+      args: error.args,
+      response: truncatedResponse,
+      stack: error.stack
+    });
+  }
 }
