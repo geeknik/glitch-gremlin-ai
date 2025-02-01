@@ -1,5 +1,5 @@
 [toolchain]
-channel = "nightly-2023-05-31"  # Version known to work with Solana BPF
+channel = "nightly-2023-05-30"  # Version with bpfel-unknown-unknown rust-std support
 components = [
     "rustfmt",
     "clippy",
