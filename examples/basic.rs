@@ -431,10 +431,12 @@ impl EnhancedRedisClient {
         let mut conn = self.client.get_connection()
             .map_err(|e| CacheError::Connection(e.to_string()))?;
 
-        // Use INFO command to get Redis stats
-        let info: HashMap<String, String> = redis::cmd("INFO")
+        // Get raw INFO response and parse it
+        let raw_info: String = redis::cmd("INFO")
             .query(&mut conn)
             .map_err(CacheError::Redis)?;
+        
+        let info = parseRedisInfo(&raw_info);  // Parse the raw response
 
         let total_keys: usize = redis::cmd("DBSIZE")
             .query(&mut conn)
@@ -971,6 +973,24 @@ fn calculate_security_hash(key: &str, value: &str, timestamp: u64) -> String {
 }
 
 /// Calculate cache hit rate
+fn parseRedisInfo(response: &str) -> HashMap<String, String> {
+    let mut result = HashMap::new();
+    response.split('\r').for_each(|line| {
+        if line.starts_with('#') || line.trim().is_empty() {
+            return; // Skip comments and empty lines
+        }
+        if let Some((key, value)) = line.split(':').collect::<Vec<&str>>().split_first() {
+            if !value.is_empty() {
+                result.insert(
+                    key.trim().to_string(),
+                    value.join(":").trim().to_string()
+                );
+            }
+        }
+    });
+    result
+}
+
 fn calculate_hit_rate(metrics: &CacheMetrics) -> f64 {
     let total = metrics.cache_hits + metrics.cache_misses;
     if total > 0 {
