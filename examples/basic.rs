@@ -972,23 +972,81 @@ fn calculate_security_hash(key: &str, value: &str, timestamp: u64) -> String {
     format!("{:x}", hasher.finalize())
 }
 
-/// Calculate cache hit rate
+/// Parse Redis INFO command response into a structured format
 fn parse_redis_info(response: &str) -> HashMap<String, String> {
     let mut result = HashMap::new();
-    response.split('\r').for_each(|line| {
-        if line.starts_with('#') || line.trim().is_empty() {
-            return; // Skip comments and empty lines
+    let mut current_section = String::new();
+
+    for line in response.lines() {
+        let line = line.trim();
+        
+        // Skip empty lines
+        if line.is_empty() {
+            continue;
         }
-        if let Some((key, value)) = line.split(':').collect::<Vec<&str>>().split_first() {
-            if !value.is_empty() {
-                result.insert(
-                    key.trim().to_string(),
-                    value.join(":").trim().to_string()
-                );
+
+        // Handle section headers
+        if line.starts_with('#') {
+            current_section = line[1..].trim().to_lowercase();
+            continue;
+        }
+
+        // Parse key-value pairs
+        if let Some(idx) = line.find(':') {
+            let (key, value) = line.split_at(idx);
+            let key = key.trim();
+            let value = value[1..].trim(); // Skip the ':' character
+
+            // Add section prefix for better organization
+            let full_key = if current_section.is_empty() {
+                key.to_string()
+            } else {
+                format!("{}_{}", current_section, key)
+            };
+
+            // Handle special cases for memory values
+            if full_key.contains("memory") && value.ends_with('M') {
+                // Convert MB to bytes
+                if let Some(num) = value.strip_suffix('M') {
+                    if let Ok(mb) = num.parse::<f64>() {
+                        let bytes = (mb * 1024.0 * 1024.0) as u64;
+                        result.insert(full_key, bytes.to_string());
+                        continue;
+                    }
+                }
             }
+
+            result.insert(full_key, value.to_string());
         }
-    });
+    }
     result
+}
+
+/// Parse human readable sizes like "1.1M" or "16.51M" into bytes
+fn parse_human_size(size: &str) -> Option<u64> {
+    let size = size.trim();
+    if size.is_empty() {
+        return None;
+    }
+
+    // Extract the numeric part and unit
+    let mut chars = size.chars();
+    let last_char = chars.next_back()?;
+    let num_str = chars.as_str();
+
+    // Parse the number
+    let num: f64 = num_str.parse().ok()?;
+
+    // Convert to bytes based on unit
+    let bytes = match last_char {
+        'K' => num * 1024.0,
+        'M' => num * 1024.0 * 1024.0,
+        'G' => num * 1024.0 * 1024.0 * 1024.0,
+        'B' => num,
+        _ => return None,
+    };
+
+    Some(bytes as u64)
 }
 
 fn calculate_hit_rate(metrics: &CacheMetrics) -> f64 {
