@@ -543,13 +543,21 @@ impl EnhancedRedisClient {
         let mut conn = self.client.get_connection()
             .map_err(|e| CacheError::Connection(e.to_string()))?;
 
-        let info: HashMap<String, String> = redis::cmd("INFO")
+        // Retrieve the raw INFO output from Redis as a string
+        let raw_info: String = redis::cmd("INFO")
             .query(&mut conn)
             .map_err(CacheError::Redis)?;
+        
+        // Parse the raw INFO string into a structured HashMap
+        let info = parse_redis_info(&raw_info);
 
-        let used_memory = info.get("used_memory_human")
-            .and_then(|s| s.trim_end_matches("K").parse::<u64>().ok())
-            .unwrap_or(0);
+        let used_memory = info.get("memory_used_memory_human")
+            .and_then(|s| parse_human_size(s))
+            .unwrap_or_else(|| {
+                info.get("memory_used_memory")
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(0)
+            });
 
         let metrics = if let Ok(metrics) = self.metrics.lock() {
             metrics.clone()
