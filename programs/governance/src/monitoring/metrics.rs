@@ -66,25 +66,61 @@ impl MetricsCollector {
 
     fn parse_redis_info(info_str: &str) -> Result<HashMap<String, String>, GovernanceError> {
         let mut info_map = HashMap::new();
+        let mut current_section = String::new();
         
         for line in info_str.lines() {
             let trimmed = line.trim();
-            if trimmed.is_empty() || trimmed.starts_with('#') {
+            if trimmed.is_empty() {
                 continue;
             }
             
-            let parts: Vec<&str> = trimmed.splitn(2, ':').collect();
-            if parts.len() == 2 {
-                let key = parts[0].trim().to_string();
-                let value = parts[1].trim().replace("\r", "");
-                info_map.insert(key, value);
+            // Handle section headers
+            if trimmed.starts_with('#') {
+                current_section = trimmed.trim_start_matches('#').trim().to_string();
+                continue;
             }
+            
+            // Handle key-value pairs with multiple colons
+            let mut parts = trimmed.splitn(2, ':');
+            let key = match parts.next() {
+                Some(k) => k.trim(),
+                None => continue,
+            };
+            
+            let value = parts.next().unwrap_or("").trim();
+            
+            // Build hierarchical keys for nested metrics
+            let full_key = if !current_section.is_empty() { 
+                format!("{}.{}", current_section.replace(' ', "_"), key) 
+            } else { 
+                key.to_string() 
+            };
+            
+            // Handle value formatting for Prometheus compatibility
+            let processed_value = value
+                .replace('=', "_")
+                .replace('{', "")
+                .replace('}', "")
+                .replace('"', "")
+                .replace('/', "_per_");
+            
+            info_map.insert(full_key.to_lowercase(), processed_value);
         }
         
         if info_map.is_empty() {
             Err(GovernanceError::RedisInfoParseError)
         } else {
             Ok(info_map)
+        }
+    }
+
+    fn detect_metric_type(value: &str) -> &'static str {
+        if value.contains('.') {
+            "gauge"
+        } else if value.parse::<i64>().is_ok() {
+            "counter"
+        } else {
+            "label"
         }
     }
 
@@ -101,10 +137,20 @@ impl MetricsCollector {
         let info_map = Self::parse_redis_info(&redis_info)?;
 
         // Record Redis metrics
-        if let Some(used_memory) = info_map.get("used_memory") {
-            let memory_value = used_memory.parse::<f64>()
-                .map_err(|_| GovernanceError::RedisInfoParseError)?;
-            gauge!("redis.used_memory", memory_value);
+        for (key, value) in info_map.iter() {
+            match detect_metric_type(value) {
+                "gauge" => {
+                    if let Ok(val) = value.parse::<f64>() {
+                        gauge!(format!("redis.{}", key), val);
+                    }
+                },
+                "counter" => {
+                    if let Ok(val) = value.parse::<i64>() {
+                        counter!(format!("redis.{}", key), val);
+                    }
+                },
+                _ => debug!("Ignoring non-numeric metric {}={}", key, value),
+            }
         }
 
         // Record individual metrics
@@ -351,6 +397,30 @@ mod tests {
         collector.record_metrics(point.clone()).await.unwrap();
         let history = collector.get_metrics_history(1).await;
         assert!(!history.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_redis_parser_validation() {
+        let test_data = r#"
+        # Server
+        redis_version:7.0.15
+        config_file:/etc/redis/conf.d/default.conf
+        
+        # Clients
+        connected_clients:105
+        client_recent_max_input_buffer:20480
+        
+        # Memory
+        used_memory:1.23GB
+        mem_fragmentation_ratio:15.36
+        "#;
+        
+        let parsed = MetricsCollector::parse_redis_info(test_data).unwrap();
+        
+        assert_eq!(parsed["server.redis_version"], "7.0.15");
+        assert_eq!(parsed["clients.connected_clients"], "105");
+        assert_eq!(parsed["memory.used_memory"], "1_23GB");
+        assert_eq!(parsed["memory.mem_fragmentation_ratio"], "15_36");
     }
 
     #[tokio::test]
