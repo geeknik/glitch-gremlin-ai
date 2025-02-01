@@ -20,6 +20,10 @@ anchor-lang = { version = "=0.30.1", features = ["init-if-needed"] }
 anchor-spl = "=0.30.1"
 num_enum = "0.5.11"
 solana-program = "=1.18.26"
+
+[patch.crates-io]
+num_enum = { version = "0.5.11" }  # Force override transitive dependencies
+
 spl-token = { version = "=4.0.0", features = ["no-entrypoint"] }
 mpl-token-metadata = { version = "=1.13.1", features = ["no-entrypoint"] }
 bytemuck = { version = "1.13", features = ["derive"] }
