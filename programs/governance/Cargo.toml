@@ -23,6 +23,8 @@ solana-program = "=1.16.12"
 
 [patch.crates-io]
 num_enum = { version = "0.5.11" }  # Force override transitive dependencies
+ahash = { version = "0.8.3" }
+hashbrown = { version = "0.13.2" }
 
 spl-token = { version = "=4.0.0", features = ["no-entrypoint"] }
 mpl-token-metadata = { version = "=1.13.1", features = ["no-entrypoint"] }
@@ -30,6 +32,8 @@ bytemuck = { version = "1.13", features = ["derive"] }
 thiserror = "1.0"
 num-derive = "=0.3.3"
 num-traits = "0.2.19"
+ahash = "=0.8.3"
+hashbrown = "=0.13.2"
 arrayref = "0.3.7"
 borsh = "0.10.3"
 serde = { version = "1.0", features = ["derive"] }
