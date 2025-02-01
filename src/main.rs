@@ -1,3 +1,6 @@
+#![feature(build_hasher_simple_hash_one)]
+#![feature(asm_const)]
+#![cfg_attr(target_arch = "bpf", feature(solana_custom_heap))]
 //! Glitch Gremlin AI - Command Line Interface
 //! 
 //! This binary provides the main entrypoint for interacting with the Glitch Gremlin AI system.
