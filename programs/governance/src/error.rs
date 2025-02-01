@@ -154,6 +154,8 @@ pub enum GovernanceError {
     DatabaseError,
     #[msg("Redis error")]
     RedisError,
+    #[msg("Failed to parse Redis INFO response")]
+    RedisInfoParseError,
     #[msg("Not implemented")]
     NotImplemented,
 }

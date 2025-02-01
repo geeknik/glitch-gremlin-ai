@@ -5,6 +5,7 @@ use {
     circular_buffer::CircularBuffer,
     metrics::{counter, gauge, histogram},
     std::sync::Arc,
+    std::collections::HashMap,
     tokio::sync::RwLock,
     super::forecasting::{TimeSeriesForecaster, ExponentialSmoothingParams, ForecastResult},
     time_series_generator::{Generator, TimePoint},
@@ -63,7 +64,49 @@ impl MetricsCollector {
         }
     }
 
+    fn parse_redis_info(info_str: &str) -> Result<HashMap<String, String>, GovernanceError> {
+        let mut info_map = HashMap::new();
+        
+        for line in info_str.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() || trimmed.starts_with('#') {
+                continue;
+            }
+            
+            let parts: Vec<&str> = trimmed.splitn(2, ':').collect();
+            if parts.len() == 2 {
+                let key = parts[0].trim().to_string();
+                let value = parts[1].trim().replace("\r", "");
+                info_map.insert(key, value);
+            }
+        }
+        
+        if info_map.is_empty() {
+            Err(GovernanceError::RedisInfoParseError)
+        } else {
+            Ok(info_map)
+        }
+    }
+
     pub async fn record_metrics(&self, point: MetricsPoint) -> Result<(), GovernanceError> {
+        // Collect Redis metrics
+        let redis_info: String = redis::cmd("INFO")
+            .query_async(&mut get_redis_connection().await?)
+            .await
+            .map_err(|e| {
+                msg!("Redis error: {:?}", e);
+                GovernanceError::RedisError
+            })?;
+
+        let info_map = Self::parse_redis_info(&redis_info)?;
+
+        // Record Redis metrics
+        if let Some(used_memory) = info_map.get("used_memory") {
+            let memory_value = used_memory.parse::<f64>()
+                .map_err(|_| GovernanceError::RedisInfoParseError)?;
+            gauge!("redis.used_memory", memory_value);
+        }
+
         // Record individual metrics
         gauge!("governance.total_stake", point.total_stake as f64);
         gauge!("governance.active_proposals", point.active_proposals as f64);
