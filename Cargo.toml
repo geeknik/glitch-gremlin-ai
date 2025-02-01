@@ -50,12 +50,12 @@ memoffset = "0.9"
 static_assertions = "1.1"
 
 # Base64 for decoding account data
-base64 = "0.21.0"
+base64 = "=0.21.0"
 
 # Time handling
-time = { version = "0.3", features = ["macros"] }
-log = "0.4.25"
-env_logger = { version = "0.10", features = ["auto-color", "humantime"] }
+time = { version = "=0.3", features = ["macros"] }
+log = "=0.4.25"
+env_logger = { version = "=0.10.0", features = ["auto-color", "humantime"] }
 
 [features]
 default = ["custom-heap", "custom-panic"]
