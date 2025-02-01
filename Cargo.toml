@@ -5,12 +5,27 @@ description = "On-chain program for Glitch Gremlin AI protocol"
 edition = "2021"
 license = "MIT"
 
+[workspace]
+members = [
+    "programs/governance"
+]
+
+[workspace.dependencies]
+num_enum = "0.5.11"
+anchor-lang = "=0.28.0"
+anchor-spl = "=0.28.0"
+solana-program = "=1.16.12"
+solana-sdk = "=1.16.12"
+solana-program-test = "=1.16.12"
+hashbrown = { version = "0.13", default-features = false, features = ["inline-more"] }
+
 [dependencies]
 # Solana ecosystem
-solana-sdk = "=1.16.12"
-solana-program = "=1.16.12"
-anchor-lang = { version = "=0.28.0", features = ["derive"] }
-anchor-spl = "=0.28.0"
+solana-sdk.workspace = true
+solana-program.workspace = true
+anchor-lang = { workspace = true, features = ["derive"] }
+anchor-spl.workspace = true
+hashbrown = { workspace = true }
 
 # Error handling
 anyhow = "1.0"
@@ -49,10 +64,6 @@ arrayref = "0.3.7"
 memoffset = "0.9"
 static_assertions = "1.1"
 
-# Explicit version pins for hash dependencies
-ahash = "=0.8.3"
-hashbrown = "=0.13.2"
-
 # Base64 for decoding account data
 base64 = "=0.21.7"
 
@@ -62,10 +73,13 @@ log = "=0.4.25"
 env_logger = { version = "=0.10.0", features = ["auto-color", "humantime"] }
 
 [features]
-default = ["custom-heap", "custom-panic"]
+default = ["custom-heap", "custom-panic", "gremlin-hasher"]
 custom-heap = []
 custom-panic = []
 test = []
+gremlin-hasher = [] # Use our custom GremlinHasher implementation
+std-hasher = [] # Use standard library hasher (for comparison/testing)
+simd-accel = [] # Enable SIMD acceleration for hashing (requires nightly)
 
 [profile.release]
 overflow-checks = true
@@ -85,7 +99,8 @@ name = "basic"
 path = "examples/basic.rs"
 required-features = ["test"]
 
-[workspace]
-members = [
-    "programs/governance"
-]
+[workspace.metadata.gremlin]
+# Configuration for the Gremlin hasher
+hash_rounds = 3 # Number of hash rounds for enhanced security
+simd_width = 256 # SIMD vector width when available
+pubkey_optimization = true # Enable Solana pubkey-specific optimizations
