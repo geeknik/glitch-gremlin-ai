@@ -74,45 +74,53 @@ impl MetricsCollector {
                 continue;
             }
             
-            // Handle section headers
             if trimmed.starts_with('#') {
-                current_section = trimmed.trim_start_matches('#').trim().to_string();
+                current_section = trimmed.trim_start_matches('#').trim()
+                    .replace(' ', "_")
+                    .replace("(", "")
+                    .replace(")", "")
+                    .to_lowercase();
                 continue;
             }
             
-            // Handle key-value pairs with multiple colons
             let mut parts = trimmed.splitn(2, ':');
-            let key = match parts.next() {
-                Some(k) => k.trim(),
-                None => continue,
+            let (key, value) = match (parts.next(), parts.next()) {
+                (Some(k), Some(v)) => (k.trim(), v.trim()),
+                _ => continue,
             };
-            
-            let value = parts.next().unwrap_or("").trim();
-            
-            // Build hierarchical keys for nested metrics
-            let full_key = if !current_section.is_empty() { 
-                format!("{}.{}", current_section.replace(' ', "_"), key) 
-            } else { 
-                key.to_string() 
-            };
-            
-            // Handle value formatting for Prometheus compatibility
-            let processed_value = value
-                .replace('=', "_")
-                .replace('{', "")
-                .replace('}', "")
-                .replace('"', "")
-                .replace('/', "_per_");
-            
-            info_map.insert(full_key.to_lowercase(), processed_value);
+
+            let formatted_key = format!("{}_{}", current_section, key)
+                .trim_start_matches('_')
+                .to_string();
+
+            if !Self::ALLOWED_METRICS.iter().any(|prefix| formatted_key.starts_with(prefix)) {
+                continue;
+            }
+
+            let valid_value = value
+                .replace('\r', "")
+                .replace('%', "_percent")
+                .replace('/', "_per");
+                
+            info_map.insert(formatted_key, valid_value);
         }
         
         if info_map.is_empty() {
+            msg!("Parsed 0 metrics from Redis info:\n{}", info_str);
             Err(GovernanceError::RedisInfoParseError)
         } else {
             Ok(info_map)
         }
     }
+
+    const ALLOWED_METRICS: &'static [&'static str] = &[
+        "server_", 
+        "clients_",
+        "memory_",
+        "stats_",
+        "cpu_",
+        "persistence_"
+    ];
 
     fn detect_metric_type(value: &str) -> &'static str {
         if value.contains('.') {
@@ -125,31 +133,38 @@ impl MetricsCollector {
     }
 
     pub async fn record_metrics(&self, point: MetricsPoint) -> Result<(), GovernanceError> {
-        // Collect Redis metrics
         let redis_info: String = redis::cmd("INFO")
             .query_async(&mut get_redis_connection().await?)
             .await
             .map_err(|e| {
-                msg!("Redis error: {:?}", e);
+                msg!("Redis query error: {:?}", e);
                 GovernanceError::RedisError
             })?;
 
-        let info_map = Self::parse_redis_info(&redis_info)?;
+        let info_map = Self::parse_redis_info(&redis_info)
+            .map_err(|e| {
+                msg!("Parsing failed for Redis info:\n{}", redis_info);
+                e
+            })?;
 
-        // Record Redis metrics
         for (key, value) in info_map.iter() {
-            match detect_metric_type(value) {
+            match Self::detect_metric_type(value) {
                 "gauge" => {
-                    if let Ok(val) = value.parse::<f64>() {
+                    let sanitized = value
+                        .replace("M", "_megabytes")
+                        .replace("K", "_kilobytes")
+                        .replace("B", "_bytes");
+                    if let Ok(val) = sanitized.parse::<f64>() {
                         gauge!(format!("redis.{}", key), val);
                     }
                 },
                 "counter" => {
-                    if let Ok(val) = value.parse::<i64>() {
+                    let sanitized = value.replace(",", "");
+                    if let Ok(val) = sanitized.parse::<i64>() {
                         counter!(format!("redis.{}", key), val);
                     }
                 },
-                _ => debug!("Ignoring non-numeric metric {}={}", key, value),
+                _ => debug!("Discarded invalid metric {}={}", key, value),
             }
         }
 
