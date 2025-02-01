@@ -1,5 +1,5 @@
 [toolchain]
-channel = "nightly-2024-04-05"  # Verified working with Solana 1.18+
+channel = "nightly-2024-04-04"  # Verified working with Solana 1.18+
 components = ["rustfmt", "clippy"]
 targets = ["x86_64-unknown-linux-gnu", "bpfel-unknown-unknown"]
 profile = "minimal"
