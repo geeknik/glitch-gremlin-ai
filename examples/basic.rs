@@ -436,7 +436,7 @@ impl EnhancedRedisClient {
             .query(&mut conn)
             .map_err(CacheError::Redis)?;
         
-        let info = parseRedisInfo(&raw_info);  // Parse the raw response
+        let info = parse_redis_info(&raw_info);  // Parse the raw response
 
         let total_keys: usize = redis::cmd("DBSIZE")
             .query(&mut conn)
@@ -973,7 +973,7 @@ fn calculate_security_hash(key: &str, value: &str, timestamp: u64) -> String {
 }
 
 /// Calculate cache hit rate
-fn parseRedisInfo(response: &str) -> HashMap<String, String> {
+fn parse_redis_info(response: &str) -> HashMap<String, String> {
     let mut result = HashMap::new();
     response.split('\r').for_each(|line| {
         if line.starts_with('#') || line.trim().is_empty() {
