@@ -1,5 +1,17 @@
 import type { Redis as IORedis, RedisOptions } from 'ioredis';
 
+export function parseRedisInfo(response: string): Record<string, string> {
+    const result: Record<string, string> = {};
+    response.split('\r\n').forEach(line => {
+        if (line.startsWith('#')) return; // Skip section headers
+        const [key, ...values] = line.split(':');
+        if (key && values.length) {
+            result[key.trim()] = values.join(':').trim();
+        }
+    });
+    return result;
+}
+
 export interface RedisError extends Error {
     code?: string;
     command?: string;
@@ -22,7 +34,8 @@ export interface RedisConfig extends RedisOptions {
 }
 
 export interface Redis extends IORedis {
-    info(section?: string): Promise<string>;
+    infoRaw(section?: string): Promise<string>;
+    info(section?: string): Promise<Record<string, string>>;
     get(key: string): Promise<string | null>;
     hgetall(key: string): Promise<{[key: string]: string} | null>;
 }
