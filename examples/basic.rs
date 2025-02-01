@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 //! Basic example demonstrating core functionality of the Glitch Gremlin Program
 //! 
 //! This example shows how to:
@@ -9,78 +11,143 @@
 //! 
 //! For more advanced examples, see the other files in the examples directory.
 
-extern crate serde;
-extern crate thiserror;
-
 use serde::{Serialize, Deserialize};
 use solana_program::pubkey::Pubkey;
 use glitch_gremlin_program::{
-    state::chaos_request::{TestType, ChaosRequestStatus as CoreChaosRequestStatus},
-    rpc::helius_client::{HeliusClient, HeliusConfig},
+    state::chaos_request::ChaosRequestStatus as CoreChaosRequestStatus,
 };
 
 // Standard library imports for core functionality
 use std::{
-    collections::{HashMap, HashSet},
-    io::Write,
-    sync::{Arc, Mutex, atomic::{AtomicUsize, Ordering}},
+    collections::{HashMap, HashSet, VecDeque},
+    sync::{Arc, Mutex},
     time::{Duration, Instant, SystemTime},
 };
 
-// External crates
-use anyhow::{Result, Context};
-use thiserror::Error;
+// Redis imports for async operations
 use redis::{
     Client as RedisClient, 
     Commands, 
     FromRedisValue, 
     ToRedisArgs,
-    Value as RedisValue,
-    ErrorKind,
+    Pipeline,
+    AsyncCommands,
 };
-use time::{OffsetDateTime, Time};
 
-// Add Redis and environment imports
-use std::env;
+// External crates for enhanced functionality
+use anyhow::Result;
+use thiserror::Error;
+use tokio;
+use rand::Rng;
+use sha2::{Sha256, Digest};
+use log::{error, info, warn};
 
-// Add CacheError definition
+// Redis connection configuration
+const REDIS_HOST: &str = "r.glitchgremlin.ai";
+const REDIS_PORT: u16 = 6379;
+const CACHE_TTL_SECS: u64 = 3600; // 1 hour cache TTL
+const CACHE_WARM_BATCH_SIZE: usize = 50;
+const CACHE_STALE_THRESHOLD_SECS: u64 = 300; // 5 minutes
+const CACHE_INVALIDATION_PATTERN: &str = "request_status:*";
+const CACHE_WARM_INTERVAL_SECS: u64 = 60;
+
+// Security thresholds and limits
+const MAX_GLOBAL_TRANSITIONS_PER_SEC: usize = 1000;
+const MIN_TRANSITION_INTERVAL_MS: u64 = 50;
+const MAX_TRANSITIONS_PER_STATUS: usize = 100;
+const SECURITY_TIME_WINDOW_SECS: u64 = 60;
+const MAX_TIMESTAMP_SKEW_SECS: u64 = 300; // 5 minutes maximum clock skew allowed
+const MAX_DAILY_REQUESTS: u32 = 10_000;
+
+// Rate limiting configuration
+const RATE_LIMIT_WINDOW_SECS: u64 = 60;
+const HIGH_PRIORITY_MULTIPLIER: f64 = 1.5;
+const BURST_ALLOWANCE: u32 = 100;
+
+// Error recovery and circuit breaker settings
+const CIRCUIT_BREAKER_THRESHOLD: usize = 5;
+const CIRCUIT_BREAKER_RESET_SECS: u64 = 300;
+const MAX_ERROR_HISTORY: usize = 1000;
+
+/// Cache-related errors that can occur during Redis operations
 #[derive(Debug, Error)]
 pub enum CacheError {
+    /// Redis-specific errors from the underlying client
     #[error("Redis error: {0}")]
     Redis(#[from] redis::RedisError),
     
+    /// Serialization errors when converting between formats
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
     
+    /// Connection errors when establishing Redis connections
     #[error("Connection error: {0}")]
     Connection(String),
     
+    /// Key not found errors when accessing cache entries
     #[error("Value not found for key: {0}")]
     NotFound(String),
     
+    /// Data format validation errors
     #[error("Invalid data format: {0}")]
     InvalidFormat(String),
+
+    /// Security violation errors including replay attacks, rate limiting, etc.
+    #[error("Security violation: {0}")]
+    SecurityViolation(String),
 }
 
-// Add CacheMetrics definition
-#[derive(Debug, Default)]
+/// Metrics for monitoring cache performance and health
+#[derive(Debug, Default, Clone)]
 pub struct CacheMetrics {
+    /// Total number of operations performed
     pub total_operations: usize,
+    /// Number of successful cache hits
     pub cache_hits: usize,
+    /// Number of cache misses requiring fallback
     pub cache_misses: usize,
+    /// Number of stale entries removed during cleanup
     pub stale_entries_cleared: usize,
+    /// Timestamp of last write operation
     pub last_write: Option<SystemTime>,
+    /// Timestamp of last cleanup operation
     pub last_cleanup: Option<SystemTime>,
+    /// Count of errors encountered
+    pub error_count: usize,
+    /// History of operation latencies
+    pub operation_latencies: Vec<Duration>,
+    /// Timestamps of operations for analysis
+    pub operation_timestamps: Vec<SystemTime>,
+    /// Peak memory usage in bytes
+    pub peak_memory: u64,
 }
 
-// Add EnhancedRedisClient definition
+/// Enhanced Redis client with monitoring and security features
 #[derive(Clone)]
 pub struct EnhancedRedisClient {
+    /// Underlying Redis client
     client: RedisClient,
+    /// Performance and health metrics
     metrics: Arc<Mutex<CacheMetrics>>,
 }
 
 impl EnhancedRedisClient {
+    /// Create a new enhanced Redis client with the specified host and port
+    /// 
+    /// # Arguments
+    /// 
+    /// * `host` - The Redis server hostname or IP address
+    /// * `port` - The Redis server port number
+    /// 
+    /// # Returns
+    /// 
+    /// Returns a Result containing either the new EnhancedRedisClient instance or a CacheError
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// let client = EnhancedRedisClient::new("localhost", 6379)?;
+    /// ```
     pub fn new(host: &str, port: u16) -> Result<Self, CacheError> {
         let client = RedisClient::open(format!("redis://{}:{}", host, port))
             .map_err(|e| CacheError::Connection(e.to_string()))?;
@@ -91,66 +158,58 @@ impl EnhancedRedisClient {
         })
     }
 
-    pub async fn set_cached_status(&self, program_id: &Pubkey, status: &CoreChaosRequestStatus) -> Result<(), CacheError> {
-        let mut conn = self.client.get_connection()
-            .map_err(|e| CacheError::Connection(e.to_string()))?;
+    /// Enhanced Redis query with proper error handling and metrics
+    async fn redis_hget<T>(&self, key: &str, field: &str) -> Result<Option<T>, CacheError> 
+    where
+        T: FromRedisValue + Send + Sync + 'static,
+    {
+        let mut conn = self.client.get_async_connection().await.map_err(CacheError::Redis)?;
+        let result: Option<T> = conn.hget(key, field).await.map_err(CacheError::Redis)?;
+        Ok(result)
+    }
 
-        let key = format!("request_status:{}", program_id);
-        let serialized = serde_json::to_string(&SerializableChaosRequestStatus(status.clone()))
-            .map_err(CacheError::Serialization)?;
-
-        let mut pipe = redis::pipe();
-        pipe.atomic()
-            .hset(&key, "status", serialized)
-            .hset(&key, "last_update", SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as i64)
-            .expire(&key, CACHE_TTL_SECS as usize)
-            .query(&mut conn)
-            .map_err(CacheError::Redis)?;
-
-        if let Ok(mut metrics) = self.metrics.lock() {
-            metrics.total_operations += 1;
-            metrics.last_write = Some(SystemTime::now());
-        }
-
+    /// Enhanced Redis set with proper error handling and metrics
+    async fn redis_hset<T>(&self, key: &str, field: &str, value: T) -> Result<(), CacheError>
+    where
+        T: ToRedisArgs + Send + Sync + 'static,
+    {
+        let mut conn = self.client.get_async_connection().await.map_err(CacheError::Redis)?;
+        let _: () = conn.hset(key, field, value).await.map_err(CacheError::Redis)?;
         Ok(())
     }
 
-    pub async fn get_cached_timestamp(&self, key: &str) -> Result<Option<i64>, CacheError> {
-        let mut conn = self.client.get_connection()
-            .map_err(|e| CacheError::Connection(e.to_string()))?;
-
-        if let Ok(Some(timestamp)) = redis_hget::<_, _, i64>(&mut conn, &key, "last_update").await {
-            if let Ok(mut metrics) = self.metrics.lock() {
-                metrics.total_operations += 1;
-                metrics.cache_hits += 1;
-            }
-            Ok(Some(timestamp))
-        } else {
-            if let Ok(mut metrics) = self.metrics.lock() {
-                metrics.total_operations += 1;
-                metrics.cache_misses += 1;
-            }
-            Ok(None)
-        }
+    /// Pipeline multiple Redis operations atomically
+    async fn redis_pipeline<T>(&self, pipe: &mut Pipeline) -> Result<T, CacheError>
+    where
+        T: FromRedisValue + Send + Sync + 'static,
+    {
+        let mut conn = self.client.get_async_connection().await.map_err(CacheError::Redis)?;
+        let result: T = pipe.query_async(&mut conn).await.map_err(CacheError::Redis)?;
+        Ok(result)
     }
 
+    /// Clear expired entries with proper error handling and type safety
     pub async fn clear_expired_entries(&self) -> Result<u64, CacheError> {
+        let mut cleared: u64 = 0;
         let mut conn = self.client.get_connection()
             .map_err(|e| CacheError::Connection(e.to_string()))?;
 
-        let mut cleared = 0;
-        let keys: Vec<String> = conn.keys(CACHE_INVALIDATION_PATTERN)
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        let pattern = "program:*:status";
+        let keys: Vec<String> = conn.keys(pattern)
             .map_err(CacheError::Redis)?;
 
         for key in keys {
-            if let Ok(Some(timestamp)) = redis_hget::<_, _, i64>(&mut conn, &key, "last_update").await {
-                let age = SystemTime::now()
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs() as i64 - timestamp;
+            let last_update: Option<u64> = conn.hget(&key, "last_update")
+                .map_err(CacheError::Redis)?;
 
-                if age > CACHE_STALE_THRESHOLD_SECS as i64 {
-                    conn.del(&key).map_err(CacheError::Redis)?;
+            if let Some(timestamp) = last_update {
+                if now - timestamp > 24 * 60 * 60 { // 24 hours
+                    let _: () = conn.del(&key).map_err(CacheError::Redis)?;
                     cleared += 1;
                 }
             }
@@ -163,1584 +222,729 @@ impl EnhancedRedisClient {
 
         Ok(cleared)
     }
-}
 
-        max_attempts: u32,
-        reason: String,
-    },
-    SwitchEndpoint {
-        reason: String,
-    },
-    Alert {
-        message: String,
-    },
-}
+    /// Validate and enforce security time windows for operations
+    async fn validate_time_window(&self, program_id: &Pubkey) -> Result<bool, CacheError> {
+        let mut conn = self.client.get_connection()
+            .map_err(|e| CacheError::Connection(e.to_string()))?;
 
-impl RecoveryAction {
-    pub fn get_duration(&self) -> Option<Duration> {
-        match self {
-            RecoveryAction::BackOff { duration, .. } => Some(Duration::from_millis(*duration)),
-            _ => None,
-        }
-    }
-
-    pub fn get_reason(&self) -> &str {
-        match self {
-            RecoveryAction::BackOff { reason, .. } => reason,
-            RecoveryAction::Retry { reason, .. } => reason,
-            RecoveryAction::SwitchEndpoint { reason } => reason,
-            RecoveryAction::Alert { message } => message,
-        }
-    }
-}
-
-/// Enhanced error tracking with timestamps and categorization
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ErrorEntry {
-    pub timestamp: u64,
-    pub error: String,
-    pub error_type: ErrorType,
-    pub program_id: Option<Pubkey>,
-    pub request_id: Option<String>,
-    pub recovery_attempts: usize,
-}
-
-/// Analysis of error patterns and trends
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ErrorAnalysis {
-    pub total_errors: usize,
-    pub error_types: HashMap<ErrorType, usize>,
-    pub error_timeline: Vec<(u64, ErrorType)>,
-    pub peak_error_rate: f64,
-    pub avg_recovery_time: Duration,
-    pub most_affected_programs: HashMap<Pubkey, usize>,
-}
-
-/// Entry for error timeline analysis
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ErrorTimelineEntry {
-    pub timestamp: u64,
-    pub error_type: ErrorType,
-    pub program_id: Pubkey,
-    pub recovery_action: Option<RecoveryAction>,
-    pub resolution_time: Option<Duration>,
-}
-
-// Constants for security thresholds
-const MAX_GLOBAL_TRANSITIONS_PER_SEC: usize = 1000;
-const MIN_TRANSITION_INTERVAL_MS: u64 = 50;
-const MAX_TRANSITIONS_PER_STATUS: usize = 100;
-const SECURITY_TIME_WINDOW_SECS: u64 = 60;
-
-// Add security timestamp validation
-const MAX_TIMESTAMP_SKEW_SECS: u64 = 300; // 5 minutes maximum clock skew allowed
-
-// Add Redis configuration constants
-const REDIS_HOST: &str = "r.glitchgremlin.ai";
-const REDIS_PORT: u16 = 6379;
-const CACHE_TTL_SECS: u64 = 3600; // 1 hour cache TTL
-const MAX_DAILY_REQUESTS: u32 = 10_000;
-
-// Add cache configuration constants
-const CACHE_WARM_BATCH_SIZE: usize = 50;
-const CACHE_STALE_THRESHOLD_SECS: u64 = 300; // 5 minutes
-const CACHE_INVALIDATION_PATTERN: &str = "request_status:*";
-const CACHE_WARM_INTERVAL_SECS: u64 = 60;
-
-// Add rate limiting constants
-const RATE_LIMIT_WINDOW_SECS: u64 = 60;
-const HIGH_PRIORITY_MULTIPLIER: f64 = 1.5;
-const BURST_ALLOWANCE: u32 = 100;
-
-// Add error recovery constants
-const CIRCUIT_BREAKER_THRESHOLD: usize = 5;
-const CIRCUIT_BREAKER_RESET_SECS: u64 = 300;
-const MAX_ERROR_HISTORY: usize = 1000;
-
-/// Network configuration for test execution
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct NetworkConfig {
-    cluster: SolanaCluster,
-    commitment: String,
-    test_mode: TestMode,
-    /// Rate limit for RPC requests (requests per second)
-    rate_limit: Option<u32>,
-    /// Retry configuration
-    retry_config: RetryConfig,
-}
-
-/// Configuration for request retries with enhanced metrics
-#[derive(Debug, Clone)]
-struct RetryConfig {
-    max_retries: u64,  // Changed from u32 to u64 for consistency
-    base_delay_ms: u64,
-    max_delay_ms: u64,
-    /// Jitter range in milliseconds (0-100)
-    jitter_range_ms: u64,
-    /// Whether to use exponential backoff
-    use_exponential: bool,
-}
-
-impl Default for RetryConfig {
-    fn default() -> Self {
-        Self {
-            max_retries: 3,
-            base_delay_ms: 500,
-            max_delay_ms: 5000,
-            jitter_range_ms: 100,
-            use_exponential: true,
-        }
-    }
-}
-
-/// Available Solana clusters with enhanced configuration
-#[derive(Debug, Clone, PartialEq)]
-enum SolanaCluster {
-    Mainnet,
-    Devnet,
-    Testnet,
-    Localnet,
-    Custom {
-        name: String,
-        rpc_url: String,
-        ws_url: Option<String>,
-    },
-}
-
-impl SolanaCluster {
-    fn name(&self) -> String {
-        match self {
-            SolanaCluster::Mainnet => "Mainnet".to_string(),
-            SolanaCluster::Devnet => "Devnet".to_string(),
-            SolanaCluster::Testnet => "Testnet".to_string(),
-            SolanaCluster::Localnet => "Localnet".to_string(),
-            SolanaCluster::Custom { name, .. } => format!("Custom ({})", name),
-        }
-    }
-
-    fn rpc_url(&self) -> String {
-        match self {
-            SolanaCluster::Mainnet => "https://api.mainnet-beta.solana.com".to_string(),
-            SolanaCluster::Devnet => "https://api.devnet.solana.com".to_string(),
-            SolanaCluster::Testnet => "https://api.testnet.solana.com".to_string(),
-            SolanaCluster::Localnet => "http://127.0.0.1:8899".to_string(),
-            SolanaCluster::Custom { rpc_url, .. } => rpc_url.clone(),
-        }
-    }
-
-    fn ws_url(&self) -> Option<String> {
-        match self {
-            SolanaCluster::Mainnet => Some("wss://api.mainnet-beta.solana.com".to_string()),
-            SolanaCluster::Devnet => Some("wss://api.devnet.solana.com".to_string()),
-            SolanaCluster::Testnet => Some("wss://api.testnet.solana.com".to_string()),
-            SolanaCluster::Localnet => Some("ws://127.0.0.1:8900".to_string()),
-            SolanaCluster::Custom { ws_url, .. } => ws_url.clone(),
-        }
-    }
-
-    fn is_local(&self) -> bool {
-        matches!(self, SolanaCluster::Localnet)
-    }
-
-    fn requires_api_key(&self) -> bool {
-        matches!(self, SolanaCluster::Mainnet | SolanaCluster::Custom { .. })
-    }
-
-    fn get_network_tier(&self) -> &'static str {
-        match self {
-            SolanaCluster::Mainnet => "production",
-            SolanaCluster::Devnet => "development",
-            SolanaCluster::Testnet => "testing",
-            SolanaCluster::Localnet => "local",
-            SolanaCluster::Custom { .. } => "custom",
-        }
-    }
-
-    fn get_recommended_commitment(&self) -> &'static str {
-        match self {
-            SolanaCluster::Mainnet => "finalized",
-            SolanaCluster::Devnet | SolanaCluster::Testnet => "confirmed",
-            SolanaCluster::Localnet | SolanaCluster::Custom { .. } => "processed",
-        }
-    }
-
-    fn get_rate_limits(&self) -> Option<(u32, Duration)> {
-        match self {
-            SolanaCluster::Mainnet => Some((100, Duration::from_secs(1))), // 100 req/s
-            SolanaCluster::Devnet => Some((50, Duration::from_secs(1))),   // 50 req/s
-            SolanaCluster::Testnet => Some((25, Duration::from_secs(1))),  // 25 req/s
-            SolanaCluster::Localnet => None,                               // No limits
-            SolanaCluster::Custom { .. } => Some((200, Duration::from_secs(1))), // Custom high limit
-        }
-    }
-}
-
-/// Test execution modes with enhanced configuration
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum TestMode {
-    /// Real transactions on network
-    Live {
-        /// Maximum concurrent requests
-        max_concurrent: u32,
-        /// Transaction confirmation level
-        confirm_level: u8,
-    },
-    /// Mock responses for testing
-    Mock {
-        /// Simulated latency in ms
-        latency_ms: u32,
-        /// Error rate percentage (0-100)
-        error_rate: u8,
-    },
-    /// Simulation without committing
-    Simulate {
-        /// Simulation speed multiplier
-        speed_multiplier: f32,
-        /// Include state changes
-        track_state: bool,
-    },
-}
-
-impl TestMode {
-    /// Get the recommended timeout for this mode
-    fn get_timeout_secs(&self) -> u64 {
-        match self {
-            TestMode::Live { max_concurrent, .. } => {
-                // Scale timeout based on concurrency
-                120 + (max_concurrent * 10) as u64
-            }
-            TestMode::Mock { latency_ms, .. } => {
-                // Scale timeout based on simulated latency
-                30 + ((*latency_ms as u64) / 1000)
-            }
-            TestMode::Simulate { speed_multiplier, .. } => {
-                // Adjust timeout based on simulation speed
-                (60.0 / *speed_multiplier as f32) as u64
-            }
-        }
-    }
-
-    /// Get the recommended poll interval with improved timing
-    fn get_poll_interval(&self) -> Duration {
-        match self {
-            TestMode::Live { .. } => Duration::from_secs(5),
-            TestMode::Mock { latency_ms, .. } => Duration::from_millis(*latency_ms as u64),
-            TestMode::Simulate { speed_multiplier, .. } => {
-                Duration::from_secs_f64(1.0 / (*speed_multiplier as f64))
-            }
-        }
-    }
-
-    /// Simulates state changes based on test mode
-    fn simulate_state_metrics(&self, checks: usize) -> StateMetrics {
-        match self {
-            TestMode::Live { max_concurrent, .. } => {
-                // Real-world like resource usage
-                StateMetrics {
-                    checks_in_state: checks,
-                    memory_usage: 1000 + (checks as u64 * 500), // 500KB per check
-                    cpu_usage: 0.1 + (checks as f64 * 0.01).min(0.8), // Max 80% CPU
-                    error_count: if checks % ((*max_concurrent as usize) * 10) == 0 { 1 } else { 0 },
-                    start_time: std::time::Instant::now(),
-                    last_update: std::time::Instant::now(),
-                    status_history: Vec::new(),
-                    // Initialize enhanced metrics
-                    peak_memory_usage: 0,
-                    peak_cpu_usage: 0.0,
-                    avg_check_duration: Duration::from_secs(0),
-                    total_check_duration: Duration::from_secs(0),
-                    check_count: 0,
-                }
-            }
-            TestMode::Mock { error_rate, .. } => {
-                // Simulated errors based on error rate
-                StateMetrics {
-                    checks_in_state: checks,
-                    memory_usage: 500 + (checks as u64 * 100), // Light memory usage
-                    cpu_usage: 0.05 + (checks as f64 * 0.005), // Low CPU usage
-                    error_count: if rand::random::<u8>() < *error_rate { 1 } else { 0 },
-                    start_time: std::time::Instant::now(),
-                    last_update: std::time::Instant::now(),
-                    status_history: Vec::new(),
-                    // Initialize enhanced metrics
-                    peak_memory_usage: 0,
-                    peak_cpu_usage: 0.0,
-                    avg_check_duration: Duration::from_secs(0),
-                    total_check_duration: Duration::from_secs(0),
-                    check_count: 0,
-                }
-            }
-            TestMode::Simulate { speed_multiplier, .. } => {
-                // Accelerated simulation metrics
-                let multiplier = *speed_multiplier as f64;
-                StateMetrics {
-                    checks_in_state: checks,
-                    memory_usage: if true { 
-                        2000 + (checks as f64 * 200.0 * multiplier) as u64 
-                    } else { 
-                        500 + (checks as f64 * 50.0 * multiplier) as u64 
-                    },
-                    cpu_usage: 0.2 + ((checks as f64 * 0.02 * multiplier).min(0.95)),
-                    error_count: if checks % (10 * multiplier.round() as usize) == 0 { 1 } else { 0 },
-                    start_time: std::time::Instant::now(),
-                    last_update: std::time::Instant::now(),
-                    status_history: Vec::new(),
-                    // Initialize enhanced metrics
-                    peak_memory_usage: 0,
-                    peak_cpu_usage: 0.0,
-                    avg_check_duration: Duration::from_secs(0),
-                    total_check_duration: Duration::from_secs(0),
-                    check_count: 0,
-                }
-            }
-        }
-    }
-
-    /// Get mode description
-    fn description(&self) -> String {
-        match self {
-            TestMode::Live { max_concurrent, confirm_level } => {
-                format!("LIVE (max_concurrent={}, confirm_level={})", 
-                    max_concurrent, confirm_level)
-            }
-            TestMode::Mock { latency_ms, error_rate } => {
-                format!("MOCK (latency={}ms, error_rate={}%)", 
-                    latency_ms, error_rate)
-            }
-            TestMode::Simulate { speed_multiplier, track_state } => {
-                format!("SIMULATION (speed={}x, track_state={})",
-                    speed_multiplier, track_state)
-            }
-        }
-    }
-
-    /// Create default test mode configuration
-    fn default_live() -> Self {
-        TestMode::Live {
-            max_concurrent: 5,
-            confirm_level: 1,
-        }
-    }
-
-    fn default_mock() -> Self {
-        TestMode::Mock {
-            latency_ms: 500,
-            error_rate: 10,
-        }
-    }
-
-    fn default_simulate() -> Self {
-        TestMode::Simulate {
-            speed_multiplier: 2.0,
-            track_state: true,
-        }
-    }
-
-    fn default_mainnet() -> Self {
-        TestMode::Live {
-            max_concurrent: 2,  // Conservative for mainnet
-            confirm_level: 2,   // Higher confirmation requirement
-        }
-    }
-
-    fn default_testnet() -> Self {
-        TestMode::Live {
-            max_concurrent: 8,  // More aggressive for testnet
-            confirm_level: 1,   // Lower confirmation requirement
-        }
-    }
-
-    fn get_network_requirements(&self) -> NetworkRequirements {
-        match self {
-            TestMode::Live { max_concurrent, confirm_level } => NetworkRequirements {
-                min_rpc_nodes: (*max_concurrent as u32).max(3),
-                min_confirmation_level: *confirm_level,
-                requires_websocket: true,
-                requires_archive_node: false,
-            },
-            TestMode::Mock { .. } => NetworkRequirements {
-                min_rpc_nodes: 1,
-                min_confirmation_level: 1,
-                requires_websocket: false,
-                requires_archive_node: false,
-            },
-            TestMode::Simulate { .. } => NetworkRequirements {
-                min_rpc_nodes: 1,
-                min_confirmation_level: 1,
-                requires_websocket: true,
-                requires_archive_node: true,
-            },
-        }
-    }
-}
-
-/// Network requirements for different test modes
-#[derive(Debug)]
-struct NetworkRequirements {
-    min_rpc_nodes: u32,
-    min_confirmation_level: u8,
-    requires_websocket: bool,
-    requires_archive_node: bool,
-}
-
-/// Creates a network configuration for test execution with enhanced options
-fn create_network_config(cluster: SolanaCluster, test_mode: TestMode) -> NetworkConfig {
-    NetworkConfig {
-        cluster,
-        commitment: "confirmed".to_string(),
-        test_mode,
-        rate_limit: match test_mode {
-            TestMode::Live { max_concurrent, .. } => Some(max_concurrent),
-            TestMode::Mock { .. } => None,
-            TestMode::Simulate { speed_multiplier, .. } => Some((20.0 * speed_multiplier) as u32),
-        },
-        retry_config: RetryConfig::default(),
-    }
-}
-
-/// Creates a parameter map with common settings
-fn create_base_parameters() -> HashMap<String, String> {
-    let mut params = HashMap::new();
-    params.insert("duration_seconds".to_string(), "300".to_string());
-    params.insert("max_transactions".to_string(), "1000".to_string());
-    params.insert("log_level".to_string(), "debug".to_string());
-    params.insert("retry_count".to_string(), "3".to_string());
-    params
-}
-
-/// Creates test-specific parameters based on test type
-fn create_test_parameters(test_type: &TestType) -> HashMap<String, String> {
-    let mut params = create_base_parameters();
-    
-    match test_type {
-        TestType::Fuzz => {
-            params.extend([
-                ("test_type".to_string(), "fuzz".to_string()),
-                ("mutation_rate".to_string(), "50".to_string()),
-                ("seed".to_string(), "12345".to_string()),
-                ("target_instructions".to_string(), "all".to_string()),
-                ("mutation_strategy".to_string(), "random".to_string()),
-            ]);
-        },
-        TestType::LoadTest => {
-            params.extend([
-                ("test_type".to_string(), "load_test".to_string()),
-                ("tps".to_string(), "5000".to_string()),
-                ("ramp_up".to_string(), "60".to_string()),
-                ("distribution".to_string(), "exponential".to_string()),
-                ("cool_down".to_string(), "30".to_string()),
-            ]);
-        },
-        TestType::SecurityScan => {
-            params.extend([
-                ("test_type".to_string(), "security_scan".to_string()),
-                ("scan_depth".to_string(), "deep".to_string()),
-                ("vuln_categories".to_string(), "buffer,arithmetic,access".to_string()),
-                ("ignore_false_positives".to_string(), "true".to_string()),
-                ("export_format".to_string(), "sarif".to_string()),
-            ]);
-        },
-        TestType::ConcurrencyTest => {
-            params.extend([
-                ("test_type".to_string(), "concurrency_test".to_string()),
-                ("thread_count".to_string(), "16".to_string()),
-                ("conflict_percentage".to_string(), "30".to_string()),
-                ("interleave_strategy".to_string(), "random".to_string()),
-                ("deadlock_detection".to_string(), "enabled".to_string()),
-            ]);
-        },
-        TestType::Custom(name) => {
-            params.extend([
-                ("test_type".to_string(), "custom".to_string()),
-                ("custom_param".to_string(), "value".to_string()),
-                ("test_name".to_string(), name.clone()),
-                ("custom_mode".to_string(), "advanced".to_string()),
-            ]);
-        },
-    }
-    params
-}
-
-/// Status update formatting options with enhanced display capabilities
-#[derive(Debug, Clone)]
-struct StatusFormat {
-    use_color: bool,
-    show_metrics: bool,
-    compact: bool,
-    /// Maximum width for progress display
-    max_width: usize,
-    /// Whether to show timestamps
-    show_timestamps: bool,
-}
-
-impl Default for StatusFormat {
-    fn default() -> Self {
-        Self {
-            use_color: true,
-            show_metrics: true,
-            compact: false,
-            max_width: 120,
-            show_timestamps: true,
-        }
-    }
-}
-
-/// Prints a formatted status update for a chaos request with enhanced visualization
-fn print_status_update(request_id: &str, status: &CoreChaosRequestStatus, program: &Pubkey, format: &StatusFormat) -> String {
-    let (status_symbol, status_desc, color_code) = match status {
-        CoreChaosRequestStatus::Pending => ("⏳", "pending execution", "\x1b[33m"),
-        CoreChaosRequestStatus::InProgress => ("🔄", "currently running", "\x1b[36m"),
-        CoreChaosRequestStatus::Completed => ("✅", "completed successfully", "\x1b[32m"),
-        CoreChaosRequestStatus::Failed => ("❌", "failed to complete", "\x1b[31m"),
-        CoreChaosRequestStatus::Cancelled => ("🚫", "cancelled by authority", "\x1b[35m"),
-        CoreChaosRequestStatus::TimedOut => ("⌛", "timed out during execution", "\x1b[33m"),
-    };
-    
-    let mut output = String::new();
-
-    // Add timestamp if enabled
-    if format.show_timestamps {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default();
-        output.push_str(&format!("[{:>10.3}s] ", now.as_secs_f64()));
-    }
-
-    // Add status symbol and basic info
-    output.push_str(&format!("{} {}", status_symbol, request_id));
-
-    // Add program ID if not compact
-    if !format.compact {
-        output.push_str(&format!(" for program {}", program.to_string()));
-    }
-
-    // Add status description with optional color
-    let status_text = if format.use_color {
-        format!("{}{}{}\x1b[0m", color_code, status_desc, "\x1b[0m")
-    } else {
-        status_desc.to_string()
-    };
-    output.push_str(&format!(" is {}", status_text));
-
-    // Truncate if exceeds max width
-    if output.len() > format.max_width {
-        output.truncate(format.max_width - 3);
-        output.push_str("...");
-    }
-
-    output
-}
-
-/// Tracks the progress and results of a chaos request
-#[derive(Debug)]
-struct RequestTracker {
-    request_id: String,
-    program_id: Pubkey,
-    start_time: std::time::Instant,
-    last_status: CoreChaosRequestStatus,
-    status_changes: Vec<(CoreChaosRequestStatus, std::time::Instant, StateMetrics)>,
-    metrics: RequestMetrics,
-    network_config: NetworkConfig,  // Add network configuration
-}
-
-/// Tracks performance metrics for a request
-#[derive(Debug, Default)]
-struct RequestMetrics {
-    status_check_count: usize,
-    total_pending_time: Duration,
-    total_in_progress_time: Duration,
-    last_check_time: Option<std::time::Instant>,
-}
-
-/// Enhanced wrapper around CoreChaosRequestStatus with additional security features
-#[derive(Debug, Clone)]
-pub struct EnhancedRequestStatus {
-    inner: CoreChaosRequestStatus,
-    created_at: Instant,
-    transition_count: usize,
-    last_transition: Option<(CoreChaosRequestStatus, Instant)>,
-}
-
-impl EnhancedRequestStatus {
-    pub fn new(status: CoreChaosRequestStatus) -> Self {
-        Self {
-            inner: status,
-            created_at: Instant::now(),
-            transition_count: 0,
-            last_transition: None,
-        }
-    }
-
-    pub fn inner(&self) -> &CoreChaosRequestStatus {
-        &self.inner
-    }
-
-    pub fn is_terminal(&self) -> bool {
-        matches!(
-            self.inner,
-            CoreChaosRequestStatus::Completed |
-            CoreChaosRequestStatus::Failed |
-            CoreChaosRequestStatus::Cancelled |
-            CoreChaosRequestStatus::TimedOut
-        )
-    }
-
-    pub fn validate_transition(&mut self, new_status: &CoreChaosRequestStatus) -> bool {
-        let now = Instant::now();
+        let window_key = format!("security:{}:window", program_id);
+        let transitions_key = format!("security:{}:transitions", program_id);
         
-        // Security check: Prevent transitions from terminal states
-        if self.is_terminal() {
-            println!("⚠️  Security: Attempted transition from terminal state");
-            return false;
-        }
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
 
-        // Security check: Rate limiting
-        if let Some((_, last_time)) = self.last_transition.as_ref() {
-            let elapsed = now.duration_since(*last_time);
-            if elapsed < Duration::from_millis(100) {
-                println!("⚠️  Security: Rate limit exceeded - transitions too frequent");
-                println!("   ├─ Last transition: {:.2}ms ago", elapsed.as_millis());
-                println!("   └─ Minimum interval: 100ms");
-                return false;
-            }
-        }
+        // Check and update time window
+        let window_start: Option<u64> = conn.get(&window_key).map_err(CacheError::Redis)?;
+        let transitions: Option<usize> = conn.get(&transitions_key).map_err(CacheError::Redis)?;
 
-        // Validate state transition rules with enhanced logging
-        let valid = match (&self.inner, new_status) {
-            (CoreChaosRequestStatus::Pending, CoreChaosRequestStatus::InProgress) => true,
-            (CoreChaosRequestStatus::InProgress, CoreChaosRequestStatus::Completed) => true,
-            (CoreChaosRequestStatus::InProgress, CoreChaosRequestStatus::Failed) => true,
-            (CoreChaosRequestStatus::InProgress, CoreChaosRequestStatus::TimedOut) => true,
-            (_, CoreChaosRequestStatus::Cancelled) if !self.is_terminal() => {
-                println!("ℹ️  Cancellation requested from state {:?}", self.inner);
-                true
+        match (window_start, transitions) {
+            (Some(start), Some(count)) => {
+                if now - start > SECURITY_TIME_WINDOW_SECS {
+                    // Reset window if expired
+                    let _: () = conn.set(&window_key, now).map_err(CacheError::Redis)?;
+                    let _: () = conn.set(&transitions_key, 1).map_err(CacheError::Redis)?;
+                    Ok(true)
+                } else if count >= MAX_GLOBAL_TRANSITIONS_PER_SEC * SECURITY_TIME_WINDOW_SECS as usize {
+                    Ok(false) // Too many transitions in window
+                } else {
+                    let _: () = conn.incr(&transitions_key, 1).map_err(CacheError::Redis)?;
+                    Ok(true)
+                }
             },
-            (from, to) => {
-                println!("⚠️  Security: Invalid state transition");
-                println!("   ├─ From: {:?}", from);
-                println!("   ├─ To: {:?}", to);
-                println!("   ├─ Total transitions: {}", self.transition_count);
-                println!("   └─ Age: {:.2}s", self.age().as_secs_f64());
-                false
+            _ => {
+                // Initialize new window
+                let _: () = conn.set(&window_key, now).map_err(CacheError::Redis)?;
+                let _: () = conn.set(&transitions_key, 1).map_err(CacheError::Redis)?;
+                Ok(true)
             }
+        }
+    }
+
+    /// Enforce minimum interval between transitions
+    async fn enforce_transition_interval(&self, program_id: &Pubkey) -> Result<bool, CacheError> {
+        let mut conn = self.client.get_connection()
+            .map_err(|e| CacheError::Connection(e.to_string()))?;
+
+        let last_transition_key = format!("transition:{}:last", program_id);
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
+
+        let last_transition: Option<u64> = conn.get(&last_transition_key).map_err(CacheError::Redis)?;
+
+        match last_transition {
+            Some(last) if now - last < MIN_TRANSITION_INTERVAL_MS => {
+                Ok(false) // Too soon for next transition
+            },
+            _ => {
+                let _: () = conn.set(&last_transition_key, now).map_err(CacheError::Redis)?;
+                Ok(true)
+            }
+        }
+    }
+
+    /// Track transitions per status to prevent abuse
+    async fn track_status_transitions(&self, program_id: &Pubkey, status: &CoreChaosRequestStatus) -> Result<bool, CacheError> {
+        let mut conn = self.client.get_connection()
+            .map_err(|e| CacheError::Connection(e.to_string()))?;
+
+        let status_key = format!("status:{}:{:?}:count", program_id, status);
+        let count: Option<usize> = conn.get(&status_key).map_err(CacheError::Redis)?;
+
+        match count {
+            Some(c) if c >= MAX_TRANSITIONS_PER_STATUS => {
+                Ok(false) // Too many transitions to this status
+            },
+            _ => {
+                let _: () = conn.incr(&status_key, 1).map_err(CacheError::Redis)?;
+                let _: () = conn.expire(&status_key, CACHE_TTL_SECS as usize).map_err(CacheError::Redis)?;
+                Ok(true)
+            }
+        }
+    }
+
+    /// Validate timestamp to prevent replay attacks
+    async fn validate_timestamp(&self, timestamp: u64) -> Result<bool, CacheError> {
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        if timestamp > now + MAX_TIMESTAMP_SKEW_SECS || now > timestamp + MAX_TIMESTAMP_SKEW_SECS {
+            Ok(false) // Timestamp outside acceptable range
+        } else {
+            Ok(true)
+        }
+    }
+
+    /// Circuit breaker implementation
+    async fn check_circuit_breaker(&self, program_id: &Pubkey) -> Result<bool, CacheError> {
+        let mut conn = self.client.get_connection()
+            .map_err(|e| CacheError::Connection(e.to_string()))?;
+
+        let error_key = format!("errors:{}:count", program_id);
+        let last_reset_key = format!("errors:{}:last_reset", program_id);
+
+        let error_count: Option<usize> = conn.get(&error_key).map_err(CacheError::Redis)?;
+        let last_reset: Option<u64> = conn.get(&last_reset_key).map_err(CacheError::Redis)?;
+
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        match (error_count, last_reset) {
+            (Some(_), Some(reset)) if now - reset > CIRCUIT_BREAKER_RESET_SECS => {
+                // Reset circuit breaker after timeout
+                let _: () = conn.set(&error_key, 0).map_err(CacheError::Redis)?;
+                let _: () = conn.set(&last_reset_key, now).map_err(CacheError::Redis)?;
+                info!("Circuit breaker reset for program {}", program_id);
+                Ok(true)
+            },
+            (Some(count), _) if count >= CIRCUIT_BREAKER_THRESHOLD => {
+                warn!("Circuit breaker triggered for program {} with {} errors", program_id, count);
+                Ok(false) // Circuit breaker triggered
+            },
+            _ => Ok(true)
+        }
+    }
+
+    /// Periodic cache warming based on configured interval
+    async fn schedule_cache_warming(&self) -> Result<(), CacheError> {
+        let mut interval = tokio::time::interval(Duration::from_secs(CACHE_WARM_INTERVAL_SECS));
+        
+        loop {
+            interval.tick().await;
+            if let Err(e) = self.warm_cache().await {
+                error!("Cache warming failed: {}", e);
+            } else {
+                info!("Cache warming completed successfully");
+            }
+        }
+    }
+
+    /// Enhanced set_cached_status with all security checks
+    pub async fn set_cached_status(&self, program_id: &Pubkey, status: &CoreChaosRequestStatus) -> Result<(), CacheError> {
+        // Validate all security constraints
+        if !self.validate_time_window(program_id).await? {
+            return Err(CacheError::SecurityViolation("Time window violation".into()));
+        }
+
+        if !self.enforce_transition_interval(program_id).await? {
+            return Err(CacheError::SecurityViolation("Transition interval violation".into()));
+        }
+
+        if !self.track_status_transitions(program_id, status).await? {
+            return Err(CacheError::SecurityViolation("Status transition limit exceeded".into()));
+        }
+
+        if !self.check_circuit_breaker(program_id).await? {
+            return Err(CacheError::SecurityViolation("Circuit breaker triggered".into()));
+        }
+
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        if !self.validate_timestamp(now).await? {
+            return Err(CacheError::SecurityViolation("Invalid timestamp".into()));
+        }
+
+        // Proceed with status update if all checks pass
+        let serializable = SerializableChaosRequestStatus(status.clone());
+        let serialized = serde_json::to_string(&serializable)
+            .map_err(|e| CacheError::Serialization(e))?;
+        
+        let mut pipe = Pipeline::new();
+        let key = format!("program:{}:status", program_id);
+        
+        pipe.atomic()
+            .hset(&key, "status", &serialized)
+            .hset(&key, "last_update", now);
+
+        let _: () = self.redis_pipeline(&mut pipe).await?;
+        Ok(())
+    }
+
+    /// Get cached status with explicit type annotations
+    pub async fn get_cached_status(&self, program_id: &Pubkey) -> Result<Option<CoreChaosRequestStatus>, CacheError> {
+        let key = format!("program:{}:status", program_id);
+        
+        let cached_status: Option<String> = self.redis_hget(&key, "status").await?;
+        
+        if let Some(status_str) = cached_status {
+            let wrapper = serde_json::from_str::<SerializableChaosRequestStatus>(&status_str)
+                .map_err(|e| CacheError::Serialization(e))?;
+            Ok(Some(wrapper.0))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Get cache health metrics with proper error handling
+    pub async fn get_cache_health(&self) -> Result<CacheHealth, CacheError> {
+        let mut conn = self.client.get_connection()
+            .map_err(|e| CacheError::Connection(e.to_string()))?;
+
+        // Use INFO command to get Redis stats
+        let info: HashMap<String, String> = redis::cmd("INFO")
+            .query(&mut conn)
+            .map_err(CacheError::Redis)?;
+
+        let total_keys: usize = redis::cmd("DBSIZE")
+            .query(&mut conn)
+            .map_err(CacheError::Redis)?;
+
+        let metrics = if let Ok(metrics) = self.metrics.lock() {
+            metrics.clone()
+        } else {
+            CacheMetrics::default()
         };
 
-        if valid {
-            // Update transition history with security context
-            self.last_transition = Some((self.inner.clone(), now));
-            self.transition_count += 1;
-            
-            // Log successful transition
-            println!("✅ Valid state transition");
-            println!("   ├─ From: {:?}", self.inner);
-            println!("   ├─ To: {:?}", new_status);
-            println!("   ├─ Transition #{}", self.transition_count);
-            println!("   └─ Total age: {:.2}s", self.age().as_secs_f64());
-        }
-
-        valid
-    }
-
-    pub fn transition_count(&self) -> usize {
-        self.transition_count
-    }
-
-    pub fn last_transition_age(&self) -> Option<Duration> {
-        self.last_transition.as_ref().map(|(_, time)| time.elapsed())
-    }
-
-    pub fn age(&self) -> Duration {
-        self.created_at.elapsed()
-    }
-
-    /// Get detailed transition metrics
-    pub fn get_transition_metrics(&self) -> TransitionMetrics {
-        TransitionMetrics {
-            total_transitions: self.transition_count,
-            age: self.age(),
-            last_transition_age: self.last_transition_age(),
-            current_state: self.inner.clone(),
-            is_terminal: self.is_terminal(),
-        }
-    }
-
-    /// Check for potential security violations with enhanced rate limiting
-    pub fn check_security(&self, security_metrics: &mut SecurityMetrics) -> bool {
-        // Check global transition rate with proper type handling
-        let global_transitions = GLOBAL_TRANSITION_COUNT.load(Ordering::SeqCst);
-        if global_transitions > MAX_GLOBAL_TRANSITIONS_PER_SEC {
-            security_metrics.record_violation("GlobalRateExceeded");
-            println!("   ⚠️  Security: Global transition rate exceeded");
-            println!("   ├─ Current Rate: {} transitions/sec", global_transitions);
-            println!("   └─ Maximum Rate: {} transitions/sec", MAX_GLOBAL_TRANSITIONS_PER_SEC);
-            return false;
-        }
-
-        // Enhanced transition frequency check
-        if let Some((_, last_time)) = &self.last_transition {
-            let elapsed_ms = last_time.elapsed().as_millis() as u64;
-            if elapsed_ms < MIN_TRANSITION_INTERVAL_MS {
-                security_metrics.record_violation("TransitionTooFrequent");
-                println!("   ⚠️  Security: Transition too frequent");
-                println!("   ├─ Elapsed: {}ms", elapsed_ms);
-                println!("   └─ Required: {}ms", MIN_TRANSITION_INTERVAL_MS);
-                return false;
-            }
-        }
-
-        // Enhanced transition count check
-        if self.transition_count > MAX_TRANSITIONS_PER_STATUS {
-            security_metrics.record_violation("ExcessiveTransitions");
-            println!("   ⚠️  Security: Excessive transitions detected");
-            println!("   ├─ Current Count: {}", self.transition_count);
-            println!("   └─ Maximum Allowed: {}", MAX_TRANSITIONS_PER_STATUS);
-            return false;
-        }
-
-        true
-    }
-
-    /// Record a successful transition with security tracking
-    fn record_transition(&mut self, new_status: CoreChaosRequestStatus) {
-        GLOBAL_TRANSITION_COUNT.fetch_add(1, Ordering::SeqCst);
-        self.inner = new_status;
-        self.transition_count += 1;
-    }
-}
-
-impl From<CoreChaosRequestStatus> for EnhancedRequestStatus {
-    fn from(status: CoreChaosRequestStatus) -> Self {
-        Self::new(status)
-    }
-}
-
-impl From<EnhancedRequestStatus> for CoreChaosRequestStatus {
-    fn from(enhanced: EnhancedRequestStatus) -> Self {
-        enhanced.inner
-    }
-}
-
-/// Enhanced status display with state cache metrics
-fn print_enhanced_status(
-    tracker: &RequestTracker,
-    status: &CoreChaosRequestStatus,
-    state_cache: &StateCache,
-    format: &StatusFormat,
-    elapsed: Duration,
-) {
-    // Clear line and print progress
-    print!("\r\x1B[K");
-
-    // Print status with enhanced metrics
-    let status_text = print_status_update(
-        &tracker.request_id,
-        status,
-        &tracker.program_id,
-        format
-    );
-
-    if format.show_metrics {
-        let metrics = tracker.get_metrics();
-        let state_metrics = tracker.get_current_state_metrics();
-        
-        match status {
-            CoreChaosRequestStatus::Pending => {
-                print!("{} | \x1b[33mWaiting\x1b[0m | Queue: \x1b[36m{:.1}s\x1b[0m | Checks: \x1b[36m{}\x1b[0m", 
-                    status_text,
-                    metrics.total_pending_time.as_secs_f64(),
-                    state_cache.metrics.total_checks
-                );
-            }
-            CoreChaosRequestStatus::InProgress => {
-                let progress = match tracker.network_config.test_mode {
-                    TestMode::Live { max_concurrent, .. } => 
-                        (metrics.status_check_count as f64 / max_concurrent as f64) * 100.0,
-                    TestMode::Mock { .. } => 
-                        (metrics.status_check_count as f64 / 15.0) * 100.0,
-                    TestMode::Simulate { speed_multiplier, .. } => 
-                        (metrics.status_check_count as f64 / (20.0 * speed_multiplier) as f64) * 100.0,
-                };
-
-                print!("{} | \x1b[36mRunning\x1b[0m | CPU: \x1b[36m{:.1}%\x1b[0m | Mem: \x1b[36m{} KB\x1b[0m | Prog: \x1b[36m{:.1}%\x1b[0m | Trans: \x1b[36m{}\x1b[0m", 
-                    status_text,
-                    state_metrics.cpu_usage * 100.0,
-                    state_metrics.memory_usage,
-                    progress,
-                    state_cache.metrics.total_checks
-                );
-            }
-            _ => {
-                print!("{} | Runtime: \x1b[36m{:.1}s\x1b[0m | Transitions: \x1b[36m{}\x1b[0m", 
-                    status_text,
-                    state_cache.total_duration().as_secs_f64(),
-                    state_cache.metrics.total_checks
-                );
-            }
-        }
-    } else {
-        print!("{}", status_text);
-    }
-
-    // Print common metrics
-    print!(" | Elapsed: \x1b[36m{:.1}s\x1b[0m", elapsed.as_secs_f64());
-    
-    // Flush output
-    std::io::stdout().flush().ok();
-}
-
-/// Enhanced client configuration trait for safe cloning and configuration management
-pub trait EnhancedClientConfig {
-    fn get_endpoint(&self) -> String;
-    fn get_api_key(&self) -> String;
-    fn get_timeout_secs(&self) -> u64;
-    fn is_mock(&self) -> bool;
-    fn clone_client(&self) -> HeliusClient;
-}
-
-/// Enhanced client configuration with Redis caching
-#[derive(Debug, Clone)]
-pub struct EnhancedHeliusConfig {
-    pub endpoint: String,
-    pub api_key: String,
-    pub timeout_secs: u64,
-    pub use_mock: bool,
-    pub redis_client: RedisClient,
-    pub request_count_key: String,
-}
-
-impl EnhancedHeliusConfig {
-    pub fn new() -> Result<Self> {
-        let api_key = env::var("HELIUS_API_KEY")
-            .context("HELIUS_API_KEY environment variable not set")?;
-
-        let redis_url = format!("redis://{}:{}", REDIS_HOST, REDIS_PORT);
-        let redis_client = RedisClient::open(redis_url)
-            .context("Failed to create Redis client")?;
-
-        Ok(Self {
-            endpoint: "https://api.helius.xyz".to_string(),
-            api_key,
-            timeout_secs: 60,
-            use_mock: false,
-            redis_client,
-            request_count_key: "helius_daily_requests".to_string(),
+        Ok(CacheHealth {
+            total_keys,
+            hit_rate: calculate_hit_rate(&metrics),
+            last_write: metrics.last_write,
+            last_cleanup: metrics.last_cleanup,
+            stale_entries_cleared: metrics.stale_entries_cleared,
+            peak_memory_usage: info.get("used_memory")
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0),
+            peak_operations_per_sec: self.calculate_ops_per_second(),
+            avg_operation_latency_ms: self.calculate_avg_latency().as_millis() as f64,
+            error_rate: self.calculate_error_rate(),
         })
     }
 
-    /// Check if we've exceeded our daily API limit
-    pub fn check_rate_limit(&self) -> Result<bool> {
-        let mut conn = self.redis_client.get_connection()
-            .context("Failed to connect to Redis")?;
+    /// Monitor Redis performance metrics
+    async fn update_performance_metrics(&self, operation_latency: Duration, success: bool) {
+        if let Ok(mut metrics) = self.metrics.lock() {
+            // Update operation metrics
+            metrics.total_operations += 1;
+            if !success {
+                metrics.error_count += 1;
+            }
 
-        let count: Option<u32> = conn.get(&self.request_count_key)
-            .unwrap_or(Some(0));
+            // Track latencies for moving average
+            metrics.operation_latencies.push(operation_latency);
+            metrics.operation_timestamps.push(SystemTime::now());
 
-        Ok(count.unwrap_or(0) < MAX_DAILY_REQUESTS)
-    }
+            // Cleanup old metrics (keep last minute)
+            let one_minute_ago = SystemTime::now()
+                .checked_sub(Duration::from_secs(60))
+                .unwrap_or_else(SystemTime::now);
 
-    /// Increment the daily request counter
-    pub fn increment_request_count(&self) -> Result<()> {
-        let mut conn = self.redis_client.get_connection()
-            .context("Failed to connect to Redis")?;
+            // Store timestamps in a separate vector to avoid borrow issues
+            let old_timestamps: Vec<_> = metrics.operation_timestamps.clone();
+            let mut new_timestamps = Vec::new();
+            let mut new_latencies = Vec::new();
 
-        // Increment counter and set TTL to expire at midnight UTC
-        let _: () = redis::pipe()
-            .atomic()
-            .incr(&self.request_count_key, 1)
-            .expire(&self.request_count_key, get_seconds_until_midnight())
-            .query(&mut conn)
-            .context("Failed to increment request counter")?;
-
-        Ok(())
-    }
-
-    /// Warm up cache for a batch of program IDs
-    pub async fn warm_cache(&self, program_ids: &[Pubkey], client: &HeliusClient) -> Result<()> {
-        let mut conn = self.redis_client.get_connection()
-            .context("Failed to connect to Redis")?;
-
-        for chunk in program_ids.chunks(CACHE_WARM_BATCH_SIZE) {
-            let mut pipe = redis::pipe();
-            pipe.atomic();
-
-            for program_id in chunk {
-                let cache_key = format!("request_status:{}", program_id);
-                
-                // Check if recently cached using proper HGET
-                let cached_time: Option<i64> = conn.hget(&cache_key, "last_update")
-                    .context("Failed to get cached timestamp")?;
-                
-                if let Some(cached_time) = cached_time {
-                    let age = SystemTime::now()
-                        .duration_since(SystemTime::UNIX_EPOCH)
-                        .unwrap()
-                        .as_secs() as i64 - cached_time;
-                    
-                    if age < CACHE_WARM_INTERVAL_SECS as i64 {
-                        continue;
-                    }
-                }
-
-                // Fetch and cache status
-                if let Ok(status) = client.get_request_status(program_id).await {
-                    let now = SystemTime::now()
-                        .duration_since(SystemTime::UNIX_EPOCH)
-                        .unwrap()
-                        .as_secs();
-
-                    pipe.hset(&cache_key, "status", serde_json::to_string(&status)?);
-                    pipe.hset(&cache_key, "last_update", now as i64);
-                    pipe.expire(&cache_key, CACHE_TTL_SECS as usize);
+            for (idx, &ts) in old_timestamps.iter().enumerate() {
+                if ts > one_minute_ago {
+                    new_timestamps.push(ts);
+                    new_latencies.push(metrics.operation_latencies[idx]);
                 }
             }
 
-            pipe.query(&mut conn)
-                .context("Failed to execute cache warming pipeline")?;
+            metrics.operation_timestamps = new_timestamps;
+            metrics.operation_latencies = new_latencies;
+        }
+    }
+
+    /// Calculate current operations per second
+    fn calculate_ops_per_second(&self) -> f64 {
+        if let Ok(metrics) = self.metrics.lock() {
+            let now = SystemTime::now();
+            let one_second_ago = now
+                .checked_sub(Duration::from_secs(1))
+                .unwrap_or(now);
+
+            let recent_ops = metrics.operation_timestamps
+                .iter()
+                .filter(|&&ts| ts > one_second_ago)
+                .count();
+
+            recent_ops as f64
+        } else {
+            0.0
+        }
+    }
+
+    /// Get average operation latency
+    fn calculate_avg_latency(&self) -> Duration {
+        if let Ok(metrics) = self.metrics.lock() {
+            if metrics.operation_latencies.is_empty() {
+                return Duration::from_millis(0);
+            }
+
+            let total = metrics.operation_latencies
+                .iter()
+                .sum::<Duration>();
+
+            total / metrics.operation_latencies.len() as u32
+        } else {
+            Duration::from_millis(0)
+        }
+    }
+
+    /// Get enhanced cache metrics with performance data
+    pub async fn get_enhanced_metrics(&self) -> Result<EnhancedCacheMetrics, CacheError> {
+        let mut conn = self.client.get_connection()
+            .map_err(|e| CacheError::Connection(e.to_string()))?;
+
+        let info: HashMap<String, String> = redis::cmd("INFO")
+            .query(&mut conn)
+            .map_err(CacheError::Redis)?;
+
+        let used_memory = info.get("used_memory_human")
+            .and_then(|s| s.trim_end_matches("K").parse::<u64>().ok())
+            .unwrap_or(0);
+
+        let metrics = if let Ok(metrics) = self.metrics.lock() {
+            metrics.clone()
+        } else {
+            CacheMetrics::default()
+        };
+
+        Ok(EnhancedCacheMetrics {
+            total_operations: metrics.total_operations,
+            cache_hits: metrics.cache_hits,
+            cache_misses: metrics.cache_misses,
+            error_rate: self.calculate_error_rate(),
+            ops_per_second: self.calculate_ops_per_second(),
+            avg_latency: self.calculate_avg_latency(),
+            used_memory_kb: used_memory,
+            last_update: SystemTime::now(),
+        })
+    }
+
+    fn calculate_error_rate(&self) -> f64 {
+        if let Ok(metrics) = self.metrics.lock() {
+            if metrics.total_operations == 0 {
+                return 0.0;
+            }
+            metrics.error_count as f64 / metrics.total_operations as f64
+        } else {
+            0.0
+        }
+    }
+
+    /// Warm up the cache with frequently accessed keys
+    pub async fn warm_cache(&self) -> Result<usize, CacheError> {
+        let mut warmed = 0;
+        let mut conn = self.client.get_connection()
+            .map_err(|e| CacheError::Connection(e.to_string()))?;
+
+        let pattern = CACHE_INVALIDATION_PATTERN;
+        let keys: Vec<String> = conn.keys(pattern)
+            .map_err(CacheError::Redis)?;
+
+        // Process keys in batches
+        for chunk in keys.chunks(CACHE_WARM_BATCH_SIZE) {
+            let mut pipe = Pipeline::new();
+            for key in chunk {
+                pipe.hgetall(key);
+            }
+            let _: Vec<HashMap<String, String>> = self.redis_pipeline(&mut pipe).await?;
+            warmed += chunk.len();
         }
 
-        Ok(())
+        if let Ok(mut metrics) = self.metrics.lock() {
+            metrics.last_write = Some(SystemTime::now());
+        }
+
+        Ok(warmed)
     }
 
-    /// Invalidate stale cache entries
-    pub fn invalidate_stale_cache(&self) -> Result<usize> {
-        let mut conn = self.redis_client.get_connection()
-            .context("Failed to connect to Redis")?;
+    /// Invalidate stale cache entries based on TTL
+    pub async fn invalidate_stale_entries(&self) -> Result<usize, CacheError> {
+        let mut conn = self.client.get_connection()
+            .map_err(|e| CacheError::Connection(e.to_string()))?;
 
-        let mut invalidated = 0;
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64;
+            .unwrap_or_default()
+            .as_secs();
 
-        // Scan for all cache keys
-        let mut cursor = 0;
-        loop {
-            let (next_cursor, keys): (i64, Vec<String>) = redis::cmd("SCAN")
-                .arg(cursor)
-                .arg("MATCH")
-                .arg(CACHE_INVALIDATION_PATTERN)
-                .query(&mut conn)
-                .context("Failed to scan cache keys")?;
+        let pattern = CACHE_INVALIDATION_PATTERN;
+        let keys: Vec<String> = conn.keys(pattern)
+            .map_err(CacheError::Redis)?;
 
-            for key in keys {
-                if let Ok(cached_time) = conn.hget::<_, i64>(&key, "last_update") {
-                    if now - cached_time > CACHE_STALE_THRESHOLD_SECS as i64 {
-                        conn.del::<_, ()>(&key).context("Failed to delete stale cache entry")?;
-                        invalidated += 1;
-                    }
+        let mut invalidated = 0;
+        for key in keys {
+            let last_update: Option<u64> = conn.hget(&key, "last_update")
+                .map_err(CacheError::Redis)?;
+
+            if let Some(timestamp) = last_update {
+                if now - timestamp > CACHE_STALE_THRESHOLD_SECS {
+                    let _: () = conn.del(&key).map_err(CacheError::Redis)?;
+                    invalidated += 1;
                 }
             }
+        }
 
-            cursor = next_cursor;
-            if cursor == 0 {
-                break;
-            }
+        if let Ok(mut metrics) = self.metrics.lock() {
+            metrics.stale_entries_cleared += invalidated;
+            metrics.last_cleanup = Some(SystemTime::now());
         }
 
         Ok(invalidated)
     }
 
-    /// Get cache statistics
-    pub fn get_cache_stats(&self) -> Result<CacheStats> {
-        let mut conn = self.redis_client.get_connection()
-            .context("Failed to connect to Redis")?;
+    /// Check rate limits for operations with priority-based increments
+    pub async fn check_rate_limits(&self, program_id: &Pubkey) -> Result<bool, CacheError> {
+        let mut conn = self.client.get_connection()
+            .map_err(|e| CacheError::Connection(e.to_string()))?;
 
-        let mut stats = CacheStats::default();
-        let mut cursor = 0;
+        let key = format!("rate_limit:{}:ops", program_id);
+        let current_count: Option<u32> = conn.get(&key).map_err(CacheError::Redis)?;
 
-        loop {
-            let (next_cursor, keys): (i64, Vec<String>) = redis::cmd("SCAN")
-                .arg(cursor)
-                .arg("MATCH")
-                .arg(CACHE_INVALIDATION_PATTERN)
-                .query(&mut conn)
-                .context("Failed to scan cache keys")?;
+        match current_count {
+            Some(count) if count >= MAX_DAILY_REQUESTS => {
+                Ok(false)
+            },
+            _ => {
+                // Calculate increment based on priority and burst allowance
+                let base_increment = 1;
+                let priority_multiplier = if self.is_high_priority().await {
+                    HIGH_PRIORITY_MULTIPLIER
+                } else {
+                    1.0
+                };
 
-            for key in keys {
-                stats.total_entries += 1;
-                if let Ok(cached_time) = conn.hget::<_, i64>(&key, "last_update") {
-                    let age = SystemTime::now()
-                        .duration_since(SystemTime::UNIX_EPOCH)
-                        .unwrap()
-                        .as_secs() as i64 - cached_time;
-                    
-                    if age > CACHE_STALE_THRESHOLD_SECS as i64 {
-                        stats.stale_entries += 1;
+                let increment = (base_increment as f64 * priority_multiplier).ceil() as i64;
+                
+                // Apply rate limiting with burst allowance
+                let _: () = conn.incr(&key, increment).map_err(CacheError::Redis)?;
+                let _: () = conn.expire(&key, RATE_LIMIT_WINDOW_SECS as usize).map_err(CacheError::Redis)?;
+
+                // Track burst usage
+                let burst_key = format!("rate_limit:{}:burst", program_id);
+                let burst_count: Option<u32> = conn.get(&burst_key).map_err(CacheError::Redis)?;
+                
+                if let Some(count) = burst_count {
+                    if count > BURST_ALLOWANCE {
+                        // Apply exponential backoff for burst exceeded
+                        let backoff = Duration::from_millis((count as u64 - BURST_ALLOWANCE as u64) * 100);
+                        tokio::time::sleep(backoff).await;
                     }
                 }
-            }
 
-            cursor = next_cursor;
-            if cursor == 0 {
-                break;
+                Ok(true)
             }
         }
-
-        Ok(stats)
     }
-}
 
-/// Cache statistics for monitoring
-#[derive(Debug, Default)]
-pub struct CacheStats {
-    pub total_entries: usize,
-    pub stale_entries: usize,
-}
+    /// Check if current operation is high priority
+    async fn is_high_priority(&self) -> bool {
+        if let Ok(metrics) = self.metrics.lock() {
+            // Consider operation high priority if:
+            // 1. Error rate is low (healthy system)
+            // 2. Queue depth is low (no backpressure)
+            // 3. Recent latencies are within acceptable range
+            let error_rate = metrics.error_count as f64 / metrics.total_operations.max(1) as f64;
+            let recent_latencies: Vec<Duration> = metrics.operation_latencies
+                .iter()
+                .rev()
+                .take(10)
+                .cloned()
+                .collect();
 
-impl CacheStats {
-    pub fn get_summary(&self) -> String {
-        let stale_percentage = if self.total_entries > 0 {
-            (self.stale_entries as f64 / self.total_entries as f64) * 100.0
+            let avg_latency = if !recent_latencies.is_empty() {
+                recent_latencies.iter().sum::<Duration>() / recent_latencies.len() as u32
+            } else {
+                Duration::from_secs(0)
+            };
+
+            error_rate < 0.01 && // Less than 1% errors
+            avg_latency < Duration::from_millis(100) // Under 100ms latency
         } else {
-            0.0
-        };
-
-        format!(
-            "Cache Stats:\n  ├─ Total Entries: {}\n  ├─ Stale Entries: {}\n  └─ Stale Percentage: {:.1}%",
-            self.total_entries,
-            self.stale_entries,
-            stale_percentage
-        )
-    }
-}
-
-/// Get cached request status or fetch from Helius
-async fn get_cached_request_status(
-    client: &HeliusClient,
-    config: &EnhancedHeliusConfig,
-    program_id: &Pubkey,
-) -> Result<CoreChaosRequestStatus> {
-    let cache_key = format!("request_status:{}", program_id);
-    let mut conn = config.redis_client.get_connection()
-        .context("Failed to connect to Redis")?;
-
-    // Try to get from cache first
-    if let Ok(cached_status) = conn.get::<_, String>(&cache_key) {
-        return Ok(serde_json::from_str(&cached_status)
-            .context("Failed to deserialize cached status")?);
-    }
-
-    // Check rate limit before making API call
-    if !config.check_rate_limit()? {
-        return Err(anyhow::anyhow!("Daily Helius API limit exceeded"));
-    }
-
-    // Fetch from Helius
-    let status = client.get_request_status(program_id).await?;
-    config.increment_request_count()?;
-
-    // Cache the result
-    let _: () = conn.set_ex(
-        &cache_key,
-        serde_json::to_string(&status)?,
-        CACHE_TTL_SECS as usize,
-    ).context("Failed to cache request status")?;
-
-    Ok(status)
-}
-
-/// Get seconds until midnight UTC for Redis TTL
-fn get_seconds_until_midnight() -> usize {
-    let now = OffsetDateTime::now_utc();
-    let tomorrow = (now + time::Duration::days(1))
-        .replace_time(Time::MIDNIGHT);
-    let duration = tomorrow - now;
-    duration.whole_seconds().max(0) as usize
-}
-
-// Update the EnhancedClientConfig implementation
-impl EnhancedClientConfig for HeliusClient {
-    fn get_endpoint(&self) -> String {
-        env::var("HELIUS_ENDPOINT")
-            .unwrap_or_else(|_| "https://api.helius.xyz".to_string())
-    }
-
-    fn get_api_key(&self) -> String {
-        env::var("HELIUS_API_KEY")
-            .expect("HELIUS_API_KEY environment variable not set")
-    }
-
-    fn get_timeout_secs(&self) -> u64 {
-        env::var("HELIUS_TIMEOUT_SECS")
-            .ok()
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(60)
-    }
-
-    fn is_mock(&self) -> bool {
-        env::var("HELIUS_USE_MOCK")
-            .map(|v| v == "true")
-            .unwrap_or(false)
-    }
-
-    fn clone_client(&self) -> HeliusClient {
-        HeliusClient::with_config(HeliusConfig {
-            endpoint: self.get_endpoint(),
-            api_key: self.get_api_key(),
-            timeout_secs: self.get_timeout_secs(),
-            use_mock: self.is_mock(),
-        })
-    }
-}
-
-/// Monitors a chaos request until completion or timeout with enhanced status tracking
-async fn monitor_request(
-    client: &mut HeliusClient,
-    tracker: &mut RequestTracker,
-    timeout_secs: u64,
-) -> Result<()> {
-    let timeout = Duration::from_secs(timeout_secs);
-    let start = Instant::now();
-    let poll_interval = tracker.network_config.test_mode.get_poll_interval();
-    let mut error_tracker = RetryErrorTracker::new();
-    let mut state_cache = StateCache::new();
-    let mut current_status = EnhancedRequestStatus::new(CoreChaosRequestStatus::Pending);
-    let mut security_metrics = SecurityMetrics::new();
-
-    // Initialize enhanced Helius configuration with Redis
-    let enhanced_config = EnhancedHeliusConfig::new()
-        .context("Failed to initialize enhanced Helius configuration")?;
-
-    // Create compact format for progress updates
-    let format = StatusFormat {
-        use_color: true,
-        show_metrics: true,
-        compact: true,
-        max_width: 120,
-        show_timestamps: true,
-    };
-
-    println!("\n🔍 Starting monitoring for request {} on {}", 
-        tracker.request_id,
-        tracker.network_config.cluster.name()
-    );
-
-    // Create a cloned client for async operations
-    let client_arc = Arc::new(Mutex::new(client.clone_client()));
-
-    while start.elapsed() < timeout {
-        let program_id = tracker.program_id;
-        let request_id = tracker.request_id.clone();
-        let retry_config = tracker.network_config.retry_config.clone();
-        let enhanced_config = enhanced_config.clone();
-
-        // Create operation factory with Redis caching
-        let make_operation = {
-            let client = Arc::clone(&client_arc);
-            let request_id = request_id.clone();
-            let program_id = program_id;
-
-            move || {
-                let client = Arc::clone(&client);
-                let request_id = request_id.clone();
-                let enhanced_config = enhanced_config.clone();
-
-                async move {
-                    let start = Instant::now();
-                    let result = {
-                        let client_guard = client.lock().map_err(|e| {
-                            anyhow::anyhow!("Failed to acquire client lock: {} (request: {})", e, request_id)
-                        })?;
-
-                        // Enhanced security validation
-                        if let Err(security_error) = security_metrics.validate_request(&program_id, SystemTime::now()) {
-                            println!("\n⚠️  Security validation failed:");
-                            println!("   └─ {}", security_error);
-                            return Err(anyhow::anyhow!("Security validation failed: {}", security_error));
-                        }
-
-                        // Use cached request status with rate limiting
-                        get_cached_request_status(&client_guard, &enhanced_config, &program_id).await
-                            .with_context(|| format!(
-                                "Failed to get status for request {} (program: {}, elapsed: {:.2}s)", 
-                                request_id, program_id, start.elapsed().as_secs_f64()
-                            ))
-                    };
-
-                    // Enhanced performance monitoring
-                    let duration = start.elapsed();
-                    if duration > Duration::from_millis(500) {
-                        println!("\n⚠️  Performance warning:");
-                        println!("   ├─ Slow request detected for {}", request_id);
-                        println!("   ├─ Duration: {:.2}s", duration.as_secs_f64());
-                        println!("   └─ Program: {}", program_id);
-                    }
-
-                    result
-                }
-            }
-        };
-
-        let new_core_status = match retry_with_backoff(make_operation, &retry_config).await {
-            Ok(status) => status,
-            Err(e) => {
-                error_tracker.add_error(&e);
-                let error_context = format!(
-                    "Request failed after {} retries\nTotal duration: {:.2}s\nError history:\n{}",
-                    retry_config.max_retries,
-                    start.elapsed().as_secs_f64(),
-                    error_tracker.get_error_summary()
-                );
-                return Err(anyhow::anyhow!("{}\nContext: {}", e, error_context));
-            }
-        };
-
-        // Validate state transition with enhanced security
-        if !current_status.validate_transition(&new_core_status) {
-            println!("⚠️  Invalid state transition detected");
-            println!("   ├─ From: {:?}", current_status.inner());
-            println!("   ├─ To: {:?}", new_core_status);
-            println!("   └─ Security metrics: {}", security_metrics.get_summary());
-            tokio::time::sleep(poll_interval).await;
-            continue;
+            false
         }
-
-        // Update current status with security tracking
-        current_status.record_transition(new_core_status.clone());
-
-        // Update state cache and tracker with enhanced metrics
-        let current_metrics = tracker.get_current_state_metrics();
-        state_cache.update(
-            current_status.clone(),
-            current_metrics.memory_usage,
-            current_metrics.cpu_usage
-        );
-
-        tracker.update_status(new_core_status.clone());
-
-        // Enhanced status display with security context
-        print_enhanced_status(
-            tracker,
-            current_status.inner(),
-            &state_cache,
-            &format,
-            start.elapsed()
-        );
-
-        // Check for terminal states with enhanced reporting
-        if current_status.is_terminal() {
-            println!("\nRequest completed with {} state transitions", current_status.transition_count());
-            if let Some(age) = current_status.last_transition_age() {
-                println!("Last transition was {:.2}s ago", age.as_secs_f64());
-            }
-            println!("\nSecurity Summary:");
-            println!("{}", security_metrics.get_detailed_report());
-            tracker.print_progress();
-            println!("\n{}", state_cache.get_metrics_summary());
-            return Ok(());
-        }
-
-        tokio::time::sleep(poll_interval).await;
     }
 
-    // Handle timeout with enhanced error reporting
-    println!("\n\x1b[33m⚠️  Monitoring timed out after {}s\x1b[0m", timeout_secs);
-    println!("\nFinal Security Report:");
-    println!("{}", security_metrics.get_detailed_report());
-    
-    let timeout_status = CoreChaosRequestStatus::TimedOut;
-    tracker.update_status(timeout_status.clone());
-    
-    state_cache.update(
-        EnhancedRequestStatus::new(timeout_status),
-        tracker.get_current_state_metrics().memory_usage,
-        tracker.get_current_state_metrics().cpu_usage
-    );
-    
-    tracker.print_progress();
-    println!("\n{}", state_cache.get_metrics_summary());
+    /// Apply security checks to cache operations
+    pub async fn apply_security_checks(&self, program_id: &Pubkey, value: &str) -> Result<bool, CacheError> {
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
 
-    if error_tracker.total_errors > 0 {
-        println!("\n⚠️  Error Statistics:");
-        print!("{}", error_tracker.get_error_summary());
-    }
+        let key = format!("security:{}:checks", program_id);
+        let hash = calculate_security_hash(&key, value, now);
 
-    Ok(())
-}
+        let mut conn = self.client.get_connection()
+            .map_err(|e| CacheError::Connection(e.to_string()))?;
 
-/// Metrics for tracking state transitions and performance
-#[derive(Debug, Clone)]
-pub struct StateMetrics {
-    /// Number of status checks in current state
-    pub checks_in_state: usize,
-    /// Current memory usage in KB
-    pub memory_usage: u64,
-    /// Current CPU usage percentage (0.0-1.0)
-    pub cpu_usage: f64,
-    /// Count of errors in current state
-    pub error_count: usize,
-    /// When this state began
-    pub start_time: Instant,
-    /// Last time metrics were updated
-    pub last_update: Instant,
-    /// History of status changes with timestamps
-    pub status_history: Vec<(CoreChaosRequestStatus, Instant)>,
-    // Enhanced metrics
-    pub peak_memory_usage: u64,
-    pub peak_cpu_usage: f64,
-    pub avg_check_duration: Duration,
-    pub total_check_duration: Duration,
-    pub check_count: usize,
-}
+        let previous_hash: Option<String> = conn.get(&key).map_err(CacheError::Redis)?;
+        let _: () = conn.set(&key, &hash).map_err(CacheError::Redis)?;
 
-impl Default for StateMetrics {
-    fn default() -> Self {
-        let now = Instant::now();
-        Self {
-            checks_in_state: 0,
-            memory_usage: 0,
-            cpu_usage: 0.0,
-            error_count: 0,
-            start_time: now,
-            last_update: now,
-            status_history: Vec::new(),
-            peak_memory_usage: 0,
-            peak_cpu_usage: 0.0,
-            avg_check_duration: Duration::from_secs(0),
-            total_check_duration: Duration::from_secs(0),
-            check_count: 0,
+        match previous_hash {
+            Some(prev_hash) if prev_hash == hash => {
+                Ok(false) // Potential replay attack
+            },
+            _ => Ok(true)
         }
     }
 }
 
-/// Metrics for monitoring state transitions
-#[derive(Debug, Clone)]
-pub struct TransitionMetrics {
-    /// Total number of transitions
-    pub total_transitions: usize,
-    /// Age of the request
-    pub age: Duration,
-    /// Time since last transition
-    pub last_transition_age: Option<Duration>,
-    /// Current state
-    pub current_state: CoreChaosRequestStatus,
-    /// Whether current state is terminal
-    pub is_terminal: bool,
+/// Enhanced metrics including performance data and resource utilization
+#[derive(Debug)]
+pub struct EnhancedCacheMetrics {
+    /// Total number of operations processed by the cache
+    pub total_operations: usize,
+    /// Number of successful cache hits
+    pub cache_hits: usize,
+    /// Number of cache misses requiring fallback
+    pub cache_misses: usize,
+    /// Current error rate as a percentage (0.0-1.0)
+    pub error_rate: f64,
+    /// Current operations per second throughput
+    pub ops_per_second: f64,
+    /// Average latency of operations
+    pub avg_latency: Duration,
+    /// Current memory usage in kilobytes
+    pub used_memory_kb: u64,
+    /// Timestamp of last metrics update
+    pub last_update: SystemTime,
 }
 
-/// Enhanced state caching with performance metrics
-#[derive(Debug, Clone)]
-pub struct StateCache {
-    /// Tracks all state transitions with timestamps
-    pub state_transitions: Vec<(CoreChaosRequestStatus, Instant)>,
-    /// Performance metrics for the request
-    pub metrics: StateCacheMetrics,
-    /// Last known state
-    pub last_state: Option<CoreChaosRequestStatus>,
-    /// Cache creation time
-    pub created_at: Instant,
-    /// Security context for state transition validation
-    pub security_context: SecurityContext,
-}
-
-/// Detailed metrics for state cache monitoring
-#[derive(Debug, Clone)]
-pub struct StateCacheMetrics {
-    /// Total number of state checks performed
-    pub total_checks: usize,
-    /// Number of state transitions
-    pub transition_count: usize,
-    /// Average time between state changes
-    pub avg_transition_time: Duration,
-    /// Peak memory usage observed
-    pub peak_memory_kb: u64,
-    /// Peak CPU usage observed
-    pub peak_cpu_percent: f64,
-    /// Error counts by type
-    pub error_counts: HashMap<String, usize>,
-}
-
-/// Security context for state transition validation
-#[derive(Debug, Clone)]
-pub struct SecurityContext {
-    /// Maximum transitions allowed per time window
-    pub max_transitions: usize,
-    /// Time window for rate limiting in seconds
-    pub time_window: u64,
-    /// Count of transitions in current window
-    pub transition_count: usize,
-    /// Start of current time window
-    pub window_start: Instant,
-    /// Last transition timestamp
-    pub last_transition: Option<Instant>,
-}
-
-/// Enhanced error tracking for retry operations
-#[derive(Debug, Default)]
-pub struct RetryErrorTracker {
-    pub total_errors: usize,
-    pub error_history: Vec<(Instant, String)>,
-    pub error_types: HashMap<String, usize>,
-}
-
-/// Security metrics for monitoring system-wide state transitions
-#[derive(Debug, Default)]
-pub struct SecurityMetrics {
-    /// Set of seen program IDs for detecting replay attacks
-    pub seen_programs: HashSet<Pubkey>,
-    /// Timestamp of last security event
-    pub last_security_event: Option<SystemTime>,
-    /// Count of security violations
-    pub violation_count: usize,
-    /// Types of violations observed
-    pub violation_types: HashMap<String, usize>,
-}
-
-impl SecurityMetrics {
-    pub fn new() -> Self {
-        Self {
-            seen_programs: HashSet::new(),
-            last_security_event: None,
-            violation_count: 0,
-            violation_types: HashMap::new(),
-        }
-    }
-
-    pub fn record_violation(&mut self, violation_type: &str) {
-        self.violation_count += 1;
-        *self.violation_types.entry(violation_type.to_string()).or_insert(0) += 1;
-        self.last_security_event = Some(SystemTime::now());
-    }
-
-    pub fn validate_request(&self, program_id: &Pubkey, current_time: SystemTime) -> Result<()> {
-        // Check if program has been seen before
-        if !self.seen_programs.contains(program_id) {
-            return Ok(());
-        }
-
-        // Check for suspicious rapid requests
-        if let Some(last_event) = self.last_security_event {
-            let duration = current_time.duration_since(last_event)
-                .context("Invalid time comparison")?;
-            
-            if duration.as_secs() < SECURITY_TIME_WINDOW_SECS {
-                return Err(anyhow::anyhow!("Request rate exceeds security threshold"));
-            }
-        }
-
-        Ok(())
-    }
-
-    pub fn get_summary(&self) -> String {
-        let mut summary = String::new();
-        summary.push_str(&format!("Security Metrics Summary:\n"));
-        summary.push_str(&format!("├─ Total Programs: {}\n", self.seen_programs.len()));
-        summary.push_str(&format!("├─ Violation Count: {}\n", self.violation_count));
-        
-        if let Some(last_event) = self.last_security_event {
-            if let Ok(age) = SystemTime::now().duration_since(last_event) {
-                summary.push_str(&format!("└─ Last Event: {}s ago\n", age.as_secs()));
-            }
-        }
-        
-        summary
-    }
-
+impl EnhancedCacheMetrics {
+    /// Generate a detailed report of cache metrics and performance
     pub fn get_detailed_report(&self) -> String {
         let mut report = String::new();
-        report.push_str(&format!("Security Report:\n"));
-        report.push_str(&format!("├─ Total Violations: {}\n", self.violation_count));
-        report.push_str(&format!("├─ Unique Programs: {}\n", self.seen_programs.len()));
+        report.push_str("Enhanced Cache Metrics Report:\n");
+        report.push_str("\nOperation Statistics:\n");
+        report.push_str(&format!("├─ Total Operations: {}\n", self.total_operations));
+        report.push_str(&format!("├─ Cache Hits: {}\n", self.cache_hits));
+        report.push_str(&format!("├─ Cache Misses: {}\n", self.cache_misses));
+        report.push_str(&format!("├─ Hit Rate: {:.1}%\n", self.get_hit_rate() * 100.0));
         
-        if let Some(last_event) = self.last_security_event {
-            let age = SystemTime::now()
-                .duration_since(last_event)
-                .unwrap_or_default();
-            report.push_str(&format!("├─ Last Event: {}s ago\n", age.as_secs()));
-        }
-
-        report.push_str("└─ Violation Types:\n");
-        for (violation_type, count) in &self.violation_types {
-            let percentage = (*count as f64 / self.violation_count as f64) * 100.0;
-            report.push_str(&format!("   └─ {}: {} ({:.1}%)\n", violation_type, count, percentage));
-        }
-
+        report.push_str("\nPerformance Metrics:\n");
+        report.push_str(&format!("├─ Operations/sec: {:.2}\n", self.ops_per_second));
+        report.push_str(&format!("├─ Avg Latency: {:.2}ms\n", self.avg_latency.as_secs_f64() * 1000.0));
+        report.push_str(&format!("├─ Error Rate: {:.2}%\n", self.error_rate * 100.0));
+        
+        report.push_str("\nResource Usage:\n");
+        report.push_str(&format!("└─ Memory Usage: {} KB\n", self.used_memory_kb));
+        
         report
     }
-}
 
-impl Default for StateCacheMetrics {
-    fn default() -> Self {
-        Self {
-            total_checks: 0,
-            transition_count: 0,
-            avg_transition_time: Duration::from_secs(0),
-            peak_memory_kb: 0,
-            peak_cpu_percent: 0.0,
-            error_counts: HashMap::new(),
+    /// Check if the cache is operating within healthy parameters
+    pub fn is_healthy(&self) -> bool {
+        self.get_hit_rate() >= 0.7 && // At least 70% hit rate
+        self.error_rate <= 0.01 && // Less than 1% errors
+        self.avg_latency <= Duration::from_millis(100) && // Under 100ms latency
+        self.ops_per_second <= 10_000.0 // Under 10k ops/sec
+    }
+
+    fn get_hit_rate(&self) -> f64 {
+        let total = self.cache_hits + self.cache_misses;
+        if total > 0 {
+            self.cache_hits as f64 / total as f64
+        } else {
+            0.0
         }
     }
 }
 
-// Add atomic counter for global transitions
-static GLOBAL_TRANSITION_COUNT: AtomicUsize = AtomicUsize::new(0);
+/// Cache health metrics for monitoring and diagnostics
+#[derive(Debug)]
+pub struct CacheHealth {
+    /// Total number of keys in the cache
+    pub total_keys: usize,
+    /// Cache hit rate as a percentage (0.0-1.0)
+    pub hit_rate: f64,
+    /// Timestamp of last write operation
+    pub last_write: Option<SystemTime>,
+    /// Timestamp of last cleanup operation
+    pub last_cleanup: Option<SystemTime>,
+    /// Number of stale entries removed in last cleanup
+    pub stale_entries_cleared: usize,
+    /// Peak memory usage in bytes
+    pub peak_memory_usage: u64,
+    /// Peak operations per second observed
+    pub peak_operations_per_sec: f64,
+    /// Average operation latency in milliseconds
+    pub avg_operation_latency_ms: f64,
+    /// Current error rate as a percentage (0.0-1.0)
+    pub error_rate: f64,
+}
 
-impl StateCache {
-    pub fn new() -> Self {
-        Self {
-            state_transitions: Vec::new(),
-            metrics: StateCacheMetrics::default(),
-            last_state: None,
-            created_at: Instant::now(),
-            security_context: SecurityContext::new(100, 60), // 100 transitions per minute
-        }
-    }
-
-    pub fn update(&mut self, status: EnhancedRequestStatus, memory_kb: u64, cpu_percent: f64) {
-        let now = Instant::now();
-        self.metrics.total_checks += 1;
-        
-        // Update metrics
-        self.metrics.peak_memory_kb = self.metrics.peak_memory_kb.max(memory_kb);
-        self.metrics.peak_cpu_percent = self.metrics.peak_cpu_percent.max(cpu_percent);
-
-        // Track state transition if state changed
-        if self.last_state.as_ref() != Some(status.inner()) {
-            self.state_transitions.push((status.inner().clone(), now));
-            self.metrics.transition_count += 1;
-            
-            if self.state_transitions.len() > 1 {
-                let last_transition = self.state_transitions[self.state_transitions.len() - 2].1;
-                let transition_time = now.duration_since(last_transition);
-                self.metrics.avg_transition_time = Duration::from_secs_f64(
-                    (self.metrics.avg_transition_time.as_secs_f64() * (self.metrics.transition_count - 1) as f64
-                    + transition_time.as_secs_f64()) / self.metrics.transition_count as f64
-                );
-            }
-        }
-
-        if matches!(status.inner(), CoreChaosRequestStatus::Failed) {
-            *self.metrics.error_counts.entry("Failed".to_string()).or_insert(0) += 1;
-        }
-
-        self.last_state = Some(status.inner().clone());
-    }
-
-    pub fn total_duration(&self) -> Duration {
-        Instant::now().duration_since(self.created_at)
-    }
-
-    pub fn get_metrics_summary(&self) -> String {
+impl CacheHealth {
+    /// Generate a summary of cache health metrics
+    pub fn get_summary(&self) -> String {
         let mut summary = String::new();
-        summary.push_str(&format!("📊 Cache Metrics:\n"));
-        summary.push_str(&format!("   ├─ Total Checks: {}\n", self.metrics.total_checks));
-        summary.push_str(&format!("   ├─ State Transitions: {}\n", self.metrics.transition_count));
-        summary.push_str(&format!("   ├─ Avg Transition Time: {:.2}s\n", self.metrics.avg_transition_time.as_secs_f64()));
-        summary.push_str(&format!("   ├─ Peak Memory: {} KB\n", self.metrics.peak_memory_kb));
-        summary.push_str(&format!("   ├─ Peak CPU: {:.1}%\n", self.metrics.peak_cpu_percent));
+        summary.push_str(&format!("Cache Health Summary:\n"));
+        summary.push_str(&format!("├─ Total Keys: {}\n", self.total_keys));
+        summary.push_str(&format!("├─ Hit Rate: {:.1}%\n", self.hit_rate * 100.0));
         
-        if !self.metrics.error_counts.is_empty() {
-            summary.push_str("   └─ Error Distribution:\n");
-            for (error_type, count) in &self.metrics.error_counts {
-                summary.push_str(&format!("      └─ {}: {}\n", error_type, count));
+        if let Some(last_write) = self.last_write {
+            if let Ok(age) = SystemTime::now().duration_since(last_write) {
+                summary.push_str(&format!("├─ Last Write: {}s ago\n", age.as_secs()));
             }
         }
         
+        if let Some(last_cleanup) = self.last_cleanup {
+            if let Ok(age) = SystemTime::now().duration_since(last_cleanup) {
+                summary.push_str(&format!("├─ Last Cleanup: {}s ago\n", age.as_secs()));
+            }
+        }
+        
+        summary.push_str(&format!("├─ Stale Entries Cleared: {}\n", self.stale_entries_cleared));
+        summary.push_str(&format!("├─ Peak Memory Usage: {} KB\n", self.peak_memory_usage));
+        summary.push_str(&format!("├─ Peak Operations/sec: {:.2}\n", self.peak_operations_per_sec));
+        summary.push_str(&format!("├─ Avg Operation Latency: {:.2}ms\n", self.avg_operation_latency_ms));
+        summary.push_str(&format!("└─ Error Rate: {:.2}%\n", self.error_rate * 100.0));
         summary
     }
+
+    /// Check if cache health is within acceptable thresholds
+    pub fn is_healthy(&self) -> bool {
+        self.hit_rate >= 0.7 && // At least 70% hit rate
+        self.error_rate <= 0.01 && // Less than 1% errors
+        self.avg_operation_latency_ms <= 100.0 // Under 100ms average latency
+    }
+
+    /// Get detailed health analysis with recommendations
+    pub fn get_health_analysis(&self) -> String {
+        let mut analysis = String::new();
+        analysis.push_str("Cache Health Analysis:\n");
+
+        // Performance Analysis
+        analysis.push_str("\nPerformance Metrics:\n");
+        analysis.push_str(&format!("├─ Hit Rate: {:.1}% ", self.hit_rate * 100.0));
+        if self.hit_rate < 0.7 {
+            analysis.push_str("⚠️  Consider increasing cache size or TTL\n");
+        } else {
+            analysis.push_str("✅\n");
+        }
+
+        analysis.push_str(&format!("├─ Operation Latency: {:.2}ms ", self.avg_operation_latency_ms));
+        if self.avg_operation_latency_ms > 100.0 {
+            analysis.push_str("⚠️  High latency detected\n");
+        } else {
+            analysis.push_str("✅\n");
+        }
+
+        // Resource Usage
+        analysis.push_str("\nResource Usage:\n");
+        analysis.push_str(&format!("├─ Memory: {} KB ", self.peak_memory_usage));
+        if self.peak_memory_usage > 1_000_000 {
+            analysis.push_str("⚠️  Consider memory optimization\n");
+        } else {
+            analysis.push_str("✅\n");
+        }
+
+        // Error Analysis
+        analysis.push_str("\nReliability:\n");
+        analysis.push_str(&format!("└─ Error Rate: {:.2}% ", self.error_rate * 100.0));
+        if self.error_rate > 0.01 {
+            analysis.push_str("⚠️  High error rate detected\n");
+        } else {
+            analysis.push_str("✅\n");
+        }
+
+        if !self.is_healthy() {
+            analysis.push_str("\nRecommendations:\n");
+            if self.hit_rate < 0.7 {
+                analysis.push_str("├─ Consider increasing cache TTL\n");
+                analysis.push_str("├─ Review cache key design\n");
+            }
+            if self.avg_operation_latency_ms > 100.0 {
+                analysis.push_str("├─ Optimize Redis connection pool\n");
+                analysis.push_str("├─ Review network configuration\n");
+            }
+            if self.error_rate > 0.01 {
+                analysis.push_str("├─ Implement retry mechanism\n");
+                analysis.push_str("└─ Review error handling logic\n");
+            }
+        }
+
+        analysis
+    }
 }
 
+/// Test execution mode configuration for different environments
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TestMode {
+    /// Live testing on actual network
+    Live {
+        /// Maximum number of concurrent operations
+        max_concurrent: usize,
+        /// Transaction confirmation level requirement
+        confirm_level: String,
+    },
+    /// Mock testing with simulated responses
+    Mock {
+        /// Simulated operation latency in milliseconds
+        latency_ms: u64,
+        /// Simulated error rate (0.0-1.0)
+        error_rate: f64,
+    },
+    /// Simulation mode with adjustable parameters
+    Simulate {
+        /// Time compression/expansion multiplier
+        speed_multiplier: f64,
+        /// Whether to track and validate state changes
+        track_state: bool,
+    },
+}
+
+/// Wrapper for serializing chaos request status with custom serialization
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SerializableChaosRequestStatus(#[serde(with = "chaos_request_status_serde")] pub CoreChaosRequestStatus);
+
 impl SecurityContext {
+    /// Create a new security context with specified limits
     pub fn new(max_transitions: usize, time_window: u64) -> Self {
         Self {
             max_transitions,
@@ -1751,870 +955,564 @@ impl SecurityContext {
         }
     }
 
-    pub fn can_transition(&mut self) -> bool {
-        let now = Instant::now();
-        
-        // Check if we need to reset the window
-        if now.duration_since(self.window_start).as_secs() >= self.time_window {
-            self.window_start = now;
-            self.transition_count = 0;
-        }
-
-        // Check rate limiting
-        if self.transition_count >= self.max_transitions {
-            return false;
-        }
-
-        // Update state
-        self.transition_count += 1;
-        self.last_transition = Some(now);
-        true
+    /// Check if a transition is allowed under current constraints
+    pub fn can_transition(&self) -> bool {
+        self.transition_count < self.max_transitions
     }
 }
 
-impl RetryErrorTracker {
-    pub fn new() -> Self {
-        Self::default()
-    }
+/// Calculate security hash for cache entries
+fn calculate_security_hash(key: &str, value: &str, timestamp: u64) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(key.as_bytes());
+    hasher.update(value.as_bytes());
+    hasher.update(timestamp.to_le_bytes());
+    format!("{:x}", hasher.finalize())
+}
 
-    pub fn add_error(&mut self, error: &anyhow::Error) {
-        self.total_errors += 1;
-        self.error_history.push((Instant::now(), error.to_string()));
-        
-        // Categorize error
-        let error_type = if error.to_string().contains("timeout") {
-            "Timeout"
-        } else if error.to_string().contains("rate limit") {
-            "RateLimit"
-        } else {
-            "Unknown"
-        };
-        
-        *self.error_types.entry(error_type.to_string()).or_insert(0) += 1;
-    }
-
-    pub fn get_error_summary(&self) -> String {
-        let mut summary = String::new();
-        if self.total_errors > 0 {
-            summary.push_str(&format!("Total Errors: {}\n", self.total_errors));
-            summary.push_str("Error Types:\n");
-            for (error_type, count) in &self.error_types {
-                let percentage = (count * 100) / self.total_errors;
-                summary.push_str(&format!("  {}: {} ({}%)\n", error_type, count, percentage));
-            }
-        }
-        summary
+/// Calculate cache hit rate
+fn calculate_hit_rate(metrics: &CacheMetrics) -> f64 {
+    let total = metrics.cache_hits + metrics.cache_misses;
+    if total > 0 {
+        metrics.cache_hits as f64 / total as f64
+    } else {
+        0.0
     }
 }
 
-impl RequestTracker {
-    pub fn new(request_id: String, program_id: Pubkey, network_config: NetworkConfig) -> Self {
-        let now = Instant::now();
-        Self {
-            request_id,
-            program_id,
-            start_time: now,
-            last_status: CoreChaosRequestStatus::Pending,
-            status_changes: vec![(CoreChaosRequestStatus::Pending, now, StateMetrics::default())],
-            metrics: RequestMetrics::default(),
-            network_config,
-        }
-    }
-
-    pub fn get_metrics(&self) -> &RequestMetrics {
-        &self.metrics
-    }
-
-    pub fn get_current_state_metrics(&self) -> &StateMetrics {
-        &self.status_changes.last().unwrap().2
-    }
-
-    pub fn update_status(&mut self, new_status: CoreChaosRequestStatus) {
-        let now = Instant::now();
-        
-        // Update metrics
-        self.metrics.status_check_count += 1;
-        if let Some(last_check) = self.metrics.last_check_time {
-            let duration = now.duration_since(last_check);
-            match self.last_status {
-                CoreChaosRequestStatus::Pending => self.metrics.total_pending_time += duration,
-                CoreChaosRequestStatus::InProgress => self.metrics.total_in_progress_time += duration,
-                _ => {}
-            }
-        }
-        self.metrics.last_check_time = Some(now);
-
-        // Create state metrics
-        let state_metrics = StateMetrics {
-            checks_in_state: self.metrics.status_check_count,
-            memory_usage: 1000 + (self.metrics.status_check_count as u64 * 100),
-            cpu_usage: 0.1 + (self.metrics.status_check_count as f64 * 0.01).min(0.9),
-            error_count: if matches!(new_status, CoreChaosRequestStatus::Failed) { 1 } else { 0 },
-            start_time: self.start_time,
-            last_update: now,
-            status_history: vec![(new_status.clone(), now)],
-            // Initialize enhanced metrics
-            peak_memory_usage: 0,
-            peak_cpu_usage: 0.0,
-            avg_check_duration: Duration::from_secs(0),
-            total_check_duration: Duration::from_secs(0),
-            check_count: 0,
-        };
-
-        // Update status if changed
-        if new_status != self.last_status {
-            self.status_changes.push((new_status.clone(), now, state_metrics));
-            self.last_status = new_status;
-        }
-    }
-
-    pub fn print_progress(&self) {
-        println!("\n📊 Request Progress for {}", self.request_id);
-        println!("├─ Program: {}", self.program_id);
-        println!("├─ Current Status: {:?}", self.last_status);
-        println!("├─ Duration: {:.2}s", self.start_time.elapsed().as_secs_f64());
-        println!("├─ Status Checks: {}", self.metrics.status_check_count);
-        println!("├─ Time Pending: {:.2}s", self.metrics.total_pending_time.as_secs_f64());
-        println!("└─ Time In Progress: {:.2}s", self.metrics.total_in_progress_time.as_secs_f64());
-        
-        // Print status history
-        if !self.status_changes.is_empty() {
-            println!("\nStatus History:");
-            for (i, (status, time, metrics)) in self.status_changes.iter().enumerate() {
-                let elapsed = time.duration_since(self.start_time);
-                println!("{}─ [{:>5.2}s] {:?}", 
-                    if i == self.status_changes.len() - 1 { "└" } else { "├" },
-                    elapsed.as_secs_f64(),
-                    status
-                );
-                println!("   ├─ Checks: {}", metrics.checks_in_state);
-                println!("   ├─ Memory: {} KB", metrics.memory_usage);
-                println!("   └─ CPU: {:.1}%", metrics.cpu_usage * 100.0);
-            }
-        }
-    }
-}
-
-/// Async retry mechanism with exponential backoff
-pub async fn retry_with_backoff<T, F, Fut>(
-    operation: F,
-    config: &RetryConfig,
-) -> Result<T>
-where
-    F: Fn() -> Fut,
-    Fut: std::future::Future<Output = Result<T>>,
-{
-    let mut delay = config.base_delay_ms;
-    let mut attempt = 0;
-    let mut error_tracker = RetryErrorTracker::new();
-
-    loop {
-        match operation().await {
-            Ok(result) => return Ok(result),
-            Err(e) => {
-                attempt += 1;
-                error_tracker.add_error(&e);
-
-                if attempt >= config.max_retries {
-                    return Err(anyhow::anyhow!(
-                        "Max retries ({}) exceeded. Error summary:\n{}",
-                        config.max_retries,
-                        error_tracker.get_error_summary()
-                    ));
-                }
-
-                // Exponential backoff with jitter
-                let jitter = rand::random::<u64>() % config.jitter_range_ms;
-                delay = if config.use_exponential {
-                    ((delay * 2) + jitter).min(config.max_delay_ms)
-                } else {
-                    (delay + jitter).min(config.max_delay_ms)
-                };
-
-                tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
-            }
-        }
-    }
-}
-
-/// Enhanced rate limiting with priority support
+/// Security metrics for monitoring system integrity
 #[derive(Debug)]
-pub struct RateLimiter {
-    redis_client: RedisClient,
-    window_size: u64,
-    max_requests: u32,
-    reset_interval: u64,
-    error_threshold: usize,
-    burst_allowance: u32,
+pub struct SecurityMetrics {
+    /// Total number of state transitions
+    pub total_transitions: usize,
+    /// Number of suspicious transitions detected
+    pub suspicious_transitions: usize,
+    /// Map of security violation types to counts
+    pub violations: HashMap<String, usize>,
+    /// Timestamp of last violation
+    pub last_violation: Option<SystemTime>,
+    /// Average transitions per second
+    pub transition_frequency: f64,
+    /// Peak transition rate observed
+    pub peak_transition_rate: f64,
+    /// History of state transitions
+    pub transition_history: VecDeque<(SystemTime, CoreChaosRequestStatus, CoreChaosRequestStatus)>,
+    /// Severity scores for violations
+    pub violation_severity_scores: HashMap<String, f64>,
+    /// Time spent in each state
+    pub state_dwell_times: HashMap<CoreChaosRequestStatus, Duration>,
+    /// Historical anomaly scores
+    pub anomaly_scores: Vec<(SystemTime, f64)>,
+    /// Security checkpoint validation status
+    pub security_checkpoints: HashSet<String>,
+    /// Duration of rate limiting window
+    pub rate_limit_window: Duration,
+    /// Maximum transitions allowed per window
+    pub max_transitions_per_window: usize,
+    /// Start time of current window
+    pub current_window_start: SystemTime,
+    /// Transitions in current window
+    pub current_window_transitions: usize,
 }
 
-impl RateLimiter {
-    pub fn new(redis_client: RedisClient) -> Self {
-        Self {
-            redis_client,
-            window_size: RATE_LIMIT_WINDOW_SECS,
-            max_requests: MAX_DAILY_REQUESTS,
-            burst_allowance: BURST_ALLOWANCE,
-        }
-    }
-
-    /// Check if request is allowed with priority support
-    pub async fn check_rate_limit(&self, program_id: &Pubkey, priority: RequestPriority) -> Result<bool> {
-        let mut conn = self.redis_client.get_connection()
-            .context("Failed to connect to Redis")?;
-        
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
-        let window_key = format!("rate_limit:{}:{}", program_id, now / self.window_size);
-        let count: Option<u32> = conn.get(&window_key)?;
-
-        let current_count = count.unwrap_or(0);
-        let adjusted_max = match priority {
-            RequestPriority::High => (self.max_requests as f64 * HIGH_PRIORITY_MULTIPLIER) as u32,
-            RequestPriority::Normal => self.max_requests,
-            RequestPriority::Low => self.max_requests / 2,
-        };
-
-        // Allow burst if within allowance
-        let burst_key = format!("burst:{}:{}", program_id, now / (self.window_size * 24));
-        let burst_count: Option<u32> = conn.get(&burst_key)?;
-        let can_burst = burst_count.unwrap_or(0) < self.burst_allowance;
-
-        Ok(current_count < adjusted_max || can_burst)
-    }
-
-    /// Record a request with sliding window
-    pub async fn record_request(&self, program_id: &Pubkey) -> Result<()> {
-        let mut conn = self.redis_client.get_connection()
-            .map_err(|e| anyhow::anyhow!("Redis connection error: {}", e))?;
-
-        let key = format!("rate_limit:{}", program_id);
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
-        let mut pipe = redis::pipe();
-        pipe.atomic()
-            .zadd(&key, now.to_string(), now)
-            .zremrangebyrank(&key, 0, -(self.max_requests as isize))
-            .expire(&key, self.window_size as usize);
-
-        let _: () = pipe.query(&mut conn)
-            .map_err(|e| anyhow::anyhow!("Redis query error: {}", e))?;
-
-        Ok(())
-    }
-
-    /// Get current rate limit status
-    pub async fn get_rate_limit_status(&self, program_id: &Pubkey) -> Result<RateLimitStatus> {
-        let mut conn = self.redis_client.get_connection()
-            .context("Failed to connect to Redis")?;
-
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
-        let window_key = format!("rate_limit:{}:{}", program_id, now / self.window_size);
-        let burst_key = format!("burst:{}:{}", program_id, now / (self.window_size * 24));
-
-        let current_count: u32 = conn.get(&window_key).unwrap_or(0);
-        let burst_count: u32 = conn.get(&burst_key).unwrap_or(0);
-
-        Ok(RateLimitStatus {
-            current_count,
-            burst_count,
-            window_remaining: self.window_size - (now % self.window_size),
-            max_requests: self.max_requests,
-            burst_allowance: self.burst_allowance,
-        })
-    }
-
-    pub async fn record_error(&self, program_id: &Pubkey, error: &anyhow::Error) -> Result<CircuitStatus> {
-        let mut conn = self.redis_client.get_connection()
-            .map_err(|e| anyhow::anyhow!("Redis connection error: {}", e))?;
-
-        let key = format!("errors:{}", program_id);
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
-        let mut pipe = redis::pipe();
-        pipe.atomic()
-            .zadd(&key, error.to_string(), now)
-            .zremrangebyscore(&key, "-inf", (now - self.reset_interval).to_string())
-            .expire(&key, self.reset_interval as usize);
-
-        let _: () = pipe.query(&mut conn)
-            .map_err(|e| anyhow::anyhow!("Redis query error: {}", e))?;
-
-        let error_count: usize = conn.zcard(&key)
-            .map_err(|e| anyhow::anyhow!("Redis ZCARD error: {}", e))?;
-
-        if error_count >= self.error_threshold {
-            Ok(CircuitStatus::Open)
-        } else if error_count == self.error_threshold - 1 {
-            Ok(CircuitStatus::JustOpened)
-        } else {
-            Ok(CircuitStatus::Closed)
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum RequestPriority {
-    High,
-    Normal,
-    Low,
-}
-
+/// Cache for program state management
 #[derive(Debug)]
-pub struct RateLimitStatus {
-    pub current_count: u32,
-    pub burst_count: u32,
-    pub window_remaining: u64,
-    pub max_requests: u32,
-    pub burst_allowance: u32,
+pub struct StateCache {
+    /// History of state transitions
+    pub state_transitions: Vec<(CoreChaosRequestStatus, Instant)>,
+    /// Cache performance metrics
+    pub metrics: StateCacheMetrics,
+    /// Last recorded state
+    pub last_state: Option<CoreChaosRequestStatus>,
+    /// Cache creation timestamp
+    pub created_at: Instant,
+    /// Security context for operations
+    pub security_context: SecurityContext,
 }
 
-impl RateLimitStatus {
-    pub fn get_summary(&self) -> String {
-        format!(
-            "Rate Limit Status:\n  ├─ Current Count: {}/{}\n  ├─ Burst Count: {}/{}\n  ├─ Window Remaining: {}s\n  └─ Usage: {:.1}%",
-            self.current_count,
-            self.max_requests,
-            self.burst_count,
-            self.burst_allowance,
-            self.window_remaining,
-            (self.current_count as f64 / self.max_requests as f64) * 100.0
-        )
-    }
+/// Metrics for state cache performance
+#[derive(Debug, Default)]
+pub struct StateCacheMetrics {
+    /// Total number of state checks
+    pub total_checks: usize,
+    /// Count of state transitions
+    pub transition_count: usize,
+    /// Average time per transition
+    pub avg_transition_time: Duration,
+    /// Peak memory usage in KB
+    pub peak_memory_kb: u64,
+    /// Peak CPU usage percentage
+    pub peak_cpu_percent: f64,
+    /// Error counts by type
+    pub error_counts: HashMap<String, usize>,
 }
 
-/// Enhanced error recovery with circuit breaker pattern
+/// Security context for state operations
 #[derive(Debug)]
-pub struct ErrorRecovery {
-    redis_client: RedisClient,
-    error_threshold: usize,
-    reset_interval: u64,
+pub struct SecurityContext {
+    /// Maximum allowed transitions
+    pub max_transitions: usize,
+    /// Time window for limits
+    pub time_window: u64,
+    /// Current transition count
+    pub transition_count: usize,
+    /// Window start timestamp
+    pub window_start: Instant,
+    /// Last transition timestamp
+    pub last_transition: Option<Instant>,
 }
 
-impl ErrorRecovery {
-    pub fn new(redis_client: RedisClient) -> Self {
+/// Performance monitoring metrics for tracking system behavior and resource usage
+/// Provides comprehensive monitoring of system performance, resource utilization, and error tracking
+/// Used for real-time performance analysis and capacity planning
+#[derive(Debug, Default, Clone)]
+pub struct PerformanceMetrics {
+    /// Track operation latencies for performance analysis and optimization
+    pub operation_latencies: Vec<Duration>,
+    /// Timestamps of operations for time-based analysis and pattern detection
+    pub operation_timestamps: Vec<SystemTime>,
+    /// Count of errors encountered during operations, used for reliability metrics
+    pub error_count: usize,
+    /// Total number of operations processed since startup, for throughput analysis
+    pub total_operations: usize,
+    /// Peak memory usage in bytes during program execution, for resource monitoring
+    pub peak_memory: u64,
+    /// Last time metrics were updated with new data, for freshness tracking
+    pub last_metrics_update: Option<SystemTime>,
+    /// Peak latency observed across all operations, for SLA monitoring
+    pub peak_latency: Duration,
+    /// Minimum latency observed across all operations, for baseline performance
+    pub min_latency: Duration,
+    /// Latency percentiles (50th, 90th, 95th, 99th) for statistical analysis
+    pub latency_percentiles: HashMap<u8, Duration>,
+    /// Operations processed per second (throughput metric) for capacity planning
+    pub throughput_per_second: f64,
+    /// Breakdown of error types encountered with counts for reliability analysis
+    pub error_types: HashMap<String, usize>,
+    /// Detailed resource utilization metrics for system monitoring and scaling
+    pub resource_usage: ResourceMetrics,
+    /// Current depth of pending request queue for backpressure monitoring
+    pub request_queue_depth: usize,
+    /// Number of currently active connections for capacity management
+    pub active_connections: usize,
+    /// Count of connection-related errors for network reliability tracking
+    pub connection_errors: usize,
+    /// Peak number of concurrent requests observed for capacity planning
+    pub peak_concurrent_requests: usize,
+    /// Count of request timeout incidents for SLA monitoring
+    pub request_timeouts: usize,
+}
+
+/// Resource utilization metrics for comprehensive system monitoring
+/// Tracks detailed system resource usage across CPU, memory, network, and disk
+/// Used for capacity planning and performance optimization
+#[derive(Debug, Default, Clone)]
+pub struct ResourceMetrics {
+    /// CPU usage percentage (0-100) for processor utilization tracking
+    pub cpu_usage_percent: f64,
+    /// Time spent in system mode (kernel operations) for OS overhead analysis
+    pub cpu_system_time: Duration,
+    /// Time spent in user mode (application code) for application profiling
+    pub cpu_user_time: Duration,
+    /// Time spent waiting for I/O operations for bottleneck detection
+    pub cpu_iowait_time: Duration,
+    
+    // Memory metrics
+    /// Current memory usage in bytes for heap analysis
+    pub memory_usage_bytes: u64,
+    /// Peak memory usage observed during execution for capacity planning
+    pub peak_memory_usage: u64,
+    /// Count of memory allocation operations for leak detection
+    pub memory_allocation_count: usize,
+    /// Count of memory deallocation operations for memory churn analysis
+    pub memory_free_count: usize,
+    /// Memory fragmentation ratio (0-1) for heap health monitoring
+    pub heap_fragmentation: f64,
+    
+    // Network metrics
+    /// Total bytes sent over network for bandwidth utilization
+    pub network_bytes_sent: u64,
+    /// Total bytes received over network for traffic analysis
+    pub network_bytes_received: u64,
+    /// Total network packets sent for protocol efficiency
+    pub network_packets_sent: u64,
+    /// Total network packets received for connection health
+    pub network_packets_received: u64,
+    /// Count of network-related errors for reliability tracking
+    pub network_errors: usize,
+    
+    // File system metrics
+    /// Number of currently open file descriptors for resource limits
+    pub open_file_descriptors: usize,
+    /// Maximum allowed file descriptors by system for capacity limits
+    pub max_file_descriptors: usize,
+    /// Total bytes read from disk for I/O profiling
+    pub disk_read_bytes: u64,
+    /// Total bytes written to disk for storage analysis
+    pub disk_write_bytes: u64,
+    /// Disk I/O operations per second for storage performance
+    pub disk_iops: u64,
+}
+
+/// Configuration for retry behavior
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RetryConfig {
+    /// Maximum number of retry attempts
+    pub max_retries: u64,
+    /// Base delay between retries in milliseconds
+    pub base_delay_ms: u64,
+    /// Maximum delay between retries in milliseconds
+    pub max_delay_ms: u64,
+    /// Random jitter range in milliseconds
+    pub jitter_range_ms: u64,
+    /// Whether to use exponential backoff
+    pub use_exponential: bool,
+    /// Optional timeout for each attempt
+    pub timeout_ms: Option<u64>,
+    /// Set of error types that should trigger retries
+    pub retry_on_errors: HashSet<ErrorType>,
+}
+
+impl Default for RetryConfig {
+    fn default() -> Self {
+        let mut retry_on_errors = HashSet::new();
+        retry_on_errors.insert(ErrorType::Network);
+        retry_on_errors.insert(ErrorType::Timeout);
+        retry_on_errors.insert(ErrorType::RateLimit);
+        
         Self {
-            redis_client,
-            error_threshold: CIRCUIT_BREAKER_THRESHOLD,
-            reset_interval: CIRCUIT_BREAKER_RESET_SECS,
+            max_retries: 3,
+            base_delay_ms: 1000,
+            max_delay_ms: 30000,
+            jitter_range_ms: 100,
+            use_exponential: true,
+            timeout_ms: Some(30000),
+            retry_on_errors,
         }
-    }
-
-    pub async fn record_error(&self, program_id: &Pubkey, error: &anyhow::Error) -> Result<CircuitStatus> {
-        let mut conn = self.redis_client.get_connection()
-            .context("Failed to connect to Redis")?;
-
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
-        let error_key = format!("errors:{}", program_id);
-        let circuit_key = format!("circuit:{}", program_id);
-
-        // Check if circuit is already open
-        let is_open: bool = conn.exists(&circuit_key)
-            .context("Failed to check circuit status")?;
-            
-        if is_open {
-            return Ok(CircuitStatus::Open);
-        }
-
-        // Add error to history with timestamp
-        let error_entry = ErrorEntry {
-            timestamp: now,
-            error: error.to_string(),
-            error_type: categorize_error(error),
-            program_id: Some(*program_id),
-            request_id: None,
-            recovery_attempts: 0,
-        };
-
-        let json = serde_json::to_string(&error_entry)
-            .context("Failed to serialize error entry")?;
-
-        // Use pipeline for atomic operations
-        redis::pipe()
-            .atomic()
-            .lpush(&error_key, json)
-            .ltrim(&error_key, 0, MAX_ERROR_HISTORY as isize - 1)
-            .expire(&error_key, (self.reset_interval * 2) as usize)
-            .query(&mut conn)
-            .context("Failed to record error")?;
-
-        // Get recent errors for analysis
-        let recent_errors: Vec<String> = conn.lrange(&error_key, 0, self.error_threshold as isize - 1)
-            .context("Failed to get recent errors")?;
-
-        let error_count = recent_errors.len();
-        
-        if error_count >= self.error_threshold {
-            // Open circuit breaker
-            conn.set_ex(&circuit_key, "open", self.reset_interval as usize)
-                .context("Failed to open circuit breaker")?;
-            
-            Ok(CircuitStatus::JustOpened)
-        } else {
-            Ok(CircuitStatus::Closed)
-        }
-    }
-
-    pub async fn attempt_recovery(&self, program_id: &Pubkey) -> Result<RecoveryAction> {
-        let mut conn = self.redis_client.get_connection()
-            .context("Failed to connect to Redis")?;
-
-        let error_key = format!("errors:{}", program_id);
-        
-        // Get recent errors for analysis
-        let recent_errors: Vec<String> = conn.lrange(&error_key, 0, MAX_ERROR_HISTORY as isize - 1)
-            .context("Failed to get recent errors")?;
-
-        let mut error_types = HashMap::new();
-        let mut total_errors = 0;
-
-        // Analyze error patterns
-        for error_json in recent_errors {
-            if let Ok(error_entry) = serde_json::from_str::<ErrorEntry>(&error_json) {
-                *error_types.entry(error_entry.error_type).or_insert(0) += 1;
-                total_errors += 1;
-            }
-        }
-
-        // Determine dominant error type
-        let mut dominant_type = None;
-        let mut max_count = 0;
-
-        for (error_type, count) in error_types {
-            if count > max_count {
-                max_count = count;
-                dominant_type = Some(error_type);
-            }
-        }
-
-        // Choose recovery action based on error pattern
-        let action = match dominant_type {
-            Some(ErrorType::RateLimit) => RecoveryAction::BackOff {
-                duration: 60_000, // 60 seconds
-                reason: "Rate limit errors dominant".to_string(),
-            },
-            Some(ErrorType::Timeout) => RecoveryAction::Retry {
-                max_attempts: 3,
-                reason: "Timeout errors dominant".to_string(),
-            },
-            Some(ErrorType::Network) => RecoveryAction::SwitchEndpoint {
-                reason: "Network errors dominant".to_string(),
-            },
-            _ => RecoveryAction::Alert {
-                message: format!("Unknown error pattern detected ({} errors)", total_errors),
-            },
-        };
-
-        Ok(action)
     }
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+impl RetryConfig {
+    /// Create a new RetryConfig with custom settings
+    pub fn new(max_retries: u64, base_delay_ms: u64) -> Self {
+        Self {
+            max_retries,
+            base_delay_ms,
+            ..Default::default()
+        }
+    }
+
+    /// Set maximum number of retry attempts
+    pub fn with_max_retries(mut self, max_retries: u64) -> Self {
+        self.max_retries = max_retries;
+        self
+    }
+
+    /// Set base delay between retries
+    pub fn with_base_delay(mut self, base_delay_ms: u64) -> Self {
+        self.base_delay_ms = base_delay_ms;
+        self
+    }
+
+    /// Set maximum delay between retries
+    pub fn with_max_delay(mut self, max_delay_ms: u64) -> Self {
+        self.max_delay_ms = max_delay_ms;
+        self
+    }
+
+    /// Set jitter range for randomization
+    pub fn with_jitter(mut self, jitter_range_ms: u64) -> Self {
+        self.jitter_range_ms = jitter_range_ms;
+        self
+    }
+
+    /// Enable or disable exponential backoff
+    pub fn with_exponential_backoff(mut self, use_exponential: bool) -> Self {
+        self.use_exponential = use_exponential;
+        self
+    }
+
+    /// Set timeout for each attempt
+    pub fn with_timeout(mut self, timeout_ms: Option<u64>) -> Self {
+        self.timeout_ms = timeout_ms;
+        self
+    }
+
+    /// Add error types that should trigger retries
+    pub fn with_retry_errors(mut self, errors: &[ErrorType]) -> Self {
+        self.retry_on_errors.extend(errors.iter().cloned());
+        self
+    }
+
+    /// Calculate delay for a specific retry attempt
+    pub fn calculate_delay(&self, attempt: u64) -> Duration {
+        let base = if self.use_exponential {
+            self.base_delay_ms * (2_u64.pow(attempt as u32))
+        } else {
+            self.base_delay_ms
+        };
+
+        let with_jitter = if self.jitter_range_ms > 0 {
+            let mut rng = rand::thread_rng();
+            base + rng.gen_range(0..=self.jitter_range_ms)
+        } else {
+            base
+        };
+
+        Duration::from_millis(with_jitter.min(self.max_delay_ms))
+    }
+
+    /// Check if an error should trigger a retry
+    pub fn should_retry(&self, error: &ErrorType) -> bool {
+        self.retry_on_errors.contains(error)
+    }
+
+    /// Get the timeout duration for an attempt
+    pub fn get_timeout(&self) -> Option<Duration> {
+        self.timeout_ms.map(Duration::from_millis)
+    }
+}
+
+/// Error types that can occur during program execution
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum ErrorType {
-    RateLimit,
-    Timeout,
+    /// Network-related errors including connection failures
     Network,
-    Authorization,
-    Unknown,
+    /// Request timeout errors
+    Timeout,
+    /// Rate limiting errors
+    RateLimit,
+    /// Invalid input errors
+    InvalidInput,
+    /// Internal system errors
+    InternalError,
+    /// Security policy violations
+    SecurityViolation,
+    /// Resource exhaustion errors
+    ResourceExhausted,
+    /// State transition validation errors
+    StateTransition,
+    /// Circuit breaker triggered errors
+    CircuitBreaker,
 }
 
-#[derive(Debug)]
-pub enum CircuitStatus {
-    Open,
-    Closed,
-    JustOpened,
-}
+mod chaos_request_status_serde {
+    use super::*;
+    use serde::{Deserializer, Serializer};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum RecoveryAction {
-    BackOff {
-        duration: u64,  // Store duration as u64 milliseconds for serialization
-        reason: String,
-    },
-    Retry {
-        max_attempts: u32,
-        reason: String,
-    },
-    SwitchEndpoint {
-        reason: String,
-    },
-    Alert {
-        message: String,
-    },
-}
-
-impl ErrorAnalysis {
-    fn get_error_percentage(&self, error_type: ErrorType) -> f64 {
-        if self.total_errors == 0 {
-            return 0.0;
-        }
-
-        let error_count = self.error_types.get(&error_type).copied().unwrap_or(0);
-        (error_count as f64 / self.total_errors as f64) * 100.0
-    }
-
-    fn is_error_type_dominant(&self, error_type: ErrorType, threshold: f64) -> bool {
-        self.get_error_percentage(error_type) >= threshold
-    }
-
-    fn is_rate_limit_dominant(&self) -> bool {
-        self.is_error_type_dominant(ErrorType::RateLimit, 50.0)
-    }
-
-    fn is_timeout_dominant(&self) -> bool {
-        self.is_error_type_dominant(ErrorType::Timeout, 50.0)
-    }
-
-    fn is_network_dominant(&self) -> bool {
-        self.is_error_type_dominant(ErrorType::Network, 50.0)
-    }
-
-    /// Get detailed error analysis with trends
-    pub fn get_detailed_analysis(&self) -> String {
-        let mut analysis = format!("Error Analysis (Total: {}):\n", self.total_errors);
-        
-        // Error type distribution
-        analysis.push_str("Error Distribution:\n");
-        for (error_type, count) in &self.error_types {
-            let percentage = self.get_error_percentage(error_type.clone());
-            analysis.push_str(&format!("  ├─ {:?}: {} ({:.1}%)\n", error_type, count, percentage));
-        }
-
-        // Timeline analysis
-        if !self.error_timeline.is_empty() {
-            let last_error = self.error_timeline[0].0;
-            let now = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
-            
-            analysis.push_str(&format!("\nTimeline Analysis:\n"));
-            analysis.push_str(&format!("  ├─ Last Error: {}s ago\n", now - last_error));
-            analysis.push_str(&format!("  ├─ Peak Error Rate: {:.2} errors/sec\n", self.peak_error_rate));
-            analysis.push_str(&format!("  └─ Avg Recovery Time: {:.2}s\n", self.avg_recovery_time.as_secs_f64()));
-        }
-
-        // Program impact analysis
-        if !self.most_affected_programs.is_empty() {
-            analysis.push_str("\nMost Affected Programs:\n");
-            let mut programs: Vec<_> = self.most_affected_programs.iter().collect();
-            programs.sort_by(|a, b| b.1.cmp(a.1));
-            
-            for (program_id, error_count) in programs.iter().take(5) {
-                let percentage = (*error_count as f64 / self.total_errors as f64) * 100.0;
-                analysis.push_str(&format!("  └─ {}: {} errors ({:.1}%)\n", 
-                    program_id, error_count, percentage));
-            }
-        }
-
-        analysis
-    }
-
-    /// Get recommendations based on error patterns
-    pub fn get_recommendations(&self) -> Vec<String> {
-        let mut recommendations = Vec::new();
-
-        if self.is_rate_limit_dominant() {
-            recommendations.push("Consider implementing rate limiting with exponential backoff".to_string());
-            recommendations.push("Review and optimize API usage patterns".to_string());
-        }
-
-        if self.is_timeout_dominant() {
-            recommendations.push("Consider increasing timeout values".to_string());
-            recommendations.push("Implement request chunking for large operations".to_string());
-        }
-
-        if self.is_network_dominant() {
-            recommendations.push("Implement automatic endpoint failover".to_string());
-            recommendations.push("Consider using a connection pool".to_string());
-        }
-
-        if self.peak_error_rate > 10.0 {
-            recommendations.push("Implement circuit breaker pattern".to_string());
-            recommendations.push("Add request throttling".to_string());
-        }
-
-        if self.avg_recovery_time > Duration::from_secs(30) {
-            recommendations.push("Review and optimize recovery strategies".to_string());
-            recommendations.push("Consider implementing parallel recovery attempts".to_string());
-        }
-
-        recommendations
-    }
-}
-
-fn categorize_error(error: &anyhow::Error) -> ErrorType {
-    let error_str = error.to_string().to_lowercase();
-    
-    if error_str.contains("rate limit") || error_str.contains("too many requests") {
-        ErrorType::RateLimit
-    } else if error_str.contains("timeout") || error_str.contains("deadline exceeded") {
-        ErrorType::Timeout
-    } else if error_str.contains("network") || error_str.contains("connection") {
-        ErrorType::Network
-    } else if error_str.contains("unauthorized") || error_str.contains("forbidden") {
-        ErrorType::Authorization
-    } else {
-        ErrorType::Unknown
-    }
-}
-
-#[tokio::main]
-async fn main() -> Result<()> {
-    println!("🚀 Starting Glitch Gremlin Basic Example");
-
-    // Initialize network configuration
-    let network_config = create_network_config(
-        SolanaCluster::Devnet,
-        TestMode::default_testnet(),
-    );
-
-    // Initialize Helius client with enhanced configuration
-    let enhanced_config = EnhancedHeliusConfig::new()?;
-    let mut client = HeliusClient::with_config(HeliusConfig {
-        endpoint: enhanced_config.endpoint.clone(),
-        api_key: enhanced_config.api_key.clone(),
-        timeout_secs: enhanced_config.timeout_secs,
-        use_mock: enhanced_config.use_mock,
-    });
-
-    // Create a test program ID
-    let program_id = Pubkey::new_unique();
-    let request_id = format!("test-{}", program_id);
-
-    // Initialize request tracker
-    let mut tracker = RequestTracker::new(
-        request_id.clone(),
-        program_id,
-        network_config.clone(),
-    );
-
-    println!("\n📋 Test Configuration:");
-    println!("├─ Network: {}", network_config.cluster.name());
-    println!("├─ Mode: {}", network_config.test_mode.description());
-    println!("├─ Program ID: {}", program_id);
-    println!("└─ Request ID: {}", request_id);
-
-    // Monitor the request
-    match monitor_request(&mut client, &mut tracker, 60).await {
-        Ok(()) => println!("\n✅ Request monitoring completed successfully"),
-        Err(e) => println!("\n❌ Error monitoring request: {}", e),
-    }
-
-    Ok(())
-}
-
-// Add Default implementation for StateMetrics
-impl Default for StateMetrics {
-    fn default() -> Self {
-        let now = Instant::now();
-        Self {
-            checks_in_state: 0,
-            memory_usage: 0,
-            cpu_usage: 0.0,
-            error_count: 0,
-            start_time: now,
-            last_update: now,
-            status_history: Vec::new(),
-            peak_memory_usage: 0,
-            peak_cpu_usage: 0.0,
-            avg_check_duration: Duration::from_secs(0),
-            total_check_duration: Duration::from_secs(0),
-            check_count: 0,
-        }
-    }
-}
-
-// Add serde implementation for ChaosRequestStatus
-impl Serialize for CoreChaosRequestStatus {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    pub fn serialize<S>(status: &CoreChaosRequestStatus, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer,
+        S: Serializer,
     {
-        serializer.serialize_str(match self {
-            CoreChaosRequestStatus::Pending => "Pending",
-            CoreChaosRequestStatus::InProgress => "InProgress",
-            CoreChaosRequestStatus::Completed => "Completed",
-            CoreChaosRequestStatus::Failed => "Failed",
-            CoreChaosRequestStatus::Cancelled => "Cancelled",
-            CoreChaosRequestStatus::TimedOut => "TimedOut",
-        })
-    }
-}
-
-impl<'de> Deserialize<'de> for CoreChaosRequestStatus {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        match s.as_str() {
-            "Pending" => Ok(CoreChaosRequestStatus::Pending),
-            "InProgress" => Ok(CoreChaosRequestStatus::InProgress),
-            "Completed" => Ok(CoreChaosRequestStatus::Completed),
-            "Failed" => Ok(CoreChaosRequestStatus::Failed),
-            "Cancelled" => Ok(CoreChaosRequestStatus::Cancelled),
-            "TimedOut" => Ok(CoreChaosRequestStatus::TimedOut),
-            _ => Err(serde::de::Error::custom(format!("Invalid status: {}", s))),
-        }
-    }
-}
-
-// Helper function for Redis HGET operations with proper type handling
-async fn redis_hget<K, F, RV>(
-    conn: &mut redis::Connection,
-    key: K,
-    field: F
-) -> Result<Option<RV>> 
-where
-    K: ToRedisArgs,
-    F: ToRedisArgs,
-    RV: FromRedisValue,
-{
-    match conn.hget::<K, F, RV>(key, field) {
-        Ok(value) => Ok(Some(value)),
-        Err(e) if e.kind() == ErrorKind::Nil => Ok(None),
-        Err(e) => Err(e.into())
-    }
-}
-
-// Enhanced Redis operations with proper error handling
-impl EnhancedRedisClient {
-    pub async fn set_cached_status(&self, program_id: &Pubkey, status: &CoreChaosRequestStatus) -> Result<(), CacheError> {
-        let mut conn = self.client.get_connection()
-            .map_err(|e| CacheError::Connection(e.to_string()))?;
-            
-        let cache_key = format!("request_status:{}", program_id);
-        let json = serde_json::to_string(&SerializableChaosRequestStatus(status.clone()))
-            .map_err(CacheError::Serialization)?;
-            
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64;
-            
-        redis::pipe()
-            .atomic()
-            .hset(&cache_key, "status", json)
-            .hset(&cache_key, "last_update", now)
-            .expire(&cache_key, CACHE_TTL_SECS as usize)
-            .query(&mut conn)
-            .map_err(CacheError::Redis)?;
-            
-        // Update metrics
-        if let Ok(mut metrics) = self.metrics.lock() {
-            metrics.total_operations += 1;
-            metrics.last_write = Some(SystemTime::now());
-        }
-        
-        Ok(())
-    }
-
-    pub async fn get_cached_timestamp(&self, key: &str) -> Result<Option<i64>, CacheError> {
-        let mut conn = self.client.get_connection()
-            .map_err(|e| CacheError::Connection(e.to_string()))?;
-            
-        redis_hget::<_, _, i64>(&mut conn, key, "last_update")
-            .await
-            .map_err(|e| CacheError::Redis(redis::RedisError::from((
-                ErrorKind::TypeError,
-                "Failed to get timestamp",
-                e.to_string()
-            ))))
-    }
-
-    pub async fn clear_expired_entries(&self) -> Result<u64, CacheError> {
-        let mut conn = self.client.get_connection()
-            .map_err(|e| CacheError::Connection(e.to_string()))?;
-            
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64;
-            
-        let mut cleared = 0;
-        let pattern = "request_status:*";
-        
-        let keys: Vec<String> = conn.keys(pattern)
-            .map_err(CacheError::Redis)?;
-            
-        for key in keys {
-            if let Some(timestamp) = redis_hget::<_, _, i64>(&mut conn, &key, "last_update").await? {
-                if now - timestamp > CACHE_TTL_SECS as i64 {
-                    conn.del::<_, ()>(&key)
-                        .map_err(CacheError::Redis)?;
-                    cleared += 1;
-                    
-                    // Update metrics
-                    if let Ok(mut metrics) = self.metrics.write() {
-                        metrics.stale_entries_cleared += 1;
-                    }
-                }
-            }
-        }
-        
-        // Update last cleanup timestamp
-        if let Ok(mut metrics) = self.metrics.write() {
-            metrics.last_cleanup = Some(SystemTime::now());
-        }
-        
-        Ok(cleared)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct SerializableChaosRequestStatus(pub CoreChaosRequestStatus);
-
-impl Serialize for SerializableChaosRequestStatus {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        // Convert the status to a string representation
-        let status_str = match self.0 {
+        let s = match status {
             CoreChaosRequestStatus::Pending => "pending",
             CoreChaosRequestStatus::InProgress => "in_progress",
             CoreChaosRequestStatus::Completed => "completed",
             CoreChaosRequestStatus::Failed => "failed",
             CoreChaosRequestStatus::Cancelled => "cancelled",
+            CoreChaosRequestStatus::TimedOut => "timed_out",
         };
-        serializer.serialize_str(status_str)
+        serializer.serialize_str(s)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<CoreChaosRequestStatus, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        match s.as_str() {
+            "pending" => Ok(CoreChaosRequestStatus::Pending),
+            "in_progress" => Ok(CoreChaosRequestStatus::InProgress),
+            "completed" => Ok(CoreChaosRequestStatus::Completed),
+            "failed" => Ok(CoreChaosRequestStatus::Failed),
+            "cancelled" => Ok(CoreChaosRequestStatus::Cancelled),
+            "timed_out" => Ok(CoreChaosRequestStatus::TimedOut),
+            _ => Err(serde::de::Error::custom(format!("Invalid status: {}", s))),
+        }
     }
 }
 
-impl<'de> Deserialize<'de> for SerializableChaosRequestStatus {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let status_str = String::deserialize(deserializer)?;
-        let status = match status_str.as_str() {
-            "pending" => CoreChaosRequestStatus::Pending,
-            "in_progress" => CoreChaosRequestStatus::InProgress,
-            "completed" => CoreChaosRequestStatus::Completed,
-            "failed" => CoreChaosRequestStatus::Failed,
-            "cancelled" => CoreChaosRequestStatus::Cancelled,
-            _ => return Err(serde::de::Error::custom("Invalid status value")),
-        };
-        Ok(SerializableChaosRequestStatus(status))
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Initialize logging
+    env_logger::init();
+    info!("Starting Glitch Gremlin Basic Example with enhanced features...");
+
+    // Initialize Redis client with error handling
+    let redis_client = EnhancedRedisClient::new(REDIS_HOST, REDIS_PORT)
+        .map_err(|e| anyhow::anyhow!("Failed to initialize Redis client: {}", e))?;
+    
+    // Initialize test configuration with comprehensive retry settings
+    let retry_config = RetryConfig::default()
+        .with_max_retries(5)
+        .with_base_delay(100)
+        .with_jitter(50)
+        .with_exponential_backoff(true)
+        .with_retry_errors(&[
+            ErrorType::Network,
+            ErrorType::Timeout,
+            ErrorType::RateLimit
+        ]);
+
+    // Create a test program ID
+    let program_id = Pubkey::new_unique();
+    info!("Using test program ID: {}", program_id);
+    
+    // Start periodic cache warming in the background
+    let redis_client_clone = redis_client.clone();
+    tokio::spawn(async move {
+        info!("Starting periodic cache warming...");
+        if let Err(e) = redis_client_clone.schedule_cache_warming().await {
+            error!("Cache warming task failed: {}", e);
+        }
+    });
+
+    // Warm up cache before operations
+    info!("Performing initial cache warm-up...");
+    let warmed_keys = redis_client.warm_cache().await
+        .map_err(|e| anyhow::anyhow!("Failed to warm cache: {}", e))?;
+    info!("Warmed up {} cache keys", warmed_keys);
+
+    // Demonstrate rate limiting with high-priority operations
+    info!("\nTesting rate limiting with burst protection...");
+    for i in 0..BURST_ALLOWANCE + 10 {
+        match redis_client.check_rate_limits(&program_id).await {
+            Ok(true) => {
+                info!("Request {} allowed", i + 1);
+            },
+            Ok(false) => {
+                warn!("Request {} rate limited", i + 1);
+                // Apply exponential backoff when rate limited
+                tokio::time::sleep(Duration::from_millis((i as u64 + 1) * 100)).await;
+            },
+            Err(e) => {
+                error!("Rate limit check failed: {}", e);
+                break;
+            }
+        }
     }
+
+    // Demonstrate status transitions with metrics tracking
+    let status_sequence = vec![
+        CoreChaosRequestStatus::Pending,
+        CoreChaosRequestStatus::InProgress,
+        CoreChaosRequestStatus::Completed,
+    ];
+
+    // Process status transitions with enhanced error handling and retry logic
+    for status in status_sequence {
+        info!("\nAttempting transition to {:?}", status);
+        
+        // Check rate limits before proceeding
+        if !redis_client.check_rate_limits(&program_id).await
+            .map_err(|e| anyhow::anyhow!("Failed to check rate limits: {}", e))? {
+            warn!("Rate limit exceeded, waiting before retry...");
+            tokio::time::sleep(Duration::from_secs(5)).await;
+            continue;
+        }
+        
+        // Apply security checks with timestamp validation
+        let status_str = serde_json::to_string(&SerializableChaosRequestStatus(status.clone()))
+            .map_err(|e| anyhow::anyhow!("Serialization error: {}", e))?;
+        
+        if !redis_client.apply_security_checks(&program_id, &status_str).await
+            .map_err(|e| anyhow::anyhow!("Failed to apply security checks: {}", e))? {
+            error!("⚠️  Security check failed - potential replay attack detected");
+            continue;
+        }
+
+        // Check circuit breaker status
+        if !redis_client.check_circuit_breaker(&program_id).await
+            .map_err(|e| anyhow::anyhow!("Failed to check circuit breaker: {}", e))? {
+            error!("🔴 Circuit breaker triggered - system protection active");
+            continue;
+        }
+        
+        let mut attempt = 0;
+        let mut last_error = None;
+        let operation_start = Instant::now();
+        
+        // Retry loop with exponential backoff
+        while attempt <= retry_config.max_retries {
+            let start = Instant::now();
+            
+            match redis_client.set_cached_status(&program_id, &status).await {
+                Ok(_) => {
+                    info!("Status set successfully on attempt {} (took {:?})", 
+                        attempt + 1, start.elapsed());
+                    
+                    // Update performance metrics
+                    redis_client.update_performance_metrics(start.elapsed(), true).await;
+                    break;
+                }
+                Err(e) => {
+                    last_error = Some(e);
+                    attempt += 1;
+                    
+                    // Update performance metrics for failed attempt
+                    redis_client.update_performance_metrics(start.elapsed(), false).await;
+                    
+                    if attempt <= retry_config.max_retries {
+                        let delay = retry_config.calculate_delay(attempt);
+                        warn!("Attempt {} failed after {:?}, retrying in {:?}...", 
+                            attempt, start.elapsed(), delay);
+                        tokio::time::sleep(delay).await;
+                    }
+                }
+            }
+        }
+
+        // Handle max retries exceeded
+        if attempt > retry_config.max_retries {
+            return Err(anyhow::anyhow!(
+                "Failed to set status after {} attempts: {:?}",
+                attempt,
+                last_error
+            ));
+        }
+        
+        // Verify status was set correctly
+        let cached_status = redis_client.get_cached_status(&program_id).await
+            .map_err(|e| anyhow::anyhow!("Failed to get status: {}", e))?;
+        
+        assert_eq!(cached_status.as_ref(), Some(&status), 
+            "Status verification failed: expected {:?}, got {:?}", 
+            status, cached_status);
+        
+        info!("Status transition completed successfully in {:?}", operation_start.elapsed());
+        
+        // Add artificial delay between transitions to demonstrate rate limiting
+        tokio::time::sleep(Duration::from_millis(MIN_TRANSITION_INTERVAL_MS)).await;
+    }
+
+    // Clean up stale entries
+    info!("\nCleaning up stale cache entries...");
+    let invalidated = redis_client.invalidate_stale_entries().await
+        .map_err(|e| anyhow::anyhow!("Failed to invalidate stale entries: {}", e))?;
+    info!("Invalidated {} stale cache entries", invalidated);
+
+    // Demonstrate metrics collection with detailed analysis
+    let metrics = redis_client.get_enhanced_metrics().await
+        .map_err(|e| anyhow::anyhow!("Failed to get metrics: {}", e))?;
+    
+    info!("\nCache Metrics Report:");
+    println!("{}", metrics.get_detailed_report());
+
+    // Perform health check with recommendations
+    let health = redis_client.get_cache_health().await
+        .map_err(|e| anyhow::anyhow!("Failed to get health status: {}", e))?;
+    
+    info!("\nHealth Analysis:");
+    println!("{}", health.get_health_analysis());
+
+    if !health.is_healthy() {
+        warn!("\n⚠️  Warning: Cache health check failed!");
+        info!("Please review the health analysis above for recommendations.");
+    } else {
+        info!("\n✅ Cache health check passed successfully!");
+    }
+
+    info!("\nBasic example completed successfully!");
+    Ok(())
 }
