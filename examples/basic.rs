@@ -454,9 +454,13 @@ impl EnhancedRedisClient {
             last_write: metrics.last_write,
             last_cleanup: metrics.last_cleanup,
             stale_entries_cleared: metrics.stale_entries_cleared,
-            peak_memory_usage: info.get("used_memory")
+            peak_memory_usage: info.get("memory_used_memory")
                 .and_then(|s| s.parse().ok())
-                .unwrap_or(0),
+                .unwrap_or_else(|| {
+                    info.get("memory_used_memory_human")
+                        .and_then(|s| parse_human_size(s))
+                        .unwrap_or(0)
+                }),
             peak_operations_per_sec: self.calculate_ops_per_second(),
             avg_operation_latency_ms: self.calculate_avg_latency().as_millis() as f64,
             error_rate: self.calculate_error_rate(),
