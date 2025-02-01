@@ -100,7 +100,6 @@ config/program_ids.json
 scripts/
 
 # Dependency files
-Cargo.lock
 yarn.lock
 package-lock.json
 node_modules/
