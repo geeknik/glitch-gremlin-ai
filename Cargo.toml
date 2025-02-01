@@ -7,10 +7,10 @@ license = "MIT"
 
 [dependencies]
 # Solana ecosystem
-solana-sdk = "=1.18.26"
-solana-program = "=1.18.26"
-anchor-lang = { version = "=0.30.1", features = ["derive"] }
-anchor-spl = "=0.30.1"
+solana-sdk = "=1.16.12"
+solana-program = "=1.16.12"
+anchor-lang = { version = "=0.28.0", features = ["derive"] }
+anchor-spl = "=0.28.0"
 
 # Error handling
 anyhow = "1.0"

@@ -16,10 +16,10 @@ default = []
 test-sbf = []
 
 [dependencies]
-anchor-lang = { version = "=0.30.1", features = ["init-if-needed"] }
-anchor-spl = "=0.30.1"
+anchor-lang = { version = "=0.28.0", features = ["init-if-needed"] }
+anchor-spl = "=0.28.0"
 num_enum = "0.5.11"
-solana-program = "=1.18.26"
+solana-program = "=1.16.12"
 
 [patch.crates-io]
 num_enum = { version = "0.5.11" }  # Force override transitive dependencies
@@ -36,5 +36,5 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
 [dev-dependencies]
-solana-program-test = "=1.18.26"
-solana-sdk = "=1.18.26"
+solana-program-test = "=1.16.12"
+solana-sdk = "=1.16.12"
