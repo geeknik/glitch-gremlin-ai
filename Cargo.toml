@@ -63,6 +63,7 @@ bv = "0.11.1"
 arrayref = "0.3.7"
 memoffset = "0.9"
 static_assertions = "1.1"
+ahash = "=0.8.10"  # Exact version to avoid stable feature issues
 
 # Base64 for decoding account data
 base64 = "=0.21.7"
