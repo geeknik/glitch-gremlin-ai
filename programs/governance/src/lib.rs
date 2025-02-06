@@ -1215,6 +1215,7 @@ pub struct GovernanceConfig {
     pub approval_threshold: u8,
     pub execution_delay: u64,
     pub grace_period: u64,
+    pub base_chaos_fee: u64,
     pub treasury_fee_bps: u16,
 }
 
@@ -1230,6 +1231,7 @@ impl Default for GovernanceConfig {
             approval_threshold: 60,
             execution_delay: 86_400, // 1 day
             grace_period: 43_200, // 12 hours
+            base_chaos_fee: 100_000, // Base fee for chaos request calculation
             treasury_fee_bps: 100, // 1%
         }
     }
