@@ -10,6 +10,20 @@
         "name": "abi_checksum",
         "hash_algorithm": "SHA3-256",
         "expected_value": "c3ab...c4f2"
+      },
+      {
+        "name": "quantum_entanglement",
+        "bits": 32768,
+        "verification_type": "continuous",
+        "nuclear_grade": true
+      },
+      {
+        "name": "hardware_security",
+        "requirements": [
+          "avx512f",
+          "sgx.relaxmode=disabled",
+          "cpu.md_clear=1"
+        ]
       }
     ]
   },

@@ -23,6 +23,12 @@
         "enabled": true,
         "size": "256MB",
         "timeout": "5m"
+      },
+      "nuclear_protection": {
+        "rowhammer_mitigation": true,
+        "cache_isolation": true,
+        "memory_encryption": "aes-256-gcm",
+        "realtime_monitoring": true
       }
     }
   },

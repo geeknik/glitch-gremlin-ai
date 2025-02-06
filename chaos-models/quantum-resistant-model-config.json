@@ -9,6 +9,11 @@
       "ecdsa_backup": true,
       "curve": "secp384r1",
       "signature_format": "IEEE_P1363"
+    },
+    "nuclear_grade": {
+      "entanglement_bits": 32768,
+      "measurement_protocol": "continuous",
+      "verification_interval": 100
     }
   },
   "chaos_parameters": {
