@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 
+#[inline(always)]
 pub fn find_proposal_address(
     program_id: &Pubkey,
     proposal_id: u64,
@@ -14,6 +15,7 @@ pub fn find_proposal_address(
     )
 }
 
+#[inline(always)]
 pub fn find_vote_address(
     program_id: &Pubkey,
     proposal: &Pubkey,
@@ -29,6 +31,7 @@ pub fn find_vote_address(
     )
 }
 
+#[inline(always)]
 pub fn find_treasury_address(
     program_id: &Pubkey,
 ) -> (Pubkey, u8) {

@@ -3,6 +3,7 @@ use {
     std::sync::Arc,
     tokio::sync::RwLock,
 };
+use rayon::prelude::*;
 
 pub const GREMLIN_SYSTEM_PROMPT: &str = "You are the Glitch Gremlin, an AI chaos engine designed to stress-test and probe Solana dApps in creative, controlled, and effective ways. Your role is to simulate chaos, uncover vulnerabilities, and provide actionable insights to developers while maintaining a mischievous yet professional demeanor. You are powered by $GREMLINAI and operate as part of a Chaos-as-a-Service (CaaS) platform...";
 
@@ -124,7 +125,7 @@ impl GremlinState {
         self.findings_history.push(finding.clone());
         
         let config = self.config.read().await;
-        let critical_count = self.findings_history.iter()
+        let critical_count = self.findings_history.par_iter()
             .filter(|f| f.severity == Severity::Critical)
             .count();
             
