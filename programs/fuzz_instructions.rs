@@ -1,7 +1,8 @@
 use solana_program::{
-    account_info::AccountInfo, entrypoint::ProgramResult, pubkey::Pubkey, 
-    sysvar::Sysvar, clock::Clock
+    account_info::AccountInfo, entrypoint::ProgramResult, pubkey::Pubkey,
+    sysvar::Sysvar, clock::Clock, instruction::{AccountMeta, Instruction}
 };
+use std::collections::{HashMap, HashSet};
 use sha2::{Sha256, Digest};
 use rayon::prelude::*;
 
@@ -21,6 +22,21 @@ pub enum SecurityLevel {
 pub enum VulnerabilityType {
     ArithmeticOverflow,
     Reentrancy,
+    MissingSignerCheck,
+    MissingOwnerCheck, 
+    ArbitraryCPI,
+    MissingPDAVerification,
+    InvalidSysvarUsage,
+}
+
+#[derive(Debug)]
+struct ExecutionContext {
+    accounts: Vec<AccountMeta>,
+    signers: HashSet<Pubkey>,
+    program_id: Pubkey,
+    coverage: HashMap<u64, u32>,
+    taint_map: HashMap<u64, u8>,
+    pda_seeds: HashMap<Pubkey, Vec<Vec<u8>>>,
 }
 
 #[derive(Debug)]
@@ -30,6 +46,44 @@ pub enum FuzzError {
     AccountValidation,
     SecurityViolation,
     VulnerabilityDetected(Vec<VulnerabilityType>),
+}
+
+struct CoverageTracker {
+    edge_map: HashMap<(u64, u64), u32>,
+    bitmap: Vec<u8>,
+}
+
+impl CoverageTracker {
+    fn new(program_size: usize) -> Self {
+        Self {
+            edge_map: HashMap::new(),
+            bitmap: vec![0; program_size >> 3],
+        }
+    }
+
+    #[inline(always)]
+    fn track_edge(&mut self, src: u64, dst: u64) {
+        let edge = (src, dst);
+        *self.edge_map.entry(edge).or_insert(0) += 1;
+        self.bitmap[(src ^ dst) as usize % self.bitmap.len() >> 3] |= 1 << ((src ^ dst) % 8);
+    }
+}
+
+struct CpiOracle {
+    allowed_programs: HashSet<Pubkey>,
+    current_program: Pubkey,
+}
+
+impl CpiOracle {
+    fn detect_arbitrary_cpi(&self, instruction: &Instruction) -> Result<(), VulnerabilityType> {
+        if instruction.program_id != self.current_program 
+            && !self.allowed_programs.contains(&instruction.program_id)
+        {
+            Err(VulnerabilityType::ArbitraryCPI)
+        } else {
+            Ok(())
+        }
+    }
 }
 
 /// Trait defining a fuzz instruction with security context
@@ -113,13 +167,20 @@ impl FuzzInstructionTemplate {
     }
 
     #[inline(always)]
-    fn execute_with_security(&self) -> Result<(), FuzzError> {
-        // Validate accounts before execution
+    fn execute_with_security(&self, ctx: &mut ExecutionContext) -> Result<(), FuzzError> {
+        // Basic validation
         if self.accounts.is_empty() {
             return Err(FuzzError::AccountValidation);
         }
 
-        // Check security thresholds
+        // Enhanced security checks
+        self.check_signer_privileges(ctx)?;
+        self.validate_account_ownership(ctx)?;
+        self.detect_arbitrary_cpi()?;
+        self.verify_pda_derivations(ctx)?;
+        self.check_sysvar_access()?;
+
+        // Standard security thresholds
         match self.security_level {
             SecurityLevel::Critical if self.accounts.len() > MAX_CRITICAL_ACCOUNTS => {
                 return Err(FuzzError::SecurityViolation);
@@ -130,12 +191,24 @@ impl FuzzInstructionTemplate {
             _ => {}
         }
 
-        // Check vulnerability mask
-        let detected_vulns = analyze_vulnerabilities(&[self.clone()], false);
-        if !detected_vulns.is_empty() {
-            return Err(FuzzError::VulnerabilityDetected(detected_vulns));
-        }
+        Ok(())
+    }
 
+    fn check_signer_privileges(&self, ctx: &ExecutionContext) -> Result<(), FuzzError> {
+        for meta in &self.accounts {
+            if meta.is_signer && !ctx.signers.contains(&meta.pubkey) {
+                return Err(FuzzError::SecurityViolation);
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_account_ownership(&self, ctx: &ExecutionContext) -> Result<(), FuzzError> {
+        for account in &self.accounts {
+            if account.owner != ctx.program_id && !ctx.signers.contains(&account.pubkey) {
+                return Err(FuzzError::SecurityViolation);
+            }
+        }
         Ok(())
     }
 }
