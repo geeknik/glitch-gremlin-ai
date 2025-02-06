@@ -1,10 +1,12 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use thiserror::Error;
+use pqcrypto::dilithium::dilithium5::{self, Keypair, SignedMessage};
 #[cfg(target_os = "linux")]
 use landlock::{self, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetStatus};
 #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 use sgx_types::*;
+use libseccomp::*;
 
 // Configure global allocator
 #[cfg(target_arch = "sbf")]
@@ -98,6 +100,18 @@ pub struct SecurityProof {
     pub enclave_id: Option<u64>,
 }
 
+#[derive(BorshSerialize, BorshDeserialize, Default)]
+pub struct ChaosMetrics {
+    pub start_slot: u64,
+    pub end_slot: u64,
+    pub cpu_cycles_used: u64,
+    pub memory_peak_kb: u32,
+    pub instruction_count: u32,
+    pub branch_mispredicts: u16,
+    pub cache_misses: u32,
+    pub simd_utilization: f32,
+}
+
 #[derive(Debug)]
 pub struct ChaosExecutionRecord {
     pub target: Pubkey,
@@ -105,6 +119,17 @@ pub struct ChaosExecutionRecord {
     pub result: ChaosResult<()>,
     pub security_proof: Option<SecurityProof>,
     pub timestamp: i64,
+
+    pub fn analyze_metrics(&self) -> ChaosResult<ChaosMetrics> {
+        let proof_data = self.security_proof
+            .as_ref()
+            .ok_or(ChaosError::MissingProof)?
+            .hash
+            .as_slice();
+            
+        ChaosMetrics::try_from_slice(proof_data)
+            .map_err(|_| ChaosError::CorruptedMetrics)
+    }
 }
 
 impl SecuritySanitizer {

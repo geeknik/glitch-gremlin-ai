@@ -58,11 +58,15 @@ rustflags = [
     "-C", "inline-threshold=100",
     "-C", "no-redzone=yes",
     "-C", "embed-llvm-bitcode=yes",
+    "-C", "target-feature=+avx512f,+avx512cd,+avx512bw,+avx512dq,+avx512vl",
     "-Z", "mir-opt-level=5",
     "-Z", "instrument-coverage",
     "-Z", "build-std=core,alloc,panic_abort",
     "-Z", "build-std-features=compiler-builtins-mem",
-    "-Z", "unleash-the-mango"
+    "-Z", "unleash-the-mango",
+    "-Z", "graphene",
+    "--cfg", "chaos_core",
+    "--cfg", "quantum_safe"
 ]
 
 [test.validator]
