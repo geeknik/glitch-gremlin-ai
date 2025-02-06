@@ -86,7 +86,7 @@ env_logger = { version = "0.10.0", features = ["auto-color", "humantime"] }
 [features]
 default = ["secure-mode", "post-quantum", "monitoring"]
 secure-mode = []
-sbf-optimized = ["solana-program/sbf-instrs", "solana-sbf-allocator"]
+sbf-optimized = ["solana-sdk/sbf-instrs", "solana-sbf-allocator"]
 post-quantum = []
 monitoring = []
 test = ["secure-mode", "monitoring"]
@@ -133,7 +133,7 @@ codegen-units = 1
 lto = "fat"
 debug = false
 strip = true
-target = "sbfv1-solana-solana"  # Explicit triple
+target = "sbfv2-solana-solana"  # Updated for SBF v2 toolchain
 rustflags = ["-C", "link-arg=-znotext", "-C", "link-arg=-Bsymbolic"]
 debug-assertions = false
 overflow-checks = true
