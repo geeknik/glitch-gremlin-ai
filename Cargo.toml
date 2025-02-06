@@ -7,10 +7,8 @@ license = "MIT"
 
 # Force SBF toolchain resolution
 [patch.crates-io]
-solana-sbf-tools = { git = "https://github.com/solana-labs/sbf-tools", rev = "sbfv1" }
-solana-program = { version = "1.17.0", features = [
-    "sbf-verifier-v2", "accelerated-cpi"  # DESIGN.md 9.4.3
-]}
+solana-sbf-tools = { git = "https://github.com/anza-xyz/sbpf.git", branch = "main" }
+solana-sdk = { git = "https://github.com/anza-xyz/solana-sdk.git", branch = "master" }  # Replacing solana-program with solana-sdk per new dependency strategy
 
 [workspace]
 members = [
@@ -19,9 +17,7 @@ members = [
 
 [workspace.dependencies]
 # Core Solana dependencies
-solana-program = { version = "1.17.0", features = ["sbfv1", "borsh", "no-entrypoint"] }
-solana-program-runtime = "1.17.0"
-solana-sdk = "1.17.0"
+solana-sdk = { git = "https://github.com/anza-xyz/solana-sdk.git", branch = "master", features = ["sbfv1", "borsh", "no-entrypoint"] }
 solana-program-test = "1.17.0"
 solana-runtime = "1.17.0"
 solana-logger = "1.17.0"

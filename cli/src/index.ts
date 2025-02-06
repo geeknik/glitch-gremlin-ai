@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Using new dependencies: platform-tools, agave, solana-web3.js, pinocchio, sbpf, solana-sdk
 
 import { Command } from 'commander';
 import { readFileSync } from 'node:fs';
