@@ -18,6 +18,8 @@ members = [
 [workspace.dependencies]
 trident-fuzz = { version = "0.3.1", features = ["afl", "honggfuzz"] }
 # Core Solana dependencies
+# Implementation of FuzzDelSol architecture based on:
+# "Fuzz on the Beach: Fuzzing Solana Smart Contracts" by Smolka et al. (arXiv:2309.03006)
 solana-sdk = { git = "https://github.com/anza-xyz/solana-sdk.git", branch = "master", features = ["sbfv1", "borsh", "no-entrypoint"] }
 solana-program-test = "1.17.0"
 solana-runtime = "1.17.0"

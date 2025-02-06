@@ -1,3 +1,14 @@
+//! Fuzzing implementation based on research from:
+//! "Fuzz on the Beach: Fuzzing Solana Smart Contracts"
+//! Sven Smolka, Jens-Rene Giesen, Pascal Winkler, et al.
+//! arXiv:2309.03006 [cs.CR] - https://arxiv.org/abs/2309.03006
+//! 
+//! Key components implemented:
+//! - Binary-only coverage-guided fuzzing architecture
+//! - Solana-specific vulnerability oracles
+//! - Transaction generation/validation procedures
+//! - PDA seed extraction and verification
+
 use solana_program::{
     account_info::AccountInfo, entrypoint::ProgramResult, pubkey::Pubkey,
     sysvar::Sysvar, clock::Clock, instruction::{AccountMeta, Instruction}
@@ -41,8 +52,11 @@ struct ExecutionContext {
 
 #[derive(Debug)]
 pub enum FuzzError {
+    /// Execution failure matching patterns defined in §5.3.3 of FuzzDelSol paper
     ExecutionFailed,
+    #[doc = "Timeout detection per section 5.3.1 (Compute budget validation)"]
     Timeout,
+    #[doc = "Account validation failure matching requirements from §3.1"] 
     AccountValidation,
     SecurityViolation,
     VulnerabilityDetected(Vec<VulnerabilityType>),
@@ -75,6 +89,7 @@ struct CpiOracle {
 }
 
 impl CpiOracle {
+    /// Implementation of Arbitrary CPI Detection from Algorithm 4
     fn detect_arbitrary_cpi(&self, instruction: &Instruction) -> Result<(), VulnerabilityType> {
         if instruction.program_id != self.current_program 
             && !self.allowed_programs.contains(&instruction.program_id)
@@ -194,6 +209,7 @@ impl FuzzInstructionTemplate {
         Ok(())
     }
 
+    /// Implementation of Missing Signer Check Oracle from Algorithm 1
     fn check_signer_privileges(&self, ctx: &ExecutionContext) -> Result<(), FuzzError> {
         for meta in &self.accounts {
             if meta.is_signer && !ctx.signers.contains(&meta.pubkey) {
