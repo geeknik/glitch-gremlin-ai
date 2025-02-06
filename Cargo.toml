@@ -12,14 +12,18 @@ solana-sdk = { git = "https://github.com/anza-xyz/solana-sdk.git", branch = "mas
 
 [workspace]
 members = [
-    "programs/*"
+    "programs/*",
+    "src/token/program"  # Explicitly include token program
 ]
+resolver = "2"  # Required for proper workspace inheritance
 
 [workspace.dependencies]
 trident-fuzz = { version = "0.3.1", features = ["afl", "honggfuzz"] }
 prometheus = { version = "0.13.3", features = ["process", "push"] }
 portable-atomic = "1.6"
 crossbeam = { version = "0.8", features = ["crossbeam-queue"] }
+borsh = "0.17.0"  # Unified version for workspace
+ed25519-dalek = { version = "2.1.0", features = ["serde"] }  # Updated for security
 # Core Solana dependencies
 # Implementation of FuzzDelSol architecture based on:
 # "Fuzz on the Beach: Fuzzing Solana Smart Contracts" by Smolka et al. (arXiv:2309.03006)
