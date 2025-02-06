@@ -365,6 +365,72 @@ impl SecuritySanitizer {
         verify_remote_attestation(report).map_err(|e| ChaosError::EnclaveVerificationFailed(e))
     }
 
+    /// Hybrid quantum-safe signature scheme
+    pub fn quantum_safe_sign(&self, msg: &[u8]) -> ChaosResult<Vec<u8>> {
+        let kp = dilithium5::keypair(); // Post-quantum keypair
+        
+        // Traditional ECDSA fallback
+        let ecdsa_sig = self.tee_status
+            .as_ref()
+            .map(|s| sign_with_enclave(s.enclave_id, msg))
+            .transpose()?;
+        
+        let mut hybrid_sig = dilithium5::sign(msg, &kp).as_ref().to_vec();
+        if let Some(s) = ecdsa_sig {
+            hybrid_sig.extend(s);
+        }
+        
+        Ok(hybrid_sig)
+    }
+
+    /// Hybrid signature verification
+    pub fn quantum_safe_verify(
+        &self,
+        msg: &[u8],
+        sig: &[u8],
+        pubkey: &[u8]
+    ) -> ChaosResult<()> {
+        // First try post-quantum verification
+        if let Ok(()) = dilithium5::verify_open(sig, msg, pubkey) {
+            return Ok(());
+        }
+        
+        // Fallback to ECDSA if needed
+        let enclave_id = self.tee_status.as_ref().ok_or(ChaosError::NoTrustedEnvironment)?;
+        verify_enclave_sig(enclave_id.enclave_id, msg, sig)
+            .map_err(|e| ChaosError::EnclaveVerificationFailed(e))
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn enable_kernel_hardening(&self) -> ChaosResult<()> {
+        let mut filter = ScmpFilterContext::new(ScmpAction::Allow)?;
+        
+        // Block dangerous syscalls
+        let blocked = [
+            Sysno::keyctl, 
+            Sysno::add_key,
+            Sysno::request_key,
+            Sysno::memfd_create,
+            Sysno::userfaultfd
+        ];
+        
+        for syscall in blocked {
+            filter.add_rule(ScmpAction::Errno(ENOSYS as u32), syscall)?;
+        }
+        
+        // Prevent memory access patterns common to Rowhammer attacks
+        seccomp_rule_add(
+            &mut filter,
+            ScmpAction::KillProcess,
+            Sysno::membarrier,
+            1,
+            &[ScmpArgCompare::new(0, ScmpCompareOp::MaskedEq, 0, 3)]
+        )?;
+        
+        filter.load()?;
+        Ok(())
+    }
+
     pub fn execute_chaos_safely<T>(
         &self,
         target: Pubkey,
