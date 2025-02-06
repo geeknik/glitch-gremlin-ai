@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use solana_sdk::pubkey::Pubkey;
 use sha2::{Sha256, Digest};
+use rayon::prelude::*;
 
 /// Trait defining a fuzz instruction.
 /// Fully optimized for minimal allocation and inlined getters.
@@ -65,4 +66,24 @@ pub fn create_sample_fuzz_instruction() -> impl FuzzInstruction {
         data: vec![1, 2, 3, 4], // Sample instruction input bytes
         accounts: vec![Pubkey::new_unique(), Pubkey::new_unique()],
     }
+}
+
+/// Error type for fuzz test execution.
+#[derive(Debug)]
+pub enum FuzzError {
+    ExecutionFailed,
+}
+
+/// Executes a slice of fuzz instructions in parallel for maximum throughput.
+///
+/// This function is fully optimized using Rayon for parallel iteration and
+/// inlined instruction getters to minimize overhead.
+#[inline(always)]
+pub fn execute_fuzz_tests(instructions: &[impl FuzzInstruction]) -> Vec<Result<(), FuzzError>> {
+    instructions.par_iter().map(|instr| {
+        // Simulate optimized execution for each instruction.
+        // Replace this placeholder logic with actual instruction execution.
+        println!("Executing instruction with discriminator: {:?}", instr.get_discriminator());
+        Ok(())
+    }).collect()
 }
