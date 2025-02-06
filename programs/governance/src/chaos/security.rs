@@ -134,7 +134,35 @@ impl ChaosExecutionRecord {
     }
 }
 
+use jsonschema::{JSONSchema, Draft, CompilationOptions};
+use serde_json::Value;
+
 impl SecuritySanitizer {
+    pub fn validate_model_config(&self, config: &Value) -> Result<(), SecurityError> {
+        let schema = include_str!("../../../chaos-models/quantum-resistant-model-config.json");
+        let compiled_schema = JSONSchema::compile(&serde_json::from_str(schema)?)
+            .map_err(|e| SecurityError::SchemaError(e.to_string()))?;
+
+        let result = compiled_schema.validate(config);
+        if let Err(errors) = result {
+            let mut error_msg = String::new();
+            for error in errors {
+                error_msg += &format!("[{}] {}\n", error.instance_path, error.kind);
+            }
+            return Err(SecurityError::InvalidConfig(error_msg));
+        }
+
+        // Quantum-safe signature check
+        let sig = config.get("signature")
+            .ok_or(SecurityError::MissingSignature)?;
+        self.quantum_safe_verify(
+            config.to_string().as_bytes(),
+            sig.as_str().unwrap().as_bytes(),
+            &self.enclave_pubkey
+        )?;
+
+        Ok(())
+    }
     pub fn new() -> Self {
         let mut sanitizer = Self {
             trusted_programs: HashSet::new(),

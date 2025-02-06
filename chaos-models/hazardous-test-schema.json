@@ -1,0 +1,44 @@
+{
+  "test_authorization": {
+    "required_checks": [
+      {
+        "name": "sgx_attestation",
+        "version": "4.1+",
+        "evidence_type": "ECDSA_P384_SHA384"
+      },
+      {
+        "name": "abi_checksum",
+        "hash_algorithm": "SHA3-256",
+        "expected_value": "c3ab...c4f2"
+      }
+    ]
+  },
+  "containment_protocols": {
+    "memory_isolation": {
+      "type": "address_space_layout_randomization",
+      "entropy_bits": 32
+    },
+    "syscall_interception": {
+      "monitor": ["execve", "fork"],
+      "action": "kill_and_log"
+    }
+  },
+  "destruction_containers": [
+    {
+      "type": "PTRACE_SANDBOX",
+      "config": {
+        "max_memory": "512MB",
+        "max_runtime": "300s"
+      }
+    }
+  ],
+  "cleanup_requirements": {
+    "memory_wipe": {
+      "method": "memset_s",
+      "iterations": 7
+    },
+    "entropy_reset": {
+      "sources": ["rdrand", "sgx"]
+    }
+  }
+}

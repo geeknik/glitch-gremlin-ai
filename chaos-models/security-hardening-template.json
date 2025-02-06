@@ -1,0 +1,44 @@
+{
+  "kernel_protections": {
+    "seccomp": {
+      "blocked_syscalls": [
+        "keyctl",
+        "memfd_create", 
+        "userfaultfd"
+      ],
+      "action": "kill_process"
+    },
+    "landlock": {
+      "filesystem_rules": {
+        "read": ["./models/*.json"],
+        "write": []
+      }
+    }
+  },
+  "memory_safety": {
+    "allocator": "jemalloc",
+    "protection": {
+      "guard_pages": 3,
+      "quarantine": {
+        "enabled": true,
+        "size": "256MB",
+        "timeout": "5m"
+      }
+    }
+  },
+  "cryptographic_envelope": {
+    "signature_formats": [
+      {
+        "algorithm": "Dilithium5",
+        "key_length": 2592,
+        "mode": "fips203-ipd"
+      },
+      {
+        "algorithm": "ECDSA",
+        "curve": "secp384r1",
+        "fallback": true
+      }
+    ],
+    "hybrid_mode": "strict"
+  }
+}

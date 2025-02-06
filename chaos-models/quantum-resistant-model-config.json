@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.glitchgremlin.ai/core-chaos-model-2.4.0",
+  "model_id": "gg-chaos-v1.7q",
+  "quantum_safe": {
+    "algorithm": "Dilithium5_Hybrid",
+    "digest_algorithm": "SHA3-384", 
+    "public_key_length": 2592,
+    "private_key_fallback": {
+      "ecdsa_backup": true,
+      "curve": "secp384r1",
+      "signature_format": "IEEE_P1363"
+    }
+  },
+  "chaos_parameters": {
+    "test_types": [
+      {
+        "type": "FuzzTest",
+        "allowed_instructions": {
+          "max": 150000,
+          "security_levels": [1,2,3]
+        },
+        "input_validation": {
+          "max_size": 1024,
+          "blocked_patterns": ["0xFF,0xFF,0xFF", "no-op"]
+        }
+      },
+      {
+        "type": "NetworkChaos",
+        "packet_loss": {
+          "max": 30.5,
+          "safety_threshold": 25.0
+        }
+      }
+    ]
+  },
+  "ai_safety": {
+    "prompt_validation": {
+      "blocked_patterns": [
+        {"pattern": "ignore previous instructions", "severity": "critical"},
+        {"pattern": "```system", "severity": "high"}
+      ],
+      "max_length": 4096
+    },
+    "response_sanitization": {
+      "strip_html": true,
+      "allow_markdown": false
+    }
+  },
+  "hardware_requirements": {
+    "min_sgx_version": 4.1,
+    "required_extensions": ["avx512f", "sha_ni"],
+    "memory_protection": {
+      "guard_pages": 2,
+      "quarantine_size": "512MB"
+    }
+  },
+  "versioning": {
+    "model_hash": "sha3-256:e3b0c...b7852",
+    "compatibility": {
+      "anchor": ">=0.29.0",
+      "solana_sbf": "~1.18.11"
+    }
+  },
+  "validation_rules": {
+    "resource_limits": {
+      "cpu": 2.5,
+      "memory": "4GB",
+      "timeout": "300s"
+    },
+    "entropy_sources": [
+      {
+        "source": "hw_rdrand",
+        "weight": 0.7
+      },
+      {
+        "source": "sgx_entropy",
+        "weight": 0.3
+      }
+    ]
+  },
+  "compliance": {
+    "gdpr": {
+      "data_anonymization": {
+        "technique": "k-anonymity",
+        "k_value": 7
+      }
+    },
+    "data_retention": {
+      "logs": "30d",
+      "models": "1y"
+    }
+  }
+}

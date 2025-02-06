@@ -98,6 +98,9 @@ secure-inference = true
 attack-simulation = true
 fault-injection = true
 entropy-source = "hardware"
+model-config = "chaos-models/quantum-resistant-model-config.json"
+security-template = "chaos-models/security-hardening-template.json"
+hazard-schema = "chaos-models/hazardous-test-schema.json"
 
 [metrics]
 enabled = true
