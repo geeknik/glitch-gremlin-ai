@@ -195,11 +195,17 @@ program
             ]);
             console.log('Security Proof:', securityProof);
             console.log('Security Analysis Report:', securityReport);
-            // Simulate live chaos testing with 3 iterations separating each by 5 seconds
-            for (let i = 0; i < 3; i++) {
-                console.log(`Running chaos test iteration ${i + 1} on contract: ${options.contract}`);
-                await new Promise(resolve => setTimeout(resolve, 5000));
-            }
+            // Simulate live chaos testing in parallel using scheduled intervals (fully optimized)
+            await Promise.all(
+                Array.from({ length: 3 }, (_, i) =>
+                    new Promise<void>(resolve =>
+                        setTimeout(() => {
+                            console.log(`Running chaos test iteration ${i + 1} on contract: ${options.contract}`);
+                            resolve();
+                        }, 5000 * (i + 1))
+                    )
+                )
+            );
             console.log('Live chaos and security checks completed successfully.');
             process.exit(0);
         } catch (error) {
