@@ -270,6 +270,53 @@ program
       process.exit(0);
   });
 
+program
+  .command('how')
+  .description('Print instructions on how to write fuzz tests')
+  .action(() => {
+    console.log(`How To Write Fuzz Tests:
+1. Run "trident init" to initialize your Anchor-based workspace and generate the initial fuzz test template.
+2. Edit the generated FuzzAccounts in Trident.toml as needed.
+3. Implement fuzz instructions in the generated "fuzz_instructions.rs" file.
+4. Use "trident fuzz add" to add new fuzz test templates.
+5. Run tests with "trident fuzz run-hfuzz <fuzz_target>" or "trident fuzz run-afl <fuzz_target>".
+6. Debug using "trident fuzz debug-hfuzz <fuzz_target> <crash_file_path>" or "trident fuzz debug-afl <fuzz_target> <crash_file_path>".
+7. Clean up your workspace with "trident clean".`);
+    process.exit(0);
+  });
+
+program
+  .command('fuzz:add')
+  .description('Add a new fuzz test template to your workspace')
+  .action(() => {
+    const fs = require('fs');
+    const path = require('path');
+    const newTestDir = path.join(process.cwd(), 'trident-tests', 'fuzz_tests', `fuzz_${Date.now()}`);
+    fs.mkdirSync(newTestDir, { recursive: true });
+    fs.writeFileSync(path.join(newTestDir, 'test_fuzz.rs'),
+      '// Fuzz Test Binary Target Template\nfn main() { println!("Fuzz test executed"); }', 'utf8');
+    fs.writeFileSync(path.join(newTestDir, 'fuzz_instructions.rs'),
+      '// Fuzz Instruction Definitions Template\n', 'utf8');
+    console.log(`New fuzz test template created at ${newTestDir}`);
+    process.exit(0);
+  });
+
+program
+  .command('clean')
+  .description('Clean the Trident workspace by removing generated fuzz test folders')
+  .action(() => {
+    const fs = require('fs');
+    const path = require('path');
+    const testsPath = path.join(process.cwd(), 'trident-tests');
+    if (fs.existsSync(testsPath)) {
+      fs.rmSync(testsPath, { recursive: true, force: true });
+      console.log('Trident workspace cleaned.');
+    } else {
+      console.log('No Trident workspace found to clean.');
+    }
+    process.exit(0);
+  });
+
 process.on('unhandledRejection', (err) => {
     console.error(err instanceof Error ? err.message : String(err));
     process.exit(1);
