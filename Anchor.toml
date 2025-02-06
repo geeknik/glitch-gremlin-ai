@@ -48,12 +48,16 @@ rustflags = [
     "-C", "link-arg=--soname=libchaos_engine_v3.so",
     "-C", "opt-level=z",
     "-C", "panic=abort",
-    "-C", "debug-assertions=no", 
-    "-C", "overflow-checks=no",
+    "-C", "debug-assertions=no",
+    "-C", "overflow-checks=no", 
     "-C", "embed-bitcode=yes",
     "-C", "strip=symbols",
-    "-C", "target-feature=+solana-sbfv2",
-    "-Z", "mir-opt-level=5"
+    "-C", "target-feature=+solana-sbf,+solana-smartheap",
+    "-C", "target-cpu=solana-sbfv2",
+    "-Z", "mir-opt-level=5",
+    "-Z", "instrument-coverage",
+    "-Z", "build-std=core,alloc,panic_abort",
+    "-Z", "build-std-features=compiler-builtins-mem"
 ]
 
 [test.validator]
