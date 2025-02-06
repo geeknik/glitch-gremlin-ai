@@ -41,9 +41,9 @@ The more chaos you create, the more you earn. Stake $GREMLINAI to fuel the ecosy
 
 🚧 Currently in initial development phase:
 - [x] Token Configuration
-- [ ] On-chain Program Development
-- [ ] AI Engine Implementation
-- [ ] Governance Integration
+- [x] On-chain Program Development
+- [x] AI Engine Implementation
+- [x] Governance Integration
 
 ## Getting Started
 
