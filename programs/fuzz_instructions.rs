@@ -16,6 +16,29 @@ use solana_program::{
 use std::collections::{HashMap, HashSet};
 use sha2::{Sha256, Digest};
 use rayon::prelude::*;
+use std::simd::{u64x8, mask64x8};
+use crossbeam::utils::CachePadded;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+#[repr(C, packed)]
+struct SecurityContext {
+    coverage_bits: [u128; 1024],  // 128KB coverage tracking (16M edges)
+    taint_bits: [u64; 4096],      // 32KB taint tracking (524K locations)
+}
+
+impl SecurityContext {
+    #[inline(always)]
+    fn track_edge(&mut self, src: u32, dst: u32) {
+        let idx = ((src as u64 * src as u64 + dst as u64) % 1024) as usize;
+        self.coverage_bits[idx] |= 1 << ((src | dst) % 128);
+    }
+
+    #[inline(always)]
+    fn check_taint(&self, addr: u64) -> bool {
+        let idx = (addr >> 6) as usize % 4096;
+        self.taint_bits[idx] & (1 << (addr % 64)) != 0
+    }
+}
 
 const MAX_EXECUTION_TIME: i64 = 5; // seconds
 const MAX_CRITICAL_ACCOUNTS: usize = 4;
@@ -41,13 +64,26 @@ pub enum VulnerabilityType {
 }
 
 #[derive(Debug)]
+struct SharedFuzzState {
+    global_coverage: [CachePadded<AtomicU64>; 1024],
+    iteration_count: AtomicU64,
+}
+
+impl SharedFuzzState {
+    #[inline(always)]
+    fn track_coverage(&self, edge: (u32, u32)) {
+        let idx = (edge.0 ^ edge.1) as usize % 1024;
+        self.global_coverage[idx].fetch_or(1 << (edge.0 % 64), Ordering::Relaxed);
+    }
+}
+
 struct ExecutionContext {
     accounts: Vec<AccountMeta>,
     signers: HashSet<Pubkey>,
     program_id: Pubkey,
-    coverage: HashMap<u64, u32>,
-    taint_map: HashMap<u64, u8>,
+    security_ctx: SecurityContext,
     pda_seeds: HashMap<Pubkey, Vec<Vec<u8>>>,
+    shared_state: Arc<SharedFuzzState>,
 }
 
 #[derive(Debug)]
@@ -117,13 +153,25 @@ pub trait FuzzInstruction {
 
 /// Optimized instruction wrapper with security context
 #[derive(Debug, Clone)]
+#[repr(C, align(64))]  // Cache-line aligned for vector loads
 pub struct FuzzInstructionTemplate {
-    pub discriminator: [u8; 8],
-    pub program_id: Pubkey,
-    pub data: Vec<u8>,
-    pub accounts: Vec<Pubkey>,
-    pub security_level: SecurityLevel,
-    pub vulnerability_mask: u64,
+    discriminator: [u8; 8],
+    program_id: Pubkey,
+    security_level: SecurityLevel,
+    vulnerability_mask: u64,
+    // Group hot fields together
+    data: Vec<u8>,
+    accounts: Vec<Pubkey>,
+}
+
+// Use SoA layout for batch processing
+struct FuzzBatch {
+    discriminators: Vec<[u8; 8]>,
+    program_ids: Vec<Pubkey>,
+    security_levels: Vec<SecurityLevel>,
+    vulnerability_masks: Vec<u64>,
+    data: Vec<Vec<u8>>,
+    accounts: Vec<Vec<Pubkey>>,
 }
 
 impl FuzzInstruction for FuzzInstructionTemplate {
@@ -231,31 +279,56 @@ impl FuzzInstructionTemplate {
 
 /// Vectorized security analyzer using SIMD optimizations
 #[inline(always)]
-pub fn analyze_vulnerabilities(
-    instructions: &[FuzzInstructionTemplate],
-    parallel: bool
-) -> Vec<VulnerabilityType> {
-    let analyzer = |instr: &FuzzInstructionTemplate| {
-        let mut vulns = Vec::new();
+#[inline(always)]
+pub fn analyze_vulnerabilities(instructions: &[FuzzInstructionTemplate]) -> Vec<VulnerabilityType> {
+    let mut vulns = Vec::with_capacity(instructions.len());
+    let mask_critical = u64x8::splat(0xFFFFFFFFFFFFFFFF);
+    
+    instructions.chunks_exact(8).for_each(|chunk| {
+        let masks = u64x8::from_slice(&chunk.iter().map(|i| i.vulnerability_mask).collect::<Vec<_>>());
+        let results = masks.lanes_eq(mask_critical);
         
-        // Overflow check
-        if instr.vulnerability_mask & 0x1 != 0 {
-            vulns.push(VulnerabilityType::ArithmeticOverflow);
+        for i in 0..8 {
+            if results.test(i) {
+                let mut v = chunk[i].vulnerability_mask;
+                while v != 0 {
+                    let idx = v.trailing_zeros() as usize;
+                    vulns.push(match idx {
+                        0 => VulnerabilityType::ArithmeticOverflow,
+                        1 => VulnerabilityType::Reentrancy,
+                        2 => VulnerabilityType::MissingSignerCheck,
+                        3 => VulnerabilityType::MissingOwnerCheck,
+                        4 => VulnerabilityType::ArbitraryCPI,
+                        5 => VulnerabilityType::MissingPDAVerification,
+                        6 => VulnerabilityType::InvalidSysvarUsage,
+                        _ => break,
+                    });
+                    v ^= 1 << idx;
+                }
+            }
         }
-        
-        // Reentrancy check
-        if instr.vulnerability_mask & 0x2 != 0 {
-            vulns.push(VulnerabilityType::Reentrancy);
+    });
+    
+    // Handle remaining instructions
+    for instr in instructions.chunks_exact(8).remainder() {
+        let mut v = instr.vulnerability_mask;
+        while v != 0 {
+            let idx = v.trailing_zeros() as usize;
+            vulns.push(match idx {
+                0 => VulnerabilityType::ArithmeticOverflow,
+                1 => VulnerabilityType::Reentrancy,
+                2 => VulnerabilityType::MissingSignerCheck,
+                3 => VulnerabilityType::MissingOwnerCheck,
+                4 => VulnerabilityType::ArbitraryCPI,
+                5 => VulnerabilityType::MissingPDAVerification,
+                6 => VulnerabilityType::InvalidSysvarUsage,
+                _ => break,
+            });
+            v ^= 1 << idx;
         }
-
-        vulns
-    };
-
-    if parallel {
-        instructions.par_iter().flat_map(analyzer).collect()
-    } else {
-        instructions.iter().flat_map(analyzer).collect()
     }
+    
+    vulns
 }
 
 /// Enhanced parallel executor with security monitoring
