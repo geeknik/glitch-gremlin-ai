@@ -19,6 +19,58 @@ use rayon::prelude::*;
 use std::simd::{u64x8, mask64x8};
 use crossbeam::utils::CachePadded;
 use std::sync::atomic::{AtomicU64, Ordering};
+use core::arch::x86_64;
+
+// Spatial partitioning for optimized account access
+#[derive(Debug, Clone)]
+#[repr(C, align(64))]
+pub struct AccountSpatialGrid {
+    partitions: [AtomicU64; 1024],
+    grid_resolution: (u32, u32),
+}
+
+impl AccountSpatialGrid {
+    #[inline(always)]
+    pub fn track_access(&self, pubkey: &Pubkey) {
+        let x = u32::from_le_bytes(pubkey.as_ref()[..4].try_into().unwrap());
+        let y = u32::from_le_bytes(pubkey.as_ref()[4..8].try_into().unwrap());
+        let morton = (x.interleave(y) % 1024) as usize;
+        self.partitions[morton].fetch_add(1, Ordering::Relaxed);
+    }
+}
+
+// Differential execution tracing
+struct ExecutionDifferentials {
+    base_state: [u8; 4096],
+    diff_buffer: Vec<AtomicU64>,
+}
+
+impl ExecutionDifferentials {
+    #[inline(always)]
+    fn record_diff(&self, offset: usize, value: u64) {
+        self.diff_buffer[offset].fetch_xor(value, Ordering::Relaxed);
+    }
+}
+
+// Hardware-accelerated memory validation
+#[inline(always)]
+fn validate_memory_regions(regions: &[(usize, usize)]) -> Result<(), FuzzError> {
+    unsafe {
+        core::arch::asm!(
+            "1:",
+            "cmp qword ptr [{} + 8*{}], 0",
+            "jne 2f",
+            "add rax, 1", 
+            "loop 1b",
+            "2:",
+            inout("rax") 0 => _,
+            in("rdi") regions.as_ptr(),
+            in("rcx") regions.len(),
+            options(nostack, preserves_flags)
+        );
+    }
+    Ok(())
+}
 
 #[repr(C, packed)]
 struct SecurityContext {
@@ -281,33 +333,51 @@ impl FuzzInstructionTemplate {
 #[inline(always)]
 #[inline(always)]
 pub fn analyze_vulnerabilities(instructions: &[FuzzInstructionTemplate]) -> Vec<VulnerabilityType> {
+    const BLOCK_SIZE: usize = 256;
     let mut vulns = Vec::with_capacity(instructions.len());
     let mask_critical = u64x8::splat(0xFFFFFFFFFFFFFFFF);
-    
-    instructions.chunks_exact(8).for_each(|chunk| {
-        let masks = u64x8::from_slice(&chunk.iter().map(|i| i.vulnerability_mask).collect::<Vec<_>>());
-        let results = masks.lanes_eq(mask_critical);
-        
-        for i in 0..8 {
-            if results.test(i) {
-                let mut v = chunk[i].vulnerability_mask;
-                while v != 0 {
-                    let idx = v.trailing_zeros() as usize;
-                    vulns.push(match idx {
-                        0 => VulnerabilityType::ArithmeticOverflow,
-                        1 => VulnerabilityType::Reentrancy,
-                        2 => VulnerabilityType::MissingSignerCheck,
-                        3 => VulnerabilityType::MissingOwnerCheck,
-                        4 => VulnerabilityType::ArbitraryCPI,
-                        5 => VulnerabilityType::MissingPDAVerification,
-                        6 => VulnerabilityType::InvalidSysvarUsage,
-                        _ => break,
-                    });
-                    v ^= 1 << idx;
+
+    // Cache-oblivious recursive analysis
+    fn analyze_block(
+        instructions: &[FuzzInstructionTemplate],
+        vulns: &mut Vec<VulnerabilityType>,
+        depth: usize,
+        mask_critical: u64x8,
+    ) {
+        if instructions.len() <= BLOCK_SIZE || depth == 0 {
+            instructions.chunks_exact(8).for_each(|chunk| {
+                let masks = u64x8::from_slice(&chunk.iter().map(|i| i.vulnerability_mask).collect::<Vec<_>>());
+                let results = masks.lanes_eq(mask_critical);
+                
+                for i in 0..8 {
+                    if results.test(i) {
+                        let mut v = chunk[i].vulnerability_mask;
+                        while v != 0 {
+                            let idx = v.trailing_zeros() as usize;
+                            vulns.push(match idx {
+                                0 => VulnerabilityType::ArithmeticOverflow,
+                                1 => VulnerabilityType::Reentrancy,
+                                2 => VulnerabilityType::MissingSignerCheck,
+                                3 => VulnerabilityType::MissingOwnerCheck,
+                                4 => VulnerabilityType::ArbitraryCPI,
+                                5 => VulnerabilityType::MissingPDAVerification,
+                                6 => VulnerabilityType::InvalidSysvarUsage,
+                                _ => break,
+                            });
+                            v ^= 1 << idx;
+                        }
+                    }
                 }
-            }
+            });
+            return;
         }
-    });
+
+        let mid = instructions.len() / 2;
+        analyze_block(&instructions[..mid], vulns, depth - 1, mask_critical);
+        analyze_block(&instructions[mid..], vulns, depth - 1, mask_critical);
+    }
+
+    analyze_block(instructions, &mut vulns, 8, mask_critical);
     
     // Handle remaining instructions
     for instr in instructions.chunks_exact(8).remainder() {

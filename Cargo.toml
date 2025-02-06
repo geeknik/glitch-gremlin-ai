@@ -93,6 +93,7 @@ secure-mode = []
 sbf-optimized = ["solana-sdk/sbf-instrs", "solana-sbf-allocator"]
 post-quantum = []
 monitoring = []
+cuda = []
 test = ["secure-mode", "monitoring"]
 test-full = ["test", "post-quantum"]
 
