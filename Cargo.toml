@@ -5,6 +5,13 @@ description = "Glitch Gremlin AI monorepo"
 edition = "2021"
 license = "MIT"
 
+# Force SBF toolchain resolution
+[patch.crates-io]
+solana-sbf-tools = { git = "https://github.com/solana-labs/sbf-tools", rev = "sbfv1" }
+solana-program = { version = "1.17.0", features = [
+    "sbf-verifier-v2", "accelerated-cpi"  # DESIGN.md 9.4.3
+]}
+
 [workspace]
 members = [
     "programs/*"
@@ -12,7 +19,7 @@ members = [
 
 [workspace.dependencies]
 # Core Solana dependencies
-solana-program = { version = "1.17.0", features = ["borsh", "no-entrypoint"] }
+solana-program = { version = "1.17.0", features = ["sbfv1", "borsh", "no-entrypoint"] }
 solana-program-runtime = "1.17.0"
 solana-sdk = "1.17.0"
 solana-program-test = "1.17.0"
@@ -57,6 +64,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "time"
 tracing-futures = { version = "0.3", features = ["std-future", "futures-03", "async-await", "instrumentation"] }
 opentelemetry = { version = "0.21.0", features = ["rt-tokio", "metrics", "trace", "logs"] }
 prometheus = { version = "0.13.3", features = ["process", "push"] }
+solana-sbf-allocator = "1.17.0"  # DESIGN.md 9.3.1 Memory quarantine
 
 # Common dependencies
 borsh = "0.10.3"
@@ -82,6 +90,7 @@ env_logger = { version = "0.10.0", features = ["auto-color", "humantime"] }
 [features]
 default = ["secure-mode", "post-quantum", "monitoring"]
 secure-mode = []
+sbf-optimized = ["solana-program/sbf-instrs", "solana-sbf-allocator"]
 post-quantum = []
 monitoring = []
 test = ["secure-mode", "monitoring"]
@@ -95,6 +104,8 @@ opt-level = 3
 debug = false
 panic = "abort"
 strip = true
+codegen-backend = "llvm"  # Required for SBF SIMD
+target-cpu = "sbfv2"     # Enables 4-way parallel ops
 incremental = false
 
 [profile.release.build-override]
@@ -126,5 +137,7 @@ codegen-units = 1
 lto = "fat"
 debug = false
 strip = true
+target = "sbfv1-solana-solana"  # Explicit triple
+rustflags = ["-C", "link-arg=-znotext", "-C", "link-arg=-Bsymbolic"]
 debug-assertions = false
 overflow-checks = true
