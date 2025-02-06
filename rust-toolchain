@@ -1,2 +1,0 @@
-nightly-2025-01-15
-components = [ "rustfmt", "clippy", "llvm-tools-preview", "rust-src" ]

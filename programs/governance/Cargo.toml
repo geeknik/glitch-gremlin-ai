@@ -1,42 +1,113 @@
 [package]
 name = "glitch_gremlin_governance"
 version = "0.1.0"
-description = "Governance program for Glitch Gremlin AI"
+description = "Governance program for Glitch Gremlin AI protocol"
 edition = "2021"
-license = "Apache-2.0"
+license = "MIT"
 
 [lib]
 crate-type = ["cdylib", "lib"]
+name = "glitch_gremlin_governance"
 
 [features]
 no-entrypoint = []
-no-idl = []
 cpi = ["no-entrypoint"]
-default = []
-test-sbf = []
+default = ["secure-mode", "chaos-engine", "monitoring", "post-quantum"]
+test = ["no-entrypoint", "anchor-lang/anchor-debug", "monitoring"]
+secure-mode = ["anchor-lang/init-if-needed"]
+post-quantum = []
+chaos-engine = []
+monitoring = []
 
 [dependencies]
-anchor-lang = { version = "=0.28.0", features = ["init-if-needed"] }
-anchor-spl = "=0.28.0"
-num_enum = "0.5.11"
-solana-program = "=1.16.12"
+# Core dependencies
+anchor-lang = { workspace = true, features = ["init-if-needed"] }
+anchor-spl = { workspace = true, features = ["metadata", "mint", "token"] }
+solana-program = { workspace = true }
+solana-program-runtime = { workspace = true }
+solana-sdk = { workspace = true }
+solana-security-txt = "1.1.1"
 
-[patch.crates-io]
-num_enum = { version = "0.5.11" }  # Force override transitive dependencies
-ahash = { version = "0.8.3" }
-hashbrown = { version = "0.13.2" }
+# Enhanced security dependencies
+ring = { workspace = true }
+zeroize = { workspace = true }
+curve25519-dalek = { workspace = true }
+ed25519-dalek = { workspace = true }
 
-spl-token = { version = "=4.0.0", features = ["no-entrypoint"] }
-mpl-token-metadata = { version = "=1.13.1", features = ["no-entrypoint"] }
-bytemuck = { version = "1.13", features = ["derive"] }
+# Monitoring dependencies
+metrics = { workspace = true }
+tracing = { workspace = true }
+opentelemetry = { workspace = true }
+prometheus = { workspace = true }
+
+# Testing dependencies
+tokio = { version = "1.36.0", features = ["full"] }
+futures = "0.3"
+async-trait = "0.1"
 thiserror = "1.0"
-num-derive = "=0.3.3"
-num-traits = "0.2.19"
-arrayref = "0.3.7"
-borsh = "0.10.3"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
 
 [dev-dependencies]
-solana-program-test = "=1.16.12"
-solana-sdk = "=1.16.12"
+solana-program-test = { workspace = true }
+solana-sdk = { workspace = true }
+solana-runtime = { workspace = true }
+solana-logger = { workspace = true }
+solana-sbf-loader-program = { workspace = true }
+
+[package.metadata.docs.rs]
+targets = ["sbf-solana-solana"]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[package.metadata.solana]
+program-type = "governance"
+program-features = [
+    "secure-mode",
+    "chaos-engine",
+    "post-quantum",
+    "monitoring"
+]
+minimum-solana-version = "2.1"
+maximum-data-accounts = 32
+compute-max-units = 1400000
+memory-limit = "256KB"
+stack-size = "128KB"
+target = "sbf-solana-solana"
+sbf-sdk = true
+optimization-level = 3
+
+[package.metadata.anchor]
+features = ["init-if-needed", "event-cpi", "anchor-debug"]
+program-type = "governance"
+program-id = "GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw"
+seeds = ["governance"]
+bump = "governance_bump"
+payer = "governance_authority"
+init-if-needed = true
+close-on-success = false
+rent-receiver = "governance_authority"
+compute-max-units = 1400000
+memory-limit = "256KB"
+accounts-close-on-exit = false
+realloc = { strategy = "realloc", space = 8192, zero = true }
+account-compression = { enable = true, max-capacity = 1000000 }
+cpi-guards = true
+monitoring = { enable = true, metrics = true, tracing = true }
+target = "sbf-solana-solana"
+
+[package.metadata.build-sbf]
+target-cpu = "sbfv2"
+toolchain = "nightly"
+optimization-level = 3
+features = [
+    "secure-mode",
+    "post-quantum",
+    "chaos-engine",
+    "monitoring"
+]
+panic-strategy = "abort"
+codegen-units = 1
+debug = true
+lto = "fat"
+overflow-checks = true
+relocation-model = "static"
+code-model = "small"

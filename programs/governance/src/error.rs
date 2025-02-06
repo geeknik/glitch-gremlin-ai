@@ -158,6 +158,20 @@ pub enum GovernanceError {
     RedisInfoParseError,
     #[msg("Not implemented")]
     NotImplemented,
+    #[msg("Invalid Gremlin test configuration")]
+    InvalidGremlinConfig,
+    #[msg("Gremlin test execution failed")]
+    GremlinTestFailed,
+    #[msg("Critical finding detected during Gremlin test")]
+    CriticalGremlinFinding,
+    #[msg("Failed to generate proof for Gremlin finding")]
+    GremlinProofGenerationFailed,
+    #[msg("Failed to validate Gremlin test parameters")]
+    InvalidGremlinParameters,
+    #[msg("Gremlin monitoring error")]
+    GremlinMonitoringError,
+    #[msg("Exceeded maximum critical findings threshold")]
+    ExceededCriticalFindingsThreshold,
 }
 
 impl From<anchor_lang::error::Error> for GovernanceError {

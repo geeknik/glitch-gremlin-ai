@@ -1,9 +1,11 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount, Mint};
-use std::str::FromStr;
+use core::str::FromStr;
 
 pub mod error;
 pub mod state;
+mod hash;
+pub use hash::{gremlin_hash, GremlinMap};
 
 // Re-export core types from state module
 pub use state::{
@@ -24,7 +26,7 @@ pub use state::{
 
 pub use error::GovernanceError;
 
-declare_id!("Governance111111111111111111111111111111111");
+declare_id!("CGdnYbXRM3trAKUeSiPT4it9obeo1iTx3BJhgfriADSL");
 
 // Constants for PDA seeds and rate limiting
 pub const GOVERNANCE_SEED: &[u8] = b"governance";
@@ -74,18 +76,64 @@ pub use state::{
     ChaosParams, ChaosMode, ChaosCondition, DefenseLevel,
 };
 
->>>>>>> 3107af2 (fix: Remove duplicate GovernanceState and clean up imports)
-=======
-// Re-export types from state module
-pub use state::{
-    governance::{GovernanceParams, ProposalVotingState, ProposalMetadata},
-    governance_state::GovernanceMetrics,
-    proposal::{Proposal, ProposalStatus, ProposalAction, VoteRecord},
-    stake_account::{StakeAccount, StakeOperation, StakeOperationType},
-    ChaosParams, ChaosMode, ChaosCondition, DefenseLevel,
-};
+// Update token constants to match live deployment
+pub const GREMLINAI_TOKEN_MINT: &str = "Bx6XZrN7pjbDA5wkiKagbbyHSr1jai45m8peSSmJpump";
+pub const TREASURY_SEED: &[u8] = b"treasury";
+pub const GOVERNANCE_SEED: &[u8] = b"governance";
 
->>>>>>> 3107af2 (fix: Remove duplicate GovernanceState and clean up imports)
+// Add token validation constants
+pub const MIN_STAKE_AMOUNT: u64 = 1_000_000; // 1M tokens
+pub const MIN_PROPOSAL_STAKE: u64 = 5_000_000; // 5M tokens
+pub const BASE_CHAOS_FEE: u64 = 100_000; // 0.1M tokens
+
+impl GovernanceConfig {
+    pub fn validate(&self) -> Result<()> {
+        // Validate configuration against token supply
+        require!(
+            self.min_stake_amount >= MIN_STAKE_AMOUNT,
+            GovernanceError::InvalidConfigValue
+        );
+        require!(
+            self.min_proposal_stake >= MIN_PROPOSAL_STAKE,
+            GovernanceError::InvalidConfigValue
+        );
+        require!(
+            self.quorum_percentage >= 1 && self.quorum_percentage <= 100,
+            GovernanceError::InvalidConfigValue
+        );
+        require!(
+            self.approval_threshold >= 51 && self.approval_threshold <= 100,
+            GovernanceError::InvalidConfigValue
+        );
+        require!(
+            self.voting_period >= 24 * 60 * 60, // Minimum 1 day
+            GovernanceError::InvalidConfigValue
+        );
+        require!(
+            self.execution_delay >= 12 * 60 * 60, // Minimum 12 hours
+            GovernanceError::InvalidConfigValue
+        );
+        Ok(())
+    }
+}
+
+// Add token validation function
+pub fn validate_token_account(
+    token_account: &Account<TokenAccount>,
+    expected_mint: &Pubkey,
+    expected_owner: &Pubkey,
+) -> Result<()> {
+    require!(
+        token_account.mint == *expected_mint,
+        GovernanceError::InvalidTokenMint
+    );
+    require!(
+        token_account.owner == *expected_owner,
+        GovernanceError::InvalidTokenOwner
+    );
+    Ok(())
+}
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub enum EmergencyActionType {
     UpdateConfig(Box<GovernanceConfig>),
@@ -103,13 +151,6 @@ pub struct EmergencyActionEvent {
     pub timestamp: i64,
 }
 
-#[program]
-pub mod glitch_gremlin_governance {
-    use super::*;
-    use crate::state::governance_state::GovernanceState;
-    use crate::state::governance::GovernanceParams;
-    use crate::error::GovernanceError;
-=======
 #[program]
 pub mod glitch_gremlin_governance {
     use super::*;
@@ -562,6 +603,300 @@ pub mod glitch_gremlin_governance {
 
         Ok(())
     }
+
+    pub fn initialize_token(ctx: Context<InitializeToken>) -> Result<()> {
+        msg!("Initializing GREMLINAI token");
+        
+        // Create mint account
+        let mint_rent = ctx.accounts.rent.minimum_balance(Mint::LEN);
+        
+        // Transfer rent-exempt SOL to mint account
+        system_program::create_account(
+            CpiContext::new(
+                ctx.accounts.system_program.to_account_info(),
+                system_program::CreateAccount {
+                    from: ctx.accounts.payer.to_account_info(),
+                    to: ctx.accounts.mint.to_account_info(),
+                },
+            ),
+            mint_rent,
+            Mint::LEN as u64,
+            &ctx.accounts.token_program.key(),
+        )?;
+        
+        // Initialize mint with 6 decimals
+        token::initialize_mint(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                token::InitializeMint {
+                    mint: ctx.accounts.mint.to_account_info(),
+                    rent: ctx.accounts.rent.to_account_info(),
+                },
+            ),
+            6, // Decimals as per DESIGN.md
+            &ctx.accounts.mint_authority.key(),
+            Some(&ctx.accounts.mint_authority.key()),
+        )?;
+        
+        // Set up Metaplex metadata (will be done in a separate instruction)
+        
+        msg!("GREMLINAI token initialized successfully");
+        Ok(())
+    }
+
+    pub fn initialize_token_metadata(ctx: Context<InitializeTokenMetadata>) -> Result<()> {
+        msg!("Initializing GREMLINAI token metadata");
+        
+        // Create metadata account
+        let token_metadata_program_id = ctx.accounts.token_metadata_program.key();
+        
+        let metadata_seeds = &[
+            b"metadata",
+            token_metadata_program_id.as_ref(),
+            ctx.accounts.mint.key().as_ref(),
+        ];
+        
+        let (metadata_pda, _bump) = Pubkey::find_program_address(
+            metadata_seeds,
+            &token_metadata_program_id,
+        );
+        
+        require!(
+            metadata_pda == ctx.accounts.metadata.key(),
+            GovernanceError::InvalidMetadataAccount
+        );
+        
+        // Create metadata instruction
+        let create_metadata_ix = mpl_token_metadata::instruction::create_metadata_accounts_v3(
+            token_metadata_program_id,
+            ctx.accounts.metadata.key(),
+            ctx.accounts.mint.key(),
+            ctx.accounts.mint_authority.key(),
+            ctx.accounts.payer.key(),
+            ctx.accounts.mint_authority.key(),
+            "Glitch Gremlin AI".to_string(),
+            "GREMLINAI".to_string(),
+            "https://arweave.net/[PLACEHOLDER_HASH]".to_string(),
+            Some(vec![
+                mpl_token_metadata::state::Creator {
+                    address: ctx.accounts.mint_authority.key(),
+                    verified: true,
+                    share: 100,
+                }
+            ]),
+            500, // 5% royalty
+            true,
+            true,
+            None,
+            None,
+            None,
+        );
+        
+        // Execute create metadata instruction
+        solana_program::program::invoke_signed(
+            &create_metadata_ix,
+            &[
+                ctx.accounts.metadata.clone(),
+                ctx.accounts.mint.to_account_info(),
+                ctx.accounts.mint_authority.to_account_info(),
+                ctx.accounts.payer.to_account_info(),
+                ctx.accounts.token_metadata_program.clone(),
+                ctx.accounts.system_program.to_account_info(),
+                ctx.accounts.rent.to_account_info(),
+            ],
+            &[],
+        )?;
+        
+        msg!("GREMLINAI token metadata initialized successfully");
+        Ok(())
+    }
+
+    pub fn distribute_tokens(
+        ctx: Context<DistributeTokens>,
+        amount: u64,
+        vesting_schedule: Option<VestingSchedule>,
+    ) -> Result<()> {
+        let governance = &mut ctx.accounts.governance;
+        governance.verify_not_halted()?;
+
+        // Verify token mint
+        GovernanceState::verify_gremlinai_token(&ctx.accounts.token_mint.key())?;
+
+        // Check distribution limits
+        require!(
+            amount <= governance.config.max_distribution_amount,
+            GovernanceError::ExceedsDistributionLimit
+        );
+
+        // If vesting schedule provided, create vesting account
+        if let Some(schedule) = vesting_schedule {
+            // Create vesting account
+            let vesting = &mut ctx.accounts.vesting_account;
+            vesting.beneficiary = ctx.accounts.recipient.key();
+            vesting.total_amount = amount;
+            vesting.released_amount = 0;
+            vesting.start_time = Clock::get()?.unix_timestamp;
+            vesting.end_time = vesting.start_time + schedule.duration;
+            vesting.cliff_time = vesting.start_time + schedule.cliff_duration;
+            vesting.period = schedule.period;
+            
+            // Transfer tokens to vesting account
+            anchor_spl::token::transfer(
+                CpiContext::new(
+                    ctx.accounts.token_program.to_account_info(),
+                    anchor_spl::token::Transfer {
+                        from: ctx.accounts.distribution_authority.to_account_info(),
+                        to: ctx.accounts.vesting_token_account.to_account_info(),
+                        authority: ctx.accounts.distribution_authority.to_account_info(),
+                    },
+                ),
+                amount,
+            )?;
+        } else {
+            // Direct transfer if no vesting
+            anchor_spl::token::transfer(
+                CpiContext::new(
+                    ctx.accounts.token_program.to_account_info(),
+                    anchor_spl::token::Transfer {
+                        from: ctx.accounts.distribution_authority.to_account_info(),
+                        to: ctx.accounts.recipient_token_account.to_account_info(),
+                        authority: ctx.accounts.distribution_authority.to_account_info(),
+                    },
+                ),
+                amount,
+            )?;
+        }
+
+        // Update distribution metrics
+        governance.total_distributed = governance.total_distributed
+            .checked_add(amount)
+            .ok_or(GovernanceError::ArithmeticError)?;
+
+        Ok(())
+    }
+
+    pub fn release_vested_tokens(ctx: Context<ReleaseVestedTokens>) -> Result<()> {
+        let vesting = &mut ctx.accounts.vesting_account;
+        let current_time = Clock::get()?.unix_timestamp;
+
+        // Check if vesting has started
+        require!(
+            current_time >= vesting.start_time,
+            GovernanceError::VestingNotStarted
+        );
+
+        // Check if cliff has passed
+        require!(
+            current_time >= vesting.cliff_time,
+            GovernanceError::CliffNotReached
+        );
+
+        // Calculate vested amount
+        let vested_amount = if current_time >= vesting.end_time {
+            vesting.total_amount
+        } else {
+            let time_from_start = current_time - vesting.start_time;
+            let total_vesting_time = vesting.end_time - vesting.start_time;
+            (vesting.total_amount as u128)
+                .checked_mul(time_from_start as u128)
+                .and_then(|product| product.checked_div(total_vesting_time as u128))
+                .and_then(|quotient| quotient.try_into().ok())
+                .ok_or(GovernanceError::ArithmeticError)?
+        };
+
+        // Calculate releasable amount
+        let releasable = vested_amount
+            .checked_sub(vesting.released_amount)
+            .ok_or(GovernanceError::ArithmeticError)?;
+
+        if releasable > 0 {
+            // Transfer vested tokens
+            anchor_spl::token::transfer(
+                CpiContext::new(
+                    ctx.accounts.token_program.to_account_info(),
+                    anchor_spl::token::Transfer {
+                        from: ctx.accounts.vesting_token_account.to_account_info(),
+                        to: ctx.accounts.beneficiary_token_account.to_account_info(),
+                        authority: ctx.accounts.vesting_account.to_account_info(),
+                    },
+                ),
+                releasable,
+            )?;
+
+            // Update released amount
+            vesting.released_amount = vesting.released_amount
+                .checked_add(releasable)
+                .ok_or(GovernanceError::ArithmeticError)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn collect_chaos_fee(
+        ctx: Context<CollectChaosFee>,
+        test_params: ChaosParams,
+    ) -> Result<()> {
+        let governance = &mut ctx.accounts.governance;
+        governance.verify_not_halted()?;
+
+        // Calculate fee based on test parameters
+        let base_fee = governance.config.base_chaos_fee;
+        let complexity_multiplier = match test_params.complexity {
+            ChaosComplexity::Low => 1,
+            ChaosComplexity::Medium => 2,
+            ChaosComplexity::High => 3,
+        };
+        
+        let duration_multiplier = test_params.duration
+            .checked_div(60) // Convert to minutes
+            .and_then(|d| d.checked_add(1))
+            .ok_or(GovernanceError::ArithmeticError)?;
+
+        let total_fee = base_fee
+            .checked_mul(complexity_multiplier)
+            .and_then(|fee| fee.checked_mul(duration_multiplier as u64))
+            .ok_or(GovernanceError::ArithmeticError)?;
+
+        // Apply rate limiting
+        let current_time = Clock::get()?.unix_timestamp;
+        if current_time - governance.last_fee_collection < governance.config.fee_window {
+            governance.fee_count_window = governance.fee_count_window
+                .checked_add(1)
+                .ok_or(GovernanceError::ArithmeticError)?;
+            
+            require!(
+                governance.fee_count_window <= governance.config.max_fees_per_window,
+                GovernanceError::RateLimitExceeded
+            );
+        } else {
+            governance.fee_count_window = 1;
+            governance.last_fee_collection = current_time;
+        }
+
+        // Transfer fee to treasury
+        anchor_spl::token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                anchor_spl::token::Transfer {
+                    from: ctx.accounts.payer_token_account.to_account_info(),
+                    to: ctx.accounts.treasury_token_account.to_account_info(),
+                    authority: ctx.accounts.payer.to_account_info(),
+                },
+            ),
+            total_fee,
+        )?;
+
+        // Update treasury metrics
+        governance.treasury_balance = governance.treasury_balance
+            .checked_add(total_fee)
+            .ok_or(GovernanceError::ArithmeticError)?;
+        
+        governance.total_fees_collected = governance.total_fees_collected
+            .checked_add(total_fee)
+            .ok_or(GovernanceError::ArithmeticError)?;
+
+        Ok(())
+    }
 }
 
 // Event definitions
@@ -716,6 +1051,86 @@ pub struct ManageTreasury<'info> {
     pub token_program: Program<'info, Token>,
 }
 
+#[derive(Accounts)]
+pub struct InitializeToken<'info> {
+    #[account(mut)]
+    pub mint: Account<'info, Mint>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: This is the mint authority
+    #[account(mut)]
+    pub mint_authority: AccountInfo<'info>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
+}
+
+#[derive(Accounts)]
+pub struct InitializeTokenMetadata<'info> {
+    #[account(mut)]
+    pub metadata: AccountInfo<'info>,
+    pub mint: Account<'info, Mint>,
+    /// CHECK: This is the mint authority
+    pub mint_authority: Signer<'info>,
+    pub payer: Signer<'info>,
+    pub token_metadata_program: AccountInfo<'info>,
+    pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+pub struct VestingSchedule {
+    pub duration: i64,
+    pub cliff_duration: i64,
+    pub period: i64,
+}
+
+#[derive(Accounts)]
+pub struct DistributeTokens<'info> {
+    #[account(mut)]
+    pub governance: Account<'info, GovernanceState>,
+    #[account(mut)]
+    pub distribution_authority: Signer<'info>,
+    #[account(mut)]
+    pub recipient: AccountInfo<'info>,
+    #[account(mut)]
+    pub recipient_token_account: Account<'info, TokenAccount>,
+    #[account(
+        init,
+        payer = distribution_authority,
+        space = 8 + std::mem::size_of::<VestingAccount>()
+    )]
+    pub vesting_account: Option<Account<'info, VestingAccount>>,
+    #[account(mut)]
+    pub vesting_token_account: Option<Account<'info, TokenAccount>>,
+    pub token_mint: Account<'info, Mint>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct ReleaseVestedTokens<'info> {
+    #[account(mut)]
+    pub vesting_account: Account<'info, VestingAccount>,
+    #[account(mut)]
+    pub vesting_token_account: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub beneficiary_token_account: Account<'info, TokenAccount>,
+    pub beneficiary: Signer<'info>,
+    pub token_program: Program<'info, Token>,
+}
+
+#[account]
+pub struct VestingAccount {
+    pub beneficiary: Pubkey,
+    pub total_amount: u64,
+    pub released_amount: u64,
+    pub start_time: i64,
+    pub end_time: i64,
+    pub cliff_time: i64,
+    pub period: i64,
+}
+
 #[account]
 pub struct GovernanceState {
     pub config: GovernanceConfig,
@@ -842,5 +1257,165 @@ pub struct StakeEvent {
     pub timestamp: i64,
 }
 
-#[program]
+#[derive(Accounts)]
+pub struct CollectChaosFee<'info> {
+    #[account(mut)]
+    pub governance: Account<'info, GovernanceState>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(mut)]
+    pub payer_token_account: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub treasury_token_account: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+pub enum ChaosComplexity {
+    Low,
+    Medium,
+    High,
+}
+
+impl<'info> CreateProposal<'info> {
+    pub fn validate(&self, params: &ChaosParameters) -> Result<()> {
+        // Verify proposal creator has sufficient stake
+        require!(
+            self.proposer_stake.amount >= MIN_PROPOSAL_STAKE,
+            GovernanceError::InsufficientStakeForProposal
+        );
+
+        // Verify stake is locked
+        let clock = Clock::get()?;
+        require!(
+            self.proposer_stake.locked_until > clock.unix_timestamp,
+            GovernanceError::StakeNotLocked
+        );
+
+        // Validate chaos parameters
+        require!(
+            params.duration <= 3600, // Max 1 hour
+            GovernanceError::InvalidTestParameters
+        );
+
+        // Check for malicious parameters
+        if params.target_program == self.governance.key() {
+            return Err(GovernanceError::InvalidTargetProgram.into());
+        }
+
+        // Verify target program is not in blocklist
+        require!(
+            !self.governance.is_program_blocked(&params.target_program),
+            GovernanceError::ProgramBlocked
+        );
+
+        Ok(())
+    }
+}
+
+impl<'info> ExecuteProposal<'info> {
+    pub fn validate(&self) -> Result<()> {
+        let clock = Clock::get()?;
+        
+        // Verify proposal state
+        require!(
+            self.proposal.state == ProposalState::Succeeded,
+            GovernanceError::InvalidProposalState
+        );
+
+        // Verify execution delay
+        require!(
+            clock.unix_timestamp >= self.proposal.execution_time,
+            GovernanceError::ExecutionDelayNotElapsed
+        );
+
+        // Verify quorum
+        let total_votes = self.proposal.yes_votes + self.proposal.no_votes;
+        let quorum = (self.governance.config.quorum_percentage as u64 * self.proposal.total_stake_snapshot) / 100;
+        require!(
+            total_votes >= quorum,
+            GovernanceError::QuorumNotReached
+        );
+
+        // Verify approval threshold
+        let approval_threshold = (self.governance.config.approval_threshold as u64 * total_votes) / 100;
+        require!(
+            self.proposal.yes_votes >= approval_threshold,
+            GovernanceError::ApprovalThresholdNotMet
+        );
+
+        // Verify treasury if needed
+        if self.proposal.chaos_params.requires_treasury_funding {
+            require!(
+                self.governance.treasury_balance >= self.proposal.chaos_params.treasury_amount,
+                GovernanceError::InsufficientTreasuryBalance
+            );
+
+            let (treasury_pda, _) = Pubkey::find_program_address(
+                &[TREASURY_SEED],
+                ctx.program_id
+            );
+            require!(
+                treasury_pda == self.treasury.key(),
+                GovernanceError::InvalidTreasuryAccount
+            );
+        }
+
+        Ok(())
+    }
+}
+
+// Add emergency circuit breaker
+pub fn emergency_circuit_breaker(ctx: Context<EmergencyAction>) -> Result<()> {
+    let governance = &mut ctx.accounts.governance;
+    
+    // Only multisig authority can trigger circuit breaker
+    require!(
+        governance.verify_multisig_authority(&ctx.accounts.authority)?,
+        GovernanceError::UnauthorizedEmergencyAction
+    );
+
+    // Halt all operations
+    governance.emergency_halt_active = true;
+    governance.last_emergency_action = Clock::get()?.unix_timestamp;
+
+    emit!(EmergencyActionEvent {
+        action: EmergencyActionType::HaltProgram,
+        authority: ctx.accounts.authority.key(),
+        timestamp: Clock::get()?.unix_timestamp,
+    });
+
+    Ok(())
+}
+
+// Add multisig verification
+impl GovernanceState {
+    pub fn verify_multisig_authority(&self, signer: &AccountInfo) -> Result<bool> {
+        // Verify signer is part of multisig
+        let multisig_owners = self.get_multisig_owners()?;
+        if !multisig_owners.contains(&signer.key()) {
+            return Ok(false);
+        }
+
+        // Verify required signatures are present
+        let signatures = self.get_action_signatures()?;
+        if signatures.len() < self.config.min_signatures as usize {
+            return Ok(false);
+        }
+
+        Ok(true)
+    }
+}
+
+pub mod allocator;
+pub use allocator::{
+    GremlinSecureAllocator,
+    config::AllocatorConfig,
+    monitor::{AllocatorMonitor, MonitoringStats},
+};
+
+use nexus_zkvm::security::SecurityLevel;
+
+#[global_allocator]
+static ALLOCATOR: GremlinSecureAllocator = GremlinSecureAllocator::new(SecurityLevel::Maximum);
 
