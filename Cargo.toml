@@ -18,6 +18,8 @@ members = [
 resolver = "2"  # Required for proper workspace inheritance
 
 [workspace.dependencies]
+dusk-plonk = "0.14"
+rand = { version = "0.8", features = ["std", "std_rng"] }
 trident-fuzz = { version = "0.3.1", features = ["afl", "honggfuzz"] }
 prometheus = { version = "0.13.3", features = ["process", "push"] }
 portable-atomic = "1.6"
