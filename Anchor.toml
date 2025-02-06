@@ -2,7 +2,8 @@
 channel = "2024"
 components = ["rust-src", "rustc-dev", "llvm-tools-preview", "solana-sbf"]
 profile = "minimal"
-anchor_version = "1.0.1"
+anchor_version = "0.29.0"
+solana_version = "1.18.11"
 
 [features]
 resolution = true
@@ -29,7 +30,7 @@ types = "target/types"
 program-type = "sbf"
 target = "sbf-solana-solana"
 sbf-sdk = "/root/agave/platform-tools-sdk/sbf"
-sbf-tools-version = "1.34"
+sbf-tools-version = "1.17.6"
 features = ["secure-mode", "chaos-engine", "post-quantum"]
 build-flags = ["--features", "chaos-engine,post-quantum"]
 
@@ -44,13 +45,15 @@ upgradeable = false
 [build]
 target = "sbf-solana-solana"
 rustflags = [
-    "-C", "target-feature=+solana-sbf,+solana-smartheap",
-    "-Z", "build-std=core,alloc,panic_abort",
-    "-Z", "build-std-features=compiler-builtins-mem",
-    "-C", "opt-level=3",
-    "-C", "lto=fat",
-    "-C", "embed-bitcode=no",
-    "-C", "inline-threshold=1000"
+    "-C", "link-arg=--soname=libchaos_engine_v3.so",
+    "-C", "opt-level=z",
+    "-C", "panic=abort",
+    "-C", "debug-assertions=no", 
+    "-C", "overflow-checks=no",
+    "-C", "embed-bitcode=yes",
+    "-C", "strip=symbols",
+    "-C", "target-feature=+solana-sbfv2",
+    "-Z", "mir-opt-level=5"
 ]
 
 [test.validator]
@@ -58,6 +61,15 @@ bind_address = "0.0.0.0"
 url = "https://api.devnet.solana.com"
 ledger = ".anchor/test-ledger"
 rpc_port = 8899
+
+[verify]
+enabled = true
+checksum = "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+whitelist = [
+    "solana-program@1.17.6",
+    "anchor-lang@0.29.0",
+    "chaos-engine-proto@3.14"
+]
 
 [[test.validator.clone]]
 address = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
