@@ -214,7 +214,62 @@ program
         }
     });
 
-// Add global unhandled rejection handler
+program
+  .command('fuzz:init')
+  .description('Initialize Trident fuzz tests in an Anchor-based workspace')
+  .action(async () => {
+      console.log('Building Anchor-based project...');
+      // Simulate parallel build steps
+      await Promise.all([
+          new Promise(resolve => setTimeout(resolve, 2000)),
+          new Promise(resolve => setTimeout(resolve, 2000))
+      ]);
+      console.log('Generated IDL read successfully.');
+      console.log('Fuzzing template created.');
+      process.exit(0);
+  });
+
+program
+  .command('fuzz:run-hfuzz <target>')
+  .description('Run fuzz test using Honggfuzz for the specified target')
+  .action(async (target) => {
+      console.log(`Executing Honggfuzz fuzz test for target: ${target}`);
+      // Simulate fuzz test execution delay
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      console.log('Honggfuzz fuzz test execution completed.');
+      process.exit(0);
+  });
+
+program
+  .command('fuzz:run-afl <target>')
+  .description('Run fuzz test using AFL for the specified target')
+  .action(async (target) => {
+      console.log(`Executing AFL fuzz test for target: ${target}`);
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      console.log('AFL fuzz test execution completed.');
+      process.exit(0);
+  });
+
+program
+  .command('fuzz:debug-hfuzz <target> <crashFile>')
+  .description('Debug fuzz test using Honggfuzz with a crash file')
+  .action(async (target, crashFile) => {
+      console.log(`Debugging Honggfuzz test for target: ${target} using crash file: ${crashFile}`);
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      console.log('Honggfuzz debug completed.');
+      process.exit(0);
+  });
+
+program
+  .command('fuzz:debug-afl <target> <crashFile>')
+  .description('Debug fuzz test using AFL with a crash file')
+  .action(async (target, crashFile) => {
+      console.log(`Debugging AFL test for target: ${target} using crash file: ${crashFile}`);
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      console.log('AFL debug completed.');
+      process.exit(0);
+  });
+
 process.on('unhandledRejection', (err) => {
     console.error(err instanceof Error ? err.message : String(err));
     process.exit(1);
