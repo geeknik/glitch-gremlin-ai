@@ -82,6 +82,7 @@ base64 = "0.21.7"
 time = { version = "0.3", features = ["macros"] }
 log = "0.4.25"
 env_logger = { version = "0.10.0", features = ["auto-color", "humantime"] }
+sha2 = "0.10.6"
 
 [features]
 default = ["secure-mode", "post-quantum", "monitoring"]
