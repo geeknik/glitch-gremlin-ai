@@ -119,7 +119,9 @@ pub struct ChaosExecutionRecord {
     pub result: ChaosResult<()>,
     pub security_proof: Option<SecurityProof>,
     pub timestamp: i64,
+}
 
+impl ChaosExecutionRecord {
     pub fn analyze_metrics(&self) -> ChaosResult<ChaosMetrics> {
         let proof_data = self.security_proof
             .as_ref()
