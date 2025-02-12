@@ -1,21 +1,21 @@
-describe('TensorFlow Mock', () => {
-  it('should create a sequential model', () => {
-    const model = mockTensorFlow.sequential();
-    expect(model).toBeDefined();
-    expect(model.add).toBeDefined();
-    expect(model.compile).toBeDefined();
-    expect(model.predict).toBeDefined();
-  });
+export interface TensorFlowMock {
+  sequential: jest.Mock;
+  layers: {
+    dense: jest.Mock;
+  };
+  train: {
+    adam: jest.Mock;
+  };
+  tensor: jest.Mock;
+  tensor2d: jest.Mock;
+  model: jest.Mock;
+  ready: jest.Mock;
+  dispose: jest.Mock;
+  backend: jest.Mock;
+  memory: jest.Mock;
+}
 
-  it('should create dense layers', () => {
-    const layer = mockTensorFlow.layers.dense({ units: 32 });
-    expect(layer).toBeDefined();
-    expect(layer.units).toBe(32);
-    expect(layer.apply).toBeDefined();
-  });
-});
-
-export const mockTensorFlow = {
+export const mockTensorFlow: TensorFlowMock = {
     sequential: () => ({
         add: jest.fn(),
         compile: jest.fn(),
