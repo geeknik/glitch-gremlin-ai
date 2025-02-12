@@ -50,3 +50,26 @@ export const mockTensorFlow: TensorFlowMock = {
         dispose = jest.fn();
     }
 };
+
+describe('mockTensorFlow', () => {
+  it('should create a sequential model', () => {
+    const model = mockTensorFlow.sequential();
+    expect(model).toBeDefined();
+    expect(model.add).toBeDefined();
+    expect(model.compile).toBeDefined();
+    expect(model.predict).toBeDefined();
+    expect(model.dispose).toBeDefined();
+  });
+
+  it('should create dense layers', () => {
+    const layer = mockTensorFlow.layers.dense({ units: 32 });
+    expect(layer).toBeDefined();
+    expect(layer.units).toBe(32);
+    expect(layer.apply).toBeDefined();
+  });
+
+  it('should create adam optimizer', () => {
+    const optimizer = mockTensorFlow.train.adam(0.001);
+    expect(optimizer).toBeDefined();
+  });
+});

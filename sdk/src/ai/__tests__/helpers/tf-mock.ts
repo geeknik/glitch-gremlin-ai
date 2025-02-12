@@ -137,3 +137,33 @@ export const setupTensorFlowMocks = (): TensorFlowMock => {
 
   return tf;
 };
+
+describe('setupTensorFlowMocks', () => {
+  let tf: TensorFlowMock;
+
+  beforeEach(() => {
+    tf = setupTensorFlowMocks();
+  });
+
+  it('should create a sequential model', () => {
+    const model = tf.sequential();
+    expect(model).toBeDefined();
+    expect(model.compile).toBeDefined();
+    expect(model.fit).toBeDefined();
+    expect(model.predict).toBeDefined();
+  });
+
+  it('should create dense layers', () => {
+    const layer = tf.layers.dense({ units: 32 });
+    expect(layer).toBeDefined();
+    expect(layer.getConfig().units).toBe(32);
+    expect(layer.apply).toBeDefined();
+  });
+
+  it('should create tensors', () => {
+    const tensor = tf.tensor2d([[1, 2], [3, 4]]);
+    expect(tensor).toBeDefined();
+    expect(tensor.shape).toEqual([2, 2]);
+    expect(tensor.dataSync()).toBeInstanceOf(Float32Array);
+  });
+});
