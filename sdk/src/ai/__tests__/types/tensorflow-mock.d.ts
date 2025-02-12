@@ -1,5 +1,3 @@
-import { test, expect } from '@jest/globals';
-
 export interface TensorFlowMock {
   sequential: jest.Mock;
   layers: {
@@ -17,7 +15,8 @@ export interface TensorFlowMock {
   memory: jest.Mock;
 }
 
-export const mockTf: TensorFlowMock = {
+declare const mockTf: TensorFlowMock;
+export { mockTf };
   sequential: jest.fn(() => ({
     add: jest.fn().mockReturnThis(),
     compile: jest.fn().mockReturnThis(),
@@ -58,19 +57,3 @@ export const mockTf: TensorFlowMock = {
 };
 
 export const mockTensorFlow = mockTf;
-
-describe('TensorFlow Mock', () => {
-  test('should have all required mock functions', () => {
-    expect(mockTf).toBeDefined();
-    expect(mockTf.sequential).toBeDefined();
-    expect(mockTf.layers.dense).toBeDefined();
-    expect(mockTf.train.adam).toBeDefined();
-    expect(mockTf.tensor).toBeDefined();
-    expect(mockTf.tensor2d).toBeDefined();
-    expect(mockTf.model).toBeDefined();
-    expect(mockTf.ready).toBeDefined();
-    expect(mockTf.dispose).toBeDefined();
-    expect(mockTf.backend).toBeDefined();
-    expect(mockTf.memory).toBeDefined();
-  });
-});
