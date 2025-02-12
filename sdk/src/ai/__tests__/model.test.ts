@@ -2,17 +2,9 @@ import * as tf from '@tensorflow/tfjs-node';
 import { ConcreteMLModel } from '../src/concrete-ml-model.js';
 
 // Mock TensorFlow.js
-jest.mock('@tensorflow/tfjs-node', () => ({
-    sequential: jest.fn(),
-    layers: {
-        dense: jest.fn()
-    },
-    train: {
-        adam: jest.fn()
-    },
-    tensor2d: jest.fn(),
-    loadLayersModel: jest.fn()
-}));
+jest.mock('@tensorflow/tfjs-node');
+import * as tf from '@tensorflow/tfjs-node';
+import mockTf from '../__mocks__/@tensorflow/tfjs-node';
 
 describe('ConcreteMLModel', () => {
     let model: ConcreteMLModel;
