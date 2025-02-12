@@ -95,8 +95,13 @@ memory: () => ({
 })
 };
 
-// Set up Jest mocks
-jest.mock('@tensorflow/tfjs-node', () => mockTf);
+// Set up Jest mocks and force CPU backend
+jest.mock('@tensorflow/tfjs-node', () => {
+    // Force CPU backend
+    process.env.TF_CPP_MIN_LOG_LEVEL = '2';
+    process.env.TF_FORCE_CPU = '1';
+    return mockTf;
+});
 
 // Helper to reset all mocks
 export const resetTensorFlowMocks = () => {

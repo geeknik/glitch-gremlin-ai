@@ -3,16 +3,14 @@ import { Connection } from '@solana/web3.js';
 import { SecurityScoring } from '../src/solana/security-scoring-model.js';
 import { SecurityMetrics, SecurityScore, SecurityAnalysis, RiskLevel, SecurityMetric } from '../src/solana/types.js';
 import { VulnerabilityType } from '../types.js';
-
-import * as tf from '@tensorflow/tfjs-node';
 import mockTf from '../__mocks__/@tensorflow/tfjs-node';
 
-// Mock TensorFlow.js
-jest.mock('@tensorflow/tfjs-node', () => mockTf);
-        shape: [1, 3],
-        tensor: true,
-        arraySync: () => [0.8, 0.7, 0.9]
-    };
+// Mock TensorFlow.js and force CPU backend
+jest.mock('@tensorflow/tfjs-node', () => {
+    process.env.TF_CPP_MIN_LOG_LEVEL = '2';
+    process.env.TF_FORCE_CPU = '1';
+    return mockTf;
+});
 
     const mockDense = {
         apply: jest.fn(),
