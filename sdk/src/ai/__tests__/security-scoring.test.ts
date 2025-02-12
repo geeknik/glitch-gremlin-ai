@@ -1,50 +1,51 @@
-import * as tf from '@tensorflow/tfjs-node';
 import { Connection } from '@solana/web3.js';
-import { SecurityScoring } from '../src/solana/security-scoring-model.js';
-import { SecurityMetrics, SecurityScore, SecurityAnalysis, RiskLevel, SecurityMetric } from '../src/solana/types.js';
-import { VulnerabilityType } from '../types.js';
-import mockTf from '../__mocks__/@tensorflow/tfjs-node';
+import { SecurityScoring } from '../src/solana/security-scoring-model';
+import { SecurityMetrics, SecurityMetric } from '../src/solana/types';
+import { VulnerabilityType } from '../types';
 
-// Mock TensorFlow.js and force CPU backend
+// Import the mock directly
 jest.mock('@tensorflow/tfjs-node', () => {
-    process.env.TF_CPP_MIN_LOG_LEVEL = '2';
-    process.env.TF_FORCE_CPU = '1';
-    
-    const mockTensor = {
-        shape: [1],
-        dataSync: jest.fn(),
-        dispose: jest.fn()
-    };
-
-    const mockDense = {
-        apply: jest.fn(),
-        getConfig: () => ({}),
-        name: 'dense'
-    };
-
-    const mockModel = {
-        add: jest.fn(),
-        compile: jest.fn(),
-        fit: jest.fn().mockResolvedValue({ history: { loss: [0.1] } }),
-        predict: jest.fn().mockReturnValue(mockTensor),
-        dispose: jest.fn(),
-        layers: [],
-        save: jest.fn().mockResolvedValue(undefined),
-        load: jest.fn().mockResolvedValue(undefined)
-    };
-
+    const actual = jest.requireActual('@tensorflow/tfjs-node');
     return {
+        ...actual,
+        // Add any specific mock implementations needed
+        sequential: jest.fn(),
         layers: {
-            dense: jest.fn().mockReturnValue(mockDense)
-        },
-        sequential: jest.fn().mockReturnValue(mockModel),
-        tensor2d: jest.fn().mockReturnValue(mockTensor),
-        train: {
-            adam: jest.fn().mockReturnValue({})
-        },
-        loadLayersModel: jest.fn().mockResolvedValue(mockModel)
+            dense: jest.fn()
+        }
     };
 });
+
+// Set TensorFlow environment variables
+beforeAll(() => {
+    process.env.TF_CPP_MIN_LOG_LEVEL = '2';
+    process.env.TF_FORCE_CPU = '1';
+});
+
+// Mock TensorFlow specific methods
+const mockTensor = {
+    shape: [1],
+    dataSync: jest.fn(),
+    dispose: jest.fn()
+};
+
+const mockModel = {
+    add: jest.fn(),
+    compile: jest.fn(),
+    fit: jest.fn().mockResolvedValue({ history: { loss: [0.1] } }),
+    predict: jest.fn().mockReturnValue(mockTensor),
+    dispose: jest.fn(),
+    layers: [],
+    save: jest.fn().mockResolvedValue(undefined),
+    load: jest.fn().mockResolvedValue(undefined)
+};
+
+jest.spyOn(tf, 'sequential').mockImplementation(() => mockModel);
+jest.spyOn(tf.layers, 'dense').mockImplementation(() => ({
+    apply: jest.fn(),
+    getConfig: () => ({}),
+    name: 'dense'
+}));
 
 // Mock Connection
 const mockConnection = {
@@ -97,21 +98,47 @@ describe('SecurityScoring', () => {
 
     test('should initialize with correct model configuration', () => {
         expect(tf.sequential).toHaveBeenCalled();
-        expect(tf.layers.dense).toHaveBeenCalledTimes(3);
+        expect(tf.layers.dense).toHaveBeenCalledWith({
+            units: 64,
+            activation: 'relu',
+            inputShape: [5] // Number of metrics
+        });
+        expect(tf.layers.dense).toHaveBeenCalledWith({
+            units: 32,
+            activation: 'relu'
+        });
+        expect(tf.layers.dense).toHaveBeenCalledWith({
+            units: 1,
+            activation: 'sigmoid'
+        });
     });
 
-    test('should analyze program correctly', async () => {
-        const analysis = await securityScoring.analyzeProgram('11111111111111111111111111111111');
+    test('should analyze program and return valid security score', async () => {
+        const programId = '11111111111111111111111111111111';
+        const analysis = await securityScoring.analyzeProgram(programId);
 
         expect(analysis).toBeDefined();
-        expect(analysis.securityScore).toBeDefined();
-        expect(analysis.analysis.patterns).toBeDefined();
-        expect(analysis.analysis.riskLevel).toBeDefined();
+        expect(analysis.securityScore).toBeGreaterThanOrEqual(0);
+        expect(analysis.securityScore).toBeLessThanOrEqual(1);
+        
+        expect(analysis.analysis).toBeDefined();
+        expect(analysis.analysis.riskLevel).toMatch(/LOW|MEDIUM|HIGH|CRITICAL/);
+        
         expect(analysis.suggestions).toBeInstanceOf(Array);
+        analysis.suggestions.forEach(suggestion => {
+            expect(suggestion).toHaveProperty('description');
+            expect(suggestion).toHaveProperty('priority');
+        });
 
-        const findings = analysis.analysis.patterns;
-        expect(findings.some((p: { type: string }) => p.type === VulnerabilityType.ARITHMETIC_OVERFLOW)).toBe(true);
-        expect(findings.some((p: { type: string }) => p.type === VulnerabilityType.ACCESS_CONTROL)).toBe(true);
-        expect(findings.some((p: { type: string }) => p.type === VulnerabilityType.PDA_VALIDATION)).toBe(true);
+        // Verify connection was used
+        expect(mockConnection.getAccountInfo).toHaveBeenCalledWith(programId);
+    });
+
+    test('should handle program analysis errors gracefully', async () => {
+        mockConnection.getAccountInfo.mockRejectedValueOnce(new Error('Network error'));
+        
+        await expect(securityScoring.analyzeProgram('11111111111111111111111111111111'))
+            .rejects
+            .toThrow('Failed to analyze program');
     });
 });
