@@ -1,11 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 jest.mock('../../utils/logger.ts');
+jest.mock('@solana/web3.js');
 
 import { VulnerabilityType } from '../src/types.js';
 import { Logger } from '../../utils/logger.js';
 import { FuzzInput, FuzzingResult } from '../src/types.js';
 import { Fuzzer } from '../src/fuzzer.js';
 import { PublicKey } from '@solana/web3.js';
+import mockConnection from '../src/__mocks__/@solana/web3.js';
 
 describe('Fuzzer', () => {
     let fuzzer: Fuzzer;
@@ -38,7 +40,8 @@ describe('Fuzzer', () => {
 
         fuzzer = new Fuzzer({
             mutationRate: 0.1,
-            maxIterations: 10
+            maxIterations: 10,
+            connection: mockConnection()
         });
     });
 
