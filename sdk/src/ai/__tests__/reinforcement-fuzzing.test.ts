@@ -1,5 +1,6 @@
 import { RLFuzzingModel, FuzzingState, FuzzingAction, FuzzingExperience } from '../src/reinforcement-fuzzing.js';
-import mockTf from './__mocks__/tf-mock.js';
+import * as tf from '@tensorflow/tfjs-node';
+import mockTf from '../__mocks__/@tensorflow/tfjs-node';
 
 jest.mock('@tensorflow/tfjs-node', () => mockTf);
 

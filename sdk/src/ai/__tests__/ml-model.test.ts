@@ -1,9 +1,10 @@
 import { BaseMLModel } from '../src/ml-model.js';
 import { ModelConfig, TrainingResult, PredictionResult, VulnerabilityType } from '../../types.js';
 import * as tf from '@tensorflow/tfjs-node';
+import mockTf from '../__mocks__/@tensorflow/tfjs-node';
 import type { Tensor2D } from '@tensorflow/tfjs-node';
 
-jest.mock('@tensorflow/tfjs-node');
+jest.mock('@tensorflow/tfjs-node', () => mockTf);
 
 class TestMLModel extends BaseMLModel {
     constructor(config?: Partial<ModelConfig>) {
