@@ -4,11 +4,11 @@ import { SecurityScoring } from '../src/solana/security-scoring-model.js';
 import { SecurityMetrics, SecurityScore, SecurityAnalysis, RiskLevel, SecurityMetric } from '../src/solana/types.js';
 import { VulnerabilityType } from '../types.js';
 
+import * as tf from '@tensorflow/tfjs-node';
+import mockTf from '../__mocks__/@tensorflow/tfjs-node';
+
 // Mock TensorFlow.js
-jest.mock('@tensorflow/tfjs-node', () => {
-    const mockTensor = {
-        dispose: jest.fn(),
-        data: () => Promise.resolve(new Float32Array([0.8, 0.7, 0.9])),
+jest.mock('@tensorflow/tfjs-node', () => mockTf);
         shape: [1, 3],
         tensor: true,
         arraySync: () => [0.8, 0.7, 0.9]

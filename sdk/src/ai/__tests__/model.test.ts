@@ -1,10 +1,11 @@
 import * as tf from '@tensorflow/tfjs-node';
 import { ConcreteMLModel } from '../src/concrete-ml-model.js';
 
-// Mock TensorFlow.js
-jest.mock('@tensorflow/tfjs-node');
 import * as tf from '@tensorflow/tfjs-node';
 import mockTf from '../__mocks__/@tensorflow/tfjs-node';
+
+// Mock TensorFlow.js
+jest.mock('@tensorflow/tfjs-node', () => mockTf);
 
 describe('ConcreteMLModel', () => {
     let model: ConcreteMLModel;

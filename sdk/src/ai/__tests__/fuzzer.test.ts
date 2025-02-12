@@ -38,11 +38,16 @@ describe('Fuzzer', () => {
         } as unknown as Logger;
         (Logger as jest.MockedClass<typeof Logger>).mockImplementation(() => mockLogger);
 
-        fuzzer = new Fuzzer({
-            mutationRate: 0.1,
-            maxIterations: 10,
-            connection: mockConnection()
-        });
+        try {
+            fuzzer = new Fuzzer({
+                mutationRate: 0.1,
+                maxIterations: 10,
+                connection: mockConnection()
+            });
+        } catch (error) {
+            console.error('Fuzzer initialization failed:', error);
+            throw error;
+        }
     });
 
     afterEach(() => {
