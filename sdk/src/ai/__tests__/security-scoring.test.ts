@@ -9,8 +9,12 @@ import mockTf from '../__mocks__/@tensorflow/tfjs-node';
 jest.mock('@tensorflow/tfjs-node', () => {
     process.env.TF_CPP_MIN_LOG_LEVEL = '2';
     process.env.TF_FORCE_CPU = '1';
-    return mockTf;
-});
+    
+    const mockTensor = {
+        shape: [1],
+        dataSync: jest.fn(),
+        dispose: jest.fn()
+    };
 
     const mockDense = {
         apply: jest.fn(),
