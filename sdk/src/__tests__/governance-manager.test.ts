@@ -86,7 +86,7 @@ describe('GovernanceManager', () => {
     describe('Proposal Management', () => {
         it('should create a proposal successfully', async () => {
             const proposalData = {
-                proposer: mockWallet.publicKey,
+                authority: mockWallet.publicKey,
                 title: "Test Proposal",
                 description: "Test Description"
             };
