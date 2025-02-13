@@ -1,35 +1,90 @@
 {
+  "root": true,
   "env": {
     "browser": true,
-    "es2021": true,
+    "es2022": true,
     "node": true,
-    "jest": true
+    "jest": true,
+    "worker": true
   },
   "extends": [
     "eslint:recommended",
     "plugin:@typescript-eslint/recommended",
+    "plugin:security/recommended",
+    "plugin:sonarjs/recommended",
+    "plugin:unicorn/recommended",
     "plugin:prettier/recommended"
   ],
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
     "ecmaVersion": "latest",
     "sourceType": "module",
-    "project": ["./tsconfig.json", "./sdk/tsconfig.json", "./cli/tsconfig.json"]
+    "project": [
+      "./tsconfig.json",
+      "./security/tsconfig.json",
+      "./chaos-engine/tsconfig.json",
+      "./ai-modules/tsconfig.json",
+      "./governance/tsconfig.json",
+      "./token-manager/tsconfig.json"
+    ]
   },
-  "plugins": ["@typescript-eslint", "prettier"],
+  "plugins": [
+    "@typescript-eslint",
+    "security",
+    "sonarjs",
+    "unicorn",
+    "prettier"
+  ],
   "rules": {
-    "@typescript-eslint/explicit-function-return-type": "off",
-    "@typescript-eslint/no-explicit-any": "warn",
-    "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
-    "@typescript-eslint/no-non-null-assertion": "warn",
-    "prettier/prettier": "error",
-    "no-console": ["warn", { "allow": ["warn", "error"] }],
-    "no-debugger": "warn"
+    "@typescript-eslint/explicit-function-return-type": "error",
+    "@typescript-eslint/no-explicit-any": "error",
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      { "argsIgnorePattern": "^_", "caughtErrors": "all" }
+    ],
+    "@typescript-eslint/no-non-null-assertion": "error",
+    "security/detect-object-injection": "error",
+    "security/detect-possible-timing-attacks": "error",
+    "sonarjs/cognitive-complexity": ["error", 15],
+    "unicorn/prefer-node-protocol": "error",
+    "unicorn/prevent-abbreviations": [
+      "error",
+      {
+        "replacements": {
+          "props": false,
+          "ref": false,
+          "env": false,
+          "err": false
+        }
+      }
+    ],
+    "no-console": ["error", { "allow": ["warn", "error"] }],
+    "no-debugger": "error",
+    "complexity": ["error", 10],
+    "max-depth": ["error", 4],
+    "max-lines-per-function": ["error", 50],
+    "max-params": ["error", 3]
   },
   "settings": {
     "import/resolver": {
-      "typescript": {}
+      "typescript": {
+        "alwaysTryTypes": true,
+        "project": [
+          "./tsconfig.json",
+          "./security/tsconfig.json",
+          "./chaos-engine/tsconfig.json",
+          "./ai-modules/tsconfig.json",
+          "./governance/tsconfig.json",
+          "./token-manager/tsconfig.json"
+        ]
+      }
     }
   },
-  "ignorePatterns": ["dist", "node_modules", "coverage"]
+  "ignorePatterns": [
+    "dist",
+    "node_modules",
+    "coverage",
+    "**/__mocks__/*",
+    "**/__fixtures__/*"
+  ]
 }
