@@ -1,5 +1,34 @@
 packages:
+  - 'packages/*'
+  - 'scripts'
+  - 'tests'
+  - 'benchmarks'
+  - 'security'
+  - 'chaos-engine'
+  - 'ai-modules'
+  - 'governance'
+  - 'token-manager'
+  - 'monitoring'
+  - 'analytics'
+  - 'docs'
+  - 'examples'
+  - 'contracts'
+  - 'protocols'
+  - 'libraries'
+  - 'utilities'
   - 'cli'
   - 'sdk'
   - 'demo'
+
+sharedDependencies:
+  '@solana/web3.js': '^2.0.0'
+  '@tensorflow/tfjs-node': '^4.12.0'
+  'zlib': '^1.0.0'
+  'node-fetch': '^3.3.0'
+
+hoistPattern:
+  - '*'
+  - '**/*'
+
+shamefullyHoist: false
 
