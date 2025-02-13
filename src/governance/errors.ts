@@ -10,6 +10,7 @@ export enum ErrorCode {
     TIMEOUT = 1007,
     INVALID_STATE = 1008,
     CONFIGURATION_ERROR = 1009,
+    INVALID_WALLET = 1010,
 
     // Token & Staking errors (1100-1199)
     INVALID_AMOUNT = 1100,
@@ -98,6 +99,16 @@ export class RateLimitExceededError extends GlitchError {
 export class InvalidStateError extends GlitchError {
     constructor(details?: Partial<ErrorDetails>) {
         super('Invalid system state', ErrorCode.INVALID_STATE, details);
+    }
+}
+
+export function validateGgaiWallet(pubkey: PublicKey) {
+    if (!pubkey.toString().endsWith('ggai')) {
+        throw new GlitchError(
+            'Invalid Glitch Gremlin wallet format',
+            ErrorCode.INVALID_WALLET,
+            { received: pubkey.toString() }
+        );
     }
 
     public toJSON(): Record<string, unknown> {
