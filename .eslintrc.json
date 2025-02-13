@@ -21,12 +21,18 @@
     "sourceType": "module",
     "project": [
       "./tsconfig.json",
-      "./security/tsconfig.json",
+      "./security/tsconfig.json", 
       "./chaos-engine/tsconfig.json",
       "./ai-modules/tsconfig.json",
       "./governance/tsconfig.json",
       "./token-manager/tsconfig.json"
     ]
+  },
+  "settings": {
+    "node": {
+      "resolvePaths": ["node_modules"],
+      "tryExtensions": [".js", ".json", ".node", ".ts"]
+    }
   },
   "plugins": [
     "@typescript-eslint",
