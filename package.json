@@ -29,11 +29,15 @@
     "ioredis": "^5.3.2"
   },
   "devDependencies": {
+    "@babel/core": "^7.24.5",
+    "@babel/preset-env": "^7.24.5",
+    "@babel/preset-typescript": "^7.24.5",
     "@types/bn.js": "^5.1.1",
     "@types/jest": "^29.5.0",
     "@types/node": "^18.15.11",
     "@typescript-eslint/eslint-plugin": "^5.57.1",
     "@typescript-eslint/parser": "^5.57.1",
+    "babel-jest": "^29.7.0",
     "eslint": "^8.57.1",
     "eslint-plugin-security": "^1.7.1",
     "eslint-plugin-sonarjs": "^0.25.0",
@@ -68,5 +72,12 @@
   "bugs": {
     "url": "https://github.com/yourusername/glitch-gremlin-ai/issues"
   },
-  "homepage": "https://github.com/yourusername/glitch-gremlin-ai#readme"
+  "homepage": "https://github.com/yourusername/glitch-gremlin-ai#readme",
+  "jest": {
+    "transform": {
+      "^.+\\.(js|jsx|ts|tsx)$": "babel-jest"
+    },
+    "testEnvironment": "node",
+    "moduleFileExtensions": ["js", "jsx", "ts", "tsx"]
+  }
 }
