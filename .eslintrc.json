@@ -10,7 +10,7 @@
   "extends": [
     "eslint:recommended",
     "plugin:@typescript-eslint/recommended",
-    "plugin:security/recommended",
+    "./node_modules/eslint-plugin-security/configs/recommended.js",
     "plugin:sonarjs/recommended",
     "plugin:unicorn/recommended",
     "plugin:prettier/recommended"
