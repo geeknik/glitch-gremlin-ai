@@ -1,0 +1,43 @@
+name: Chaos Engine CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Run Security Audit
+      uses: geeknik/glitch-scanner@v2
+      with:
+        target: ./sdk
+        fail-on: critical
+        
+  test:
+    needs: security-scan
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20.x]
+        os: [ubuntu-latest]
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'pnpm'
+        
+    - name: Install Dependencies
+      run: pnpm install
+      
+    - name: Run Tests
+      run: pnpm test
+      env:
+        SOLANA_NETWORK: testnet
+        GREMLIN_API_KEY: ${{ secrets.GREMLIN_CI_KEY }}

@@ -57,20 +57,20 @@
   "packageManager": "pnpm@9.0.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/glitch-gremlin-ai.git"
+    "url": "git+https://github.com/geeknik/glitch-gremlin-ai.git"
   },
   "keywords": [
     "solana",
-    "blockchain",
+    "blockchain", 
     "chaos-testing",
     "ai",
     "machine-learning",
     "security"
   ],
-  "author": "Your Name",
+  "author": "geeknik",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/yourusername/glitch-gremlin-ai/issues"
+    "url": "https://github.com/geeknik/glitch-gremlin-ai/issues"
   },
-  "homepage": "https://github.com/yourusername/glitch-gremlin-ai#readme"
+  "homepage": "https://glitchgremlin.ai"
 }
