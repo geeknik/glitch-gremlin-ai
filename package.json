@@ -37,7 +37,7 @@
     "@types/node": "^18.15.11",
     "@typescript-eslint/eslint-plugin": "^5.57.1",
     "@typescript-eslint/parser": "^5.57.1",
-    "babel-jest": "^29.7.0",
+    "@types/jest": "^29.5.12",
     "eslint": "^8.57.1",
     "eslint-plugin-security": "^1.7.1",
     "eslint-plugin-sonarjs": "^0.25.0",
@@ -73,11 +73,4 @@
     "url": "https://github.com/yourusername/glitch-gremlin-ai/issues"
   },
   "homepage": "https://github.com/yourusername/glitch-gremlin-ai#readme",
-  "jest": {
-    "transform": {
-      "^.+\\.(js|jsx|ts|tsx)$": "babel-jest"
-    },
-    "testEnvironment": "node",
-    "moduleFileExtensions": ["js", "jsx", "ts", "tsx"]
-  }
 }

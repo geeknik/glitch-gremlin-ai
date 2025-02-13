@@ -1,61 +1,39 @@
-const { Config } = require('@jest/types');
-/** @type {import('@jest/types').Config.InitialOptions} */
-const config = {
+import type { Config } from '@jest/types';
+
+const config: Config.InitialOptions = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  roots: ['<rootDir>/sdk/src', '<rootDir>/cli/src'],
-  testMatch: [
-    '**/src/**/__tests__/**/*.[jt]s?(x)',
-    '**/src/**/?(*.)+(spec|test|tests).[jt]s?(x)'
-  ],
-  transform: {
-    '^.+\\.tsx?$': ['ts-jest', {
-      tsconfig: 'tsconfig.json',
-      useESM: true,
-      isolatedModules: true
-    }],
-    '^.+\\.jsx?$': ['babel-jest', {
-      presets: ['@babel/preset-env']
-    }]
-  },
-  transformIgnorePatterns: [
-    '/node_modules/(?!(crypto-random-string)/)'
-  ],
+  roots: ['<rootDir>/sdk/src'],
+  testRegex: '(/__tests__/.*|(\\.|/)(test|spec))\\.[jt]sx?$',
   moduleNameMapper: {
-    '^(\\.{1,2}/.*)\\.js$': '$1',
     '^@glitch-gremlin/sdk$': '<rootDir>/sdk/src/index.ts',
-    '^@glitch-gremlin/sdk/ai/types$': '<rootDir>/sdk/src/ai/src/types.ts',
     '^@security/(.*)$': '<rootDir>/sdk/src/ai/security/$1',
-    '#cli/(.*)': '<rootDir>/cli/$1',
-    '^@/(.*)$': '<rootDir>/sdk/src/$1',
-    '^@ai/(.*)$': '<rootDir>/sdk/src/ai/$1',
+    '^@/(.*)$': '<rootDir>/sdk/src/$1'
   },
-  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node', 'mjs'],
-  extensionsToTreatAsEsm: ['.ts', '.tsx'],
-  setupFilesAfterEnv: [
-    '<rootDir>/jest.setup.ts'
-  ],
+  transform: {
+    '^.+\\.tsx?$': [
+      'ts-jest', 
+      {
+        tsconfig: 'tsconfig.json',
+        isolatedModules: true,
+        diagnostics: false
+      }
+    ]
+  },
   testPathIgnorePatterns: [
     '/node_modules/',
     '/dist/',
-    'setup\\.ts$',
-    'jest\\.setup\\.ts$',
     '__mocks__'
   ],
-  collectCoverage: true,
-  coverageDirectory: 'coverage',
   coveragePathIgnorePatterns: [
-    '/node_modules/',
-    '/dist/',
-    '/__tests__/',
-    '/__mocks__/'
+    '__tests__',
+    '__mocks__'
   ],
-  testTimeout: 60000,
+  maxWorkers: '50%',
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+  testTimeout: 30000,
   verbose: true,
-  clearMocks: true,
-  restoreMocks: true,
-  resetMocks: true,
-  automock: false
+  detectOpenHandles: true
 };
 
-module.exports = config;
+export default config;
