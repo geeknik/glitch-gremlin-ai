@@ -6,22 +6,33 @@ description = "Chaos engineering program for Solana"
 license = "Apache-2.0"
 
 [features]
-default = ["quantum-resistant"]
+default = ["quantum-resistant", "bleeding-edge", "secure-mode"]
 no-entrypoint = []
-test-bpf = []
+test-sbf = []
 quantum-resistant = ["dep:crystals-dilithium"]
+secure-mode = []
 hardware-security = [
     "dep:sgx_types",
     "dep:sgx-isa",
     "getrandom/rdrand",
     "rand/std_rng"
 ]
-full-security = ["quantum-resistant", "hardware-security"]
+full-security = ["quantum-resistant", "hardware-security", "secure-mode"]
 error-context = ["dep:backtrace", "dep:eyre"]
+bleeding-edge = []
 
 [dependencies]
+# Core Solana dependencies
 solana-program = { workspace = true }
-borsh = { workspace = true, features = ["derive"] }
+solana-program-runtime = { workspace = true }
+solana-sdk = { workspace = true }
+solana-account-decoder = { workspace = true }
+solana-compute-budget = { workspace = true }
+solana-frozen-abi = { workspace = true, optional = true }
+solana-frozen-abi-macro = { workspace = true, optional = true }
+
+# Existing dependencies
+borsh = { workspace = true }
 borsh-derive = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -31,32 +42,35 @@ num-traits = "0.2"
 spl-token = { version = "4.0", features = ["no-entrypoint"] }
 strum = { version = "0.25", features = ["derive", "strum_macros"] }
 strum_macros = "0.25"
-ed25519-dalek = { version = "1.0", features = ["serde", "u64_backend"] }
+ed25519-dalek = { version = "2.1", features = ["serde", "rand_core", "zeroize"] }
 bls12_381 = { version = "0.8", features = ["groups", "pairings", "experimental"] }
 byteorder = { version = "1.5.0", features = ["std"] }
 bellman = { version = "0.14", features = ["groth16", "multicore"] }
 sha2 = { version = "0.10", features = ["oid", "compress", "asm"] }
-base64 = { version = "0.13", features = ["std"] }
+base64 = { version = "0.21", features = ["std"] }
 
 # Error handling enhancements
-backtrace = { version = "0.3", optional = true }
-eyre = { version = "0.6", optional = true }
+backtrace = { version = "0.3", optional = true, features = ["serialize-serde"] }
+eyre = { version = "0.6", optional = true, features = ["auto-install"] }
 
 # Optional security dependencies
 crystals-dilithium = { version = "1.0.0", optional = true }
-sgx_types = { version = "1.1.2", optional = true }
+sgx_types = { version = "1.1.2", features = ["debug", "backtrace"], optional = true }
 sgx-isa = { version = "0.4.0", optional = true }
 
-# System dependencies
-libc = { version = "0.2", features = ["extra_traits", "const-extern-fn"] }
-rand = { version = "0.8", features = ["std", "getrandom"] }
-getrandom = { version = "0.2", features = ["std"] }
+# System dependencies with enhanced features
+libc = { version = "0.2", features = ["extra_traits", "const-extern-fn", "align"] }
+rand = { version = "0.8", features = ["std", "getrandom", "simd_support"] }
+getrandom = { version = "0.2", features = ["std", "rdrand"] }
+
+# Additional bleeding-edge dependencies
+zeroize = { workspace = true }
+curve25519-dalek = { workspace = true }
+ring = { workspace = true }
 
 [dev-dependencies]
 solana-program-test = { workspace = true }
 solana-sdk = { workspace = true }
-solana-validator = { workspace = true }
-solana-cli-config = { workspace = true }
 tokio = { workspace = true }
 
 [lib]
@@ -64,10 +78,43 @@ name = "glitch_gremlin_program"
 crate-type = ["cdylib", "lib"]
 
 [package.metadata.docs.rs]
-targets = ["x86_64-unknown-linux-gnu"]
+targets = ["sbf-solana-solana"]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
-[target.'cfg(not(target_os = "solana"))'.dependencies]
-solana-program = { version = "=1.18.26" }
+[package.metadata.solana]
+name = "glitch_gremlin_program"
+version = "0.1.0"
+description = "Chaos engineering program for Solana"
+license = "Apache-2.0"
+repository = ""
+features = ["quantum-resistant", "bleeding-edge", "secure-mode"]
+target = "sbf-solana-solana"
+sbf-sdk = true
+compiler-flags = [
+    "-C", "target-cpu=sbfv2",
+    "-C", "target-feature=+solana,+post-quantum,+secure-mode",
+    "-C", "link-arg=-zstack-size=32768",
+    "-C", "force-frame-pointers=yes",
+    "-C", "debuginfo=2",
+    "-C", "overflow-checks=yes",
+    "-C", "codegen-units=1",
+    "-C", "opt-level=3",
+    "-C", "lto=fat",
+    "-C", "embed-bitcode=yes",
+    "-C", "control-flow-guard=yes",
+    "-C", "panic=abort"
+]
 
-[target.sbf-solana-solana.dependencies]
-solana-program = { version = "=1.18.26" }
+[package.metadata.build-sbf]
+target-cpu = "sbfv2"
+toolchain = "nightly"
+optimization-level = 3
+features = [
+    "secure-mode",
+    "post-quantum",
+    "chaos-engine",
+    "zero-copy"
+]
+panic-strategy = "abort"
+

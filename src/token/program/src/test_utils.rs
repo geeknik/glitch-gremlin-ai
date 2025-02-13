@@ -20,6 +20,9 @@ pub struct TestContext {
     pub banks_client: BanksClient,
     pub payer: Keypair,
     pub recent_blockhash: Hash,
+    pub security_level: SecurityLevel,
+    pub attestation_manager: Option<attestation::Manager>,
+    pub memory_safety_checks: bool,
 }
 
 impl TestContext {
@@ -37,7 +40,37 @@ impl TestContext {
             banks_client,
             payer,
             recent_blockhash,
+            security_level: SecurityLevel::High,
+            attestation_manager: Some(attestation::Manager::new_with_config(attestation::Config {
+                tee_type: attestation::TeeType::Sgx,
+                quote_type: attestation::QuoteType::Ecdsa,
+                ..Default::default()
+            })),
+            memory_safety_checks: true,
         }
+    }
+
+    pub fn with_security_level(mut self, level: SecurityLevel) -> Self {
+        self.security_level = level;
+        self
+    }
+
+    pub async fn verify_security_requirements(&self, account: &AccountInfo) -> Result<(), ProgramError> {
+        if self.memory_safety_checks {
+            // Verify memory safety
+            if !account.data.borrow().iter().all(|&x| x != 0xFF) {
+                return Err(ProgramError::InvalidAccountData);
+            }
+        }
+
+        // Verify attestation if required
+        if let Some(attestation_mgr) = &self.attestation_manager {
+            if !attestation_mgr.verify_quote(&account.data.borrow()) {
+                return Err(ProgramError::InvalidAccountData);
+            }
+        }
+
+        Ok(())
     }
 
     pub async fn create_test_accounts(&mut self) -> (Keypair, Keypair, Keypair) {

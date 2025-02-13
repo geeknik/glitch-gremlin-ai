@@ -152,12 +152,9 @@ use crate::test_utils::TestContext;
 
 #[tokio::test]
 async fn test_initialize_chaos_request() {
-    let program_id = Pubkey::new_unique();
-    let mut program_test = ProgramTest::new(
-        "glitch_gremlin",
-        program_id,
-        processor!(crate::processor::Processor::process),
-    );
+    let mut ctx = TestContext::new()
+        .await
+        .with_security_level(SecurityLevel::Critical);
 
     // Generate test accounts
     let payer = Keypair::new();
@@ -196,11 +193,28 @@ async fn test_initialize_chaos_request() {
         &program_id,
     );
 
-    // Test high security level request
+    // Test critical security level request with enhanced params
     let instruction_data = GlitchInstruction::InitializeChaosRequest {
         amount: 10_000,
-        params: test_params.clone(),
-        security_level: SecurityLevel::High,
+        params: TestParams {
+            memory_fence_required: true,
+            page_access_tracking: true,
+            stack_canaries: true,
+            audit_mode: true,
+            fuzzing_strategy: "evolutionary".to_string(),
+            mutation_rate: 30,
+            coverage_target: 95, // Increased for Critical security
+            max_compute_units: 150_000,
+            memory_limit: 512 * 1024, // Reduced for tighter control
+            max_latency: 500,
+            concurrency_level: 2,
+            entropy_checks: true,
+            memory_safety: 3,
+            syscall_filter: vec![1, 2, 3, 4], // Common dangerous syscalls
+            page_quarantine: true,
+            security_level: SecurityLevel::Critical,
+        },
+        security_level: SecurityLevel::Critical,
         attestation_required: true,
     }
     .try_to_vec()
@@ -408,7 +422,11 @@ async fn test_finalize_chaos_request() {
 async fn test_validation_engine() {
     let program_id = Pubkey::new_unique();
     let mut validation_engine = ValidationEngine::new(
-        AttestationManager::new(get_test_sgx_key()),
+        attestation::Manager::new_with_config(attestation::Config {
+            tee_type: attestation::TeeType::Sgx,
+            quote_type: attestation::QuoteType::Ecdsa,
+            ..Default::default()
+        }),
         SecurityLevel::Critical,
         ValidationMode::Paranoid,
     );
@@ -501,10 +519,98 @@ fn generate_test_attack_surface() -> Vec<u8> {
     data
 }
 
-fn get_test_sgx_key() -> PublicKey {
-    // Generate test SGX key for attestation
+fn get_test_attestation_key() -> PublicKey {
+    // Generate test attestation key
     let keypair = Keypair::new();
     keypair.public_key()
+}
+
+#[tokio::test]
+async fn test_security_requirements() {
+    let mut ctx = TestContext::new().await;
+    let (chaos_request, escrow, owner) = ctx.create_test_accounts().await;
+
+    // Test with different security levels
+    for &level in &[SecurityLevel::Low, SecurityLevel::High, SecurityLevel::Critical] {
+        let test_params = TestParams {
+            memory_fence_required: level >= SecurityLevel::High,
+            page_access_tracking: level >= SecurityLevel::High,
+            stack_canaries: level >= SecurityLevel::High,
+            audit_mode: level == SecurityLevel::Critical,
+            fuzzing_strategy: "evolutionary".to_string(),
+            mutation_rate: match level {
+                SecurityLevel::Low => 10,
+                SecurityLevel::High => 30,
+                SecurityLevel::Critical => 50,
+            },
+            coverage_target: match level {
+                SecurityLevel::Low => 75,
+                SecurityLevel::High => 85,
+                SecurityLevel::Critical => 95,
+            },
+            max_compute_units: 200_000,
+            memory_limit: match level {
+                SecurityLevel::Low => 2048 * 1024,
+                SecurityLevel::High => 1024 * 1024,
+                SecurityLevel::Critical => 512 * 1024,
+            },
+            max_latency: 1000,
+            concurrency_level: 4,
+            entropy_checks: level >= SecurityLevel::High,
+            memory_safety: level as u8,
+            syscall_filter: if level == SecurityLevel::Critical {
+                vec![1, 2, 3, 4]
+            } else {
+                vec![]
+            },
+            page_quarantine: level >= SecurityLevel::High,
+            security_level: level,
+        };
+
+        let ix = Instruction {
+            program_id: ctx.program_id,
+            accounts: vec![
+                AccountMeta::new(chaos_request.pubkey(), false),
+                AccountMeta::new(escrow.pubkey(), false),
+                AccountMeta::new(owner.pubkey(), true),
+            ],
+            data: GlitchInstruction::InitializeChaosRequest {
+                amount: 100_000,
+                params: test_params,
+                security_level: level,
+                attestation_required: level >= SecurityLevel::High,
+            }.try_to_vec().unwrap(),
+        };
+
+        let result = ctx.banks_client.process_transaction(Transaction::new_signed_with_payer(
+            &[ix],
+            Some(&ctx.payer.pubkey()),
+            &[&ctx.payer, &owner],
+            ctx.recent_blockhash,
+        )).await;
+
+        match level {
+            SecurityLevel::Critical => {
+                // Verify strict security requirements
+                assert!(result.is_ok());
+                let account = ctx.banks_client.get_account(chaos_request.pubkey())
+                    .await.unwrap().unwrap();
+                ctx.verify_security_requirements(&AccountInfo::new(
+                    &chaos_request.pubkey(),
+                    false,
+                    false,
+                    &mut account.lamports,
+                    &mut account.data,
+                    &chaos_request.pubkey(),
+                    false,
+                    0,
+                )).await.unwrap();
+            },
+            _ => {
+                assert!(result.is_ok());
+            }
+        }
+    }
 }
 
 #[test]

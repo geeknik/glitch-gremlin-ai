@@ -21,7 +21,6 @@ log = { version = "=0.4", features = ["max_level_trace", "release_max_level_info
 env_logger = "=0.10"
 spl-token = { version = "=4.0", features = ["no-entrypoint"] }
 hex = "=0.4"
-mongodb = { workspace = true }
 redis = { workspace = true }
 bson = { workspace = true }
 rand = { version = "=0.8", features = ["std", "std_rng"] }

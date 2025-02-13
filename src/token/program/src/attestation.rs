@@ -4,21 +4,42 @@ use solana_program::{
     sysvar::{clock::Clock, Sysvar},
 };
 use sha2::{Sha384, Digest};
-use dilithium::{Keypair, SecretKey, PublicKey, Signature}; // CRYSTALS-Dilithium
-use rsa::{
-    pkcs1v15::{SigningKey, VerifyingKey},
-    signature::{Signer, Verifier},
-    RsaPublicKey,
-};
+use ring::signature::{self, KeyPair, Ed25519KeyPair};
 use crate::error::GlitchError;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub struct AttestationManager {
-    // Intel ME public key for SGX quote verification
-    sgx_root_key: PublicKey,
-    // CRYSTALS-Dilithium keys for post-quantum signatures
-    dilithium_keypair: Keypair,
-    // Certificate transparency log
+#[derive(Debug, Clone)]
+pub struct Config {
+    pub tee_type: TeeType,
+    pub quote_type: QuoteType,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum TeeType {
+    Sgx,
+    Tdx,
+    Custom,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum QuoteType {
+    Ecdsa,
+    EpidUnlinkable,
+    Custom,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            tee_type: TeeType::Sgx,
+            quote_type: QuoteType::Ecdsa,
+        }
+    }
+}
+
+pub struct Manager {
+    config: Config,
+    keypair: Ed25519KeyPair,
     cert_log: Vec<CertificateLog>,
 }
 
@@ -27,19 +48,25 @@ struct CertificateLog {
     validator_pubkey: Pubkey,
     attestation_timestamp: i64,
     model_hash: [u8; 48], // SHA-384 hash
-    signature: Signature,
+    signature: Vec<u8>,
 }
 
-impl AttestationManager {
-    pub fn new(sgx_root_key: PublicKey) -> Self {
+impl Manager {
+    pub fn new_with_config(config: Config) -> Self {
+        // Generate a new Ed25519 keypair for signing
+        let rng = ring::rand::SystemRandom::new();
+        let pkcs8_bytes = Ed25519KeyPair::generate_pkcs8(&rng).expect("Failed to generate keypair");
+        let keypair = Ed25519KeyPair::from_pkcs8(pkcs8_bytes.as_ref())
+            .expect("Failed to parse keypair");
+
         Self {
-            sgx_root_key,
-            dilithium_keypair: Keypair::generate(),
+            config,
+            keypair,
             cert_log: Vec::new(),
         }
     }
 
-    pub fn verify_attestation(attestation: &[u8], authority: &Pubkey) -> Result<bool, ProgramError> {
+    pub fn verify_attestation(&self, attestation: &[u8], authority: &Pubkey) -> Result<bool, ProgramError> {
         if attestation.len() < 256 {
             return Err(GlitchError::InvalidAttestation.into());
         }
@@ -63,7 +90,17 @@ impl AttestationManager {
             return Err(GlitchError::InvalidAttestation.into());
         }
 
-        Ok(true)
+        // Verify signature using Ed25519
+        let message = &attestation[..attestation.len()-64];
+        let signature = &attestation[attestation.len()-64..];
+        
+        match signature::UnparsedPublicKey::new(
+            &signature::ED25519,
+            authority.as_ref()
+        ).verify(message, signature) {
+            Ok(_) => Ok(true),
+            Err(_) => Err(GlitchError::InvalidSignature.into())
+        }
     }
 
     pub fn verify_sgx_quote(quote: &[u8]) -> Result<bool, ProgramError> {

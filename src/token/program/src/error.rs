@@ -5,6 +5,7 @@ use solana_program::{
 use thiserror::Error;
 
 #[derive(Error, Debug, Copy, Clone)]
+#[repr(u32)] // Ensure stable error codes
 pub enum GlitchError {
     #[error("Invalid instruction: The provided instruction is not recognized or malformed")]
     InvalidInstruction,
@@ -13,7 +14,7 @@ pub enum GlitchError {
     InvalidAccountOwner,
 
     #[error("Invalid signature: Transaction signature verification failed or missing required signature")]
-    InvalidSignature,
+    InvalidSignature(#[from] ed25519_dalek::SignatureError),
 
     #[error("Invalid attestation: The provided attestation proof is invalid or expired")]
     InvalidAttestation,
@@ -110,6 +111,24 @@ pub enum GlitchError {
 
     #[error("Memory safety violation: A critical memory safety check failed - potential exploit attempt")]
     MemorySafetyViolation,
+
+    #[error("Invalid entropy score: Entropy score {0} below required threshold {1}")]
+    InvalidEntropyScore(f64, f64),
+
+    #[error("Geographic diversity violation: Need {0} regions, got {1}")]
+    InsufficientDiversity(usize, usize),
+
+    #[error("Compute units exceeded: Used {0}, max allowed {1}")]
+    ComputeUnitsExceeded(u32, u32),
+
+    #[error("Attestation timeout: Quote age {0} exceeds maximum {1} seconds")]
+    AttestationTimeout(i64, i64),
+
+    #[error("Memory quarantine violation: Access to quarantined page at {0:#x}")]
+    MemoryQuarantineViolation(u64),
+
+    #[error("Invalid validator count: Need {0} validators, got {1}")]
+    InvalidValidatorCount(usize, usize),
 }
 
 // Constants for error messages

@@ -2,31 +2,46 @@
 name = "glitch-gremlin-shared"
 version = "0.1.0"
 edition = "2021"
-description = "Shared utilities and types for Glitch Gremlin"
-license = "Apache-2.0"
+description = "Shared utilities for Glitch Gremlin token program"
+license = "MIT"
 
 [features]
-default = []
+default = ["secure-mode"]
 governance = ["dep:mongodb", "dep:redis", "redis?/async-std-comp"]
 metrics = ["dep:prometheus", "prometheus?/process"]
 telemetry = [
-    "dep:opentelemetry",
-    "dep:tracing",
-    "dep:tracing-subscriber",
-    "dep:tracing-futures",
+    "opentelemetry",
+    "tracing",
+    "tracing-subscriber",
+    "tracing-futures", 
     "opentelemetry?/metrics",
     "tracing?/log",
     "tracing-subscriber?/env-filter"
 ]
 error-context = ["dep:backtrace", "dep:eyre"]
+secure-mode = []
+test = []
 
 [dependencies]
-solana-program = { workspace = true }
-solana-sdk = { workspace = true }
+# Core dependencies from workspace
+solana-program.workspace = true
+solana-sdk.workspace = true
+anchor-lang.workspace = true
+anchor-spl.workspace = true
 borsh = { workspace = true, features = ["derive", "std", "rc"] }
-borsh-derive = { workspace = true }
+borsh-derive.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+
+# Security dependencies
+ring.workspace = true
+zeroize.workspace = true
+curve25519-dalek.workspace = true
+ed25519-dalek.workspace = true
+
+# Utilities
+arrayref.workspace = true
+static_assertions.workspace = true
 thiserror = "1.0.56"
 strum = { version = "=0.25", features = ["derive", "strum_macros"] }
 tokio = { workspace = true, features = ["full", "sync"] }
@@ -44,7 +59,7 @@ redis = { workspace = true, optional = true }
 prometheus = { version = "=0.13", optional = true, features = ["process"] }
 opentelemetry = { version = "=0.20", optional = true, features = ["metrics", "trace"] }
 tracing = { workspace = true, optional = true }
-tracing-subscriber = { workspace = true, optional = true }
+tracing-subscriber = { workspace = true, optional = true, features = ["rfc-3339-timestamp"] }
 tracing-futures = { workspace = true, optional = true }
 
 [dev-dependencies]

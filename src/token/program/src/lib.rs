@@ -1,3 +1,9 @@
+//! Glitch Gremlin Program - On-chain program for chaos engineering and security testing
+//! 
+//! This program implements the core functionality for the Glitch Gremlin protocol,
+//! providing controlled chaos testing capabilities for Solana programs as described
+//! in the DESIGN.md specification.
+
 use solana_program::{
     account_info::AccountInfo,
     entrypoint,
@@ -7,6 +13,7 @@ use solana_program::{
     program_error::ProgramError,
     msg,
 };
+use ed25519_dalek::{Signature, PublicKey};
 use borsh::BorshDeserialize;
 use crate::{
     instruction::GlitchInstruction,
@@ -31,22 +38,62 @@ const MULTISIG_SIGNERS: [&str; 10] = [
     "T3nThS1gNer11111111111111111111111111111111",
 ];
 
+/// Error types and handling
 pub mod error;
+/// Instruction definitions and processing
 pub mod instruction;
+/// Main program processor
 pub mod processor;
+/// Program state management
 pub mod state;
+/// Token management functionality
 pub mod token_manager;
+/// Database interactions
 pub mod database;
+/// Governance functionality
 pub mod governance;
+/// Zero-knowledge proof utilities
 pub mod zk;
+/// Security validation and checks
 pub mod security;
+/// Result reporting and metrics
 pub mod reporting;
+/// Input validation utilities
 pub mod validation;
+/// Attestation and verification
+pub mod attestation;
+/// AI Assistant module for managing intelligent chaos testing
+pub mod ai_assistant;
+/// Deployment management for chaos testing targets
+pub mod deploy;
+/// RPC client implementations for blockchain interaction
+pub mod rpc;
+/// Server implementation for handling chaos test requests
+pub mod server;
+
+// Security constants from DESIGN.md 9.1
+pub const MIN_VALIDATOR_COUNT: usize = 3;
+pub const MIN_GEOGRAPHIC_REGIONS: usize = 3;
+pub const ATTESTATION_TIMEOUT_SECS: i64 = 300; // 5 minutes
+pub const MAX_COMPUTE_UNITS: u32 = 200_000;
+pub const MIN_ENTROPY_SCORE: f64 = 0.75;
 
 // Declare and export the program's entrypoint
 entrypoint!(process_instruction);
 
 // Program entrypoint implementation
+/// Process an incoming instruction
+///
+/// This is the main entry point for the program. It deserializes the instruction data
+/// and routes to the appropriate instruction processor.
+///
+/// # Arguments
+/// * `program_id` - The program ID of the Glitch Gremlin program
+/// * `accounts` - The accounts required for the instruction
+/// * `instruction_data` - The serialized instruction data
+///
+/// # Returns
+/// * `ProgramResult` - The result of processing the instruction
 pub fn process_instruction<'a>(
     program_id: &Pubkey,
     accounts: &'a [AccountInfo<'a>],
