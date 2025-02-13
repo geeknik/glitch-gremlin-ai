@@ -20,6 +20,6 @@
       "#cli/*": ["./*"]
     }
   },
-  "include": ["src/**/*", "../sdk/src/**/*.ts", "../sdk/src/**/*.d.ts"],
+  "include": ["src/**/*", "../sdk/src/**/*.ts", "../sdk/src/**/*.d.ts", "tests/**/*"],
   "exclude": ["node_modules", "dist"]
 }

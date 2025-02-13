@@ -1,5 +1,33 @@
 [toolchain]
-channel = "nightly-2024-04-04"  # Verified working with Solana 1.18+
-components = ["rustfmt", "clippy"]
-targets = ["x86_64-unknown-linux-gnu", "bpfel-unknown-none"]
+channel = "nightly-2024-02-04"
+components = [
+    "rust-src",
+    "rustfmt",
+    "clippy",
+    "llvm-tools-preview"
+]
+targets = ["sbf-solana-solana"]
 profile = "minimal"
+
+[target.'cfg(target_os = "solana")']
+rustflags = [
+    "-C", "target-feature=+solana",
+    "-C", "target-cpu=generic+solana",
+    "-C", "force-frame-pointers=yes",
+    "-C", "overflow-checks=yes",
+    "-C", "codegen-units=1",
+    "-C", "debuginfo=2",
+    "-C", "opt-level=3",
+    "-C", "lto=fat",
+    "-C", "embed-bitcode=yes",
+    "-C", "panic=abort",
+    "-C", "relocation-model=static",
+    "-C", "code-model=small",
+    "-Z", "always-encode-mir",
+    "-Z", "verify-llvm-ir=yes",
+    "--cfg", "feature=\"secure-mode\"",
+    "--cfg", "feature=\"post-quantum\"",
+    "--cfg", "feature=\"chaos-engine\"",
+    "--cfg", "feature=\"monitoring\"",
+    "--cfg", "solana_sbf"
+]

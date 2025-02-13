@@ -1,9 +1,14 @@
+cargo-features = ["codegen-backend", "profile-rustflags"]
+
 [package]
 name = "glitch-gremlin"
 version = "0.1.0"
 description = "Glitch Gremlin AI monorepo"
 edition = "2021"
 license = "MIT"
+[dependencies]
+solana-sbf-allocator = "1.17.0"
+solana-sdk = { git = "https://github.com/anza-xyz/solana-sdk.git", branch = "master", features = ["sbfv1", "borsh", "no-entrypoint"] }
 
 # Force SBF toolchain resolution
 [patch.crates-io]
@@ -65,7 +70,6 @@ anchor-spl = { version = "0.29.0", features = ["metadata", "mint", "token"] }
 ring = { version = "0.17.7", features = ["std", "alloc"] }
 zeroize = { version = "1.7.0", features = ["zeroize_derive"] }
 curve25519-dalek = { version = "4.1.1", features = ["simd_backend"] }
-ed25519-dalek = { version = "2.1.0", features = ["serde"] }
 
 # Monitoring dependencies
 metrics = { version = "0.22.1", features = ["std"] }
@@ -73,11 +77,9 @@ tracing = { version = "0.1.40", features = ["attributes", "async-await", "log", 
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "time", "local-time"] }
 tracing-futures = { version = "0.3", features = ["std-future", "futures-03", "async-await", "instrumentation"] }
 opentelemetry = { version = "0.21.0", features = ["rt-tokio", "metrics", "trace", "logs"] }
-prometheus = { version = "0.13.3", features = ["process", "push"] }
 solana-sbf-allocator = "1.17.0"  # DESIGN.md 9.3.1 Memory quarantine
 
 # Common dependencies
-borsh = "0.10.3"
 borsh-derive = "0.10.3"
 bytemuck = { version = "1.14.0", features = ["derive"] }
 thiserror = "1.0.50"
@@ -85,7 +87,6 @@ num-traits = "0.2"
 num-derive = "0.4"
 serde = { version = "1.0", features = ["derive", "std"] }
 serde_json = "1.0"
-tokio = { version = "1.36.0", features = ["full"] }
 futures = "0.3.30"
 bv = "0.11.1"
 arrayref = "0.3.7"
