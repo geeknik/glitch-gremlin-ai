@@ -1,0 +1,52 @@
+{
+    "arch": "bpf",
+    "data-layout": "e-m:e-p:64:64-i64:64-i128:128-n32:64-S128",
+    "target-endian": "little",
+    "target-pointer-width": "64",
+    "target-c-int-width": "64",
+    "os": "none",
+    "env": "",
+    "vendor": "solana",
+    "features": "+solana,+secure-mode",
+    "cpu": "generic+solana",
+    "linker-flavor": "ld.lld",
+    "linker": "solana-ldlld",
+    "llvm-target": "bpfel-unknown-none",
+    "no-compiler-rt": true,
+    "archive-format": "gnu",
+    "frame-pointer": "always",
+    "stack-probes": {
+        "kind": "inline-or-call",
+        "min-size": 4096
+    },
+    "position-independent-executables": true,
+    "static-position-independent-executables": true,
+    "relocation-model": "pic",
+    "code-model": "small",
+    "tls-model": "initial-exec",
+    "target-family": ["solana"],
+    "panic-strategy": "abort",
+    "crt-static-respected": true,
+    "crt-static-allows-dylibs": false,
+    "requires-uwtable": true,
+    "is-like-solana": true,
+    "emit-debug-gdb-scripts": false,
+    "function-sections": true,
+    "dll-prefix": "lib",
+    "dll-suffix": ".so",
+    "exe-suffix": ".so",
+    "staticlib-prefix": "lib",
+    "staticlib-suffix": ".a",
+    "pre-link-args": {
+        "ld.lld": [
+            "--Bstatic",
+            "--entry=entrypoint",
+            "--gc-sections",
+            "--merge-data-segments",
+            "--stack-first",
+            "-zstack-size=32768",
+            "-zmax-page-size=65536",
+            "--fatal-warnings"
+        ]
+    }
+} 

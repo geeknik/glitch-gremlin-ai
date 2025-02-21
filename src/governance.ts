@@ -2,6 +2,13 @@ import { Connection, Keypair, PublicKey, Transaction, TransactionInstruction } f
 import { ProposalState } from './types.js';
 import { GlitchError } from './errors.js';
 import { ErrorCode } from './governance/errors.js';
+import { loadGovernanceWallets, MULTISIG_WALLET } from './utils/configLoader';
+
+export const GOVERNANCE_PROGRAM_ID = loadGovernanceWallets()
+  .find(w => w.publicKey.toString().endsWith('PDaaYs...'))!.publicKey;
+
+export const TREASURY_WALLET = loadGovernanceWallets()
+  .find(w => w.publicKey.toString().endsWith('mAtfdn...'))!.publicKey;
 
 export interface GovernanceConfig {
     minStakeAmount: number;

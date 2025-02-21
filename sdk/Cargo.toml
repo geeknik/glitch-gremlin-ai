@@ -7,8 +7,9 @@ description = "SDK for interacting with Glitch Gremlin AI"
 license = "MIT"
 
 [dependencies]
-solana-client = "1.18.26"
-solana-sdk = "1.18.26"
-borsh = "0.10.3"
-tokio = { version = "1.0", features = ["full"] }
-glitch-shared = { path = "../src/token/shared" }
+solana-client = { git = "https://github.com/solana-labs/solana", tag = "v1.16.12" }
+solana-sdk.workspace = true
+borsh = { workspace = true, features = ["derive"] }
+tokio.workspace = true
+glitch-gremlin-shared = { path = "../src/token/shared" }
+solana-program.workspace = true
