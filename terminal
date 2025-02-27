@@ -1,3 +1,0 @@
-chmod +x scripts/build-sbf.sh
-./scripts/build-sbf.sh
-file target/sbf-solana-solana/release/glitch-gremlin-program.so
