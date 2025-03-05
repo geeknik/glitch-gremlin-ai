@@ -1,209 +1,349 @@
-import { VulnerabilityType, FuzzingResult, FuzzingMetrics, VulnerabilityInfo, SecurityLevel } from '../types.js';
+import { VulnerabilityType, FuzzingResult, FuzzingMetrics, VulnerabilityInfo, SecurityLevel, FuzzingConfig as BaseFuzzConfig, FuzzingMutation } from '../types.js';
 import { VulnerabilityAnalysis } from './types.js';
 import { ChaosGenerator, ChaosConfig, ChaosResult } from './src/chaosGenerator.js';
 import { MetricsCollector } from '../metrics/collector.js';
 import { Logger } from '../utils/logger.js';
+import { Worker } from 'worker_threads';
+import { createHash } from 'crypto';
+import { cpus } from 'os';
 
-interface FuzzInput {
+export interface FuzzConfig extends Partial<BaseFuzzConfig> {
+    targetProgram: string;
+    maxIterations: number;
+    timeoutMs: number;
+    mutationRate: number;
+    crossoverRate: number;
+    populationSize: number;
+    selectionPressure: number;
+    targetVulnerabilities: VulnerabilityType[];
+    maxAccounts: number;
+    maxDataSize: number;
+    maxSeeds: number;
+}
+
+export interface FuzzInput {
     programId: string;
     accounts: string[];
     data: Buffer;
-    seeds?: Buffer[];
-}
-
-interface FuzzMetrics {
-    successRate: number;
-    executionTime: number;
-    totalExecutions: number;
-    successfulExecutions: number;
-    failedExecutions: number;
-    uniquePaths: number;
-    coverage: number;
-    errorRate: number;
+    seeds: Buffer[];
 }
 
 interface FuzzResult {
-    success: boolean;
-    metrics: FuzzMetrics;
-    vulnerabilities: VulnerabilityAnalysis[];
-    error?: Error;
+    input: FuzzInput;
+    vulnerabilities: VulnerabilityInfo[];
+    metrics: FuzzingMetrics;
+    transactions: Array<{
+        signature: string;
+        result: string;
+    }>;
+}
+
+// Optimized Bloom filter for duplicate detection
+class BloomFilter {
+    private readonly bits: Uint8Array;
+    private readonly hashFunctions: number;
+    
+    constructor(size: number, hashFunctions: number) {
+        this.bits = new Uint8Array(Math.ceil(size / 8));
+        this.hashFunctions = hashFunctions;
+    }
+
+    private hash(value: Buffer, seed: number): number {
+        const hash = createHash('sha256')
+            .update(value)
+            .update(Buffer.from([seed]))
+            .digest();
+        return parseInt(hash.slice(0, 4).toString('hex'), 16) % (this.bits.length * 8);
+    }
+
+    add(value: Buffer): void {
+        for (let i = 0; i < this.hashFunctions; i++) {
+            const pos = this.hash(value, i);
+            this.bits[Math.floor(pos / 8)] |= 1 << (pos % 8);
+        }
+    }
+
+    test(value: Buffer): boolean {
+        for (let i = 0; i < this.hashFunctions; i++) {
+            const pos = this.hash(value, i);
+            if (!(this.bits[Math.floor(pos / 8)] & (1 << (pos % 8)))) {
+                return false;
+            }
+        }
+        return true;
+    }
 }
 
 export class Fuzzer {
-    private chaosGenerator: ChaosGenerator;
-    private metrics: MetricsCollector;
-    private config: ChaosConfig;
-    private logger: Logger;
+    private readonly config: FuzzConfig;
+    private readonly metricsCollector: MetricsCollector;
+    private readonly bloomFilter: BloomFilter;
+    private readonly workers: Worker[];
+    private readonly workerCount: number;
+    private adaptiveMutationRate: number;
 
-    constructor(config: ChaosConfig) {
+    constructor(config: FuzzConfig) {
         this.config = config;
-        this.chaosGenerator = new ChaosGenerator(config);
-        this.metrics = new MetricsCollector();
-        this.logger = new Logger('Fuzzer');
+        this.metricsCollector = new MetricsCollector();
+        this.bloomFilter = new BloomFilter(1024 * 1024, 7); // 1MB filter with 7 hash functions
+        this.workerCount = Math.max(1, cpus().length - 1); // Leave one CPU for main thread
+        this.workers = this.initializeWorkers();
+        this.adaptiveMutationRate = config.mutationRate;
     }
 
-    public async fuzz(): Promise<FuzzingResult> {
-        const result = await this.runFuzzingSession();
-        return {
-            success: result.metrics.successRate === 1,
-            vulnerabilities: result.vulnerabilities.map(v => ({
-                id: `VULN-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                name: v.type.toString(),
-                description: v.description,
-                severity: v.severity.toLowerCase() as SecurityLevel,
-                confidence: v.confidence,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-                evidence: v.evidence || [],
-                recommendation: this.getRecommendation(v.type),
-                vulnerabilityType: v.type,
-                details: {
-                    expectedValue: undefined,
-                    actualValue: undefined,
-                    location: v.location?.file,
-                    impact: v.details?.impact,
-                    likelihood: v.details?.likelihood
+    private initializeWorkers(): Worker[] {
+        const workers: Worker[] = [];
+        for (let i = 0; i < this.workerCount; i++) {
+            const worker = new Worker(`
+                const { parentPort } = require('worker_threads');
+                const { createHash } = require('crypto');
+
+                parentPort.on('message', async (input) => {
+                    try {
+                        const result = await fuzzWorker(input);
+                        parentPort.postMessage({ type: 'result', data: result });
+                    } catch (error) {
+                        parentPort.postMessage({ type: 'error', error: error.message });
+                    }
+                });
+
+                async function fuzzWorker(input) {
+                    // Worker-specific fuzzing logic
+                    const vulnerabilities = [];
+                    
+                    // Check for arithmetic overflow
+                    if (detectArithmeticOverflow(input.data)) {
+                        vulnerabilities.push({
+                            id: \`VULN-\${Date.now()}-\${Math.random().toString(36).substr(2, 9)}\`,
+                            name: 'Arithmetic Overflow',
+                            description: 'Potential arithmetic overflow detected',
+                            severity: 'HIGH',
+                            confidence: 0.9,
+                            createdAt: new Date(),
+                            updatedAt: new Date(),
+                            evidence: [input.data.toString('hex')],
+                            recommendation: 'Use checked math operations',
+                            vulnerabilityType: 'ARITHMETIC_OVERFLOW',
+                            details: {
+                                location: input.data.toString('hex'),
+                                impact: 'High',
+                                likelihood: 'Likely'
+                            }
+                        });
+                    }
+
+                    // Check for access control issues
+                    if (detectAccessControlIssue(input.accounts)) {
+                        vulnerabilities.push({
+                            id: \`VULN-\${Date.now()}-\${Math.random().toString(36).substr(2, 9)}\`,
+                            name: 'Access Control',
+                            description: 'Potential access control vulnerability',
+                            severity: 'CRITICAL',
+                            confidence: 0.85,
+                            createdAt: new Date(),
+                            updatedAt: new Date(),
+                            evidence: [JSON.stringify(input.accounts)],
+                            recommendation: 'Implement proper authorization checks',
+                            vulnerabilityType: 'ACCESS_CONTROL',
+                            details: {
+                                location: 'Account validation',
+                                impact: 'Critical',
+                                likelihood: 'Likely'
+                            }
+                        });
+                    }
+
+                    return { vulnerabilities };
                 }
-            })),
-            expectedVulnerabilities: [],
-            metrics: {
-                totalExecutions: result.metrics.totalExecutions,
-                successfulExecutions: result.metrics.successfulExecutions,
-                failedExecutions: result.metrics.failedExecutions,
-                totalTests: result.metrics.totalExecutions,
-                executionTime: result.metrics.executionTime,
-                errorRate: result.metrics.errorRate,
-                coverage: result.metrics.coverage,
-                vulnerabilitiesFound: result.vulnerabilities.map(v => v.type),
-                securityScore: this.calculateSecurityScore(result),
-                riskLevel: this.calculateRiskLevel(result.metrics.successRate),
-                averageExecutionTime: result.metrics.executionTime / result.metrics.totalExecutions,
-                peakMemoryUsage: 0, // To be implemented
-                cpuUtilization: 0, // To be implemented
-                uniquePaths: result.metrics.uniquePaths,
-                edgeCoverage: result.metrics.coverage,
-                mutationEfficiency: result.metrics.successRate
-            },
-            error: result.error
-        };
+
+                function detectArithmeticOverflow(data) {
+                    // Optimized arithmetic overflow detection using TypedArrays
+                    const view = new DataView(data.buffer);
+                    let hasOverflow = false;
+                    
+                    for (let i = 0; i < data.length - 3; i++) {
+                        const value = view.getUint32(i, true);
+                        if (value === 0xFFFFFFFF) {
+                            hasOverflow = true;
+                            break;
+                        }
+                    }
+                    
+                    return hasOverflow;
+                }
+
+                function detectAccessControlIssue(accounts) {
+                    // Check for common access control patterns
+                    const accountSet = new Set(accounts);
+                    return accountSet.size !== accounts.length;
+                }
+            `);
+            workers.push(worker);
+        }
+        return workers;
     }
 
-    private async runFuzzingSession(): Promise<FuzzResult> {
-        this.logger.info('Starting fuzzing session');
-        const startTime = Date.now();
+    private async distributeFuzzingTasks(input: FuzzInput): Promise<FuzzResult[]> {
+        const tasks = Array.from({ length: this.config.populationSize }, () => this.mutateInput(input));
+        const results: FuzzResult[] = [];
         
-        const input: FuzzInput = {
-            programId: this.config.programId,
-            accounts: [],
-            data: Buffer.from([]),
-            seeds: [Buffer.from([])]
-        };
-
-        try {
-            const result = await this.chaosGenerator.generateChaos(input);
-            const success = result.status === 'success';
-            
-            return {
-                success,
-                metrics: {
-                    successRate: success ? 1 : 0,
-                    executionTime: result.metrics.executionTime,
-                    totalExecutions: 1,
-                    successfulExecutions: success ? 1 : 0,
-                    failedExecutions: success ? 0 : 1,
-                    uniquePaths: result.metrics.uniquePaths,
-                    coverage: result.metrics.coverage,
-                    errorRate: success ? 0 : 1
-                },
-                vulnerabilities: this.mapVulnerabilities(result.findings || []),
-                error: result.error ? new Error(result.error) : undefined
-            };
-        } catch (error) {
-            return {
-                success: false,
-                metrics: {
-                    successRate: 0,
-                    executionTime: 0,
-                    totalExecutions: 1,
-                    successfulExecutions: 0,
-                    failedExecutions: 1,
-                    uniquePaths: 0,
-                    coverage: 0,
-                    errorRate: 1
-                },
-                vulnerabilities: [],
-                error: error instanceof Error ? error : new Error(String(error))
-            };
+        for (let i = 0; i < tasks.length; i += this.workerCount) {
+            const batch = tasks.slice(i, i + this.workerCount);
+            const batchPromises = batch.map((task, index) => {
+                return new Promise<FuzzResult>((resolve, reject) => {
+                    this.workers[index].postMessage(task);
+                    this.workers[index].once('message', (result) => {
+                        if (result.type === 'error') {
+                            reject(new Error(result.error));
+                        } else {
+                            resolve(result.data);
+                        }
+                    });
+                });
+            });
+            results.push(...(await Promise.all(batchPromises)));
         }
+        
+        return results;
     }
 
-    private mapVulnerabilities(findings: ChaosResult['findings']): VulnerabilityAnalysis[] {
-        return findings.map(finding => ({
-            type: this.mapFindingToVulnerabilityType(finding.type),
-            confidence: finding.confidence || 0.5,
-            severity: finding.severity,
-            description: finding.description,
-            evidence: finding.evidence,
-            metadata: finding.metadata,
-            location: finding.location,
-            details: {
-                impact: finding.impact || 'Unknown',
-                likelihood: finding.likelihood || 'Unknown',
-                exploitScenario: finding.exploitScenario,
-                recommendation: finding.recommendation || this.getRecommendation(this.mapFindingToVulnerabilityType(finding.type)),
-                references: finding.references
+    private mutateInput(input: FuzzInput): FuzzInput {
+        // Use TypedArray for efficient mutations
+        const data = new Uint8Array(input.data);
+        const mutatedData = new Uint8Array(data.length);
+        
+        // Fast bit manipulation for mutation
+        for (let i = 0; i < data.length; i++) {
+            if (Math.random() < this.adaptiveMutationRate) {
+                mutatedData[i] = data[i] ^ (1 << Math.floor(Math.random() * 8));
+            } else {
+                mutatedData[i] = data[i];
             }
-        }));
-    }
-
-    private mapFindingToVulnerabilityType(findingType: string): VulnerabilityType {
-        switch (findingType.toUpperCase()) {
-            case 'REENTRANCY': return VulnerabilityType.Reentrancy;
-            case 'ARITHMETIC_OVERFLOW': return VulnerabilityType.ArithmeticOverflow;
-            case 'ACCESS_CONTROL': return VulnerabilityType.AccessControl;
-            case 'PDA_SAFETY': return VulnerabilityType.PDASafety;
-            case 'CPI_SAFETY': return VulnerabilityType.CPISafety;
-            default: return VulnerabilityType.None;
         }
+
+        return {
+            ...input,
+            data: Buffer.from(mutatedData),
+            accounts: this.mutateAccounts(input.accounts),
+            seeds: this.mutateSeeds(input.seeds)
+        };
     }
 
-    private mapSeverityToSecurityLevel(severity: string): SecurityLevel {
-        switch (severity.toUpperCase()) {
-            case 'CRITICAL': return SecurityLevel.CRITICAL;
-            case 'HIGH': return SecurityLevel.HIGH;
-            case 'MEDIUM': return SecurityLevel.MEDIUM;
-            default: return SecurityLevel.LOW;
+    private mutateAccounts(accounts: string[]): string[] {
+        return accounts.map(account => 
+            Math.random() < this.adaptiveMutationRate
+                ? Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('hex')
+                : account
+        );
+    }
+
+    private mutateSeeds(seeds: Buffer[]): Buffer[] {
+        return seeds.map(seed => {
+            if (Math.random() < this.adaptiveMutationRate) {
+                const newSeed = Buffer.alloc(seed.length);
+                for (let i = 0; i < seed.length; i++) {
+                    newSeed[i] = seed[i] ^ (1 << Math.floor(Math.random() * 8));
+                }
+                return newSeed;
+            }
+            return seed;
+        });
+    }
+
+    private updateAdaptiveMutationRate(successRate: number): void {
+        // Adjust mutation rate based on success rate
+        const targetSuccessRate = 0.2; // 20% success rate is optimal
+        const adjustmentFactor = 0.1;
+        
+        if (successRate > targetSuccessRate) {
+            this.adaptiveMutationRate *= (1 + adjustmentFactor);
+        } else {
+            this.adaptiveMutationRate *= (1 - adjustmentFactor);
         }
+        
+        // Keep mutation rate within bounds
+        this.adaptiveMutationRate = Math.max(0.01, Math.min(0.5, this.adaptiveMutationRate));
     }
 
-    private getRecommendation(type: VulnerabilityType): string {
-        switch (type) {
-            case VulnerabilityType.Reentrancy:
-                return 'Implement checks-effects-interactions pattern and use reentrancy guards';
-            case VulnerabilityType.ArithmeticOverflow:
-                return 'Use checked math operations and implement value range validation';
-            case VulnerabilityType.AccessControl:
-                return 'Implement proper authorization checks and role-based access control';
-            case VulnerabilityType.PDASafety:
-                return 'Validate PDA derivation and verify ownership';
-            case VulnerabilityType.CPISafety:
-                return 'Validate CPI target programs and verify account permissions';
-            default:
-                return 'Review code for potential security issues and consider a security audit';
+    public async fuzz(input: FuzzInput): Promise<FuzzResult> {
+        const startTime = Date.now();
+        let iterationCount = 0;
+        let uniqueInputsCount = 0;
+        let totalSuccessfulMutations = 0;
+        const vulnerabilities = new Set<VulnerabilityInfo>();
+        const transactions = [];
+
+        while (iterationCount < this.config.maxIterations && 
+               Date.now() - startTime < this.config.timeoutMs) {
+            
+            // Parallel fuzzing using worker pool
+            const results = await this.distributeFuzzingTasks(input);
+            
+            let successfulMutations = 0;
+            for (const result of results) {
+                const inputHash = createHash('sha256')
+                    .update(JSON.stringify(result.input))
+                    .digest();
+                
+                if (!this.bloomFilter.test(inputHash)) {
+                    this.bloomFilter.add(inputHash);
+                    uniqueInputsCount++;
+                    successfulMutations++;
+                    totalSuccessfulMutations++;
+                    
+                    // Add new vulnerabilities
+                    result.vulnerabilities.forEach(v => {
+                        vulnerabilities.add(v);
+                    });
+                    
+                    // Record transaction results
+                    if (result.transactions) {
+                        transactions.push(...result.transactions);
+                    }
+                }
+            }
+            
+            // Update adaptive mutation rate
+            this.updateAdaptiveMutationRate(successfulMutations / results.length);
+            
+            iterationCount += results.length;
+            this.metricsCollector.recordMetric('fuzzer.iteration', iterationCount);
         }
+
+        // Record final metrics
+        const executionTimeMs = Date.now() - startTime;
+        this.metricsCollector.recordMetric('fuzzer.execution_time', executionTimeMs);
+        this.metricsCollector.recordMetric('fuzzer.unique_inputs', uniqueInputsCount);
+
+        return {
+            input,
+            vulnerabilities: Array.from(vulnerabilities),
+            metrics: {
+                totalExecutions: iterationCount,
+                successfulExecutions: uniqueInputsCount,
+                failedExecutions: iterationCount - uniqueInputsCount,
+                totalTests: iterationCount,
+                executionTime: executionTimeMs,
+                errorRate: (iterationCount - uniqueInputsCount) / iterationCount,
+                coverage: uniqueInputsCount / this.config.maxIterations,
+                vulnerabilitiesFound: Array.from(vulnerabilities).map(v => v.vulnerabilityType),
+                securityScore: 100 - (vulnerabilities.size * 10),
+                riskLevel: this.calculateRiskLevel(vulnerabilities.size),
+                averageExecutionTime: executionTimeMs / iterationCount,
+                peakMemoryUsage: process.memoryUsage().heapUsed,
+                cpuUtilization: process.cpuUsage().user / 1000000,
+                uniquePaths: uniqueInputsCount,
+                edgeCoverage: uniqueInputsCount / this.config.maxIterations,
+                mutationEfficiency: totalSuccessfulMutations / iterationCount
+            },
+            transactions
+        };
     }
 
-    private calculateSecurityScore(result: FuzzResult): number {
-        const baseScore = 100;
-        const vulnerabilityPenalty = result.vulnerabilities.length * 10;
-        const coveragePenalty = (1 - result.metrics.coverage) * 20;
-        return Math.max(0, baseScore - vulnerabilityPenalty - coveragePenalty);
-    }
-
-    private calculateRiskLevel(score: number): SecurityLevel {
-        if (score >= 90) return SecurityLevel.LOW;
-        if (score >= 70) return SecurityLevel.MEDIUM;
-        if (score >= 50) return SecurityLevel.HIGH;
+    private calculateRiskLevel(vulnerabilityCount: number): SecurityLevel {
+        if (vulnerabilityCount === 0) return SecurityLevel.LOW;
+        if (vulnerabilityCount <= 2) return SecurityLevel.MEDIUM;
+        if (vulnerabilityCount <= 5) return SecurityLevel.HIGH;
         return SecurityLevel.CRITICAL;
     }
 }
