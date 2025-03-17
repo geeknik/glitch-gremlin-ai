@@ -34,24 +34,6 @@ pub fn create_error_context(operation: &str, message: &str) -> (String, String) 
 
 #[error_code]
 pub enum GovernanceError {
-    #[msg("Invalid governance configuration")]
-    InvalidGovernanceConfig,
-    #[msg("Invalid stake amount")]
-    InvalidStakeAmount,
-    #[msg("Insufficient stake balance")]
-    InsufficientStake,
-    #[msg("Account already halted")]
-    AlreadyHalted,
-    #[msg("Program is halted")]
-    ProgramHalted,
-    #[msg("Invalid rate limit")]
-    InvalidRateLimit,
-    #[msg("Invalid min stake")]
-    InvalidMinStake,
-    #[msg("Invalid voting period")]
-    InvalidVotingPeriod,
-    #[msg("Proposal rate limit exceeded")]
-    ProposalRateLimitExceeded,
     #[msg("Quorum manipulation attempt")]
     QuorumManipulation,
     #[msg("Treasury exploit attempt")]
@@ -76,6 +58,94 @@ pub enum GovernanceError {
     StateManipulation,
     #[msg("Concurrent execution attempt")]
     ConcurrentExecution,
+    #[msg("Arithmetic error")]
+    ArithmeticError,
+    #[msg("Arithmetic overflow")]
+    ArithmeticOverflow,
+    #[msg("Arithmetic underflow")]
+    ArithmeticUnderflow,
+    #[msg("Invalid token mint")]
+    InvalidTokenMint,
+    #[msg("Unauthorized developer")]
+    UnauthorizedDeveloper,
+    #[msg("Invalid quorum")]
+    InvalidQuorum,
+    #[msg("Invalid threshold")]
+    InvalidThreshold,
+    #[msg("Insufficient treasury balance")]
+    InsufficientTreasuryBalance,
+    #[msg("Program is halted")]
+    ProgramHalted,
+    #[msg("Invalid parameters")]
+    InvalidParameters,
+    #[msg("Client error")]
+    ClientError,
+    #[msg("Serialization error")]
+    SerializationError,
+    #[msg("Invalid account data")]
+    InvalidAccountData,
+    #[msg("Database error")]
+    DatabaseError,
+    #[msg("Redis error")]
+    RedisError,
+    #[msg("Already voted")]
+    AlreadyVoted,
+    #[msg("Vote not found")]
+    VoteNotFound,
+    #[msg("Voting period ended")]
+    VotingPeriodEnded,
+    #[msg("Proposal not found")]
+    ProposalNotFound,
+    #[msg("Invalid proposal state")]
+    InvalidProposalState,
+    #[msg("Proposal already executed")]
+    ProposalAlreadyExecuted,
+    #[msg("Execution delay not elapsed")]
+    ExecutionDelayNotElapsed,
+    #[msg("Quorum not reached")]
+    QuorumNotReached,
+    #[msg("Approval threshold not met")]
+    ApprovalThresholdNotMet,
+    #[msg("Invalid treasury account")]
+    InvalidTreasuryAccount,
+    #[msg("Unauthorized unstake")]
+    UnauthorizedUnstake,
+    #[msg("Stake still locked")]
+    StakeStillLocked,
+    #[msg("Active votes exist")]
+    ActiveVotesExist,
+    #[msg("Not implemented")]
+    NotImplemented,
+    #[msg("Not halted")]
+    NotHalted,
+    #[msg("Already halted")]
+    AlreadyHalted,
+    #[msg("Insufficient stake")]
+    InsufficientStake,
+    #[msg("Invalid lock duration")]
+    InvalidLockDuration,
+    #[msg("Already delegated")]
+    AlreadyDelegated,
+    #[msg("Not delegated")]
+    NotDelegated,
+    #[msg("Unauthorized delegation")]
+    UnauthorizedDelegation,
+    #[msg("Invalid delegation")]
+    InvalidDelegation,
+    #[msg("Delegation chain not allowed")]
+    DelegationChainNotAllowed,
+    #[msg("Invalid proposal parameters")]
+    InvalidProposalParameters,
+    #[msg("Invalid chaos parameters")]
+    InvalidChaosParameters,
+    #[msg("Insufficient stake for proposal")]
+    InsufficientStakeForProposal,
+    #[msg("Too many active proposals")]
+    TooManyActiveProposals,
+    #[msg("Invalid governance config")]
+    InvalidGovernanceConfig,
+    #[msg("Uninitialized account")]
+    UninitializedAccount,
 }
 
 impl From<anchor_lang::error::Error> for GovernanceError {
