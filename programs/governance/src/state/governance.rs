@@ -1,42 +1,42 @@
-use {
-    anchor_lang::prelude::*,
-    solana_program::pubkey::Pubkey,
-    std::collections::HashMap,
-    super::proposal::{Proposal, ProposalStatus, ProposalAction, VoteRecord},
-    crate::error::GovernanceError,
-};
+use anchor_lang::prelude::*;
 
-#[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
+#[account]
 pub struct GovernanceParams {
-    pub min_stake_to_propose: u64,
-    pub min_stake_to_vote: u64,
-    pub voting_delay: i64,
-    pub voting_period: i64,
-    pub quorum_votes: u64,
-    pub timelock_delay: i64,
-    pub proposal_threshold: u64,
-    pub vote_threshold: u64,
     pub min_stake_amount: u64,
-    pub stake_lockup_duration: i64,
-    pub execution_delay: i64,
+    pub min_stake_duration: u64,
     pub min_proposal_stake: u64,
+    pub proposal_delay: u64,
+    pub voting_period: u64,
+    pub quorum_percentage: u8,
+    pub approval_threshold: u8,
+    pub execution_delay: u64,
+    pub grace_period: u64,
+    pub treasury_fee_bps: u16,
+    pub proposal_counter: u64,
+    pub total_stake: u64,
+    pub active_stake: u64,
+    pub total_proposals: u64,
+    pub active_proposals: u64,
 }
 
 impl Default for GovernanceParams {
     fn default() -> Self {
         Self {
-            min_stake_to_propose: 1000,
-            min_stake_to_vote: 100,
-            voting_delay: 0,
-            voting_period: 302400, // ~3.5 days
-            quorum_votes: 4_000_000,
-            timelock_delay: 172800, // 2 days
-            proposal_threshold: 100_000,
-            vote_threshold: 400_000,
             min_stake_amount: 1_000_000,
-            stake_lockup_duration: 604_800, // 7 days
+            min_stake_duration: 604_800, // 7 days
+            min_proposal_stake: 5_000_000,
+            proposal_delay: 86_400, // 1 day
+            voting_period: 302_400, // 3.5 days
+            quorum_percentage: 10,
+            approval_threshold: 60,
             execution_delay: 86_400, // 1 day
-            min_proposal_stake: 10_000_000,
+            grace_period: 43_200, // 12 hours
+            treasury_fee_bps: 100, // 1%
+            proposal_counter: 0,
+            total_stake: 0,
+            active_stake: 0,
+            total_proposals: 0,
+            active_proposals: 0,
         }
     }
 }

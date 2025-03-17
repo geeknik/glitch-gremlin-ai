@@ -1,25 +1,19 @@
 use anchor_lang::prelude::*;
-use std::collections::HashMap;
-use crate::error::{GovernanceError, Result};
 
 pub const MIN_STAKE_DURATION: i64 = 7 * 24 * 60 * 60; // 7 days
 pub const MAX_STAKE_DURATION: i64 = 365 * 24 * 60 * 60; // 1 year
-pub const MIN_STAKE_AMOUNT: u64 = 1_000_000; // 0.001 SOL
-pub const MAX_STAKE_AMOUNT: u64 = 1_000_000_000_000; // 1000 SOL
-pub const MAX_HISTORY_LENGTH: usize = 100;
+pub const MIN_STAKE_AMOUNT: u64 = 1_000_000; // 1 GREMLINAI (6 decimals)
+pub const MAX_STAKE_AMOUNT: u64 = 1_000_000_000_000; // 1,000,000 GREMLINAI
+pub const MAX_HISTORY_LENGTH: usize = 20;
 
 #[account]
-#[derive(Debug)]
 pub struct StakeAccount {
     pub owner: Pubkey,
     pub amount: u64,
-    pub last_update: i64,
-    pub is_locked: bool,
     pub locked_until: i64,
-    pub delegation: Option<Pubkey>,
     pub voting_power: u64,
-    pub rewards_earned: u64,
-    pub stake_history: Vec<StakeOperation>,
+    pub delegated_to: Option<Pubkey>,
+    pub operations: Vec<StakeOperation>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
@@ -27,15 +21,12 @@ pub struct StakeOperation {
     pub operation_type: StakeOperationType,
     pub amount: u64,
     pub timestamp: i64,
-    pub slot: u64,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq, Debug)]
 pub enum StakeOperationType {
-    Deposit,
-    Withdraw,
-    Lock,
-    Unlock,
+    Stake,
+    Unstake,
     Delegate,
     Undelegate,
 }

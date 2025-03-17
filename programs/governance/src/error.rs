@@ -94,6 +94,8 @@ pub enum GovernanceError {
     VoteNotFound,
     #[msg("Voting period ended")]
     VotingPeriodEnded,
+    #[msg("Voting period is still active")]
+    VotingPeriodActive,
     #[msg("Proposal not found")]
     ProposalNotFound,
     #[msg("Invalid proposal state")]
@@ -146,6 +148,10 @@ pub enum GovernanceError {
     InvalidGovernanceConfig,
     #[msg("Uninitialized account")]
     UninitializedAccount,
+    #[msg("Description too long")]
+    DescriptionTooLong,
+    #[msg("Execution period has ended")]
+    ExecutionPeriodEnded,
 }
 
 impl From<anchor_lang::error::Error> for GovernanceError {

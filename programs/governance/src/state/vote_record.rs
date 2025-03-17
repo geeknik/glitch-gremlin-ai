@@ -34,4 +34,14 @@ impl VoteRecord {
             voted_at: clock.unix_timestamp,
         }
     }
-} 
+} use anchor_lang::prelude::*;
+
+#[account]
+pub struct VoteRecord {
+    pub proposal_id: u64,
+    pub voter: Pubkey,
+    pub stake_account: Pubkey,
+    pub vote_weight: u64,
+    pub is_yes_vote: bool,
+    pub timestamp: i64,
+}

@@ -1,10 +1,5 @@
-use {
-    anchor_lang::prelude::*,
-    std::collections::HashMap,
-};
-use crate::error::GovernanceError;
-use crate::state::{ProposalState, ProposalStatus, ProposalAction, ProposalVotingState, ProposalMetadata};
-use crate::chaos::chaos_types::ChaosType;
+use anchor_lang::prelude::*;
+use super::ChaosParams;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, AnchorSerialize, AnchorDeserialize)]
 pub enum ProposalState {
@@ -43,40 +38,49 @@ impl VoteRecord {
 }
 
 #[account]
-#[derive(Debug)]
 pub struct Proposal {
-    pub is_initialized: bool,
+    pub id: u64,
     pub proposer: Pubkey,
     pub title: String,
     pub description: String,
     pub created_at: i64,
-    pub voting_starts_at: i64,
-    pub voting_ends_at: i64,
-    pub execution_time: Option<i64>,
-    pub executed_at: Option<i64>,
-    pub canceled_at: Option<i64>,
-    pub yes_votes: u64,
-    pub no_votes: u64,
-    pub abstain_votes: u64,
-    pub state: ProposalState,
-    pub status: ProposalStatus,
-    pub action: ProposalAction,
-    pub voting_state: ProposalVotingState,
-    pub metadata: ProposalMetadata,
-    pub total_stake_snapshot: u64,
-    pub unique_voters: u64,
-    pub stake_mint: Pubkey,
+    pub voting_start: i64,
+    pub voting_end: i64,
+    pub execution_deadline: i64,
+    pub votes_for: u64,
+    pub votes_against: u64,
+    pub status: u8, // 0=Active, 1=Succeeded, 2=Defeated, 3=Executed, 4=Expired
+    pub executed: bool,
+    pub execution_time: i64,
+    pub action: Option<ProposalAction>,
+    pub chaos_parameters: Option<ChaosParams>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
-pub struct ChaosParameters {
-    pub chaos_type: ChaosType,
-    pub target_program: Pubkey,
-    pub requires_treasury_funding: bool,
-    pub treasury_amount: u64,
-    pub max_duration: i64,
-    pub rate_limit: u32,
-    pub concurrent_tests: u8,
+pub enum ProposalAction {
+    UpdateConfig {
+        min_stake_amount: Option<u64>,
+        min_stake_duration: Option<u64>,
+        min_proposal_stake: Option<u64>,
+        proposal_delay: Option<u64>,
+        voting_period: Option<u64>,
+        quorum_percentage: Option<u8>,
+        approval_threshold: Option<u8>,
+        execution_delay: Option<u64>,
+        grace_period: Option<u64>,
+        treasury_fee_bps: Option<u16>,
+    },
+    ExecuteChaos {
+        params: ChaosParams,
+    },
+    TransferFunds {
+        amount: u64,
+        destination: Pubkey,
+    },
+    EmergencyAction {
+        action_type: u8, // 0=Halt, 1=Resume, 2=BlockAddress
+        target: Option<Pubkey>,
+    },
 }
 
 impl Proposal {

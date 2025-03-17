@@ -4,8 +4,6 @@ use std::collections::HashMap;
 
 // Module declarations
 pub mod governance;
-pub mod governance_state;
-pub mod governance_metrics;
 pub mod proposal;
 pub mod stake_account;
 pub mod vote_record;
@@ -134,8 +132,6 @@ pub struct ProposalMetadata {
 
 // Re-export all types
 pub use governance::*;
-pub use governance_state::*;
-pub use governance_metrics::*;
 pub use proposal::*;
 pub use stake_account::*;
 pub use vote_record::*;
