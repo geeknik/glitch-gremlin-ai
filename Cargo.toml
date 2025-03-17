@@ -4,6 +4,10 @@ members = [
     "programs/*"
 ]
 
+[[bin]]
+name = "git_helper"
+path = "programs/governance/src/bin/git_helper.rs"
+
 [profile.release]
 overflow-checks = true
 lto = "fat"

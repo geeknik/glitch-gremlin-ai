@@ -5,6 +5,7 @@ use std::convert::TryInto;
 
 pub mod error;
 pub mod state;
+pub mod git_utils;
 
 // Re-export core types from state module
 pub use state::{
