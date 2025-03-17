@@ -71,6 +71,17 @@ pub struct GovernanceVote {
     pub timestamp: i64,
 }
 
+#[account]
+pub struct LoyaltyTracker {
+    pub holder: Pubkey,          // User's wallet address
+    pub last_sell_timestamp: i64,// Unix timestamp of last sell
+    pub consecutive_holds: u8,   // Number of consecutive periods held
+    pub penalty_bps: u16,        // Basis points penalty (0-10000)
+    pub reward_multiplier: u16,  // Reward multiplier in basis points (10000 = 1x)
+    pub total_held: u64,         // Total tokens currently held
+    pub snapshot_epoch: u8,      // Epoch of last loyalty snapshot
+}
+
 pub use error::GovernanceError;
 
 declare_id!("GGremN5xG5gx3VQ8CqpVX1EdfxQt5u4ij1fF8GGR8zf");
@@ -80,6 +91,7 @@ pub const GOVERNANCE_SEED: &[u8] = b"governance";
 pub const STAKE_INFO_SEED: &[u8] = b"stake_info";
 pub const PROPOSAL_SEED: &[u8] = b"proposal";
 pub const TREASURY_SEED: &[u8] = b"treasury";
+pub const LOYALTY_SEED: &[u8] = b"loyalty";
 pub const DEFAULT_PROPOSAL_RATE_LIMIT: u64 = 5;
 pub const DEFAULT_PROPOSAL_RATE_WINDOW: i64 = 24 * 60 * 60; // 24 hours
 pub const GREMLINAI_TOKEN_MINT: &str = "Bx6XZrN7pjbDA5wkiKagbbyHSr1jai45m8peSSmJpump";
@@ -192,9 +204,157 @@ pub struct ChaosExecutionEvent {
     pub timestamp: i64,
 }
 
+#[event]
+pub struct LoyaltyEvent {
+    pub holder: Pubkey,
+    pub action_type: String,
+    pub penalty_bps: u16,
+    pub reward_multiplier: u16,
+    pub total_held: u64,
+    pub timestamp: i64,
+}
+
 #[program]
 pub mod glitch_gremlin_governance {
     use super::*;
+
+    pub fn initialize_loyalty_tracker(ctx: Context<InitializeLoyalty>) -> Result<()> {
+        let loyalty = &mut ctx.accounts.loyalty_tracker;
+        let clock = Clock::get()?;
+        
+        loyalty.holder = ctx.accounts.user_authority.key();
+        loyalty.last_sell_timestamp = 0;
+        loyalty.consecutive_holds = 0;
+        loyalty.penalty_bps = 0;
+        loyalty.reward_multiplier = 10000; // 1x base multiplier
+        loyalty.total_held = ctx.accounts.user_token_account.amount;
+        loyalty.snapshot_epoch = 0;
+        
+        emit!(LoyaltyEvent {
+            holder: loyalty.holder,
+            action_type: "initialize".to_string(),
+            penalty_bps: loyalty.penalty_bps,
+            reward_multiplier: loyalty.reward_multiplier,
+            total_held: loyalty.total_held,
+            timestamp: clock.unix_timestamp,
+        });
+        
+        Ok(())
+    }
+    
+    pub fn transfer_tokens(ctx: Context<TransferTokens>, amount: u64) -> Result<()> {
+        let loyalty = &mut ctx.accounts.loyalty_tracker;
+        let clock = Clock::get()?;
+        
+        // Detect sell behavior (>10% of balance)
+        if amount > ctx.accounts.from.amount.checked_div(10).unwrap_or(0) {
+            // Apply progressive penalty
+            loyalty.penalty_bps = loyalty.penalty_bps
+                .saturating_add(500) // 5% penalty increase
+                .min(5000); // Max 50% penalty
+            
+            loyalty.last_sell_timestamp = clock.unix_timestamp;
+            loyalty.consecutive_holds = 0;
+            
+            // Enforce cooldown period
+            if clock.unix_timestamp - loyalty.last_sell_timestamp < 86400 {
+                return Err(GovernanceError::ExcessiveSelling.into());
+            }
+        } else {
+            // Reward long-term holding
+            if clock.unix_timestamp - loyalty.last_sell_timestamp > 2592000 { // 30 days
+                loyalty.consecutive_holds = loyalty.consecutive_holds.saturating_add(1);
+                loyalty.reward_multiplier = 10000 // Base
+                    .saturating_add((loyalty.consecutive_holds as u16) * 500) // +5% per period
+                    .min(20000); // Max 2x
+            }
+        }
+
+        // Update holdings tracking
+        loyalty.total_held = ctx.accounts.from.amount
+            .checked_sub(amount)
+            .ok_or(GovernanceError::ArithmeticOverflow)?;
+
+        emit!(LoyaltyEvent {
+            holder: loyalty.holder,
+            action_type: "transfer".to_string(),
+            penalty_bps: loyalty.penalty_bps,
+            reward_multiplier: loyalty.reward_multiplier,
+            total_held: loyalty.total_held,
+            timestamp: clock.unix_timestamp,
+        });
+
+        // Proceed with transfer
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.from.to_account_info(),
+                    to: ctx.accounts.to.to_account_info(),
+                    authority: ctx.accounts.authority.to_account_info(),
+                },
+            ),
+            amount,
+        )
+    }
+    
+    pub fn claim_rewards(ctx: Context<ClaimRewards>) -> Result<()> {
+        let loyalty = &ctx.accounts.loyalty_tracker;
+        let clock = Clock::get()?;
+        
+        // Enforce loyalty requirements
+        require!(
+            loyalty.penalty_bps == 0 
+            || clock.unix_timestamp - loyalty.last_sell_timestamp > 2592000,
+            GovernanceError::SellPenaltyActive
+        );
+        
+        // Calculate adjusted rewards
+        let base_rewards = ctx.accounts.rewards_vault.amount;
+        let adjusted = base_rewards
+            .checked_mul(loyalty.reward_multiplier.into())
+            .ok_or(GovernanceError::ArithmeticOverflow)?
+            .checked_div(10000)
+            .ok_or(GovernanceError::ArithmeticOverflow)?;
+        
+        // Transfer rewards logic would go here
+        // This is a placeholder for the actual reward distribution
+        
+        emit!(LoyaltyEvent {
+            holder: loyalty.holder,
+            action_type: "claim_rewards".to_string(),
+            penalty_bps: loyalty.penalty_bps,
+            reward_multiplier: loyalty.reward_multiplier,
+            total_held: loyalty.total_held,
+            timestamp: clock.unix_timestamp,
+        });
+        
+        Ok(())
+    }
+    
+    pub fn update_loyalty_snapshot(ctx: Context<UpdateLoyaltySnapshot>) -> Result<()> {
+        let loyalty = &mut ctx.accounts.loyalty_tracker;
+        let clock = Clock::get()?;
+        
+        // Update snapshot epoch
+        loyalty.snapshot_epoch = loyalty.snapshot_epoch.saturating_add(1);
+        
+        // Reset penalties if enough time has passed
+        if clock.unix_timestamp - loyalty.last_sell_timestamp > 7776000 { // 90 days
+            loyalty.penalty_bps = 0;
+        }
+        
+        emit!(LoyaltyEvent {
+            holder: loyalty.holder,
+            action_type: "snapshot".to_string(),
+            penalty_bps: loyalty.penalty_bps,
+            reward_multiplier: loyalty.reward_multiplier,
+            total_held: loyalty.total_held,
+            timestamp: clock.unix_timestamp,
+        });
+        
+        Ok(())
+    }
 
     pub fn initialize_governance(ctx: Context<InitializeGovernance>) -> Result<()> {
         let config = &mut ctx.accounts.config;
@@ -707,6 +867,104 @@ pub struct ExecuteProposal<'info> {
     
     #[account(mut)]
     pub executor: Signer<'info>,
+    
+    pub clock: Sysvar<'info, Clock>,
+}
+
+#[derive(Accounts)]
+pub struct InitializeLoyalty<'info> {
+    #[account(
+        init,
+        payer = user_authority,
+        space = 8 + 32 + 8 + 1 + 2 + 2 + 8 + 1,
+        seeds = [LOYALTY_SEED, user_authority.key().as_ref()],
+        bump
+    )]
+    pub loyalty_tracker: Account<'info, LoyaltyTracker>,
+    
+    #[account(
+        constraint = user_token_account.owner == user_authority.key(),
+        constraint = user_token_account.mint == Pubkey::from_str(GREMLINAI_TOKEN_MINT).unwrap()
+    )]
+    pub user_token_account: Account<'info, TokenAccount>,
+    
+    #[account(mut)]
+    pub user_authority: Signer<'info>,
+    
+    pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
+    pub clock: Sysvar<'info, Clock>,
+}
+
+#[derive(Accounts)]
+pub struct TransferTokens<'info> {
+    #[account(mut)]
+    pub from: Account<'info, TokenAccount>,
+    
+    #[account(mut)]
+    pub to: Account<'info, TokenAccount>,
+    
+    #[account(
+        mut,
+        constraint = authority.key() == from.owner
+    )]
+    pub authority: Signer<'info>,
+    
+    #[account(
+        mut,
+        seeds = [LOYALTY_SEED, authority.key().as_ref()],
+        bump,
+        constraint = loyalty_tracker.holder == authority.key()
+    )]
+    pub loyalty_tracker: Account<'info, LoyaltyTracker>,
+    
+    pub token_program: Program<'info, Token>,
+    pub clock: Sysvar<'info, Clock>,
+}
+
+#[derive(Accounts)]
+pub struct ClaimRewards<'info> {
+    #[account(
+        seeds = [LOYALTY_SEED, authority.key().as_ref()],
+        bump,
+        constraint = loyalty_tracker.holder == authority.key()
+    )]
+    pub loyalty_tracker: Account<'info, LoyaltyTracker>,
+    
+    #[account(
+        mut,
+        constraint = rewards_vault.mint == Pubkey::from_str(GREMLINAI_TOKEN_MINT).unwrap()
+    )]
+    pub rewards_vault: Account<'info, TokenAccount>,
+    
+    #[account(
+        mut,
+        constraint = user_token_account.owner == authority.key(),
+        constraint = user_token_account.mint == Pubkey::from_str(GREMLINAI_TOKEN_MINT).unwrap()
+    )]
+    pub user_token_account: Account<'info, TokenAccount>,
+    
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    
+    pub token_program: Program<'info, Token>,
+    pub clock: Sysvar<'info, Clock>,
+}
+
+#[derive(Accounts)]
+pub struct UpdateLoyaltySnapshot<'info> {
+    #[account(
+        mut,
+        seeds = [LOYALTY_SEED, holder.key().as_ref()],
+        bump,
+        constraint = loyalty_tracker.holder == holder.key()
+    )]
+    pub loyalty_tracker: Account<'info, LoyaltyTracker>,
+    
+    pub holder: SystemAccount<'info>,
+    
+    #[account(mut)]
+    pub authority: Signer<'info>,
     
     pub clock: Sysvar<'info, Clock>,
 }

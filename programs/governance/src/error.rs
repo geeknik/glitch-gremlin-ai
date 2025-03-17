@@ -152,6 +152,14 @@ pub enum GovernanceError {
     DescriptionTooLong,
     #[msg("Execution period has ended")]
     ExecutionPeriodEnded,
+    #[msg("Account has sell penalty restrictions")]
+    SellPenaltyActive,
+    #[msg("Insufficient loyalty score for this action")]
+    InsufficientLoyalty,
+    #[msg("Loyalty snapshot is still pending")]
+    SnapshotPending,
+    #[msg("Too many sells in grace period")]
+    ExcessiveSelling,
 }
 
 impl From<anchor_lang::error::Error> for GovernanceError {
