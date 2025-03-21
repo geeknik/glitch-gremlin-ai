@@ -1,25 +1,12 @@
-const { Config } = require('@jest/types');
-/** @type {import('@jest/types').Config.InitialOptions} */
-const config = {
+import type { Config } from '@jest/types';
+
+const config: Config.InitialOptions = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   roots: ['<rootDir>/sdk/src', '<rootDir>/cli/src'],
   testMatch: [
     '**/src/**/__tests__/**/*.[jt]s?(x)',
     '**/src/**/?(*.)+(spec|test|tests).[jt]s?(x)'
-  ],
-  transform: {
-    '^.+\\.tsx?$': ['ts-jest', {
-      tsconfig: 'tsconfig.json',
-      useESM: true,
-      isolatedModules: true
-    }],
-    '^.+\\.jsx?$': ['babel-jest', {
-      presets: ['@babel/preset-env']
-    }]
-  },
-  transformIgnorePatterns: [
-    '/node_modules/(?!(crypto-random-string)/)'
   ],
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
@@ -29,12 +16,22 @@ const config = {
     '#cli/(.*)': '<rootDir>/cli/$1',
     '^@/(.*)$': '<rootDir>/sdk/src/$1',
     '^@ai/(.*)$': '<rootDir>/sdk/src/ai/$1',
+    '^@solana/web3.js$': '<rootDir>/sdk/src/__mocks__/@solana/web3.ts',
+    '^@tensorflow/tfjs-node$': '<rootDir>/sdk/src/ai/__mocks__/tfjs-node.ts'
+  },
+  transform: {
+    '^.+\\.tsx?$': ['ts-jest', {
+      tsconfig: 'tsconfig.json',
+      useESM: true,
+      isolatedModules: true,
+      diagnostics: false
+    }],
+    '^.+\\.jsx?$': ['babel-jest', {
+      presets: ['@babel/preset-env']
+    }]
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node', 'mjs'],
-  extensionsToTreatAsEsm: ['.ts', '.tsx'],
-  setupFilesAfterEnv: [
-    '<rootDir>/jest.setup.ts'
-  ],
+  extensionsToTreatAsEsm: ['.ts', '.tsx', '.jsx'],
   testPathIgnorePatterns: [
     '/node_modules/',
     '/dist/',
@@ -55,7 +52,15 @@ const config = {
   clearMocks: true,
   restoreMocks: true,
   resetMocks: true,
-  automock: false
+  automock: false,
+  detectOpenHandles: true,
+  transformIgnorePatterns: [
+    'node_modules/(?!(@solana/web3.js|crypto-random-string)/)'
+  ],
+  resolver: '<rootDir>/jest.resolver.mjs',
+  setupFilesAfterEnv: [
+    '<rootDir>/jest.setup.ts'
+  ]
 };
 
-module.exports = config;
+export default config;
