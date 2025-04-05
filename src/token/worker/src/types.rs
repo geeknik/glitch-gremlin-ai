@@ -1,6 +1,56 @@
 use serde::{Serialize, Deserialize};
-use crate::chaos_engine::TestType;
 use solana_program::pubkey::Pubkey;
+use std::sync::Arc;
+use dashmap::DashMap;
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ThreatLevel {
+    None,
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum DefenseAction {
+    NoAction,
+    LogOnly,
+    Throttle,
+    PartialLockdown,
+    FullLockdown,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttackVector {
+    pub pattern: Vec<u8>,
+    pub severity: ThreatLevel,
+    pub signature: [u8; 64],
+    pub last_used_slot: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransactionData {
+    pub accounts: Vec<AccountMeta>,
+    pub instruction_data: Vec<u8>,
+    pub program_id: Pubkey,
+    pub signatures: Vec<[u8; 64]>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AccountMeta {
+    pub pubkey: Pubkey,
+    pub is_signer: bool,
+    pub is_writable: bool,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct DefenseState {
+    pub threat_level: ThreatLevel,
+    pub lockdown_until: Option<u64>,
+}
+
+// Existing types below...
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SecurityLevel {
