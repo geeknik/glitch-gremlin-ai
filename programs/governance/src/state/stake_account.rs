@@ -14,6 +14,8 @@ pub struct StakeAccount {
     pub voting_power: u64,
     pub delegated_to: Option<Pubkey>,
     pub operations: Vec<StakeOperation>,
+    pub malicious_attempts: u8,
+    pub last_slash_time: i64,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
@@ -29,6 +31,7 @@ pub enum StakeOperationType {
     Unstake,
     Delegate,
     Undelegate,
+    Slash,
 }
 
 impl StakeAccount {
@@ -43,6 +46,8 @@ impl StakeAccount {
             voting_power: 0,
             rewards_earned: 0,
             stake_history: Vec::new(),
+            malicious_attempts: 0,
+            last_slash_time: 0,
         }
     }
 
@@ -295,6 +300,40 @@ impl StakeAccount {
     pub fn get_total_rewards(&self) -> u64 {
         self.rewards_earned
     }
+
+    pub fn apply_slash(&mut self, slash_percent: u8) -> Result<(), GovernanceError> {
+        // Validate slash percentage
+        if slash_percent > 100 {
+            return Err(GovernanceError::InvalidSlashPercentage);
+        }
+
+        let clock = Clock::get()?;
+        let slash_amount = self.amount
+            .checked_mul(slash_percent as u64)
+            .and_then(|v| v.checked_div(100))
+            .ok_or(GovernanceError::ArithmeticOverflow)?;
+
+        self.amount = self.amount
+            .checked_sub(slash_amount)
+            .ok_or(GovernanceError::ArithmeticUnderflow)?;
+
+        self.voting_power = self.calculate_voting_power()?;
+        self.malicious_attempts += 1;
+        self.last_slash_time = clock.unix_timestamp;
+
+        self.record_operation(StakeOperation {
+            operation_type: StakeOperationType::Slash,
+            amount: slash_amount,
+            timestamp: clock.unix_timestamp,
+        });
+
+        Ok(())
+    }
+
+    pub fn time_since_last_slash(&self) -> Result<i64, GovernanceError> {
+        let clock = Clock::get()?;
+        Ok(clock.unix_timestamp.saturating_sub(self.last_slash_time))
+    }
 }
 
 #[error_code]
@@ -313,4 +352,6 @@ pub enum StakeError {
     AlreadyDelegated,
     #[msg("Account is not delegated")]
     NotDelegated,
+    #[msg("Invalid slash percentage")]
+    InvalidSlashPercentage,
 } 
