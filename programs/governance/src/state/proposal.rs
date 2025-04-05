@@ -5,12 +5,21 @@ use super::ChaosParams;
 pub enum ProposalState {
     Draft,
     Active,
-    Canceled,
-    Defeated,
     Succeeded,
-    Queued,
-    Expired,
     Executed,
+    Defeated,
+    Canceled,
+    Expired,
+}
+
+impl ProposalState {
+    pub fn is_active(&self) -> bool {
+        matches!(self, ProposalState::Active)
+    }
+
+    pub fn is_executable(&self) -> bool {
+        matches!(self, ProposalState::Succeeded)
+    }
 }
 
 #[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
