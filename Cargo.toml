@@ -1,7 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
-    "programs/*"
+    "programs/*",
+    "programs/security"
 ]
 
 [[bin]]
@@ -34,3 +35,7 @@ solana-banks-interface = "1.18"
 solana-banks-client = "1.18"
 solana-runtime = "1.18"
 bs58 = "0.5.0"
+merlin = "3.0.0"  # For cryptographic transcripts
+blake3 = "1.3"    # For fast hashing
+thiserror = "1.0" # For error handling
+arrayref = "0.3.6" # For byte array operations
