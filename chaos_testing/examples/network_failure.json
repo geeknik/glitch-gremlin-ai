@@ -1,0 +1,32 @@
+{
+    "version": "1.0.0",
+    "title": "Network Latency Test",
+    "description": "Simulate network latency for payment service",
+    "actions": [
+        {
+            "type": "network:latency",
+            "name": "add-network-latency",
+            "provider": {
+                "type": "python",
+                "module": "chaostoolkit.network",
+                "arguments": {
+                    "latency": 2000,
+                    "jitter": 500,
+                    "duration": 300
+                }
+            }
+        }
+    ],
+    "safeguards": [
+        {
+            "name": "max-latency",
+            "provider": {
+                "type": "python",
+                "module": "chaos_testing.safeguards",
+                "arguments": {
+                    "max_latency": 5000
+                }
+            }
+        }
+    ]
+}
