@@ -32,8 +32,29 @@ pub fn create_error_context(operation: &str, message: &str) -> (String, String) 
     (operation.to_string(), message.to_string())
 }
 
+#[derive(Debug)]
+pub struct ResourceLimitContext {
+    pub memory_mb: u32,
+    pub cpu_cores: u32,
+    pub compute_units: u64,
+}
+
 #[error_code]
 pub enum GovernanceError {
+    #[msg("Resource limits exceeded: {0}")]
+    ResourceLimitExceeded(String),
+    
+    #[msg("Security context violation: {0}")]
+    SecurityContextViolation(String),
+    
+    #[msg("Invalid execution proof")]
+    InvalidExecutionProof,
+    
+    #[msg("Untrusted execution environment")]
+    UntrustedEnvironment,
+    
+    #[msg("Memory safety violation")]
+    MemorySafetyViolation,
     #[msg("Quorum manipulation attempt")]
     QuorumManipulation,
     #[msg("Treasury exploit attempt")]
@@ -166,6 +187,19 @@ impl From<anchor_lang::error::Error> for GovernanceError {
     fn from(err: anchor_lang::error::Error) -> Self {
         msg!("Anchor error: {:?}", err);
         GovernanceError::InvalidParameters
+    }
+}
+
+impl From<SecurityError> for GovernanceError {
+    fn from(err: SecurityError) -> Self {
+        match err {
+            SecurityError::PromptInjection(e) => GovernanceError::SecurityContextViolation(e),
+            SecurityError::InvalidInstruction(e) => GovernanceError::InstructionInjection(e),
+            SecurityError::MaliciousAccount(e) => GovernanceError::StateManipulation(e),
+            SecurityError::UntrustedProgram(e) => GovernanceError::UntrustedEnvironment,
+            SecurityError::ResourceLimitExceeded(e) => GovernanceError::ResourceLimitExceeded(e),
+            SecurityError::SecurityContextViolation(e) => GovernanceError::SecurityContextViolation(e),
+        }
     }
 }
 

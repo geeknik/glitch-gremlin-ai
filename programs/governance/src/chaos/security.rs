@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use thiserror::Error;
+use bs58;
 
 #[derive(Error, Debug)]
 pub enum SecurityError {
@@ -12,6 +13,10 @@ pub enum SecurityError {
     MaliciousAccount(String),
     #[error("Untrusted program invocation: {0}")]
     UntrustedProgram(String),
+    #[error("Resource limit exceeded: {0}")]
+    ResourceLimitExceeded(String),
+    #[error("Security context violation: {0}")]
+    SecurityContextViolation(String),
 }
 
 /// Security sanitizer for AI interactions and program inputs
@@ -26,6 +31,14 @@ pub struct SecuritySanitizer {
     blocked_prompts: HashSet<String>,
 }
 
+#[derive(Debug, Clone)]
+pub struct ResourceLimits {
+    pub max_memory_mb: u32,
+    pub max_cpu_cores: u32,
+    pub max_duration_secs: u64,
+    pub max_compute_units: u64,
+}
+
 impl SecuritySanitizer {
     pub fn new() -> Self {
         let mut sanitizer = Self {
@@ -38,6 +51,63 @@ impl SecuritySanitizer {
         // Initialize security rules
         sanitizer.initialize_security_rules();
         sanitizer
+    }
+
+    pub fn check_instruction_firewall(&self, instruction_data: &[u8]) -> Result<(), SecurityError> {
+        let blocked_cpi_targets = [
+            "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+            "Stake11111111111111111111111111111111111111",
+            "Sysvar1111111111111111111111111111111111111",
+            "Vote111111111111111111111111111111111111111"
+        ];
+        
+        if instruction_data.len() >= 32 {
+            let program_id = &instruction_data[0..32];
+            let program_id_str = bs58::encode(program_id).into_string();
+            
+            if blocked_cpi_targets.contains(&program_id_str.as_str()) {
+                return Err(SecurityError::UntrustedProgram(
+                    format!("Blocked CPI target: {}", program_id_str)
+                ));
+            }
+        }
+        
+        let banned_patterns = &[
+            vec![0x08, 0x00, 0x00, 0x00],
+            vec![0x09, 0x00, 0x00, 0x00]  
+        ];
+        
+        for pattern in banned_patterns {
+            if instruction_data.windows(pattern.len()).any(|w| w == pattern) {
+                return Err(SecurityError::InvalidInstruction(
+                    "Blocked syscall pattern detected".to_string()
+                ));
+            }
+        }
+        
+        Ok(())
+    }
+
+    pub fn enforce_resource_limits(&self, limits: &ResourceLimits) -> Result<(), SecurityError> {
+        if limits.max_memory_mb > 2048 {
+            return Err(SecurityError::ResourceLimitExceeded(
+                format!("Memory limit exceeded: {}MB", limits.max_memory_mb)
+            ));
+        }
+        
+        if limits.max_cpu_cores > 1 {
+            return Err(SecurityError::ResourceLimitExceeded(
+                format!("CPU core limit exceeded: {}", limits.max_cpu_cores)
+            ));
+        }
+        
+        if limits.max_compute_units > 1_400_000 {
+            return Err(SecurityError::ResourceLimitExceeded(
+                format!("Compute units exceeded: {}", limits.max_compute_units)
+            ));
+        }
+        
+        Ok(())
     }
 
     fn initialize_security_rules(&mut self) {

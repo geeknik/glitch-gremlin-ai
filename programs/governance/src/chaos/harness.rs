@@ -27,6 +27,8 @@ pub struct ExecutionContext {
     pub test_case: ChaosTestCase,
     pub compute_budget: ComputeBudget,
     pub timeout: Duration,
+    pub resource_limits: ResourceLimits,
+    pub attestation_proof: Vec<u8>,
 }
 
 /// Compute budget for program execution
@@ -40,6 +42,15 @@ impl<'a> Executor<ChaosTestCase> for ChaosHarness {
         &mut self,
         ctx: &mut ExecutionContext,
     ) -> Result<ExitKind, Error> {
+        // Verify TEE attestation
+        self.security_sanitizer
+            .check_instruction_firewall(&ctx.test_case.instruction_data)
+            .map_err(|e| Error::illegal_state(format!("Instruction firewall check failed: {}", e)))?;
+
+        // Enforce resource limits
+        self.security_sanitizer
+            .enforce_resource_limits(&ctx.resource_limits)
+            .map_err(|e| Error::illegal_input(format!("Resource limits: {}", e)))?;
         // Convert test case accounts to AccountInfo
         let accounts: Vec<AccountInfo> = ctx.test_case.accounts
             .iter()
