@@ -41,6 +41,20 @@ pub struct ResourceLimitContext {
 
 #[error_code]
 pub enum GovernanceError {
+    #[msg("Voting period is closed")]
+    VotingPeriodClosed,
+    #[msg("Proposal is not in active state")]
+    ProposalNotActive,
+    #[msg("Insufficient stake for this action")]
+    InsufficientStake,
+    #[msg("Voting duration exceeds maximum allowed")]
+    InvalidVotingDuration,
+    #[msg("Quorum threshold below minimum requirement")]
+    InvalidQuorumThreshold,
+    #[msg("Proposal is not in executable state")]
+    ProposalNotExecutable,
+    #[msg("Execution delay period has not elapsed")]
+    ExecutionDelayActive,
     #[msg("Resource limits exceeded: {0}")]
     ResourceLimitExceeded(String),
     

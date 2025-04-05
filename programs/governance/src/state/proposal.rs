@@ -37,23 +37,50 @@ impl VoteRecord {
     }
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+pub enum ProposalType {
+    ParameterChange,
+    ChaosCampaign,
+    TreasuryManagement,
+    ProtocolUpgrade,
+}
+
 #[account]
 pub struct Proposal {
     pub id: u64,
     pub proposer: Pubkey,
+    pub proposal_type: ProposalType,
     pub title: String,
     pub description: String,
     pub created_at: i64,
     pub voting_start: i64,
     pub voting_end: i64,
     pub execution_deadline: i64,
+    pub execution_delay: i64,
     pub votes_for: u64,
     pub votes_against: u64,
-    pub status: u8, // 0=Active, 1=Succeeded, 2=Defeated, 3=Executed, 4=Expired
+    pub abstain_votes: u64,
+    pub min_quorum: u64,
+    pub staked_tokens: u64,
+    pub status: ProposalStatus,
     pub executed: bool,
     pub execution_time: i64,
     pub action: Option<ProposalAction>,
     pub chaos_parameters: Option<ChaosParams>,
+}
+
+impl Proposal {
+    pub fn calculate_vote_weight(&self, voting_power: u64, current_time: i64) -> Result<u64> {
+        if current_time < self.voting_start || current_time > self.voting_end {
+            return Err(GovernanceError::VotingPeriodClosed.into());
+        }
+
+        let remaining_duration = (self.voting_end - current_time) as f64;
+        let total_duration = (self.voting_end - self.voting_start) as f64;
+        let weight = (voting_power as f64 * (remaining_duration / total_duration).sqrt()) as u64;
+        
+        Ok(weight)
+    }
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
