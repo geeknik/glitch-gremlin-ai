@@ -4,61 +4,139 @@ use solana_program::{
     pubkey::Pubkey,
     program_error::ProgramError,
     sysvar::clock::Clock,
+    msg,
 };
 use borsh::{BorshSerialize, BorshDeserialize};
+use std::collections::HashMap;
+
+const CREATOR_SHARE: u64 = 20; // 20% of incoming funds
+const INSURANCE_SHARE: u64 = 15; // 15% 
+const OPERATIONAL_SHARE: u64 = 10; // 10%
+const YIELD_STRATEGIES_SHARE: u64 = 55; // 55%
+
+#[derive(BorshSerialize, BorshDeserialize, Debug)]
+pub enum FundType {
+    Insurance,
+    Creator,
+    Operational,
+    Strategy(Pubkey),
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug)]
+pub struct PaymentSchedule {
+    pub recipient: Pubkey,
+    pub amount: u64,
+    pub frequency: u64,
+    pub next_payment: i64,
+    pub fund_type: FundType,
+}
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
 pub struct WithdrawalRequest {
     pub amount: u64,
     pub destination: Pubkey,
+    pub fund_type: FundType,
     pub approvals: Vec<Pubkey>,
     pub created_at: i64,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
-pub struct SecurityState {
-    pub anomaly_score: f32,
+pub struct TreasurySecurity {
     pub circuit_breaker: bool,
+    pub last_ai_audit: i64,
+    pub ai_model_hash: [u8; 32],
     pub required_approvals: u8,
+    pub anomaly_score: f32,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug)]
+pub struct TreasuryFunds {
+    pub insurance_pool: u64,
+    pub creator_fund: u64,
+    pub operational_reserves: u64,
+    pub yield_strategies: HashMap<Pubkey, u64>, // Strategy account -> amount
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
 pub struct TreasuryVault {
-    pub balance: u64,
+    pub funds: TreasuryFunds,
+    pub security: TreasurySecurity,
     pub withdrawal_queue: Vec<WithdrawalRequest>,
-    pub security_state: SecurityState,
-    pub last_audit_timestamp: i64,
+    pub payment_schedules: Vec<PaymentSchedule>,
 }
 
 impl TreasuryVault {
     pub fn new() -> Self {
         Self {
-            balance: 0,
-            withdrawal_queue: Vec::new(),
-            security_state: SecurityState {
-                anomaly_score: 0.0,
-                circuit_breaker: false,
-                required_approvals: 2,
+            funds: TreasuryFunds {
+                insurance_pool: 0,
+                creator_fund: 0,
+                operational_reserves: 0,
+                yield_strategies: HashMap::new(),
             },
-            last_audit_timestamp: 0,
+            security: TreasurySecurity {
+                circuit_breaker: false,
+                last_ai_audit: 0,
+                ai_model_hash: [0; 32],
+                required_approvals: 2,
+                anomaly_score: 0.0,
+            },
+            withdrawal_queue: Vec::new(),
+            payment_schedules: Vec::new(),
         }
     }
 
-    pub fn request_withdrawal(&mut self, amount: u64, destination: Pubkey) -> ProgramResult {
-        if self.security_state.circuit_breaker {
-            return Err(ProgramError::Custom(1)); // CircuitBreakerEngaged
+    /// Distribute incoming funds according to allocation ratios
+    pub fn process_deposit(&mut self, amount: u64) -> ProgramResult {
+        if self.security.circuit_breaker {
+            msg!("Circuit breaker engaged - deposits suspended");
+            return Err(ProgramError::Custom(1));
         }
+
+        let allocations = calculate_allocations(amount);
         
-        let required_sigs = 2 + (self.security_state.anomaly_score * 3.0).ceil() as u8;
-        self.security_state.required_approvals = required_sigs.min(5);
+        self.funds.insurance_pool += allocations.insurance;
+        self.funds.creator_fund += allocations.creator;
+        self.funds.operational_reserves += allocations.operational;
+        self.invest_in_strategies(allocations.yield_strategies)?;
+
+        Ok(())
+    }
+
+    /// AI-driven strategy allocation
+    fn invest_in_strategies(&mut self, amount: u64) -> ProgramResult {
+        let strategy = self.select_optimal_strategy()?;
+        *self.funds.yield_strategies.entry(strategy).or_insert(0) += amount;
+        Ok(())
+    }
+
+    fn select_optimal_strategy(&self) -> Result<Pubkey, ProgramError> {
+        // Simplified selection - would integrate with AI model
+        Ok(Pubkey::new_from_array([0; 32])) // Placeholder
+    }
+
+    /// Updated withdrawal request with fund source specification
+    pub fn request_withdrawal(
+        &mut self, 
+        amount: u64, 
+        destination: Pubkey,
+        fund_type: FundType
+    ) -> ProgramResult {
+        if self.security.circuit_breaker {
+            return Err(ProgramError::Custom(1));
+        }
+
+        validate_withdrawal_source(fund_type, amount, &self.funds)?;
         
         self.withdrawal_queue.push(WithdrawalRequest {
             amount,
             destination,
+            fund_type,
             approvals: Vec::new(),
             created_at: Clock::get()?.unix_timestamp,
         });
-        
+
+        update_security_parameters(&mut self.security);
         Ok(())
     }
 
@@ -109,6 +187,53 @@ impl TreasuryVault {
         
         Ok(())
     }
+}
+
+// Helper functions
+fn calculate_allocations(amount: u64) -> FundAllocation {
+    FundAllocation {
+        insurance: amount * INSURANCE_SHARE / 100,
+        creator: amount * CREATOR_SHARE / 100,
+        operational: amount * OPERATIONAL_SHARE / 100,
+        yield_strategies: amount * YIELD_STRATEGIES_SHARE / 100,
+    }
+}
+
+fn validate_withdrawal_source(
+    fund_type: FundType,
+    amount: u64,
+    funds: &TreasuryFunds
+) -> ProgramResult {
+    match fund_type {
+        FundType::Insurance => {
+            if funds.insurance_pool < amount {
+                return Err(ProgramError::Custom(3));
+            }
+        }
+        FundType::Creator => {
+            if funds.creator_fund < amount {
+                return Err(ProgramError::Custom(4));
+            }
+        }
+        FundType::Operational => {
+            if funds.operational_reserves < amount {
+                return Err(ProgramError::Custom(5));
+            }
+        }
+        FundType::Strategy(strategy) => {
+            if funds.yield_strategies.get(&strategy).unwrap_or(&0) < &amount {
+                return Err(ProgramError::Custom(6));
+            }
+        }
+    }
+    Ok(())
+}
+
+struct FundAllocation {
+    insurance: u64,
+    creator: u64,
+    operational: u64,
+    yield_strategies: u64,
 }
 
 #[cfg(test)]
