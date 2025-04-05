@@ -58,7 +58,10 @@ const config: Config.InitialOptions = {
   automock: false,
   detectOpenHandles: true,
   transformIgnorePatterns: [
-    'node_modules/(?!(@solana/web3.js|crypto-random-string|dedent)/)'
+    // Keep ignoring most node_modules, but *don't* ignore specific ESM packages
+    '/node_modules/(?!(dedent|@solana|@project-serum|@tensorflow|@noble|@noble/ed25519|@helius-xyz|axios|superstruct|crypto-random-string|uint8arrays|multiformats)/)',
+    // Add default pnp pattern just in case
+    '\\.pnp\\.[^\\/]+$',
   ],
   resolver: '<rootDir>/jest.resolver.mjs',
   setupFilesAfterEnv: [
