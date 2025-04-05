@@ -60,6 +60,12 @@ pub struct GovernanceProposal {
     pub executed: bool,
     pub execution_deadline: i64,
     pub chaos_parameters: Option<ChaosParams>,
+    pub security_level: u8,
+    pub required_signers: Vec<Pubkey>,
+    pub execution_environment: String,
+    pub attestation_hash: Option<[u8; 32]>,
+    pub escrow_account: Pubkey,
+    pub escrow_amount: u64,
 }
 
 #[account]
@@ -357,6 +363,12 @@ pub mod glitch_gremlin_governance {
     }
 
     pub fn initialize_governance(ctx: Context<InitializeGovernance>) -> Result<()> {
+        // Verify at least 7/10 multisig signers
+        let signers = ctx.remaining_accounts.iter()
+            .filter(|a| a.is_signer)
+            .count();
+        require!(signers >= 7, GovernanceError::MultisigRequired);
+
         let config = &mut ctx.accounts.config;
         *config = GovernanceConfig::default();
         config.proposal_counter = 0;
@@ -653,8 +665,16 @@ pub mod glitch_gremlin_governance {
         // Mark as executed
         proposal.executed = true;
         
-        // If this is a chaos proposal, trigger the chaos execution
+        // If this is a chaos proposal, verify AI attestation and trigger execution
         if let Some(chaos_params) = &proposal.chaos_parameters {
+            // First account in remaining_accounts must be AI attestation
+            let ai_attestation = ctx.remaining_accounts.get(0)
+                .ok_or(GovernanceError::MissingAttestation)?;
+            
+            verify_ai_attestation(
+                ai_attestation,
+                proposal
+            )?;
             // Here we would trigger the chaos execution
             // This would typically involve a CPI to the chaos program
             // or setting up a PDA that the off-chain system can monitor
@@ -774,6 +794,12 @@ pub struct Unstake<'info> {
 #[derive(Accounts)]
 #[instruction(description: String, chaos_parameters: Option<ChaosParams>)]
 pub struct CreateProposal<'info> {
+    #[account(
+        mut,
+        constraint = proposal_escrow.owner == user_authority.key(),
+        constraint = proposal_escrow.mint == Pubkey::from_str(GREMLINAI_TOKEN_MINT).unwrap()
+    )]
+    pub proposal_escrow: Account<'info, TokenAccount>,
     #[account(
         mut,
         seeds = [GOVERNANCE_SEED],
