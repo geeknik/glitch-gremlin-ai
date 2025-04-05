@@ -20,6 +20,9 @@ const config: Config.InitialOptions = {
     '^@tensorflow/tfjs-node$': '<rootDir>/sdk/src/ai/__mocks__/tfjs-node.ts'
   },
   transform: {
+    '^.+\\.mjs$': ['babel-jest', {
+      presets: ['@babel/preset-env']
+    }],
     '^.+\\.tsx?$': ['ts-jest', {
       tsconfig: 'tsconfig.json',
       useESM: true,
