@@ -181,6 +181,17 @@ pub enum GovernanceError {
     SnapshotPending,
     #[msg("Too many sells in grace period")]
     ExcessiveSelling,
+    #[msg("Invalid upgrade authority: {0}")]
+    InvalidUpgradeAuthority(String),
+    
+    #[msg("Upgrade time lock active: {0}")]
+    UpgradeTimeLockActive(String),
+    
+    #[msg("Insufficient approvals: {0}")]
+    InsufficientApprovals(String),
+    
+    #[msg("Unauthorized upgrade attempt")]
+    UnauthorizedUpgrade,
 }
 
 impl From<anchor_lang::error::Error> for GovernanceError {
@@ -199,6 +210,10 @@ impl From<SecurityError> for GovernanceError {
             SecurityError::UntrustedProgram(e) => GovernanceError::UntrustedEnvironment,
             SecurityError::ResourceLimitExceeded(e) => GovernanceError::ResourceLimitExceeded(e),
             SecurityError::SecurityContextViolation(e) => GovernanceError::SecurityContextViolation(e),
+            SecurityError::InvalidUpgradeAuthority(e) => GovernanceError::InvalidUpgradeAuthority(e),
+            SecurityError::UpgradeTimeLockActive(e) => GovernanceError::UpgradeTimeLockActive(e),
+            SecurityError::InsufficientApprovals(e) => GovernanceError::InsufficientApprovals(e),
+            _ => GovernanceError::UnauthorizedUpgrade,
         }
     }
 }

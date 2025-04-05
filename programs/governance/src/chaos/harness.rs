@@ -18,6 +18,50 @@ impl ChaosHarness {
         Self {
             program_id: Pubkey::try_from(program_id).unwrap(),
             accounts: Vec::new(),
+            security_sanitizer: SecuritySanitizer::new(),
+        }
+    }
+
+    pub fn attempt_upgrade(
+        &mut self,
+        new_program_data: Vec<u8>,
+        signatures: Vec<Signature>
+    ) -> Result<(), Error> {
+        let config = self.load_config()?;
+        let clock = self.get_clock()?;
+        
+        self.security_sanitizer
+            .validate_upgrade_authority(
+                &config.upgrade_authority_data,
+                clock.unix_timestamp,
+                config.last_upgrade
+            )
+            .with_context("UpgradeAuthority", "Validation failed")?;
+
+        let message = self.create_upgrade_message(&new_program_data);
+        self.security_sanitizer
+            .verify_upgrade_signatures(
+                &signatures,
+                &message,
+                &config.upgrade_signers
+            )
+            .with_context("SignatureVerification", "Failed")?;
+
+        if clock.unix_timestamp - config.last_upgrade < config.upgrade_delay {
+            return Err(Error::illegal_state(format!(
+                "Upgrade cooldown active: {}h remaining",
+                (config.upgrade_delay - (clock.unix_timestamp - config.last_upgrade)) / 3600
+            )));
+        }
+
+        self.execute_upgrade(new_program_data)?;
+        self.update_upgrade_timestamp(clock.unix_timestamp)?;
+
+        Ok(())
+    }
+        Self {
+            program_id: Pubkey::try_from(program_id).unwrap(),
+            accounts: Vec::new(),
         }
     }
 }
