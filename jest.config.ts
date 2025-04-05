@@ -55,7 +55,7 @@ const config: Config.InitialOptions = {
   automock: false,
   detectOpenHandles: true,
   transformIgnorePatterns: [
-    'node_modules/(?!(@solana/web3.js|crypto-random-string)/)'
+    'node_modules/(?!(@solana/web3.js|crypto-random-string|dedent)/)'
   ],
   resolver: '<rootDir>/jest.resolver.mjs',
   setupFilesAfterEnv: [
