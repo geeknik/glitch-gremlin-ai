@@ -59,11 +59,6 @@ impl ChaosHarness {
 
         Ok(())
     }
-        Self {
-            program_id: Pubkey::try_from(program_id).unwrap(),
-            accounts: Vec::new(),
-        }
-    }
 }
 
 /// Execution context for test cases
